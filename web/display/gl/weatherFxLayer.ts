@@ -14,7 +14,7 @@ varying vec2 vUv;
 uniform sampler2D uTex;
 uniform float uT, uAspect, uHasTex, uFlash;
 uniform vec3 uMode;
-float h21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float h21(vec2 p){ p = fract(mod(p, 256.0) * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 // drops resting on the glass: xy = lens offset, z = mask, w = specular highlight
 vec4 drops(vec2 uv, float t, float scale, float seed, float keep, out float rim){
   vec2 g = uv * vec2(scale * uAspect, scale);
@@ -152,7 +152,8 @@ export class WeatherFxLayer implements GLLayer {
     const mode = u.uMode.value as Vector3;
     this.goal.set(this.mode === 'rain' ? 1 : 0, this.mode === 'snow' ? 1 : 0, this.mode === 'sun' ? 1 : 0);
     mode.lerp(this.goal, Math.min(1, dt * 0.8));
-    u.uT.value = time;
+    // wrapped so the float maths in the shader keeps its precision on a screen that runs for weeks
+    u.uT.value = time % 3600;
     u.uAspect.value = rect.w / Math.max(1, rect.h);
 
     // an occasional far flash while it rains (never at night)

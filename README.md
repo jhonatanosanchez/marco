@@ -631,7 +631,8 @@ disable password login if you want.
   **Mixed** alternates both. Set interval, brightness, transition and ambient effect in *Background*.
 - **Weather effect** (*Background*, `background.weatherFx`): *Off*, *Simple* (light rain/snow particles, the default)
   or *Realistic* (drops on the glass that bend the photo, faint rain streaks, layered snow, soft sun rays on clear
-  days). Both draw only over the photo and need WebGL; `?lite=1` turns them off.
+  days). Both draw only over the photo and need WebGL (Realistic also needs the WebGL photo transition);
+  `?lite=1` turns them off.
 - **Photo order** (*Background*): *Random* (shuffled, without repeating the previous batch), *Newest first* or
   *By name*. The sequential orders continue where the screen left off and start over at the end.
 - **Choose which photos are shown**: every photo in the gallery has an eye toggle to take it out of the rotation (or

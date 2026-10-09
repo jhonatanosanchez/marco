@@ -291,7 +291,8 @@ function applyGL(wantAmbient: boolean, accent: string, light: boolean): void {
     root.classList.toggle('gl-ambient', wantAmbient);
     const fx = cfg.background.weatherFx ?? 'simple';
     if (precip) precip.enabled = cfg.background.enabled && fx === 'simple';
-    if (wxfx) wxfx.enabled = cfg.background.enabled && fx === 'rich';
+    // the drops refract the GL photo, so only with the WebGL transition (a DOM photo would cover the canvas)
+    if (wxfx) wxfx.enabled = cfg.background.enabled && fx === 'rich' && cfg.background.transition === 'webgl';
   }
 }
 
