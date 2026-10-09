@@ -162,7 +162,7 @@ export class MonthCalendar {
   }
 
   /**
-   * P1a — let single-day chips grow into free lanes below them (2 lines; 3 when it is the only event of the day)
+   * P1a: let single-day chips grow into free lanes below them (2 lines; 3 when it is the only event of the day)
    * instead of truncating "Merca…". Only days whose chips are all visible are re-laid out, so the "+N"
    * capacity logic (lanes ≥ L hidden) is unchanged. Multi-day bars keep their lanes.
    */
@@ -366,7 +366,7 @@ export class MonthCalendar {
       if ((e.airbnb && !e.checkoutMarker) && !sg.contR && !short && sg.eSlot - sg.s >= 3) html += `<span class="co">🚪</span>`;
       const span = sg.span ?? 1;
       if (span > 1) {
-        // multi-line chip: emoji + time glued to the first word (U+2060 word joiner — emoji allow a break after
+        // multi-line chip: emoji + time glued to the first word (U+2060 word joiner; emoji allow a break after
         // them), and a real space between time and title so the title wraps naturally.
         const WJ = '\u2060';
         let tx = e.emoji ? `<span class="em">${esc(e.emoji)}</span>${WJ}` : '';

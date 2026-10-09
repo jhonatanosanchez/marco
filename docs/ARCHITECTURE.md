@@ -33,7 +33,7 @@ display and the server guarantee. The HTTP endpoints and event formats are in [A
 | `install.sh` | One-line installer (`curl -fsSL https://marcohome.app/install \| bash`): modes all / server / kiosk, prebuilt release with checksum, `--dry-run`, update with rollback, uninstall. See *Installer and releases* below |
 | `deploy/` | `marco` command, systemd unit, kiosk script, HDMI schedule, Caddy example; `deploy/install.sh` installs a git checkout in place (wrapper around `install.sh --source`) |
 | `scripts/package-release.sh`, `scripts/release-notes.js` | Release tarball and notes (used by `.github/workflows/release.yml` on `v*` tags) |
-| `scripts/demo.js` | `npm run demo` — throw-away data directory with a fictional family |
+| `scripts/demo.js` | `npm run demo`: throw-away data directory with a fictional family |
 | `data/` | Runtime data (git-ignored; `DATA_DIR` overrides the location) |
 
 Design constraints: no native modules and few runtime dependencies (it must install on a Raspberry Pi without build
@@ -107,14 +107,14 @@ Global vs per-screen for the "split" sections:
 
 | Section | Global part | Per-screen part |
 |---|---|---|
-| screen, layout, background, message, alerts | — | all |
+| screen, layout, background, message, alerts | none | all |
 | calendar | sources, iconRules | view settings + `sourceIds` |
 | datetime | timezone | clock and date format, enabled |
 | weather | provider, location, units, HA entities | enabled, forecastDays, showHourly, showPrecipChance |
 | news | feeds, maxItems | enabled, rotateSec |
 | todo | items | enabled |
 | countdowns | items + inclusion settings | enabled, max |
-| localEvents, birthdays, eventRules, schedules, homeassistant, auth | all | — |
+| localEvents, birthdays, eventRules, schedules, homeassistant, auth | all | none |
 
 The display and most admin pages work on a **flat view of one screen** (`AppConfig`): global sections merged with
 one profile (`flatView()` in `server/screens.js`, `projectScreen()` / `applyScreen()` in `web/shared/screens.ts`,
@@ -227,7 +227,7 @@ flagged by a local event or a style rule (nearest occurrence per title), sorted 
 
 - Draft model: the full `StoredConfig` is edited locally and saved with `PUT /api/admin/config`; per-screen pages edit
   the screen chosen in the header switcher ("Editing: Living room ▾").
-- Navigation groups: Home (dashboard) · Screen (layout, background, settings, date & time — per screen) · Content
+- Navigation groups: Home (dashboard) · Screen (layout, background, settings, date & time, per screen) · Content
   (calendars, local events, birthdays, filters, icons, countdowns, weather, news, to-do, message) · Alerts ·
   Integrations (photos, Home Assistant, API & webhooks) · System (screens, connected displays, backups, activity,
   security, status).
@@ -259,9 +259,13 @@ photo routes, and the outbound address filter used by the unauthenticated setup 
 - **Updates** (`marco update`, or the installer again) download the newest `marco-<version>.tar.gz`, check it against
   its `.sha256`, prepare it next to the running one, swap `current` (rename of a new symlink), restart and wait for
   `/api/health`. If the new version does not answer within 45 s, `current` goes back to the previous release (kept on
-  disk) and the service restarts. Older releases are removed. Data is never touched.
+  disk) and the service restarts. Older releases are removed. Data is never touched. The `marco` command and the
+  stored installer are replaced only after the new version answers, so a rollback keeps the previous copies.
+  An update never installs an older version than the running one (`--force` allows it), and an install made from a
+  release stops with an error when GitHub does not say which release is the latest, instead of building from git.
 - **No release yet**: the installer clones the repository (`--version x.y.z` clones the tag `vx.y.z`), runs `npm ci`,
-  `npm run build` and `npm prune --omit=dev`, then continues as above.
+  `npm run build` and `npm prune --omit=dev`, then continues as above. When the clone is the commit already running,
+  it says so and stops (`--force` rebuilds).
 - **Checkout installs** (made with `git clone` + `deploy/install.sh`): updated in place with `git pull --ff-only`,
   `npm ci` and `npm run build`; data stays in `<checkout>/data`.
 - `/etc/marco.conf` records mode, layout, folder and user for the `marco` command (`deploy/marco`, installed to
@@ -270,6 +274,14 @@ photo routes, and the outbound address filter used by the unauthenticated setup 
 - **Release tarball** (`scripts/package-release.sh`, run by `.github/workflows/release.yml` on `v*` tags after tests and
   the build): `server/` (without tests), `dist/`, `deploy/`, `install.sh`, `package.json`, `package-lock.json`,
   `web/shared/iconRules.json`, `.env.example` and the license files. The release notes are the version's CHANGELOG
-  section (`scripts/release-notes.js`).
+  section (`scripts/release-notes.js`). The release also carries `install.sh` and `install.sh.sha256`, so the
+  installer can be checked before it runs (`releases/latest/download/install.sh`).
+- **Demo video**: `marco-demo.mp4` (about 15 MB) is too big for the repository. It lives in a fixed pre-release
+  tagged `media`, created once with
+  `gh release create media marco-demo.mp4 --prerelease --title "Media" --notes "Files linked from the README"`
+  (a pre-release, so `releases/latest` keeps pointing at the newest version). The READMEs link to
+  `releases/download/media/marco-demo.mp4`, which does not change from one release to the next. The release
+  workflow also copies the video into each version's release when the `media` release has it. The animated preview and the screenshots live in `docs/media/` and
+  `docs/screenshots/` (WebP).
 - Testing hooks (not for normal use): `--tarball-url <url>` or `MARCO_TARBALL_URL` installs a given tarball (its
   `.sha256` must sit next to it), `MARCO_REPO_URL` changes the git source.

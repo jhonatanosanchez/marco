@@ -125,7 +125,7 @@ export function normalizeAirbnbTitle(title, description, lang) {
       .replace(KEYWORD_RE, ' ')
       .replace(/\b(HM[A-Z0-9]{6,}|[A-Z0-9]{10,})\b/g, ' ') // confirmation codes
       .replace(/\(\s*\)|\[\s*\]/g, ' ')
-      .replace(/^[\s:·|/,–—-]+|[\s:·|/,–—-]+$/g, '')
+      .replace(/^[\s:·|/,\u2013\u2014-]+|[\s:·|/,\u2013\u2014-]+$/g, '')
       .replace(/\s+/g, ' ')
       .trim();
   }

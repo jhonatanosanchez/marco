@@ -1,6 +1,6 @@
 // Display identity (docs/ARCHITECTURE.md): how this display gets in (private link /d/<key>, paired-device token in
 // localStorage, or nothing: open mode / admin session), which screen profile it shows (?screen=, ignored with a
-// key or device token — those are bound to a screen) and a stable client id (?client= from the kiosk, else
+// key or device token, which are bound to a screen) and a stable client id (?client= from the kiosk, else
 // persisted in localStorage, else generated).
 
 const params = new URLSearchParams(location.search);

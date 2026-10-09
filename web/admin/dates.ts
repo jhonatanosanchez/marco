@@ -54,9 +54,9 @@ export function fmtDay(iso: string, opts: { weekday?: boolean; year?: boolean | 
 
 /** Localized date + time of an ISO timestamp ("9 oct, 14:05"). */
 export function fmtDateTime(iso: string | null | undefined, withSeconds = false): string {
-  if (!iso) return '—';
+  if (!iso) return '–';
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
+  if (Number.isNaN(d.getTime())) return '–';
   return new Intl.DateTimeFormat(locale(), {
     day: 'numeric',
     month: 'short',

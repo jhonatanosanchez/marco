@@ -33,7 +33,7 @@ test('matching modes: contains / exact / startsWith, accent and case insensitive
 });
 
 test('rename: contains replaces every occurrence; exact; startsWith; tidy; empty keeps title', () => {
-  assert.equal(renameTitle('Fútbol niños — FUTBOL', rule({ action: 'rename', match: 'futbol', replaceWith: 'Fútbol ⚽' })), 'Fútbol ⚽ niños — Fútbol ⚽');
+  assert.equal(renameTitle('Fútbol niños \u2014 FUTBOL', rule({ action: 'rename', match: 'futbol', replaceWith: 'Fútbol ⚽' })), 'Fútbol ⚽ niños \u2014 Fútbol ⚽');
   assert.equal(renameTitle('Reserved', rule({ action: 'rename', match: 'reserved', matchMode: 'exact', replaceWith: 'Huéspedes' })), 'Huéspedes');
   assert.equal(renameTitle('[Trabajo] Llamada  cliente', rule({ action: 'rename', match: '[trabajo]', matchMode: 'startsWith', replaceWith: '' })), 'Llamada cliente');
   assert.equal(renameTitle('Médico', rule({ action: 'rename', match: 'medico', replaceWith: '  ' })), 'Médico');

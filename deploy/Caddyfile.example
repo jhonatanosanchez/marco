@@ -20,7 +20,7 @@ calendar.example.com {
 	encode zstd gzip
 
 	# Display access PRIVATE (default since 0.3: Admin -> Security -> Display access): every display needs its
-	# private link (/d/<key>) or a paired-device token, so the whole app can be exposed — remote screens (a tablet at
+	# private link (/d/<key>) or a paired-device token, so the whole app can be exposed. Remote screens (a tablet at
 	# grandma's, a phone) open their private link over HTTPS. Nothing to add: everything below is proxied.
 	#
 	# Display access OPEN (installs upgraded from 0.2 until you switch): the display (/) and its API have no

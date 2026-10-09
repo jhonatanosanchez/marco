@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Marco — multi-stage image (build the web UI, then a slim runtime with production deps only).
+# Marco: multi-stage image (build the web UI, then a slim runtime with production deps only).
 
 # ---- build ---------------------------------------------------------------------------------
 FROM node:22-alpine AS build

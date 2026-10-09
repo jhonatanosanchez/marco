@@ -379,7 +379,7 @@ export function LocalEventsSection({ full, setFull, errors, cfg }: SectionProps)
                 <span>{fmtDay(next, { weekday: false, year: false }).replace(/^\d+\s*/, '')}</span>
               </>
             ) : (
-              <span class="muted">—</span>
+              <span class="muted">–</span>
             )}
           </span>
           <span class="lev__emoji">{ev.emoji || le.emoji || '📅'}</span>

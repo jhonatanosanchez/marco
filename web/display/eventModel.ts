@@ -38,7 +38,7 @@ function msOf(s: string, tzKeyFallback: boolean): number {
 
 /** Title as rendered everywhere: birthdays with a known age → "María (34)" (docs/ARCHITECTURE.md). */
 export function displayTitle(ev: Pick<CalEvent, 'title' | 'age'>): string {
-  const t = (ev.title || '').trim() || '—';
+  const t = (ev.title || '').trim() || '–';
   const age = ev.age;
   return typeof age === 'number' && Number.isFinite(age) && age >= 0 ? `${t} (${Math.round(age)})` : t;
 }

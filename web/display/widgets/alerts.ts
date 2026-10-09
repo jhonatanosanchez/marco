@@ -228,7 +228,7 @@ export class Announcements {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Scheduled messages (§5.3) — evaluated locally every minute
+// Scheduled messages (§5.3), evaluated locally every minute
 // ---------------------------------------------------------------------------------------------
 
 type Sched = Omit<ScheduledMessage, 'screenIds'>;
@@ -319,7 +319,7 @@ export class IdentifyOverlay {
   constructor(private root: HTMLElement) {}
 
   show(p: Partial<IdentifyPayload>, fallback: { name: string; slug: string; clientId: string }): void {
-    const name = (p.name || fallback.name || '').trim() || '—';
+    const name = (p.name || fallback.name || '').trim() || '–';
     const slug = (p.slug || fallback.slug || '').trim();
     const cid = (p.clientId || fallback.clientId || '').trim();
     const dur = Math.min(120, Math.max(3, Number(p.durationSec) || 10));

@@ -165,7 +165,7 @@ export function adminRouter({ onConfigSaved } = {}) {
     const all = listGallery();
     res.json({ ok: true, updated, missing, total: all.length, inRotation: all.filter((p) => !p.hidden).length });
   });
-  // Thumbnail for an existing photo (multipart field "thumb", JPEG ≤ 2 MB) — "optimize existing" uses it.
+  // Thumbnail for an existing photo (multipart field "thumb", JPEG ≤ 2 MB), used by "optimize existing".
   r.put('/photos/:file/thumb', (req, res, next) => {
     if (!isGalleryFile(req.params.file) || !getPhoto(req.params.file)) return res.status(404).json({ error: 'not found' });
     next();

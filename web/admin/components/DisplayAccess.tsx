@@ -352,7 +352,7 @@ export function PairedDevicesCard({ saved, onChanged }: { saved: StoredConfig; o
               <div class="dev__main">
                 <strong>{d.name}</strong>
                 <span class="muted small">
-                  <Icon name="monitor" size={12} /> {d.screenName || '—'} · {d.connected ? t('En línea') : d.lastSeenAt ? t('visto {when}', { when: relTime(d.lastSeenAt) }) : t('aún no se ha conectado')}
+                  <Icon name="monitor" size={12} /> {d.screenName || '–'} · {d.connected ? t('En línea') : d.lastSeenAt ? t('visto {when}', { when: relTime(d.lastSeenAt) }) : t('aún no se ha conectado')}
                 </span>
                 <span class="muted small dev__meta">
                   {t('Vinculado {date}', { date: fmtDateTime(d.createdAt) })}

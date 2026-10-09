@@ -57,7 +57,7 @@ export function StatusSection({ cfg }: SectionProps) {
                 <Icon name="monitor" size={18} />
               </span>
               <div>
-                <div class="stat__value">{st ? st.displays : '—'}</div>
+                <div class="stat__value">{st ? st.displays : '–'}</div>
                 <div class="stat__label">{t('Pantallas conectadas')}</div>
               </div>
             </div>
@@ -67,7 +67,7 @@ export function StatusSection({ cfg }: SectionProps) {
               </span>
               <div>
                 <div class="stat__value">
-                  {st ? `${okCount}/${st.sources.length}` : '—'}
+                  {st ? `${okCount}/${st.sources.length}` : '–'}
                 </div>
                 <div class="stat__label">{t('Calendarios OK')}</div>
               </div>
@@ -78,7 +78,7 @@ export function StatusSection({ cfg }: SectionProps) {
               </span>
               <div>
                 <div class="stat__value stat__value--text">
-                  {st ? <StatusDot state={st.weather.ok ? 'ok' : 'error'} /> : null} {st ? relTime(st.weather.updatedAt) : '—'}
+                  {st ? <StatusDot state={st.weather.ok ? 'ok' : 'error'} /> : null} {st ? relTime(st.weather.updatedAt) : '–'}
                 </div>
                 <div class="stat__label">{t('Tiempo')}</div>
               </div>
@@ -89,7 +89,7 @@ export function StatusSection({ cfg }: SectionProps) {
               </span>
               <div>
                 <div class="stat__value stat__value--text">
-                  {st ? <StatusDot state={st.news.ok ? 'ok' : 'error'} /> : null} {st ? relTime(st.news.updatedAt) : '—'}
+                  {st ? <StatusDot state={st.news.ok ? 'ok' : 'error'} /> : null} {st ? relTime(st.news.updatedAt) : '–'}
                 </div>
                 <div class="stat__label">
                   {t('Noticias')}
@@ -102,7 +102,7 @@ export function StatusSection({ cfg }: SectionProps) {
                 <Icon name="activity" size={18} />
               </span>
               <div>
-                <div class="stat__value">{st ? formatDuration(st.uptime) : '—'}</div>
+                <div class="stat__value">{st ? formatDuration(st.uptime) : '–'}</div>
                 <div class="stat__label">{t('Servidor activo')}</div>
               </div>
             </div>

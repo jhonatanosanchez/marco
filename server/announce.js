@@ -8,7 +8,7 @@ import { ALERT_STYLES } from './validate.js';
 
 export const HISTORY_MAX = 50;
 export const ACTIVE_MAX = 50;
-let state = null; // { active: Announcement[], history: Announcement[] } — history newest first
+let state = null; // { active: Announcement[], history: Announcement[] }, history newest first
 let loadedFrom = null;
 let timer = null;
 

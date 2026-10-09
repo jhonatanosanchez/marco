@@ -28,7 +28,7 @@ export function upcomingCountdowns(data: CountdownsResponse | null, today: strin
 }
 
 function title(it: CountdownItem): string {
-  const t = (it.title || '').trim() || '—';
+  const t = (it.title || '').trim() || '–';
   return typeof it.age === 'number' && Number.isFinite(it.age) && it.age >= 0 ? `${t} (${it.age})` : t;
 }
 

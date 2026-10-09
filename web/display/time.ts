@@ -17,7 +17,7 @@ let lastDay = '';
 let timer: ReturnType<typeof setTimeout> | null = null;
 let visBound = false;
 
-/** Optional fixed clock offset (ms) — ?now=2026-10-09T10:43 for screenshots. */
+/** Optional fixed clock offset (ms), e.g. ?now=2026-10-09T10:43 for screenshots. */
 let offset = 0;
 export function setClockOffset(ms: number) {
   offset = ms;

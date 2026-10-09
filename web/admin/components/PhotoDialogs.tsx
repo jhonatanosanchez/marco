@@ -109,7 +109,7 @@ const round = (v: number) => Math.round(v * 1000) / 1000;
 
 /**
  * Click / tap / drag on the photo to set the focal point; previews show the real crops: the display's photo panel
- * (`frame`, measured by a connected display: aspect + which bands the clock / weather card cover — the focal point
+ * (`frame`, measured by a connected display: aspect + which bands the clock / weather card cover; the focal point
  * goes to the centre of the free band) and a full 16:9 screen. Only this photo's full image is loaded.
  */
 export function FocusEditor(props: {

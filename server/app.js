@@ -29,8 +29,8 @@ export function createApp({ version, dist = path.join(ROOT, 'dist') }) {
   const app = express();
   app.disable('x-powered-by');
   // TRUST_PROXY: Express "trust proxy" value (default loopback). Set it to the address the reverse proxy connects
-  // from whenever that is not loopback — a proxy on another host (TRUST_PROXY=192.168.1.10), or any proxy in front
-  // of the Docker container (it connects from the bridge gateway: TRUST_PROXY=172.16.0.0/12) — so
+  // from whenever that is not loopback: a proxy on another host (TRUST_PROXY=192.168.1.10), or any proxy in front
+  // of the Docker container (it connects from the bridge gateway: TRUST_PROXY=172.16.0.0/12), so
   // X-Forwarded-Proto/For are honoured (secure cookies, real client IP, LAN checks). See lib/net.js isLanClient.
   const trustProxy = process.env.TRUST_PROXY?.trim();
   app.set('trust proxy', !trustProxy ? 'loopback' : trustProxy === 'true' ? true : /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy.split(',').map((x) => x.trim()));
@@ -78,7 +78,7 @@ export function createApp({ version, dist = path.join(ROOT, 'dist') }) {
   // Family photos: private mode → display key / device token (?k=) or admin session; open mode → LAN clients or
   // an admin session (and valid keys). displayAccess.js mediaAuth
   app.use('/media', mediaAuth);
-  // Gallery URLs carry ?v=<mtime> (replaced photos get a new URL), so they can be cached for long — privately.
+  // Gallery URLs carry ?v=<mtime> (replaced photos get a new URL), so they can be cached for long, privately.
   app.use('/media/photos', express.static(paths.photos, {
     maxAge: '30d', dotfiles: 'deny', index: false, fallthrough: false,
     setHeaders: (res) => res.set('cache-control', 'private, max-age=2592000'),

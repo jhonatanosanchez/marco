@@ -1,5 +1,5 @@
-// Focal point finder (no dependencies): spectral-residual saliency (Hou & Zhang, 2007) on a 64×64 luminance image —
-// what "stands out" from its surroundings: an animal's face on a floor, a person on a landscape — plus a skin-tone
+// Focal point finder (no dependencies): spectral-residual saliency (Hou & Zhang, 2007) on a 64×64 luminance image,
+// what "stands out" from its surroundings: an animal's face on a floor, a person on a landscape. Plus a skin-tone
 // map (faces) and a mild centre prior. The focal point is the weighted centre of the strongest region.
 // (smartcrop.js was evaluated first: its crop scoring prefers large crops and localised subjects poorly.)
 

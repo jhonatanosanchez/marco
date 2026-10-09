@@ -1,4 +1,4 @@
-// admin HTTP routes (session) — config save → backup + activity, screens template, displays,
+// admin HTTP routes (session): config save → backup + activity, screens template, displays,
 // announcements, tokens, backups/restore, export/import (incl. secrets → logout), activity, dashboard.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

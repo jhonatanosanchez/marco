@@ -153,7 +153,7 @@ export function CountdownsSection({ full, setFull, cfg, set, errors }: SectionPr
                   </label>
                   <ColorPicker compact allowNone value={c.color} onChange={(v) => upd(c.id, (x) => void (x.color = v))} />
                   <span class={`cd-row__days ${days != null && days <= 7 && days >= 0 ? 'is-soon' : ''}`} title={nd ? fmtDay(nd, { year: true }) : ''}>
-                    {days == null ? '—' : daysLabel(days)}
+                    {days == null ? '–' : daysLabel(days)}
                   </span>
                   <button
                     type="button"

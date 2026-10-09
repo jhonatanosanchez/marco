@@ -253,7 +253,7 @@ export function buildSourceEvents(raws, source, { rules, eventRules = [], from, 
     const emoji = r.emoji || style?.emoji || titleEmoji || icon?.emoji || source.emoji || KIND_EMOJI[source.kind] || '';
     const color = r.color || style?.color || icon?.color || source.color;
     const iconUsed = icon && ((!r.emoji && !style?.emoji && !titleEmoji && icon.emoji) || (!r.color && !style?.color && icon.color));
-    // Un-shout ALL CAPS and drop "Cumple de…" when 🎂 already says it — unless the user renamed it explicitly.
+    // Un-shout ALL CAPS and drop "Cumple de…" when 🎂 already says it, unless the user renamed it explicitly.
     if (title === originalTitle) title = tidyTitle(title, { rule: icon, source, emoji }) || title;
 
     let start, end, multiDay;

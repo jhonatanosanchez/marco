@@ -220,7 +220,7 @@ export function SetupWizard({ status: initial, onDone, onLang }: { status: Setup
     onLang(l);
   };
 
-  // Focus the first field (or the step title) whenever the step changes — keyboard and screen-reader friendly.
+  // Focus the first field (or the step title) whenever the step changes, for keyboard and screen-reader users.
   useEffect(() => {
     const root = bodyRef.current;
     if (!root) return;

@@ -11,7 +11,7 @@ const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
 export default defineConfig({
   root: 'web',
   plugins: [preact()],
-  // Build identity reported by displays (docs/ARCHITECTURE.md) — declared in web/shared/env.d.ts.
+  // Build identity reported by displays (docs/ARCHITECTURE.md), declared in web/shared/env.d.ts.
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __APP_BUILD__: JSON.stringify(new Date().toISOString()),

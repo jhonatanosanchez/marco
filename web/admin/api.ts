@@ -80,7 +80,7 @@ async function request<T>(method: string, url: string, body?: unknown, opts: { s
     if (res.status === 401 && !opts.silent401) window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
     const details = data && typeof data === 'object' && Array.isArray((data as any).details) ? (data as any).details : null;
     const detailText = details?.length
-      ? ` — ${details
+      ? `: ${details
           .slice(0, 3)
           .map((d: any) => (d && typeof d === 'object' ? `${d.path ?? ''}: ${d.message ?? ''}` : String(d)))
           .join('; ')}`

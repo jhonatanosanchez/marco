@@ -1,5 +1,5 @@
 // Hand-made crisp line icons (SVG, 64×64 grid) for WMO weather codes, with optional CSS animation
-// hooks (.wx-rays, .wx-drift, .wx-drop, .wx-flake, .wx-bolt — see styles.css). Small icons are rendered
+// hooks (.wx-rays, .wx-drift, .wx-drop, .wx-flake, .wx-bolt; see styles.css). Small icons are rendered
 // static to keep the Raspberry Pi's paint budget low; only the big "current" icon animates.
 
 const SUN = '#ffc94a';

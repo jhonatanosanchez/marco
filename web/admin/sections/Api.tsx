@@ -285,16 +285,16 @@ curl -X POST ${base}/api/hooks/night \\
           <h4>{t('Endpoints')}</h4>
           <ul>
             <li>
-              <code>GET /api/hooks/ping</code> — {t('comprueba el token')}
+              <code>GET /api/hooks/ping</code>: {t('comprueba el token')}
             </li>
             <li>
-              <code>POST /api/hooks/announce</code> — <code>{'{ title, body, emoji, style: info|success|warning|urgent, durationSec, sound, screens: [slug] }'}</code>
+              <code>POST /api/hooks/announce</code>: <code>{'{ title, body, emoji, style: info|success|warning|urgent, durationSec, sound, screens: [slug] }'}</code>
             </li>
             <li>
-              <code>POST /api/hooks/reload</code> — <code>{'{ screens?: [slug] }'}</code>
+              <code>POST /api/hooks/reload</code>: <code>{'{ screens?: [slug] }'}</code>
             </li>
             <li>
-              <code>POST /api/hooks/night</code> — <code>{'{ mode: on|off|auto, screens?: [slug] }'}</code>
+              <code>POST /api/hooks/night</code>: <code>{'{ mode: on|off|auto, screens?: [slug] }'}</code>
             </li>
           </ul>
           <p class="muted small">

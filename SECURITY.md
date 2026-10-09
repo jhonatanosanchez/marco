@@ -10,6 +10,17 @@ Please **do not** open a public issue. Use GitHub's private vulnerability report
 (*Security → Report a vulnerability* on the repository page) and include steps to reproduce and the affected version.
 You should get an answer within a week.
 
+## Installer and updates
+
+- `install.sh` downloads release packages from GitHub over HTTPS and checks each one against the `.sha256` file
+  published with it before unpacking it; Node.js builds are checked against nodejs.org's `SHASUMS256.txt`. An update
+  that does not start within 45 s is rolled back to the previous version.
+- If you do not want to pipe a script into `bash`, download `install.sh` and `install.sh.sha256` from the release
+  page, run `sha256sum -c install.sh.sha256`, read the script and run it (`--dry-run` shows every action first).
+- The installer writes `.env` and the kiosk's `kiosk.env` with mode 600 and never prints a private link in full.
+- The service runs as a normal user (yours, or a `marco` system user for a server-only install made as root), unless
+  you pass `--user root` yourself.
+
 ## Deployment model (what is and is not protected)
 
 Marco was designed for a **home network (LAN)**. Since 0.3 the displays are **private by default**, so it can also be
@@ -23,7 +34,7 @@ used on shared networks or behind an HTTPS reverse proxy on the Internet:
   - `open` (installs upgraded from 0.2 keep it so no kiosk goes blank; the admin recommends switching): the display API
     has **no authentication**, as before, and must stay on your LAN. Gallery photos (`/media/*`) are still only sent
     to LAN clients, valid keys or a signed-in admin.
-  - Either way the display API never returns calendar URLs, tokens, passwords or Home Assistant credentials — but it
+  - Either way the display API never returns calendar URLs, tokens, passwords or Home Assistant credentials, but it
     does return your events, names and photos, which is what the keys protect.
 - **Host names**: the server only answers to IP addresses, `localhost`, single-label names, `*.local` / `*.lan` /
   `*.home.arpa` / `*.internal`, the `PUBLIC_URL` host and `ALLOWED_HOSTS` (`421` otherwise; `/api/health` and the
@@ -33,12 +44,12 @@ used on shared networks or behind an HTTPS reverse proxy on the Internet:
   that is missing from `TRUST_PROXY` (forwarding headers from an untrusted hop make the client remote), and for the
   setup wizard and weak passwords also not the container's default gateway (in Docker Desktop / rootless setups
   every client looks like that address). Set `TRUST_PROXY` whenever your reverse proxy does not connect from loopback
-  — another host, or any proxy in front of the Docker container (`172.16.0.0/12`).
+  (another host, or any proxy in front of the Docker container: `172.16.0.0/12`).
 - The admin panel (`/admin/`, `/api/admin/*`) requires a session (password and/or Google sign-in with an allow-list).
   Passwords are stored as scrypt hashes; the session cookie is `HttpOnly` + `SameSite=Lax` and mutating routes require
   JSON (CSRF guard). There is no default password: a fresh install runs a first-run setup wizard that creates it
   (≥ 10 characters, common passwords refused). The setup endpoints work only until a password exists, only one
-  request can complete them, and they accept requests from LAN clients only — unless the one-time token printed in
+  request can complete them, and they accept requests from LAN clients only, unless the one-time token printed in
   the server log (or `SETUP_TOKEN`, which then is always required) is given. The token is always required with
   `SETUP_REQUIRE_TOKEN=1` (the Docker image's default) and for an install that was configured before but lost its
   `secrets.json`; an unreadable `secrets.json` stops the server instead of silently reopening setup. Wrong tokens are
@@ -67,7 +78,7 @@ password, set `PUBLIC_URL` to your domain, and set `TRUST_PROXY` whenever the pr
 
 | Credential | Entropy | Stored as | Lifetime |
 |---|---|---|---|
-| Display key (private link `/d/<key>`) | UUIDv4 from the OS CSPRNG (`crypto.randomUUID`): **122 random bits** | plain, in `data/secrets.json` (mode 600) — the admin must be able to show the link again | until *Regenerate link* or the screen is deleted |
+| Display key (private link `/d/<key>`) | UUIDv4 from the OS CSPRNG (`crypto.randomUUID`): **122 random bits** | plain, in `data/secrets.json` (mode 600), because the admin must be able to show the link again | until *Regenerate link* or the screen is deleted |
 | Device token (pairing) | `md_` + 32 random bytes: **256 bits** | SHA-256 hash only | until revoked |
 | Pairing session id | 32 random bytes: **256 bits** | SHA-256 hash, memory only | ≤ 10 minutes |
 | Pairing code | 6 symbols from a 31-symbol alphabet: 31⁶ ≈ **8.9 × 10⁸** | memory only | ≤ 10 minutes, single use |
@@ -89,7 +100,7 @@ how much of it.
   10 wrong codes per admin session + address and 50 wrong codes overall per 10 minutes (after that every claim gets
   `429`, even with a right code, so there is no oracle), codes are single use, live 10 minutes and can only be claimed
   while their display polled within the last 15 s. With at most 100 pending codes, one guess succeeds with probability
-  ≤ 100 / 31⁶ ≈ 1.1 × 10⁻⁷, and the global cap (7 200 wrong guesses per day) bounds it to ≈ 0.08 % per day — and a
+  ≤ 100 / 31⁶ ≈ 1.1 × 10⁻⁷, and the global cap (7 200 wrong guesses per day) bounds it to ≈ 0.08 % per day, and a
   "success" would only pair a stranger's waiting display to the guesser's own calendar.
 - *Starting pairing sessions* is unauthenticated: 10 per IPv4 address / IPv6 /64 per 10 minutes and at most 100
   pending in total. Flooding it can delay pairing (`503`, the display retries), never grant access; private links keep
@@ -128,7 +139,7 @@ how much of it.
   need the session cookie (`SameSite=Lax`), JSON bodies and a matching `Origin`; unknown host names get `421`. The
   pairing status endpoint needs the secret session id.
 
-**Residual risks**: the private link is a bearer secret — whoever has it sees that screen until it is regenerated.
+**Residual risks**: the private link is a bearer secret: whoever has it sees that screen until it is regenerated.
 Device tokens live in the display browser's `localStorage`, readable by scripts on the same origin (custom CSS is the
 only user-supplied content the display injects, and it is CSS only). Anybody standing in front of the screen sees
 what it shows. In open mode none of the above applies to the display API.

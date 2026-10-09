@@ -1,4 +1,4 @@
-// Cover-fit crop around a focal point — shared by the display (CSS + WebGL) and the admin previews so they agree.
+// Cover-fit crop around a focal point, shared by the display (CSS + WebGL) and the admin previews so they agree.
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const unit = (v: number | undefined) => (typeof v === 'number' && Number.isFinite(v) ? clamp(v, 0, 1) : 0.5);
@@ -10,7 +10,7 @@ export interface CoverWindow {
   /** centre of the visible window, image coords 0..1 (y from the top) */
   cx: number;
   cy: number;
-  /** where the focal point lands inside the box, 0..1 (y from the top) — the Ken Burns zoom anchor */
+  /** where the focal point lands inside the box, 0..1 (y from the top), the Ken Burns zoom anchor */
   ax: number;
   ay: number;
 }

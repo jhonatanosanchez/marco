@@ -6,7 +6,7 @@ export function fold(s) {
 }
 
 const NAMED = {
-  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', hellip: '…', mdash: '—', ndash: '–',
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', hellip: '…', mdash: '\u2014', ndash: '–',
   lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”', laquo: '«', raquo: '»', euro: '€', copy: '©', reg: '®',
   trade: '™', deg: '°', middot: '·', bull: '•', iexcl: '¡', iquest: '¿', ordf: 'ª', ordm: 'º',
 };
@@ -44,7 +44,7 @@ export function truncate(s, max) {
   if (s.length <= max) return s;
   const cut = s.slice(0, max - 1);
   const sp = cut.lastIndexOf(' ');
-  return (sp > max * 0.6 ? cut.slice(0, sp) : cut).replace(/[\s,.;:–—-]+$/, '') + '…';
+  return (sp > max * 0.6 ? cut.slice(0, sp) : cut).replace(/[\s,.;:\u2013\u2014-]+$/, '') + '…';
 }
 
 /** Stable JSON stringify (sorted keys) for hashing. */

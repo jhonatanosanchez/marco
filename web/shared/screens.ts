@@ -1,5 +1,5 @@
 // v2 config ⇄ flat per-screen view (docs/ARCHITECTURE.md). Mirror of server/screens.js + server/defaults.js key
-// lists — keep in sync. Used by the admin panel: sections keep editing the flat `AppConfig` view of the
+// lists; keep in sync. Used by the admin panel: sections keep editing the flat `AppConfig` view of the
 // selected screen; `applyScreen` writes the edited view back into the stored config.
 import type { AppConfig, ScreenProfile, StoredConfig } from './types';
 

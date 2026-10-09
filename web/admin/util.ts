@@ -32,7 +32,7 @@ export const normalize = (s: string) =>
     .toLowerCase()
     .trim();
 
-/** First icon rule matching `text` — same rule as the server (short keywords match whole words only). */
+/** First icon rule matching `text`, same rule as the server (short keywords match whole words only). */
 export function matchIconRule(rules: IconRule[], text: string): { rule: IconRule; keyword: string; index: number } | null {
   return findKeyword(rules, text);
 }

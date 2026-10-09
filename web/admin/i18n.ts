@@ -56,9 +56,9 @@ const LOCALE: Record<Lang, string> = { es: 'es-ES', en: 'en-GB', pt: 'pt-PT' };
 export const locale = () => LOCALE[current];
 
 export function relTime(iso: string | number | null | undefined): string {
-  if (iso == null || iso === '') return '—';
+  if (iso == null || iso === '') return '–';
   const ts = typeof iso === 'number' ? iso : Date.parse(iso);
-  if (!Number.isFinite(ts)) return '—';
+  if (!Number.isFinite(ts)) return '–';
   const diff = (ts - Date.now()) / 1000;
   const rtf = new Intl.RelativeTimeFormat(locale(), { numeric: 'auto' });
   const abs = Math.abs(diff);
@@ -69,7 +69,7 @@ export function relTime(iso: string | number | null | undefined): string {
 }
 
 export function formatDuration(sec: number): string {
-  if (!Number.isFinite(sec)) return '—';
+  if (!Number.isFinite(sec)) return '–';
   const d = Math.floor(sec / 86400);
   const h = Math.floor((sec % 86400) / 3600);
   const m = Math.floor((sec % 3600) / 60);

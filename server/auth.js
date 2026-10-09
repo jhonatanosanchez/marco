@@ -143,7 +143,7 @@ export function rotateSessionEpoch() {
 /**
  * CSRF guard for mutating requests: the session cookie is SameSite=Lax; additionally the body must be JSON
  * (or multipart for photo upload, or empty), and a present Origin header must match the Host and be an allowed
- * host name (lib/net.js hostAllowed: LAN names, IP literals, PUBLIC_URL, ALLOWED_HOSTS — DNS rebinding guard).
+ * host name (lib/net.js hostAllowed: LAN names, IP literals, PUBLIC_URL, ALLOWED_HOSTS; DNS rebinding guard).
  */
 export function csrfGuard({ multipartPaths = [] } = {}) {
   return (req, res, next) => {

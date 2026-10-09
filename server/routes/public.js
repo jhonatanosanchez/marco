@@ -1,4 +1,4 @@
-// Display API (display key / device token / admin session in private mode — app.js applies displayAuth; anyone
+// Display API (display key / device token / admin session in private mode; app.js applies displayAuth; anyone
 // in open mode). Never exposes secrets, tokens or calendar URLs.
 import { Router } from 'express';
 import { getConfig } from '../store.js';

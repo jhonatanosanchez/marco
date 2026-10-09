@@ -36,7 +36,7 @@ interface Queue {
 /** What an existing gallery photo still needs: thumbnail, focal point, or a lighter / upright JPEG. */
 export function needsWork(p: AdminPhoto): boolean {
   const processed = p.hasThumb && hasFocus(p) && isJpegName(p.file) && !!p.w && Math.max(p.w, p.h || 0) <= TARGET_SIDE;
-  // A processed photo that re-encoding couldn't make lighter (detailed 2560 px JPEGs) is done — don't offer it again.
+  // A processed photo that re-encoding couldn't make lighter (detailed 2560 px JPEGs) is done; don't offer it again.
   return !processed || (p.size > HEAVY && !(p.hasThumb && hasFocus(p)));
 }
 

@@ -71,7 +71,7 @@ export function HaEntityPicker(props: {
       </div>
       <datalist id={listId}>
         {options.map((e) => (
-          <option value={e.entity_id}>{`${e.name} — ${e.state}${e.unit ? ' ' + e.unit : ''}`}</option>
+          <option value={e.entity_id}>{`${e.name}: ${e.state}${e.unit ? ' ' + e.unit : ''}`}</option>
         ))}
       </datalist>
       <div class="field__hint">

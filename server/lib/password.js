@@ -1,5 +1,5 @@
 // Admin password rules (setup wizard + password change). Pure; unit-tested in setup.test.js.
-// The admin panel mirrors these rules for instant feedback (web/shared/password.ts) — the server is authoritative.
+// The admin panel mirrors these rules for instant feedback (web/shared/password.ts); the server is authoritative.
 
 export const MIN_PASSWORD = 10;
 export const MAX_PASSWORD = 200;

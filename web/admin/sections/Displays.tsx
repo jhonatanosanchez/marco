@@ -29,7 +29,7 @@ function NightMenu({ value, onPick, busy }: { value: NightCommand | null; onPick
 }
 
 function DisplayCard({ d, serverVersion, onCmd, onForget, busy }: { d: DisplayInfo; serverVersion: string; onCmd: (action: 'reload' | 'identify' | 'night', mode?: NightCommand) => void; onForget: () => void; busy: string }) {
-  const res = d.screenRes ? `${d.screenRes.w}×${d.screenRes.h}` : '—';
+  const res = d.screenRes ? `${d.screenRes.w}×${d.screenRes.h}` : '–';
   const vp = d.viewport ? `${d.viewport.w}×${d.viewport.h}` : null;
   return (
     <section class={`disp ${d.connected ? 'is-on' : 'is-off'}`}>
@@ -38,9 +38,9 @@ function DisplayCard({ d, serverVersion, onCmd, onForget, busy }: { d: DisplayIn
           <Icon name={d.connected ? 'wifi' : 'wifiOff'} size={16} />
         </span>
         <div class="disp__titles">
-          <strong>{d.screenName || d.screenSlug || '—'}</strong>
+          <strong>{d.screenName || d.screenSlug || '–'}</strong>
           <span class="muted small">
-            <span class="mono">{d.clientId.length > 14 ? `…${d.clientId.slice(-8)}` : d.clientId}</span> · {d.ip || '—'}
+            <span class="mono">{d.clientId.length > 14 ? `…${d.clientId.slice(-8)}` : d.clientId}</span> · {d.ip || '–'}
           </span>
         </div>
         <AccessBadge d={d} />
@@ -49,7 +49,7 @@ function DisplayCard({ d, serverVersion, onCmd, onForget, busy }: { d: DisplayIn
       <dl class="disp__facts">
         <div>
           <dt>{t('Navegador')}</dt>
-          <dd title={d.userAgent}>{d.uaShort || '—'}</dd>
+          <dd title={d.userAgent}>{d.uaShort || '–'}</dd>
         </div>
         <div>
           <dt>{t('Resolución')}</dt>
@@ -61,12 +61,12 @@ function DisplayCard({ d, serverVersion, onCmd, onForget, busy }: { d: DisplayIn
         </div>
         <div>
           <dt>WebGL</dt>
-          <dd>{d.webgl == null ? '—' : d.webgl ? <span class="ok-text">{t('Activo')}</span> : <span class="muted">{d.lite ? t('Modo ligero') : t('Desactivado')}</span>}</dd>
+          <dd>{d.webgl == null ? '–' : d.webgl ? <span class="ok-text">{t('Activo')}</span> : <span class="muted">{d.lite ? t('Modo ligero') : t('Desactivado')}</span>}</dd>
         </div>
         <div>
           <dt>{t('Versión')}</dt>
           <dd>
-            {d.version ?? '—'}
+            {d.version ?? '–'}
             {d.outdated && (
               <span class="badge badge--warn" title={t('El servidor ejecuta la versión {v}', { v: serverVersion })}>
                 {t('antigua')}
@@ -88,7 +88,7 @@ function DisplayCard({ d, serverVersion, onCmd, onForget, busy }: { d: DisplayIn
         <div>
           <dt>{t('Modo noche')}</dt>
           <dd>
-            {d.night == null ? '—' : d.night ? `🌙 ${t('Atenuada')}` : `☀️ ${t('Normal')}`}
+            {d.night == null ? '–' : d.night ? `🌙 ${t('Atenuada')}` : `☀️ ${t('Normal')}`}
             {d.nightOverride && d.nightOverride !== 'auto' && <span class="muted small"> · {t('manual')}</span>}
           </dd>
         </div>
@@ -280,7 +280,7 @@ export function DisplaysSection({ saved, go }: SectionProps) {
       )}
       <PairedDevicesCard saved={saved} onChanged={load} />
       <p class="muted small center">
-        <StatusDot state={online.length ? 'ok' : 'idle'} /> {t('{n} en línea', { n: online.length })} · {t('servidor v{v}', { v: data?.serverVersion ?? '—' })}
+        <StatusDot state={online.length ? 'ok' : 'idle'} /> {t('{n} en línea', { n: online.length })} · {t('servidor v{v}', { v: data?.serverVersion ?? '–' })}
       </p>
     </>
   );

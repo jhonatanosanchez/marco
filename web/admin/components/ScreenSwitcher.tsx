@@ -3,7 +3,7 @@ import type { ScreenProfile } from '../../shared/types';
 import { nScreens, t } from '../i18n';
 import { Icon } from './icons';
 
-/** Header dropdown: "Editando: Salón ▾" — pick which screen the per-screen pages edit. */
+/** Header dropdown: "Editando: Salón ▾" to pick which screen the per-screen pages edit. */
 export function ScreenSwitcher(props: {
   screens: ScreenProfile[];
   defaultId: string;

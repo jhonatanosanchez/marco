@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Builds the release tarball that install.sh downloads: marco-<version>.tar.gz and marco-<version>.tar.gz.sha256
 # (run `npm ci && npm run build` first). Output folder: release/ (or the first argument).
+# Also copies install.sh with install.sh.sha256, so people can check the installer before they run it.
 #
 # Contents: the server, the built web interface (dist/), package.json + package-lock.json (the installer runs
 # `npm ci --omit=dev`), deploy/ scripts, install.sh, the shared icon rules and the docs needed to run it.
@@ -31,5 +32,7 @@ mkdir -p "$OUT"
 # Reproducible-ish archive: fixed owner and sorted names.
 tar --sort=name --owner=0 --group=0 --numeric-owner -C "$STAGE" -czf "$OUT/$NAME.tar.gz" "$NAME"
 (cd "$OUT" && sha256sum "$NAME.tar.gz" > "$NAME.tar.gz.sha256")
+cp install.sh "$OUT/install.sh"
+(cd "$OUT" && sha256sum install.sh > install.sh.sha256)
 echo "$OUT/$NAME.tar.gz"
-cat "$OUT/$NAME.tar.gz.sha256"
+cat "$OUT/$NAME.tar.gz.sha256" "$OUT/install.sh.sha256"

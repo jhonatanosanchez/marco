@@ -70,7 +70,7 @@ function rentalFeed() {
     'BEGIN:VEVENT', `UID:demo-stay-${i}@marco.invalid`, `DTSTART;VALUE=DATE:${ics(D(a))}`,
     `DTEND;VALUE=DATE:${ics(D(b))}`, `SUMMARY:🏠 ${title}`, `DESCRIPTION:${desc}`, 'END:VEVENT',
   ].join('\r\n'));
-  // An Airbnb-style blocked range ("Not available") — hidden by a filter rule in the demo config.
+  // An Airbnb-style blocked range ("Not available"), hidden by a filter rule in the demo config.
   ev.push(['BEGIN:VEVENT', 'UID:demo-block@marco.invalid', `DTSTART;VALUE=DATE:${ics(D(30))}`,
     `DTEND;VALUE=DATE:${ics(D(32))}`, 'SUMMARY:Airbnb (Not available)', 'END:VEVENT'].join('\r\n'));
   return wrap(ev);
@@ -303,7 +303,7 @@ if (!flag('no-photos')) {
 
 // ------------------------------------------------------------------ build (if needed) + start the server
 if (!fs.existsSync(path.join(ROOT, 'dist', 'index.html'))) {
-  console.log('[demo] dist/ not found — running `npm run build` first');
+  console.log('[demo] dist/ not found, running `npm run build` first');
   const b = spawnSync('npm', ['run', 'build'], { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
   if (b.status !== 0) process.exit(b.status || 1);
 }

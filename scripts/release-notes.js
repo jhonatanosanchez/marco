@@ -27,5 +27,7 @@ const install = [
   '',
   'Already installed with the one-line installer: `marco update`. Docker: `git pull && docker compose up -d --build`.',
   `The tarball \`marco-${version}.tar.gz\` is what the installer downloads; its SHA-256 is in the \`.sha256\` file next to it.`,
+  'To read the installer before running it, download `install.sh` and `install.sh.sha256` from this release and run',
+  '`sha256sum -c install.sh.sha256`, then `bash install.sh`.',
 ];
 process.stdout.write(`${body}\n${install.join('\n')}\n`);

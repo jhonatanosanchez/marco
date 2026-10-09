@@ -20,7 +20,7 @@ const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
 /**
  * Sanitise the draft parts of a preview request with the config validators.
- * Returns { overrides, errors } — errors only for the draft sections.
+ * Returns { overrides, errors }; errors only for the draft sections.
  */
 export function sanitizeDraft(cfg, body) {
   const draft = { ...cfg };
@@ -56,7 +56,7 @@ export function eventsAdminRouter() {
   const r = Router();
   r.use(requireAuth);
 
-  // docs/ARCHITECTURE.md — live preview of filters / overrides with draft rules.
+  // docs/ARCHITECTURE.md: live preview of filters / overrides with draft rules.
   r.post('/events/preview', async (req, res, next) => {
     try {
       const body = isObj(req.body) ? req.body : {};
@@ -96,7 +96,7 @@ export function eventsAdminRouter() {
     }
   });
 
-  // docs/ARCHITECTURE.md — parse pasted CSV (name;dd/mm[/yyyy]); nothing is saved.
+  // docs/ARCHITECTURE.md: parse pasted CSV (name;dd/mm[/yyyy]); nothing is saved.
   r.post('/birthdays/parse-csv', (req, res) => {
     const text = isObj(req.body) ? req.body.text : undefined;
     if (typeof text !== 'string') return res.status(400).json({ error: 'invalid', details: [{ path: 'text', message: 'expected string' }] });
@@ -109,7 +109,7 @@ export function eventsAdminRouter() {
 
 export function eventsPublicRouter() {
   const r = Router();
-  // docs/ARCHITECTURE.md — countdown chips for a screen (unknown ?screen → default screen).
+  // docs/ARCHITECTURE.md: countdown chips for a screen (unknown ?screen → default screen).
   r.get('/countdowns', async (req, res, next) => {
     try {
       res.set('cache-control', 'private, no-store');

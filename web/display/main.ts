@@ -732,10 +732,10 @@ async function boot(): Promise<void> {
   if (accessDenied) return;
   if (!ok && !cached) {
     if (import.meta.env.DEV) {
-      console.info('[display] /api unreachable — running with the built-in demo dataset');
+      console.info('[display] /api unreachable, running with the built-in demo dataset');
       enterDemo();
       startPolling();
-      // keep probing the real API; switch over seamlessly when it appears
+      // keep probing the real API; switch over without a reload when it appears
       const probe = setInterval(async () => {
         try {
           const c = await api.config();

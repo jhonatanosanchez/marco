@@ -1,4 +1,4 @@
-// Shared JSON contracts — see docs/API.md and docs/ARCHITECTURE.md. Imported by both the display and the admin panel.
+// Shared JSON contracts, see docs/API.md and docs/ARCHITECTURE.md. Imported by both the display and the admin panel.
 // Keep in sync with the server (server/validate.js, server/defaults.js).
 import type { PhotoFrame } from './focus';
 
@@ -240,7 +240,7 @@ export interface PairClaimRequest {
  * FLAT per-screen VIEW of the v2 config (docs/ARCHITECTURE.md): global sections merged with ONE screen's sections,
  * in the historical v1 shape (+ the new global keys). This is what admin sections edit (`SectionProps.cfg`);
  * build it with `projectScreen()` and write it back with `applyScreen()` from web/shared/screens.ts.
- * NOT the stored/wire format any more — GET/PUT /api/admin/config use `StoredConfig`.
+ * NOT the stored/wire format any more: GET/PUT /api/admin/config use `StoredConfig`.
  */
 export interface AppConfig {
   version: number;
@@ -743,7 +743,7 @@ export interface ScheduledMessage {
   sound: boolean;
 }
 
-/** v2 stored config — GET/PUT /api/admin/config, backups, export. */
+/** v2 stored config: GET/PUT /api/admin/config, backups, export. */
 export interface StoredConfig {
   version: 2;
   revision: number;

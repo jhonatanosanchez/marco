@@ -79,7 +79,7 @@ export function describeActivity(e: ActivityEntry): { icon: IconName; text: stri
     case 'source.recovered':
       return { icon: 'check', text: t('Calendario {name} recuperado', { name: q(d.name ?? d.sourceId) }) };
     case 'announce.sent':
-      return { icon: 'megaphone', text: t('Aviso enviado: {title}', { title: q(d.title) || '—' }) + (d.via === 'hook' ? ` · ${t('vía webhook')}` : '') };
+      return { icon: 'megaphone', text: t('Aviso enviado: {title}', { title: q(d.title) || '–' }) + (d.via === 'hook' ? ` · ${t('vía webhook')}` : '') };
     case 'announce.cleared':
       return { icon: 'x', text: d.id ? t('Aviso retirado') : t('Avisos retirados') };
     case 'token.created':
@@ -116,7 +116,7 @@ export function describeActivity(e: ActivityEntry): { icon: IconName; text: stri
 
 /** "token:Home Assistant" → "Home Assistant (API)", "system" → "Sistema" */
 export function actorLabel(a: string): string {
-  if (!a) return '—';
+  if (!a) return '–';
   if (a === 'system') return t('Sistema');
   if (a === 'anonymous') return t('Anónimo');
   if (a === 'password') return t('Contraseña');

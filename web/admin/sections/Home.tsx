@@ -98,7 +98,7 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
         </div>
         <div class="hero__stats">
           <button type="button" class="hero__stat" onClick={() => go('displays')}>
-            <strong>{d ? online : '—'}</strong>
+            <strong>{d ? online : '–'}</strong>
             <span>{t('conectadas')}</span>
           </button>
           <button type="button" class="hero__stat" onClick={() => go('screens')}>
@@ -106,7 +106,7 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
             <span>{full.screens.length === 1 ? t('pantalla') : t('pantallas')}</span>
           </button>
           <button type="button" class="hero__stat" onClick={() => go('status')}>
-            <strong class={srcErr.length ? 'err-text' : ''}>{d ? `${d.sources.filter((s) => s.ok).length}/${d.sources.length}` : '—'}</strong>
+            <strong class={srcErr.length ? 'err-text' : ''}>{d ? `${d.sources.filter((s) => s.ok).length}/${d.sources.length}` : '–'}</strong>
             <span>{t('calendarios OK')}</span>
           </button>
         </div>

@@ -2,11 +2,11 @@
 // docs/ARCHITECTURE.md ("Display access").
 //
 // config.security.displayAccess:
-//   'private' (default for fresh installs) — every display-facing endpoint needs one of:
+//   'private' (default for fresh installs): every display-facing endpoint needs one of:
 //       - a screen's display key   (UUIDv4, the private link /d/<key>; secrets.displayKeys[screenId].key)
 //       - a paired-device token    (md_ + 43 base64url chars; only sha256 stored in secrets.devices[])
 //       - a valid admin session    (admin preview iframe, "View screen" links)
-//   'open' (installs from before 0.3) — legacy LAN mode: / and /?screen=<slug> work without a key. Keys and device
+//   'open' (installs from before 0.3): legacy LAN mode: / and /?screen=<slug> work without a key. Keys and device
 //       tokens still work (and still bind the screen); an invalid one is still refused.
 //
 // Credentials travel in the X-Marco-Key header (fetch) or ?k= (EventSource and <img>/WebGL photo URLs, where
@@ -261,7 +261,7 @@ export function updateDevice(id, body, { req } = {}) {
   updateSecrets(() => Object.assign(d, patch));
   if (patch.screenId && patch.screenId !== before.screenId) {
     // A stream is bound to the screen it opened with: close this device's streams ('reload' first) so they
-    // reconnect with the new binding — a client that ignores 'reload' must not keep the old screen's events.
+    // reconnect with the new binding: a client that ignores 'reload' must not keep the old screen's events.
     for (const c of listClients()) if (c.access?.deviceId === d.id) dropClient(c, { event: 'reload', data: {} });
   }
   logActivity('display.device_updated', { req, data: { id: d.id, name: d.name, ...(patch.name && patch.name !== before.name ? { from: before.name } : {}) } });
@@ -296,10 +296,10 @@ const sameHash = (hex, buf) => /^[a-f0-9]{64}$/.test(hex || '') && crypto.timing
  * Re-check the credential of every open stream against the current config + secrets, and close the ones that no
  * longer resolve to the same screen. Called after config saves, imports, session revocation and every heartbeat,
  * so no path that changes keys, devices, sessions or the access mode can leave a stream reading:
- *   key     — the screen's current key must still be the one the stream opened with ('invalid_key')
- *   device  — the device must still exist ('invalid_key'); moved to another screen → 'reload' + close
- *   session — the admin session must still be valid (epoch, login method) ('key_required')
- *   open    — only while display access is 'open' ('key_required')
+ *   key:     the screen's current key must still be the one the stream opened with ('invalid_key')
+ *   device:  the device must still exist ('invalid_key'); moved to another screen → 'reload' + close
+ *   session: the admin session must still be valid (epoch, login method) ('key_required')
+ *   open:    only while display access is 'open' ('key_required')
  * Returns how many streams were closed.
  */
 export function revalidateStreams(cfg = getConfig()) {

@@ -102,7 +102,7 @@ export class Engine {
       try {
         this.frame((ts - this.t0) / 1000, dt);
       } catch (e) {
-        console.error('[gl] frame failed — disabling WebGL', e);
+        console.error('[gl] frame failed, disabling WebGL', e);
         this.dead = true;
         this.stop();
         this.onLost?.();

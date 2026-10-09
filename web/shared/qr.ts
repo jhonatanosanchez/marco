@@ -1,6 +1,6 @@
 // Tiny dependency-free QR Code encoder (byte mode, error correction level M, versions 1–20, automatic mask).
 // Used by the setup wizard and the display's welcome screen to show the admin / display URLs.
-// Algorithm after Project Nayuki's "QR Code generator library" (MIT) — https://www.nayuki.io/page/qr-code-generator-library
+// Algorithm after Project Nayuki's "QR Code generator library" (MIT): https://www.nayuki.io/page/qr-code-generator-library
 
 const ECC_PER_BLOCK_M = [-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26];
 const NUM_BLOCKS_M = [-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16];
@@ -64,7 +64,7 @@ function alignmentPositions(ver: number, size: number): number[] {
 
 export interface QrCode {
   size: number;
-  /** modules[y][x] — true = dark */
+  /** modules[y][x]: true = dark */
   modules: boolean[][];
 }
 

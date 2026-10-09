@@ -6,7 +6,7 @@
 //   admin:    POST /api/admin/pair/claim { code, screenId, name? } → { device }
 //
 // The code is only a rendezvous label shown on the screen: it never returns the token. The token is handed out
-// only to whoever polls with the session id (256 random bits) that /start returned to that display — so somebody
+// only to whoever polls with the session id (256 random bits) that /start returned to that display, so somebody
 // who reads the code over the owner's shoulder cannot collect the token. Codes: 6 characters from a 31-symbol
 // alphabet without look-alikes (0/O, 1/I/L): 31^6 ≈ 8.9 × 10^8 combinations, valid 10 minutes, single use, and
 // only while the display keeps polling (claims for a display that stopped waiting fail). Claims need an admin

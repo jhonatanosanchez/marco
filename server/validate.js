@@ -436,7 +436,7 @@ export function migrateConfig(raw) {
 
 /**
  * Validate a full (v2) config object. v1 input is migrated first. Returns { ok, errors, value }.
- * `value` is always a complete, sanitised config (defaults fill gaps) — callers decide whether to persist it on errors.
+ * `value` is always a complete, sanitised config (defaults fill gaps); callers decide whether to persist it on errors.
  */
 export function validateConfig(input) {
   const ctx = new Ctx();

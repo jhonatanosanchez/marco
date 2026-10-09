@@ -28,7 +28,7 @@ and their dependencies are only used to build the web UI and are not part of the
 
 ## Services (not bundled)
 
-Weather data by [Open-Meteo](https://open-meteo.com/) (CC BY 4.0 — attribution appears in the README),
+Weather data by [Open-Meteo](https://open-meteo.com/) (CC BY 4.0, attribution appears in the README),
 stock photos by [Lorem Picsum](https://picsum.photos/) (photos from Unsplash under the Unsplash license).
 
 To list every installed package with its license: `npx license-checker --summary`.

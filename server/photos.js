@@ -131,7 +131,7 @@ export function freeName(name) {
 
 // ---------------------------------------------------------------- metadata (data/photos/.meta.json)
 
-/** { [file]: { w, h, focusX?, focusY?, bytes, uploadedAt } } — w/h are display dimensions (EXIF orientation applied). */
+/** { [file]: { w, h, focusX?, focusY?, bytes, uploadedAt } }: w/h are display dimensions (EXIF orientation applied). */
 export function readMeta() {
   try {
     const j = JSON.parse(fs.readFileSync(photoPath(META_FILE), 'utf8'));
