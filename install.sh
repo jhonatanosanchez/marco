@@ -17,8 +17,9 @@
 #   --user <name>             User that runs the server and the desktop session (default: you, or $SUDO_USER)
 #   --version <x.y.z>         Version to install (default: latest release)
 #   --update                  Update an existing install (same as running the installer again)
+#   --force                   Reinstall the same version, or install an older one
 #   --uninstall [--purge]     Remove Marco; --purge also deletes the data folder (config, photos, backups)
-#   --yes, -y                 Do not ask; use the defaults
+#   --yes, -y                 Do not ask; use the defaults (uninstall needs it when there is no terminal)
 #   --dry-run                 Print every action and change nothing
 #   --skip-apt                Do not install system packages
 #   -h, --help                Show this help
@@ -128,8 +129,19 @@ confirm() { # confirm <question> (default yes)
   ask "$1 [Y/n] " y
   case "$REPLY" in [Nn]*) return 1 ;; *) return 0 ;; esac
 }
+confirm_no() { # confirm_no <question> (default no: only y or yes goes ahead)
+  ask "$1 [y/N] " n
+  case "$REPLY" in [Yy]|[Yy][Ee][Ss]) return 0 ;; *) return 1 ;; esac
+}
 
 # ---- Helpers ---------------------------------------------------------------------------------------------
+# A kiosk link ends up in kiosk.env, which the kiosk script reads as shell: only plain URL characters are accepted.
+check_link() {
+  case "$1" in http://*|https://*) ;; *) die "The link must start with http:// or https://" ;; esac
+  case "$1" in
+    *[[:space:]]*|*\"*|*\'*|*\$*|*\`*|*\\*) die "The link contains spaces, quotes, \$, \` or \\. Copy it again from the admin." ;;
+  esac
+}
 have() { command -v "$1" >/dev/null 2>&1; }
 fetch() { curl -fsSL --retry 3 --connect-timeout 15 "$@"; }
 node_major() { node -v 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/' || echo 0; }
@@ -235,10 +247,10 @@ check_os() {
 ${C_YE}This installer supports Debian 12/13, Raspberry Pi OS (Bookworm or Trixie) and Ubuntu 22.04 or newer.${C_0}
 This system is: ${OS_NAME:-unknown}.
 
-You can still run Marco with Docker on any system:
+You can still run Marco with Docker on any system (it builds the image from the source):
 
-  mkdir marco && cd marco
-  curl -fsSLO https://raw.githubusercontent.com/${MARCO_REPO}/main/docker-compose.yml
+  git clone https://github.com/${MARCO_REPO}.git marco
+  cd marco
   docker compose up -d
   docker compose logs marco | grep setup     # the one-time setup link
 
@@ -310,6 +322,8 @@ run_group() { if [ "${NEW_USER:-0}" = 1 ] && [ "$DRY" = 1 ]; then echo "$RUN_USE
 EXISTING=""          # release | checkout | kiosk
 EXISTING_VERSION=""
 LAYOUT=release
+CUR_REL=""           # what $DIR/current points to (releases/<id>)
+CUR_GIT=0            # 1 when the running release was built from git (<version>-git.<commit>)
 
 load_existing() {
   if [ -r "$CONF" ]; then
@@ -333,7 +347,10 @@ inspect_dir() {
     fi
   }
   case "$EXISTING" in
-    release) EXISTING_VERSION="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$DIR/current/package.json" 2>/dev/null | head -n1 || true)" ;;
+    release)
+      EXISTING_VERSION="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$DIR/current/package.json" 2>/dev/null | head -n1 || true)"
+      CUR_REL="$(readlink "$DIR/current" 2>/dev/null || true)"
+      case "$CUR_REL" in *-git.*) CUR_GIT=1 ;; esac ;;
     checkout) EXISTING_VERSION="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$DIR/package.json" 2>/dev/null | head -n1 || true)"; LAYOUT=checkout ;;
   esac
   if [ -n "$SOURCE_DIR" ]; then LAYOUT=checkout; fi
@@ -444,7 +461,12 @@ choose_source() {
     fi
   else
     REL_VERSION="$(latest_version)"
-    if [ -n "$REL_VERSION" ]; then REL_SOURCE=tarball; else REL_SOURCE=git; fi
+    if [ -n "$REL_VERSION" ]; then REL_SOURCE=tarball
+    elif [ "$EXISTING" = release ] && [ "$CUR_GIT" = 0 ]; then
+      # An install from a release only ever moves to another release. No answer here usually means GitHub could
+      # not be reached (or limited the request), not that releases are gone: building main would be a guess.
+      die "Could not reach GitHub to find the latest release (https://github.com/${MARCO_REPO}/releases/latest). Nothing was changed. Check the network and try again later, or pick a version with --version <x.y.z>."
+    else REL_SOURCE=git; fi
   fi
   # A kiosk only needs a few scripts: from git they are downloaded one by one (no git needed).
   if [ "$REL_SOURCE" = git ] && { [ "$MODE" != kiosk ] || [ "$MARCO_REPO_URL" != "https://github.com/${MARCO_REPO}.git" ]; }; then
@@ -461,6 +483,15 @@ source_label() {
       else echo "latest source from git (no release published yet), built here"; fi ;;
     checkout) echo "local checkout $SOURCE_DIR, built in place" ;;
   esac
+}
+
+# True when <version> is older than the installed one and --force was not given.
+older_than_installed() {
+  [ "$FORCE" = 0 ] && [ -n "$EXISTING_VERSION" ] && [ -n "$1" ] && [ "$1" != custom ] && [ "$1" != "$EXISTING_VERSION" ] || return 1
+  [ "$(printf '%s\n%s\n' "$1" "$EXISTING_VERSION" | sort -V | head -n1)" = "$1" ]
+}
+refuse_older() {
+  die "Marco $EXISTING_VERSION is installed and the version found is older ($1). Nothing was changed. To install it anyway, add --force."
 }
 
 # Downloads and prepares a release into $DIR/releases/<id>; sets NEW_REL to its id.
@@ -494,6 +525,7 @@ stage_release() {
     fi
     id="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$tmp/x/package.json" | head -n1)"
     [ -n "$id" ] || die "No version in $base"
+    if older_than_installed "$id"; then rm -rf "$tmp"; refuse_older "$id"; fi
     REL_VERSION="$id"
   else
     if [ "$DRY" = 1 ]; then
@@ -512,6 +544,16 @@ stage_release() {
     fi
     id="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$tmp/x/package.json" | head -n1)-git.$(git -C "$tmp/x" rev-parse --short HEAD)"
     REL_VERSION="${id%%-git.*}"
+    if older_than_installed "$REL_VERSION"; then rm -rf "$tmp"; refuse_older "$REL_VERSION"; fi
+    # Same commit as the running build: nothing to do (--force rebuilds it).
+    if [ "$FORCE" = 0 ] && [ "$CUR_GIT" = 1 ]; then
+      case "${CUR_REL#releases/}" in
+        "$id"|"$id"-[0-9]*)
+          rm -rf "$tmp"
+          ok "Marco $REL_VERSION is installed and up to date (commit ${id##*-git.})."
+          exit 0 ;;
+      esac
+    fi
     rm -rf "$tmp/x/.git"
   fi
   if [ -e "$DIR/releases/$id" ]; then
@@ -667,11 +709,10 @@ setup_kiosk() {
   if [ -n "$KIOSK_URL" ]; then
     if [ "$DRY" = 1 ]; then plan "set KIOSK_URL in $kenv"
     else
-      as_user mkdir -p "$(dirname "$kenv")"
-      as_user touch "$kenv"
-      if grep -q '^KIOSK_URL=' "$kenv"; then as_user sed -i "s|^KIOSK_URL=.*|KIOSK_URL=\"${KIOSK_URL}\"|" "$kenv"
-      else echo "KIOSK_URL=\"${KIOSK_URL}\"" | as_user tee -a "$kenv" >/dev/null; fi
-      as_user chmod 600 "$kenv"
+      # The file is rewritten (other settings kept), not edited with sed: links contain & and other characters
+      # that mean something to sed. check_link() has already refused anything that is special inside "...".
+      { if [ -f "$kenv" ]; then as_user cat "$kenv" | grep -v '^KIOSK_URL=' || true; fi
+        printf 'KIOSK_URL="%s"\n' "$KIOSK_URL"; } | put_file "$kenv" 600 "$RUN_USER"
       ok "Private link saved in $kenv"
     fi
   fi
@@ -793,7 +834,8 @@ do_install_release() {
   setup_env "$DIR/releases/$NEW_REL/.env.example"
   swap_current "$NEW_REL"
   install_service "$DIR/current" "$DIR/current/deploy/marco.service"
-  install_cli "$DIR/current"
+  # The marco command and the stored installer are replaced only once the new version runs: after a rollback the
+  # next `marco update` must not go through files from the release that failed.
   if [ "$SYSTEMD" = 1 ]; then
     info "Starting Marco..."
     restart_service
@@ -803,6 +845,7 @@ do_install_release() {
         warn "The new version did not start. Rolling back to ${PREV_REL#releases/}..."
         run ln -sfn "$PREV_REL" "$DIR/.current.new"
         run mv -T "$DIR/.current.new" "$DIR/current"
+        install_service "$DIR/current" "$DIR/current/deploy/marco.service"
         restart_service
         if wait_healthy; then ok "Rolled back: the previous version is running."; else warn "The previous version does not answer either."; fi
         run rm -rf "$DIR/releases/$NEW_REL"
@@ -811,6 +854,7 @@ do_install_release() {
       warn "The server is not answering yet. Check: journalctl -u $SERVICE -n 50 --no-pager"
     fi
   fi
+  install_cli "$DIR/current"
   prune_releases
   if [ "$MODE" = all ]; then
     run chmod +x "$DIR/current/deploy/kiosk.sh" "$DIR/current/deploy/screen-schedule.sh"
@@ -859,9 +903,11 @@ stage_kiosk_scripts() {
     done
     KIOSK_SRC="$KIOSK_TMP/x"
   fi
+  # Copied as root (KIOSK_TMP is private to whoever runs the installer, which may not be the desktop user),
+  # then given to the desktop user. The folder itself is created as that user so ~/.local stays theirs.
   as_user mkdir -p "$RUN_HOME/.local/bin"
-  as_user install -m 755 "$KIOSK_SRC/deploy/kiosk.sh" "$RUN_HOME/.local/bin/marco-kiosk"
-  as_user install -m 755 "$KIOSK_SRC/deploy/screen-schedule.sh" "$RUN_HOME/.local/bin/marco-schedule"
+  run install -o "$RUN_USER" -g "$(run_group)" -m 755 "$KIOSK_SRC/deploy/kiosk.sh" "$RUN_HOME/.local/bin/marco-kiosk"
+  run install -o "$RUN_USER" -g "$(run_group)" -m 755 "$KIOSK_SRC/deploy/screen-schedule.sh" "$RUN_HOME/.local/bin/marco-schedule"
   ok "Kiosk scripts installed in $RUN_HOME/.local/bin"
 }
 
@@ -895,8 +941,16 @@ do_install_checkout() {
   fi
 }
 
+# Data left by an earlier uninstall without --purge (the folder holds Marco's data or settings, nothing else of it).
+LEFTOVER=0
+leftover_data() {
+  [ -n "$DIR" ] && [ -d "$DIR" ] || return 1
+  [ -f "$DIR/data/config.json" ] || [ -f "$DIR/data/secrets.json" ] || grep -qs '^SESSION_SECRET=' "$DIR/.env"
+}
+
 do_uninstall() {
   info "Uninstalling Marco ($MODE, $DIR)"
+  if [ "$LEFTOVER" = 1 ]; then info "Only data and settings are left in $DIR (from an earlier uninstall): deleting them."; fi
   if [ -f "/etc/systemd/system/$SERVICE.service" ]; then
     if [ "$SYSTEMD" = 1 ]; then
       run systemctl disable --now "$SERVICE" --quiet || true
@@ -914,10 +968,15 @@ do_uninstall() {
       run rmdir "$DIR" 2>/dev/null || true
       ok "Program and data removed"
     else
-      ok "Program removed. Your data is kept in $DIR/data (and settings in $DIR/.env); --purge deletes them."
+      ok "Program removed. Your data is kept in $DIR/data (and settings in $DIR/.env)."
+      echo "     To delete them later: curl -fsSL https://marcohome.app/install | bash -s -- --uninstall --purge --dir $(q "$DIR")"
     fi
   elif [ "$LAYOUT" = checkout ]; then
-    ok "The checkout in $DIR is left as it is (delete it yourself if you do not need it)."
+    if [ "$PURGE" = 1 ]; then
+      run rm -rf "$DIR/data" "$DIR/.env"
+      ok "Data and settings removed ($DIR/data, $DIR/.env)."
+    fi
+    ok "The code in $DIR is left as it is (a git checkout: delete the folder yourself if you do not need it)."
   fi
   run rm -f "$CLI" "$CONF"
   run rm -rf "$LIBDIR"
@@ -961,7 +1020,7 @@ parse_args() {
     shift
   done
   case "$MODE" in ""|all|server|kiosk) ;; *) die "--mode must be all, server or kiosk" ;; esac
-  case "$KIOSK_URL" in ""|http://*|https://*) ;; *) die "--url must start with http:// or https://" ;; esac
+  if [ -n "$KIOSK_URL" ]; then check_link "$KIOSK_URL"; fi
   case "$PORT" in ""|[0-9]|[0-9][0-9]|[0-9][0-9][0-9]|[0-9][0-9][0-9][0-9]|[0-9][0-9][0-9][0-9][0-9]) ;; *) die "--port must be a number" ;; esac
   if [ -n "$SOURCE_DIR" ]; then
     SOURCE_DIR="$(cd "$SOURCE_DIR" && pwd)" || die "--source: folder not found"
@@ -995,13 +1054,22 @@ main() {
   load_existing
   detect
   if [ "$ACTION" = uninstall ]; then
-    [ -n "$EXISTING" ] || [ -L "${DIR:-/nonexistent}/current" ] || [ -f "/etc/systemd/system/$SERVICE.service" ] || die "No Marco install found."
     MODE="${MODE:-server}"
     resolve_user
+    # After a plain uninstall only <dir>/data and <dir>/.env are left: --purge still has to be able to delete them.
+    if [ -z "$EXISTING" ] && [ ! -L "$DIR/current" ] && [ ! -f "/etc/systemd/system/$SERVICE.service" ]; then
+      if [ "$PURGE" = 1 ] && leftover_data; then LEFTOVER=1
+      else die "No Marco install found${DIR:+ in $DIR}."; fi
+    fi
     inspect_dir
     local what="Remove Marco from this device (your data is kept)?"
-    if [ "$PURGE" = 1 ]; then what="Remove Marco and ALL its data (config, photos, backups) from this device?"; fi
-    if interactive && ! confirm "$what"; then exit 0; fi
+    if [ "$PURGE" = 1 ]; then what="Remove Marco and ALL its data in $DIR (config, photos, backups)? This cannot be undone."; fi
+    if [ "$YES" = 0 ] && [ "$DRY" = 0 ]; then
+      if [ -z "$TTY" ]; then
+        die "No terminal to confirm in. To go ahead anyway, add --yes$([ "$PURGE" = 1 ] && echo " (this deletes the data folder)")."
+      fi
+      confirm_no "$what" || { echo "Nothing was changed."; exit 0; }
+    fi
     do_uninstall
     return 0
   fi
@@ -1018,7 +1086,7 @@ main() {
       echo "Paste the screen's private link (Admin > Screen > Settings > Private link), e.g. http://homeserver.lan:3000/d/..." > "$TTY"
       ask "Link: " ""
       KIOSK_URL="$REPLY"
-      case "$KIOSK_URL" in http://*|https://*) ;; *) die "The link must start with http:// or https://" ;; esac
+      check_link "$KIOSK_URL"
     else
       die "--mode kiosk needs --url <private display link> (Admin > Screen > Settings > Private link)."
     fi
@@ -1045,9 +1113,12 @@ main() {
     warn "No desktop session found. The kiosk needs Raspberry Pi OS with desktop (or another desktop) and auto-login."
   fi
   if [ "$EXISTING" = release ] && [ "$REL_SOURCE" = tarball ] && [ -z "$TARBALL_URL" ] \
-     && [ "$EXISTING_VERSION" = "$REL_VERSION" ] && [ "$FORCE" = 0 ]; then
+     && [ "$EXISTING_VERSION" = "$REL_VERSION" ] && [ "$CUR_GIT" = 0 ] && [ "$FORCE" = 0 ]; then
     ok "Marco $EXISTING_VERSION is installed and up to date."
     [ "$DRY" = 1 ] || exit 0
+  fi
+  if [ "$EXISTING" = release ] && [ "$REL_SOURCE" = tarball ] && [ -z "$TARBALL_URL" ] && older_than_installed "$REL_VERSION"; then
+    refuse_older "$REL_VERSION"
   fi
   if [ -n "$EXISTING" ] && [ "$ACTION" != update ] && interactive; then
     confirm "Marco is already installed in $DIR. Update it?" || exit 0

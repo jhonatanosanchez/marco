@@ -5,12 +5,18 @@
 #   screen-schedule.sh on      -> display on
 #   screen-schedule.sh status  -> show which method would be used
 #
-# Example crontab for the Pi user (crontab -e):
+# Where it is:
+#   kiosk-only install (--mode kiosk):  ~/.local/bin/marco-schedule
+#   all-in-one install:                 ~/marco/current/deploy/screen-schedule.sh (/opt/marco/... when installed as root)
+#   git checkout:                       <checkout>/deploy/screen-schedule.sh
+#
+# Example crontab for the desktop user (crontab -e) on a kiosk-only device (replace "pi" with your user name):
 #   # Off at 23:30 and on at 07:00 every day
-#   30 23 * * *  /home/pi/marco/deploy/screen-schedule.sh off >/dev/null 2>&1
-#   0  7  * * *  /home/pi/marco/deploy/screen-schedule.sh on  >/dev/null 2>&1
+#   30 23 * * *  /home/pi/.local/bin/marco-schedule off >/dev/null 2>&1
+#   0  7  * * *  /home/pi/.local/bin/marco-schedule on  >/dev/null 2>&1
 #   # Later on weekends (Saturday and Sunday at 09:00)
-#   # 0 9 * * 6,0 /home/pi/marco/deploy/screen-schedule.sh on >/dev/null 2>&1
+#   # 0 9 * * 6,0 /home/pi/.local/bin/marco-schedule on >/dev/null 2>&1
+# On an all-in-one install use /home/pi/marco/current/deploy/screen-schedule.sh instead.
 #
 # Optional variables: SCREEN_OUTPUT (e.g. HDMI-A-1), WAYLAND_DISPLAY, DISPLAY.
 set -euo pipefail

@@ -4,7 +4,7 @@
 #   marco status            service state, version, address
 #   marco logs [-f]         server log (-f follows it); on a kiosk-only device, the kiosk log
 #   marco restart           restart the server
-#   marco update [--force]  install the latest release (checksum verified, rolled back if it does not start)
+#   marco update [--force]  install the latest release (rolled back if it does not start; --force reinstalls)
 #   marco url               admin address and the private link of every screen, with QR codes
 #   marco version           installed version and the latest release
 #   marco uninstall [--purge]  remove Marco; your data is kept unless you add --purge
