@@ -31,10 +31,11 @@ test('invalid values are reported', () => {
   c.weather.lat = 200;
   c.datetime.timezone = 'Mars/Olympus';
   c.calendar.iconRules.push({ match: [], emoji: '❓' });
+  const badRule = `calendar.iconRules[${c.calendar.iconRules.length - 1}].match`;
   const { ok, errors } = validateConfig(c);
   assert.equal(ok, false);
   const p = errors.map((e) => e.path);
-  for (const want of ['screens[0].screen.language', 'screens[0].screen.accent', 'calendar.sources[1].url', 'calendar.sources[2].googleAccount', 'weather.lat', 'datetime.timezone', 'calendar.iconRules[18].match']) {
+  for (const want of ['screens[0].screen.language', 'screens[0].screen.accent', 'calendar.sources[1].url', 'calendar.sources[2].googleAccount', 'weather.lat', 'datetime.timezone', badRule]) {
     assert.ok(p.includes(want), `missing error for ${want}: ${p}`);
   }
 });
@@ -212,4 +213,37 @@ test('background.order: default random, back-filled into stored screens, validat
   assert.ok(bad.errors.some((e) => /background\.order/.test(e.path)));
   // v1 / merged configs get it too
   assert.equal(validateConfig(mergeDefaults({ revision: 1, background: { source: 'gallery' } })).value.screens[0].background.order, 'random');
+});
+
+test('icon rules v2: one-time additive merge into an existing config', async () => {
+  const store = await import('../store.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'marco-iconrules-'));
+  try {
+    const old = defaultConfig();
+    old.calendar.iconRules = [
+      { id: 'r_mine', match: ['piano'], emoji: '🎻', color: '#112233' },
+      { id: 'r_birthday', match: ['cumple'], emoji: '🎈', color: null },
+    ];
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify(old));
+    store.initStore(dir);
+    const rules = store.getConfig().calendar.iconRules;
+    // the user's own rule keeps its place and content
+    assert.deepEqual(rules[0], { id: 'r_mine', match: ['piano'], emoji: '🎻', color: '#112233' });
+    // a kept default gains keywords but keeps the user's emoji
+    assert.equal(rules[1].emoji, '🎈');
+    assert.ok(rules[1].match.includes('birthday') && rules[1].match[0] === 'cumple');
+    // new categories appended once
+    assert.ok(rules.some((r) => r.id === 'r_swim'));
+    assert.equal(rules.filter((r) => r.id === 'r_birthday').length, 1);
+    assert.ok(fs.existsSync(path.join(dir, '.iconrules-v2')));
+    const saved = JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8'));
+    assert.equal(saved.calendar.iconRules.length, rules.length);
+    // the merge runs once: rules removed afterwards stay removed
+    saved.calendar.iconRules = saved.calendar.iconRules.filter((r) => r.id !== 'r_swim');
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify(saved));
+    store.initStore(dir);
+    assert.ok(!store.getConfig().calendar.iconRules.some((r) => r.id === 'r_swim'));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

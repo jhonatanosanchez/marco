@@ -4,7 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { fileURLToPath } from 'node:url';
-import { defaultConfig } from './defaults.js';
+import { defaultConfig, DEFAULT_ICON_RULES } from './defaults.js';
 import { validateConfig, mergeDefaults, migrateConfig, isV1 } from './validate.js';
 import { backupBeforeSave } from './backups.js';
 
@@ -105,7 +105,49 @@ function loadConfig() {
       console.error('[store] config migration could not be persisted:', err.message);
     }
   }
+  mergeIconRuleUpdates(value);
   return value;
+}
+
+/**
+ * One-time, additive update of the icon rules in an existing config (v2 rule set: more keywords in English,
+ * Spanish and Portuguese, and new categories). Rules the user kept from the defaults gain the missing keywords;
+ * new default rules are appended after the user's own, so custom rules keep their priority. Nothing is removed.
+ * A marker file in the data folder makes it run once: rules deleted afterwards stay deleted.
+ */
+const ICON_RULES_MARKER = '.iconrules-v2';
+function mergeIconRuleUpdates(cfg) {
+  const marker = path.join(paths.data, ICON_RULES_MARKER);
+  if (fs.existsSync(marker)) return;
+  const rules = cfg.calendar?.iconRules;
+  if (Array.isArray(rules)) {
+    const byId = new Map(rules.map((r) => [r.id, r]));
+    let added = 0;
+    for (const def of DEFAULT_ICON_RULES) {
+      const mine = byId.get(def.id);
+      if (!mine) {
+        if (rules.length >= 200) break; // validate.js limit
+        rules.push({ ...def, match: [...def.match] });
+        added++;
+        continue;
+      }
+      const have = new Set(mine.match.map((m) => m.toLowerCase()));
+      for (const m of def.match) {
+        if (mine.match.length >= 50) break; // validate.js limit per rule
+        if (!have.has(m.toLowerCase())) { mine.match.push(m); added++; }
+      }
+    }
+    if (added) {
+      try {
+        writeFileAtomic(paths.config, JSON.stringify(cfg, null, 2));
+        console.log(`[store] icon rules updated (${added} keywords or rules added)`);
+      } catch (err) {
+        console.error('[store] icon rules update could not be persisted:', err.message);
+        return;
+      }
+    }
+  }
+  try { fs.writeFileSync(marker, new Date().toISOString()); } catch { /* retried on the next start */ }
 }
 
 function loadSecrets() {

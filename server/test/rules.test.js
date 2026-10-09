@@ -110,3 +110,15 @@ test('short keywords never match inside names (car ≠ Carmen/Oscar/Carlos), sha
   assert.equal(findKeyword(RULES, 'Taller: car')?.rule.id, 'r_car');
   assert.equal(findKeyword(RULES, 'Inspeção do carro')?.keyword, 'inspeção');
 });
+
+test('expanded multilingual icon rules', () => {
+  const em = (t) => matchRule(RULES, t)?.emoji ?? null;
+  assert.equal(em('Dentist appointment'), '🩺');
+  assert.equal(em('Swimming lesson'), '🏊');
+  assert.equal(em('Bin day'), '🗑️');
+  assert.equal(em('Haircut'), '💇');
+  assert.equal(em('Train to Porto'), '🚆');
+  assert.equal(em('Pay rent'), '💶');
+  assert.equal(em("Lucía's birthday party"), '🎂');
+  assert.equal(em('Carmen comes over'), null); // short keyword "car" only as a whole word
+});

@@ -1,27 +1,11 @@
-// Default icon rules (same list as server/defaults.js) + client-side resolver (used by the mock dataset and the admin preview).
+// Default icon rules (web/shared/iconRules.json, also read by server/defaults.js) + client-side resolver
+// (used by the mock dataset and the admin preview).
 import type { IconRule, SourceKind } from './types';
+import RULES from './iconRules.json';
 
-export const DEFAULT_ICON_RULES: IconRule[] = [
-  { id: 'r_birthday', match: ['cumple', 'birthday', 'aniversário', 'aniversario', 'faz anos'], emoji: '🎂', color: null },
-  { id: 'r_checkout', match: ['check-out', 'checkout', 'check out', 'salida huésped'], emoji: '🧳', color: null },
-  { id: 'r_airbnb', match: ['airbnb', 'booking', 'reserva', 'reservation', 'reserved', 'check-in', 'checkin', 'hóspede', 'huésped'], emoji: '🏠', color: null },
-  { id: 'r_flight', match: ['vuelo', 'flight', 'voo', 'aeropuerto', 'airport', 'aeroporto'], emoji: '✈️', color: null },
-  { id: 'r_doctor', match: ['médico', 'medico', 'doctor', 'dentista', 'dentist', 'consulta', 'hospital', 'clínica'], emoji: '🩺', color: null },
-  { id: 'r_school', match: ['colegio', 'escuela', 'school', 'escola', 'guardería', 'creche'], emoji: '🎒', color: null },
-  { id: 'r_sport', match: ['fútbol', 'futbol', 'futebol', 'football', 'gym', 'ginásio', 'gimnasio', 'padel', 'pádel', 'tenis', 'ténis', 'tennis', 'deporte', 'desporto', 'sport', 'running', 'yoga'], emoji: '🏃', color: null },
-  { id: 'r_dinner', match: ['cena', 'cenar', 'dinner', 'jantar', 'restaurante', 'restaurant', 'almuerzo', 'almoço', 'lunch'], emoji: '🍽️', color: null },
-  { id: 'r_meeting', match: ['reunión', 'reunion', 'meeting', 'call', 'reunião', 'zoom', 'teams'], emoji: '💼', color: null },
-  // Public holidays before vacations: Google holiday feeds carry "Public holiday" in the description.
-  { id: 'r_holiday', match: ['festivo', 'feriado', 'public holiday', 'bank holiday'], emoji: '🎉', color: null },
-  { id: 'r_vacation', match: ['vacaciones', 'holiday', 'férias', 'vacation'], emoji: '🏖️', color: null },
-  { id: 'r_wedding', match: ['boda', 'wedding', 'casamento'], emoji: '💍', color: null },
-  { id: 'r_shopping', match: ['compra', 'shopping', 'mercado', 'supermercado'], emoji: '🛒', color: null },
-  { id: 'r_car', match: ['coche', 'car', 'taller', 'itv', 'inspeção', 'inspección', 'oficina auto', 'carro'], emoji: '🚗', color: null },
-  { id: 'r_bill', match: ['pago', 'factura', 'fatura', 'bill', 'recibo', 'pagamento'], emoji: '💶', color: null },
-  { id: 'r_vet', match: ['veterinario', 'veterinário', 'vet'], emoji: '🐾', color: null },
-  { id: 'r_cinema', match: ['cine', 'cinema', 'film', 'filme', 'película'], emoji: '🎬', color: null },
-  { id: 'r_concert', match: ['concierto', 'concert', 'concerto', 'festival'], emoji: '🎵', color: null },
-];
+export const DEFAULT_ICON_RULES: IconRule[] = (RULES as { id: string; emoji: string; match: string[] }[]).map((r) => ({
+  id: r.id, match: r.match, emoji: r.emoji, color: null,
+}));
 
 export const KIND_EMOJI: Record<SourceKind, string | null> = {
   generic: null,

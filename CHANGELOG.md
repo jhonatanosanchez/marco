@@ -5,6 +5,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **More icon rules**: 35 categories with about 400 keywords in English, Spanish and Portuguese (train, pharmacy,
+  exams, swimming, haircut, coffee, drinks, parties, work, deliveries, repairs, cleaning, bin day, garden,
+  deadlines, music lessons, babysitter and more). The list lives in `web/shared/iconRules.json`, shared by the
+  server and the web UI. Existing installs get the new keywords and categories once, added after their own rules;
+  nothing is removed or reordered, and rules deleted afterwards stay deleted (marker file `data/.iconrules-v2`).
+
 ### Security
 - Open display streams follow every credential change, not only *Regenerate link* / *Revoke*: each stream keeps a hash
   of the key or device token it opened with and is re-checked after config saves, imports, session revocation and on
