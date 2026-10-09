@@ -74,6 +74,7 @@ function loadConfig() {
   if (!raw) {
     const c = defaultConfig();
     writeFileAtomic(paths.config, JSON.stringify(c, null, 2));
+    mergeIconRuleUpdates(c); // fresh install: already the v2 rule set, only records the marker
     return c;
   }
   // v1 (single screen) → v2 (screens[]): keep an untouched copy of the old file, then persist the migrated one.
