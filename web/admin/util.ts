@@ -1,0 +1,336 @@
+import { projectScreen, SLUG_RE } from '../shared/screens';
+import { locale } from './i18n';
+import type { AppConfig, CalendarSource, IconRule, SourceKind, StoredConfig } from '../shared/types';
+import { findKeyword } from '../../server/lib/keywords.js';
+
+export const uid = (prefix: string) =>
+  `${prefix}_${Date.now().toString(36).slice(-4)}${Math.random().toString(36).slice(2, 7)}`;
+
+export const clone = <T,>(v: T): T =>
+  typeof structuredClone === 'function' ? structuredClone(v) : JSON.parse(JSON.stringify(v));
+
+/** Immer-lite: clone then mutate. Config is small, so this is cheap enough. */
+export function produce<T>(base: T, fn: (draft: T) => void): T {
+  const d = clone(base);
+  fn(d);
+  return d;
+}
+
+export function moveItem<T>(arr: T[], from: number, to: number): T[] {
+  const out = arr.slice();
+  if (to < 0 || to >= out.length || from === to) return out;
+  const [it] = out.splice(from, 1);
+  out.splice(to, 0, it);
+  return out;
+}
+
+/** Case- and accent-insensitive normalisation (same rule the server applies). */
+export const normalize = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim();
+
+/** First icon rule matching `text` — same rule as the server (short keywords match whole words only). */
+export function matchIconRule(rules: IconRule[], text: string): { rule: IconRule; keyword: string; index: number } | null {
+  return findKeyword(rules, text);
+}
+
+export const KIND_EMOJI: Record<SourceKind, string> = { generic: '', airbnb: '🏠', birthdays: '🎂', holidays: '🎉' };
+
+export function resolveEmoji(rules: IconRule[], source: CalendarSource | undefined, text: string): string {
+  const m = matchIconRule(rules, text);
+  if (m?.rule.emoji) return m.rule.emoji;
+  if (source?.emoji) return source.emoji;
+  if (source) return KIND_EMOJI[source.kind] || '';
+  return '';
+}
+
+export const HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+export const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function isHttpUrl(s: string, allowWebcal = false): boolean {
+  try {
+    const u = new URL(s.trim());
+    return u.protocol === 'http:' || u.protocol === 'https:' || (allowWebcal && u.protocol === 'webcal:');
+  } catch {
+    return false;
+  }
+}
+
+/** Public holiday iCal feeds (Google's public holiday calendars), by ISO country code. Name = Spanish i18n key. */
+export const HOLIDAY_PRESETS: { cc: string; flag: string; name: string; url: string }[] = [
+  { cc: 'PT', flag: '🇵🇹', name: 'Festivos de Portugal', url: 'https://calendar.google.com/calendar/ical/es.portuguese.official%23holiday%40group.v.calendar.google.com/public/basic.ics' },
+  { cc: 'ES', flag: '🇪🇸', name: 'Festivos de España', url: 'https://calendar.google.com/calendar/ical/es.spain%23holiday%40group.v.calendar.google.com/public/basic.ics' },
+  { cc: 'GB', flag: '🇬🇧', name: 'Festivos de Reino Unido', url: 'https://calendar.google.com/calendar/ical/en.uk%23holiday%40group.v.calendar.google.com/public/basic.ics' },
+  { cc: 'US', flag: '🇺🇸', name: 'Festivos de Estados Unidos', url: 'https://calendar.google.com/calendar/ical/en.usa%23holiday%40group.v.calendar.google.com/public/basic.ics' },
+  { cc: 'DE', flag: '🇩🇪', name: 'Festivos de Alemania', url: 'https://calendar.google.com/calendar/ical/en.german%23holiday%40group.v.calendar.google.com/public/basic.ics' },
+  { cc: 'FR', flag: '🇫🇷', name: 'Festivos de Francia', url: 'https://calendar.google.com/calendar/ical/en.french%23holiday%40group.v.calendar.google.com/public/basic.ics' },
+  { cc: 'BR', flag: '🇧🇷', name: 'Festivos de Brasil', url: 'https://calendar.google.com/calendar/ical/pt.brazilian%23holiday%40group.v.calendar.google.com/public/basic.ics' },
+];
+
+export const SWATCHES = [
+  '#ff5a4e', '#ff8a3d', '#ffc23d', '#9bd34a', '#2ec4b6', '#3ab0ff',
+  '#5b7cfa', '#9b6bff', '#e05bd6', '#ff6f91', '#8d99ae', '#f2f2f2',
+];
+
+export const EMOJI_GRID = [
+  '🎂', '🎁', '🎉', '🥳', '🏠', '🧳', '🛎️', '🔑', '✈️', '🚆', '🚗', '⛽',
+  '🩺', '💊', '🦷', '🎒', '📚', '🎓', '🏃', '⚽', '🎾', '🏋️', '🚴', '🏊',
+  '🍽️', '☕', '🍷', '🍕', '💼', '📞', '💻', '📅', '🏖️', '⛰️', '🏕️', '🌴',
+  '💍', '❤️', '👶', '👨‍👩‍👧', '🐾', '🐶', '🛒', '💶', '🧾', '🏦', '🔧', '🧹',
+  '🎬', '🎵', '🎮', '📺', '🎨', '📸', '⭐', '📌', '⏰', '🔔', '💬', '✅',
+];
+
+/** Mirror of server/defaults.js DEFAULT_ICON_RULES (used by "restore defaults"). */
+export const DEFAULT_ICON_RULES: IconRule[] = [
+  { id: 'r_birthday', match: ['cumple', 'birthday', 'aniversário', 'aniversario', 'faz anos'], emoji: '🎂', color: null },
+  { id: 'r_checkout', match: ['check-out', 'checkout', 'check out', 'salida huésped'], emoji: '🧳', color: null },
+  { id: 'r_airbnb', match: ['airbnb', 'booking', 'reserva', 'reservation', 'reserved', 'check-in', 'checkin', 'hóspede', 'huésped'], emoji: '🏠', color: null },
+  { id: 'r_flight', match: ['vuelo', 'flight', 'voo', 'aeropuerto', 'airport', 'aeroporto'], emoji: '✈️', color: null },
+  { id: 'r_doctor', match: ['médico', 'medico', 'doctor', 'dentista', 'dentist', 'consulta', 'hospital', 'clínica'], emoji: '🩺', color: null },
+  { id: 'r_school', match: ['colegio', 'escuela', 'school', 'escola', 'guardería', 'creche'], emoji: '🎒', color: null },
+  { id: 'r_sport', match: ['fútbol', 'futbol', 'futebol', 'football', 'gym', 'ginásio', 'gimnasio', 'padel', 'pádel', 'tenis', 'ténis', 'tennis', 'deporte', 'desporto', 'sport', 'running', 'yoga'], emoji: '🏃', color: null },
+  { id: 'r_dinner', match: ['cena', 'cenar', 'dinner', 'jantar', 'restaurante', 'restaurant', 'almuerzo', 'almoço', 'lunch'], emoji: '🍽️', color: null },
+  { id: 'r_meeting', match: ['reunión', 'reunion', 'meeting', 'call', 'reunião', 'zoom', 'teams'], emoji: '💼', color: null },
+  // Public holidays before vacations: Google holiday feeds carry "Public holiday" in the description.
+  { id: 'r_holiday', match: ['festivo', 'feriado', 'public holiday', 'bank holiday'], emoji: '🎉', color: null },
+  { id: 'r_vacation', match: ['vacaciones', 'holiday', 'férias', 'vacation'], emoji: '🏖️', color: null },
+  { id: 'r_wedding', match: ['boda', 'wedding', 'casamento'], emoji: '💍', color: null },
+  { id: 'r_shopping', match: ['compra', 'shopping', 'mercado', 'supermercado'], emoji: '🛒', color: null },
+  { id: 'r_car', match: ['coche', 'car', 'taller', 'itv', 'inspeção', 'inspección', 'oficina auto', 'carro'], emoji: '🚗', color: null },
+  { id: 'r_bill', match: ['pago', 'factura', 'fatura', 'bill', 'recibo', 'pagamento'], emoji: '💶', color: null },
+  { id: 'r_vet', match: ['veterinario', 'veterinário', 'vet'], emoji: '🐾', color: null },
+  { id: 'r_cinema', match: ['cine', 'cinema', 'film', 'filme', 'película'], emoji: '🎬', color: null },
+  { id: 'r_concert', match: ['concierto', 'concert', 'concerto', 'festival'], emoji: '🎵', color: null },
+];
+
+export function guessKind(nameOrId: string): SourceKind {
+  const s = normalize(nameOrId);
+  if (/airbnb|booking|reserv|al\b|alojamento/.test(s)) return 'airbnb';
+  if (/birthday|cumple|aniversar|contacts/.test(s)) return 'birthdays';
+  if (/holiday|festivo|feriado/.test(s)) return 'holidays';
+  return 'generic';
+}
+
+export function formatBytes(n: number): string {
+  if (!Number.isFinite(n)) return '';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  // "4,1 MB" in Spanish / Portuguese, "4.1 MB" in English
+  return `${(n / 1024 / 1024).toLocaleString(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MB`;
+}
+
+export type Errors = Record<string, string>;
+
+/** Client-side validation. Keys are dotted paths used by fields to show inline errors. Messages are Spanish keys for t(). */
+export function validateConfig(c: AppConfig): Errors {
+  const e: Errors = {};
+  const s = c.screen;
+  if (!s.name.trim()) e['screen.name'] = 'Obligatorio';
+  if (!HEX_RE.test(s.accent)) e['screen.accent'] = 'Color no válido';
+  if (!(s.fontScale >= 0.5 && s.fontScale <= 2)) e['screen.fontScale'] = 'Entre 0.5 y 2';
+  if (s.nightMode.enabled) {
+    if (!TIME_RE.test(s.nightMode.from)) e['screen.nightMode.from'] = 'Hora no válida (HH:MM)';
+    if (!TIME_RE.test(s.nightMode.to)) e['screen.nightMode.to'] = 'Hora no válida (HH:MM)';
+  }
+  const b = c.background;
+  if (!(b.intervalSec >= 10)) e['background.intervalSec'] = 'Mínimo 10 s';
+  const cal = c.calendar;
+  if (!(cal.weeks >= 1 && cal.weeks <= 6)) e['calendar.weeks'] = 'Entre 1 y 6';
+  if (!(cal.maxEventsPerDay >= 1 && cal.maxEventsPerDay <= 12)) e['calendar.maxEventsPerDay'] = 'Entre 1 y 12';
+  cal.sources.forEach((src) => {
+    const p = `source.${src.id}`;
+    if (!src.name.trim()) e[`${p}.name`] = 'Obligatorio';
+    if (!HEX_RE.test(src.color)) e[`${p}.color`] = 'Color no válido';
+    if (src.type === 'ics') {
+      if (!src.url || !isHttpUrl(src.url, true)) e[`${p}.url`] = 'URL no válida (http, https o webcal)';
+    } else {
+      if (!src.googleAccount || !src.googleCalendarId) e[`${p}.url`] = 'Falta la cuenta o el calendario de Google';
+    }
+    if (!(src.refreshMin >= 1 && src.refreshMin <= 1440)) e[`${p}.refreshMin`] = 'Entre 1 y 1440 min';
+  });
+  cal.iconRules.forEach((r) => {
+    if (!r.match.some((m) => m.trim())) e[`rule.${r.id}.match`] = 'Añade al menos una palabra clave';
+    if (!r.emoji.trim()) e[`rule.${r.id}.emoji`] = 'Elige un emoji';
+    if (r.color && !HEX_RE.test(r.color)) e[`rule.${r.id}.color`] = 'Color no válido';
+  });
+  const d = c.datetime;
+  if (!d.timezone.trim()) e['datetime.timezone'] = 'Obligatorio';
+  else {
+    try {
+      new Intl.DateTimeFormat('en', { timeZone: d.timezone });
+    } catch {
+      e['datetime.timezone'] = 'Zona horaria desconocida';
+    }
+  }
+  const w = c.weather;
+  if (w.enabled) {
+    if (!(w.lat >= -90 && w.lat <= 90)) e['weather.lat'] = 'Latitud entre -90 y 90';
+    if (!(w.lon >= -180 && w.lon <= 180)) e['weather.lon'] = 'Longitud entre -180 y 180';
+    if (w.provider === 'homeassistant' && !w.haWeatherEntity) e['weather.haWeatherEntity'] = 'Elige una entidad weather.*';
+  }
+  c.news.feeds.forEach((f) => {
+    if (!f.name.trim()) e[`feed.${f.id}.name`] = 'Obligatorio';
+    if (!isHttpUrl(f.url)) e[`feed.${f.id}.url`] = 'URL no válida';
+  });
+  if (!(c.news.rotateSec >= 3)) e['news.rotateSec'] = 'Mínimo 3 s';
+  if (!(c.news.maxItems >= 1 && c.news.maxItems <= 200)) e['news.maxItems'] = 'Entre 1 y 200';
+  if (c.homeassistant.enabled && !isHttpUrl(c.homeassistant.url)) e['homeassistant.url'] = 'URL no válida';
+  c.auth.allowedGoogleEmails.forEach((m, i) => {
+    if (!EMAIL_RE.test(m)) e[`auth.allowedGoogleEmails.${i}`] = 'Email no válido';
+  });
+  if (!c.auth.passwordLoginEnabled && c.auth.allowedGoogleEmails.length === 0)
+    e['auth.passwordLoginEnabled'] = 'Añade un email de Google permitido antes de desactivar la contraseña';
+  return e;
+}
+
+export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+export const isValidDate = (v: string) => {
+  if (!DATE_RE.test(v)) return false;
+  const [y, m, d] = v.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+};
+const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+export const daysInMonth = (m: number) => DAYS_IN_MONTH[m - 1] ?? 31;
+
+/** Keys produced by validateConfig() that belong to the selected screen (the rest are global). */
+const PER_SCREEN_KEY = /^(screen\.|background\.|layout\.|message\.|alerts\.|calendar\.(weeks|maxEventsPerDay)$|news\.rotateSec$|countdowns\.max$)/;
+export const isPerScreenKey = (k: string) => PER_SCREEN_KEY.test(k);
+
+/** Validation of the global v2 lists (local events, birthdays, rules, countdowns, schedules, screens). */
+export function validateGlobal(c: StoredConfig): Errors {
+  const e: Errors = {};
+  const seenSlugs = new Map<string, string>();
+  for (const s of c.screens) {
+    if (!s.name.trim()) e[`scr.${s.id}.name`] = 'Obligatorio';
+    if (!SLUG_RE.test(s.slug)) e[`scr.${s.id}.slug`] = 'Solo minúsculas, números y guiones';
+    else if (seenSlugs.has(s.slug)) e[`scr.${s.id}.slug`] = 'Ya existe otra pantalla con esta dirección';
+    seenSlugs.set(s.slug, s.id);
+  }
+  for (const x of c.localEvents?.items ?? []) {
+    const p = `local.${x.id}`;
+    if (!x.title.trim()) e[`${p}.title`] = 'Obligatorio';
+    if (!isValidDate(x.date)) e[`${p}.date`] = 'Fecha no válida';
+    if (!isValidDate(x.endDate) || x.endDate < x.date) e[`${p}.endDate`] = 'Debe ser igual o posterior al inicio';
+    if (!x.allDay) {
+      if (!TIME_RE.test(x.startTime)) e[`${p}.startTime`] = 'Hora no válida (HH:MM)';
+      if (!TIME_RE.test(x.endTime)) e[`${p}.endTime`] = 'Hora no válida (HH:MM)';
+      else if (x.endDate === x.date && x.endTime <= x.startTime) e[`${p}.endTime`] = 'Debe ser posterior a la hora de inicio';
+    }
+    if (x.repeat.until && (!isValidDate(x.repeat.until) || x.repeat.until < x.date)) e[`${p}.until`] = 'Debe ser igual o posterior al inicio';
+    if (x.color && !HEX_RE.test(x.color)) e[`${p}.color`] = 'Color no válido';
+  }
+  for (const b of c.birthdays?.items ?? []) {
+    const p = `bday.${b.id}`;
+    if (!b.name.trim()) e[`${p}.name`] = 'Obligatorio';
+    if (!(b.month >= 1 && b.month <= 12) || !(b.day >= 1 && b.day <= daysInMonth(b.month))) e[`${p}.date`] = 'Fecha no válida';
+    if (b.year != null && !(b.year >= 1900 && b.year <= 2100)) e[`${p}.year`] = 'Año entre 1900 y 2100';
+  }
+  for (const r of c.eventRules?.items ?? []) {
+    const p = `frule.${r.id}`;
+    if (!r.match.trim()) e[`${p}.match`] = 'Obligatorio';
+    if (r.action === 'style' && !r.emoji && !r.color && !r.countdown) e[`${p}.emoji`] = 'Elige un emoji, un color o la cuenta atrás';
+    if (r.color && !HEX_RE.test(r.color)) e[`${p}.color`] = 'Color no válido';
+  }
+  for (const k of c.countdowns?.items ?? []) {
+    const p = `cd.${k.id}`;
+    if (!k.title.trim()) e[`${p}.title`] = 'Obligatorio';
+    if (!isValidDate(k.date)) e[`${p}.date`] = 'Fecha no válida';
+  }
+  const cd = c.countdowns;
+  if (cd) {
+    if (!(cd.birthdayDays >= 1 && cd.birthdayDays <= 366)) e['countdowns.birthdayDays'] = 'Entre 1 y 366';
+    if (!(cd.horizonDays >= 1 && cd.horizonDays <= 3660)) e['countdowns.horizonDays'] = 'Entre 1 y 3660';
+  }
+  for (const m of c.schedules?.items ?? []) {
+    const p = `sched.${m.id}`;
+    if (!m.title.trim()) e[`${p}.title`] = 'Obligatorio';
+    if (!TIME_RE.test(m.from)) e[`${p}.from`] = 'Hora no válida (HH:MM)';
+    if (!TIME_RE.test(m.to)) e[`${p}.to`] = 'Hora no válida (HH:MM)';
+    else if (m.from === m.to) e[`${p}.to`] = 'Debe ser distinta de la hora de inicio';
+    if (m.startDate && m.endDate && m.endDate < m.startDate) e[`${p}.endDate`] = 'Debe ser igual o posterior al inicio';
+  }
+  return e;
+}
+
+export interface AllErrors {
+  /** errors not tied to a screen (sources, rules, lists, auth…) */
+  global: Errors;
+  /** per-screen errors, keyed by screen id (keys as produced by validateConfig on the flat view) */
+  screens: Record<string, Errors>;
+  total: number;
+}
+
+/** Validate the whole stored config: every screen's flat view + the global lists. */
+export function validateAll(full: StoredConfig): AllErrors {
+  const global: Errors = { ...validateGlobal(full) };
+  const screens: Record<string, Errors> = {};
+  for (const s of full.screens) {
+    const errs = validateConfig(projectScreen(full, s.id));
+    const mine: Errors = {};
+    for (const [k, v] of Object.entries(errs)) {
+      if (isPerScreenKey(k)) mine[k] = v;
+      else global[k] = v;
+    }
+    screens[s.id] = mine;
+  }
+  const total = Object.keys(global).length + Object.values(screens).reduce((n, e) => n + Object.keys(e).length, 0);
+  return { global, screens, total };
+}
+
+/**
+ * Server validation path → { screenIndex, section } (docs/ARCHITECTURE.md error paths).
+ * `screens[1].screen.accent` → { screenIndex: 1, section: 'screen' }; `calendar.sources[2].url` → calendars.
+ */
+export function sectionForServerPath(path: string): { screenIndex: number | null; section: string } {
+  const m = /^screens\[(\d+)\]\.?([a-zA-Z]+)?/.exec(path);
+  if (m) {
+    const sec = m[2] ?? '';
+    const map: Record<string, string> = { screen: 'screen', layout: 'layout', background: 'background', message: 'message', calendar: 'calendars', datetime: 'datetime', weather: 'weather', news: 'news', todo: 'todo', countdowns: 'countdowns', alerts: 'alerts' };
+    return { screenIndex: Number(m[1]), section: map[sec] ?? 'screens' };
+  }
+  const top = path.split(/[.[]/)[0];
+  const map: Record<string, string> = {
+    calendar: path.includes('iconRules') ? 'icons' : 'calendars',
+    datetime: 'datetime', weather: 'weather', news: 'news', todo: 'todo', localEvents: 'local', birthdays: 'birthdays',
+    eventRules: 'filters', countdowns: 'countdowns', schedules: 'alerts', homeassistant: 'homeassistant', auth: 'security',
+    screens: 'screens', defaultScreen: 'screens',
+  };
+  return { screenIndex: null, section: map[top] ?? 'home' };
+}
+
+/** Map an error key to the nav section that owns it (for "jump to error"). */
+export function sectionForError(key: string): string {
+  if (key.startsWith('screen.')) return 'screen';
+  if (key.startsWith('layout.')) return 'layout';
+  if (key.startsWith('message.')) return 'message';
+  if (key.startsWith('alerts.') || key.startsWith('sched.')) return 'alerts';
+  if (key.startsWith('countdowns.') || key.startsWith('cd.')) return 'countdowns';
+  if (key.startsWith('local.')) return 'local';
+  if (key.startsWith('bday.')) return 'birthdays';
+  if (key.startsWith('frule.')) return 'filters';
+  if (key.startsWith('scr.')) return 'screens';
+  if (key.startsWith('background.')) return 'background';
+  if (key.startsWith('calendar.') || key.startsWith('source.')) return 'calendars';
+  if (key.startsWith('rule.')) return 'icons';
+  if (key.startsWith('datetime.')) return 'datetime';
+  if (key.startsWith('weather.')) return 'weather';
+  if (key.startsWith('feed.') || key.startsWith('news.')) return 'news';
+  if (key.startsWith('homeassistant.')) return 'homeassistant';
+  if (key.startsWith('auth.')) return 'security';
+  return 'screen';
+}
+
+/** User calendar sources + the built-in pseudo-sources (local events, birthdays) as picker options. */
+export function allSourceOptions(c: Pick<StoredConfig, 'calendar' | 'localEvents' | 'birthdays'>, opts: { includeDisabled?: boolean } = {}) {
+  const out = c.calendar.sources
+    .filter((s) => opts.includeDisabled || s.enabled)
+    .map((s) => ({ id: s.id, name: s.name || s.id, color: s.color, emoji: s.emoji || KIND_EMOJI[s.kind] || '' }));
+  out.push({ id: 'local', name: c.localEvents.name || 'Local', color: c.localEvents.color, emoji: c.localEvents.emoji || '📅' });
+  out.push({ id: 'birthdays', name: c.birthdays.name || 'Cumpleaños', color: c.birthdays.color, emoji: c.birthdays.emoji || '🎂' });
+  return out;
+}

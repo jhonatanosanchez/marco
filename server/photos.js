@@ -1,0 +1,530 @@
+// Background photos: picsum.photos stock (with author info) and the local gallery in data/photos/.
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import multer from 'multer';
+import { requestJson } from './lib/http.js';
+import { defaultScreen } from './screens.js';
+import { getConfig, paths, writeFileAtomic } from './store.js';
+
+const LIST_TTL = 24 * 3600_000;
+const ALLOWED_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
+/** Per-file upload limit (the admin optimizes photos in the browser first, so real uploads are far smaller). */
+export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+/** Longest side the admin downscales to; larger gallery photos are offered for optimization. */
+export const TARGET_MAX_SIDE = 2560;
+export const CONFLICT_POLICIES = ['replace', 'rename', 'skip'];
+const META_FILE = '.meta.json';
+const TMP_PREFIX = '.upload-';
+let picsumList = null; // { at, items }
+
+async function getPicsumList() {
+  if (picsumList && Date.now() - picsumList.at < LIST_TTL) return picsumList.items;
+  try {
+    const pages = await Promise.all([1, 2, 3].map((p) => requestJson(`https://picsum.photos/v2/list?page=${p}&limit=100`)));
+    // landscape-ish photos only, they look best on a wall screen
+    const items = pages.flat().filter((p) => p && p.id != null && p.width >= p.height);
+    if (items.length) picsumList = { at: Date.now(), items };
+  } catch (err) {
+    console.warn('[photos] picsum list failed:', err.message);
+  }
+  return picsumList?.items || [];
+}
+
+/** Tests: seed the cached picsum list (no network). */
+export function _setPicsumList(items) { picsumList = items ? { at: Date.now(), items } : null; }
+
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+export async function stockPhotos(count, { width = 1920, height = 1080 } = {}) {
+  const list = await getPicsumList();
+  if (!list.length) {
+    return Array.from({ length: count }, () => ({
+      url: `https://picsum.photos/seed/${crypto.randomBytes(5).toString('hex')}/${width}/${height}`,
+      source: 'stock',
+    }));
+  }
+  return shuffle([...list]).slice(0, count).map((p) => ({
+    url: `https://picsum.photos/id/${p.id}/${width}/${height}`,
+    author: p.author,
+    source: 'stock',
+  }));
+}
+
+export function sanitizeFilename(name) {
+  const base = path.basename(String(name || '')).normalize('NFD').replace(/\p{M}+/gu, '');
+  let ext = path.extname(base).toLowerCase();
+  if (ext === '.jpeg') ext = '.jpg';
+  const stem = path.basename(base, path.extname(base)).toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-').replace(/^[.-]+|[.-]+$/g, '').replace(/-{2,}/g, '-').slice(0, 80) || 'foto';
+  return `${stem}${ext}`;
+}
+
+// busboy decodes multipart filenames as latin1; recover UTF-8 names ("Fotó" instead of "FotÃ³").
+export function fixLatin1(name) {
+  const s = String(name || '');
+  if (!/[\u0080-\u00ff]/.test(s)) return s;
+  const utf8 = Buffer.from(s, 'latin1').toString('utf8');
+  return utf8.includes('\ufffd') ? s : utf8;
+}
+
+export function isGalleryFile(name) {
+  return typeof name === 'string' && name === path.basename(name) && !name.startsWith('.') && ALLOWED_EXT.has(path.extname(name).toLowerCase());
+}
+
+/** Name an upload will get on disk: sanitized, `.jpeg` → `.jpg`, extension added from the MIME type when missing. */
+export function uploadName(original, mimetype = 'image/jpeg', { multipart = false } = {}) {
+  let name = sanitizeFilename(multipart ? fixLatin1(original) : original);
+  if (!ALLOWED_EXT.has(path.extname(name))) {
+    name = name.replace(/\.[^.]*$/, '') || 'foto';
+    name += mimetype === 'image/png' ? '.png' : mimetype === 'image/webp' ? '.webp' : '.jpg';
+  }
+  return name;
+}
+
+const photoPath = (file) => path.join(paths.photos, file);
+const exists = (file) => fs.existsSync(photoPath(file));
+export const MAX_THUMB_BYTES = 2 * 1024 * 1024;
+const THUMB_FIELDS = new Set(['thumbs[]', 'thumb']);
+const PHOTO_FIELDS = new Set(['photos[]', 'photos']);
+export const thumbsDir = () => path.join(paths.photos, '.thumbs');
+const thumbPath = (file) => path.join(thumbsDir(), file);
+export const isThumbField = (f) => THUMB_FIELDS.has(f);
+
+/** Store a (browser-made, small JPEG) thumbnail for a gallery file; `src` = temp file path or Buffer. */
+export function storeThumb(file, src) {
+  fs.mkdirSync(thumbsDir(), { recursive: true });
+  if (Buffer.isBuffer(src)) writeFileAtomic(thumbPath(file), src);
+  else fs.renameSync(src, thumbPath(file));
+}
+export function removeThumb(file) {
+  try { fs.rmSync(thumbPath(file), { force: true }); } catch { /* ignore */ }
+}
+const isJpeg = (buf) => buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+/** Cheap sanity check for an uploaded thumbnail (JPEG magic bytes, size cap). */
+export function validThumb(src) {
+  try {
+    const buf = Buffer.isBuffer(src) ? src : fs.readFileSync(src);
+    return buf.length <= MAX_THUMB_BYTES && isJpeg(buf);
+  } catch {
+    return false;
+  }
+}
+
+/** First free "stem-2.ext", "stem-3.ext"… (same convention the sanitizer produces, so names stay URL-friendly). */
+export function freeName(name) {
+  if (!exists(name)) return name;
+  const ext = path.extname(name);
+  const stem = name.slice(0, name.length - ext.length) || 'foto';
+  for (let i = 2; ; i++) {
+    const c = `${stem}-${i}${ext}`;
+    if (!exists(c)) return c;
+  }
+}
+
+// ---------------------------------------------------------------- metadata (data/photos/.meta.json)
+
+/** { [file]: { w, h, focusX?, focusY?, bytes, uploadedAt } } — w/h are display dimensions (EXIF orientation applied). */
+export function readMeta() {
+  try {
+    const j = JSON.parse(fs.readFileSync(photoPath(META_FILE), 'utf8'));
+    return j && typeof j === 'object' && !Array.isArray(j) ? j : {};
+  } catch {
+    return {};
+  }
+}
+
+export function writeMeta(meta) {
+  fs.mkdirSync(paths.photos, { recursive: true });
+  writeFileAtomic(photoPath(META_FILE), JSON.stringify(meta));
+}
+
+/** Read-modify-write (synchronous, so concurrent requests cannot interleave). */
+export function updateMeta(fn) {
+  const m = readMeta();
+  const r = fn(m);
+  writeMeta(m);
+  return r;
+}
+
+export const isUnit = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1;
+const round4 = (v) => Math.round(v * 10000) / 10000;
+
+/**
+ * Pixel size of a JPEG / PNG / WebP from its header (no decoding). For JPEGs the EXIF orientation is read and
+ * w/h are swapped for rotated (5–8) images, so they describe the photo as displayed. Returns null if unknown.
+ */
+export function imageInfo(file) {
+  let fd;
+  try {
+    fd = fs.openSync(file, 'r');
+    const head = Buffer.alloc(32);
+    if (fs.readSync(fd, head, 0, 32, 0) < 4) return null;
+    if (head.readUInt32BE(0) === 0x89504e47) return { w: head.readUInt32BE(16), h: head.readUInt32BE(20), orientation: 1 };
+    if (head.toString('latin1', 0, 4) === 'RIFF' && head.toString('latin1', 8, 12) === 'WEBP') {
+      const chunk = head.toString('latin1', 12, 16);
+      if (chunk === 'VP8X') return { w: 1 + head.readUIntLE(24, 3), h: 1 + head.readUIntLE(27, 3), orientation: 1 };
+      if (chunk === 'VP8 ') return { w: head.readUInt16LE(26) & 0x3fff, h: head.readUInt16LE(28) & 0x3fff, orientation: 1 };
+      if (chunk === 'VP8L') {
+        const b = head.readUInt32LE(21);
+        return { w: (b & 0x3fff) + 1, h: ((b >>> 14) & 0x3fff) + 1, orientation: 1 };
+      }
+      return null;
+    }
+    if (head[0] !== 0xff || head[1] !== 0xd8) return null;
+    let pos = 2;
+    let orientation = 1;
+    const m = Buffer.alloc(9);
+    for (let guard = 0; guard < 500; guard++) {
+      if (fs.readSync(fd, m, 0, 4, pos) < 4 || m[0] !== 0xff) return null;
+      const marker = m[1];
+      if (marker === 0xff) { pos++; continue; } // fill byte
+      if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) { pos += 2; continue; }
+      if (marker === 0xda || marker === 0xd9) return null; // scan data before any SOF: give up
+      const len = m.readUInt16BE(2);
+      if (marker === 0xe1 && len > 16 && len < 65536) {
+        const seg = Buffer.alloc(len - 2);
+        fs.readSync(fd, seg, 0, seg.length, pos + 4);
+        orientation = exifOrientation(seg) || orientation;
+      } else if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+        if (fs.readSync(fd, m, 0, 5, pos + 4) < 5) return null;
+        const h = m.readUInt16BE(1), w = m.readUInt16BE(3);
+        return orientation >= 5 && orientation <= 8 ? { w: h, h: w, orientation } : { w, h, orientation };
+      }
+      pos += 2 + len;
+    }
+    return null;
+  } catch {
+    return null;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
+
+/** Orientation tag (0x0112) from an APP1 segment body ("Exif\0\0" + TIFF), or 0. */
+export function exifOrientation(seg) {
+  if (seg.length < 14 || seg.toString('latin1', 0, 4) !== 'Exif') return 0;
+  const t = 6;
+  const le = seg.toString('latin1', t, t + 2) === 'II';
+  const u16 = (o) => (le ? seg.readUInt16LE(o) : seg.readUInt16BE(o));
+  const u32 = (o) => (le ? seg.readUInt32LE(o) : seg.readUInt32BE(o));
+  try {
+    const ifd = t + u32(t + 4);
+    const n = u16(ifd);
+    for (let i = 0; i < n; i++) {
+      const e = ifd + 2 + i * 12;
+      if (u16(e) === 0x0112) {
+        const v = u16(e + 8);
+        return v >= 1 && v <= 8 ? v : 0;
+      }
+    }
+  } catch { /* truncated */ }
+  return 0;
+}
+
+/** Fresh metadata for a file on disk (keeps the focal point unless `resetFocus`). */
+function describe(file, prev = {}, { resetFocus = false } = {}) {
+  const st = fs.statSync(photoPath(file));
+  const info = imageInfo(photoPath(file));
+  const out = { ...(info ? { w: info.w, h: info.h } : {}), bytes: st.size, uploadedAt: prev.uploadedAt || st.mtime.toISOString() };
+  if (!resetFocus && isUnit(prev.focusX) && isUnit(prev.focusY)) Object.assign(out, { focusX: prev.focusX, focusY: prev.focusY });
+  if (prev.hidden === true) out.hidden = true; // excluded from the rotation (survives replace / re-describe)
+  return out;
+}
+
+function entry(file, st, m = {}) {
+  const v = Math.round(st.mtimeMs).toString(36);
+  const url = `/media/photos/${encodeURIComponent(file)}?v=${v}`;
+  let thumb = null;
+  try { thumb = fs.statSync(thumbPath(file)); } catch { /* no thumbnail yet */ }
+  return {
+    file,
+    url,
+    thumbUrl: thumb ? `/media/thumbs/${encodeURIComponent(file)}?v=${Math.round(thumb.mtimeMs).toString(36)}` : url,
+    hasThumb: !!thumb,
+    size: st.size,
+    mtime: st.mtime.toISOString(),
+    ...(m.w && m.h ? { w: m.w, h: m.h } : {}),
+    ...(isUnit(m.focusX) && isUnit(m.focusY) ? { focusX: m.focusX, focusY: m.focusY } : {}),
+    ...(m.uploadedAt ? { uploadedAt: m.uploadedAt } : {}),
+    hidden: m.hidden === true,
+  };
+}
+
+/**
+ * Gallery listing with metadata. Missing/stale entries (photos copied in by hand, replaced outside the admin)
+ * get their size read from the header; entries of deleted files are pruned.
+ */
+export function listGallery() {
+  let files = [];
+  try { files = fs.readdirSync(paths.photos); } catch { return []; }
+  const meta = readMeta();
+  let dirty = false;
+  const out = [];
+  for (const file of files.filter(isGalleryFile)) {
+    let st;
+    try { st = fs.statSync(photoPath(file)); } catch { continue; }
+    if (!st.isFile()) continue;
+    let m = meta[file];
+    if (!m || m.bytes !== st.size || !m.w) {
+      m = meta[file] = describe(file, m || {}, { resetFocus: !!m && m.bytes !== st.size });
+      dirty = true;
+    }
+    out.push(entry(file, st, m));
+  }
+  const known = new Set(out.map((p) => p.file));
+  for (const k of Object.keys(meta)) {
+    if (!known.has(k)) { delete meta[k]; dirty = true; }
+  }
+  try {
+    for (const t of fs.readdirSync(thumbsDir())) if (!known.has(t) && !t.startsWith('.')) removeThumb(t); // orphaned thumbnails
+  } catch { /* no thumbs dir yet */ }
+  if (dirty) { try { writeMeta(meta); } catch (err) { console.warn('[photos] meta write failed:', err.message); } }
+  return out.sort((a, b) => b.mtime.localeCompare(a.mtime));
+}
+
+export function getPhoto(file) {
+  return isGalleryFile(file) ? listGallery().find((p) => p.file === file) || null : null;
+}
+
+export const PHOTO_ORDERS = ['random', 'newest', 'name'];
+const collator = new Intl.Collator('es', { numeric: true, sensitivity: 'base' });
+/** Per-screen memory of the last gallery batch served: { files, last } (random: avoid repeats; sequential: cursor). */
+const recent = new Map();
+const RECENT_MAX = 64;
+export function resetPhotoHistory() { recent.clear(); }
+
+function sortFor(list, order) {
+  if (order === 'name') list.sort((a, b) => collator.compare(a.file, b.file) || a.file.localeCompare(b.file));
+  else if (order === 'newest') {
+    const when = (g) => g.uploadedAt || g.mtime;
+    list.sort((a, b) => when(b).localeCompare(when(a)) || collator.compare(a.file, b.file));
+  }
+  return list;
+}
+
+/**
+ * Pick `n` gallery photos for one batch. Sequential orders ('newest' / 'name') continue right after `after`
+ * (the photo the display showed last; else where the previous batch for this screen ended) and wrap around.
+ * 'random' shuffles, putting the photos of the previous batch last and never starting with `after`.
+ */
+function pickGallery(order, n, key, after) {
+  const all = listGallery();
+  const list = all.filter((g) => !g.hidden);
+  if (!list.length || n <= 0) return [];
+  const prev = recent.get(key);
+  let out;
+  if (order === 'newest' || order === 'name') {
+    // Locate the reference in the full sorted gallery (it may have just been hidden), then take the next
+    // photos in rotation from there.
+    const full = sortFor(all, order);
+    const ref = after || prev?.last;
+    let start = 0;
+    if (ref) {
+      const i = full.findIndex((g) => g.file === ref);
+      if (i >= 0) start = i + 1;
+      else if (order === 'name') {
+        // deleted meanwhile: continue with the next name after it
+        const j = full.findIndex((g) => collator.compare(g.file, ref) > 0);
+        start = j < 0 ? 0 : j;
+      }
+    }
+    const seq = [...full.slice(start), ...full.slice(0, start)].filter((g) => !g.hidden);
+    out = seq.slice(0, n);
+  } else {
+    const seen = new Set(prev?.files || []);
+    const fresh = shuffle(list.filter((g) => !seen.has(g.file)));
+    const stale = shuffle(list.filter((g) => seen.has(g.file)));
+    out = [...fresh, ...stale].slice(0, n);
+    const avoid = after || prev?.last;
+    if (out.length > 1 && out[0].file === avoid) [out[0], out[1]] = [out[1], out[0]];
+  }
+  recent.delete(key);
+  recent.set(key, { files: out.map((g) => g.file), last: out[out.length - 1].file });
+  if (recent.size > RECENT_MAX) recent.delete(recent.keys().next().value);
+  return out.map((g) => ({
+    url: g.url,
+    file: g.file,
+    title: g.file.replace(/\.[^.]+$/, ''),
+    source: 'gallery',
+    ...(g.focusX !== undefined ? { focusX: g.focusX, focusY: g.focusY } : {}),
+  }));
+}
+
+/**
+ * One batch for the display. `opts.key` identifies the screen (rotation memory), `opts.after` = gallery file the
+ * display showed last. Hidden photos never appear; a gallery with nothing in rotation falls back to stock.
+ */
+export async function getPhotos(count = 20, bg = defaultScreen(getConfig()).background, { key = '', after = '' } = {}) {
+  count = Math.max(1, Math.min(100, count | 0 || 20));
+  const order = PHOTO_ORDERS.includes(bg.order) ? bg.order : 'random';
+  if (!isGalleryFile(after)) after = '';
+  key = String(key || 'default');
+  if (bg.source === 'gallery') {
+    const g = pickGallery(order, count, key, after);
+    return g.length ? g : stockPhotos(count); // fall back to stock when nothing is in rotation
+  }
+  if (bg.source === 'mixed') {
+    const g = pickGallery(order, Math.ceil(count / 2), key, after);
+    const s = await stockPhotos(count - g.length);
+    // interleave, keeping the gallery part in its order
+    const out = [];
+    for (let i = 0; i < Math.max(g.length, s.length); i++) {
+      if (g[i]) out.push(g[i]);
+      if (s[i]) out.push(s[i]);
+    }
+    return out;
+  }
+  return stockPhotos(count);
+}
+
+export function deletePhoto(file) {
+  if (!isGalleryFile(file)) return false;
+  const p = photoPath(file);
+  if (path.dirname(p) !== paths.photos || !fs.existsSync(p)) return false;
+  fs.unlinkSync(p);
+  removeThumb(file);
+  try { updateMeta((m) => void delete m[file]); } catch { /* listing prunes it later */ }
+  return true;
+}
+
+/** Set the focal point (0..1 of width/height). Returns the updated listing entry, or null if the photo is unknown. */
+export function setFocus(file, focusX, focusY) {
+  if (!isGalleryFile(file) || !exists(file)) return null;
+  updateMeta((m) => {
+    m[file] = { ...describe(file, m[file] || {}), focusX: round4(focusX), focusY: round4(focusY) };
+  });
+  return getPhoto(file);
+}
+
+/**
+ * Include (`hidden` false) or exclude photos from the rotation. Returns { updated: [...files], missing: [...files] }.
+ */
+export function setHidden(files, hidden) {
+  const updated = [], missing = [];
+  updateMeta((m) => {
+    for (const file of new Set(files)) {
+      if (!isGalleryFile(file) || !exists(file)) { missing.push(file); continue; }
+      const next = describe(file, m[file] || {});
+      if (hidden) next.hidden = true;
+      else delete next.hidden;
+      m[file] = next;
+      updated.push(file);
+    }
+  });
+  return { updated, missing };
+}
+
+/** For POST /photos/check: what each name becomes and whether it is taken. */
+export function checkNames(names) {
+  return names.map((name) => {
+    const sanitized = uploadName(name);
+    const taken = exists(sanitized);
+    return { name, sanitized, exists: taken, ...(taken ? { renamed: freeName(sanitized) } : {}) };
+  });
+}
+
+/**
+ * Move an uploaded temp file into the gallery under `requested` according to the conflict policy:
+ * replace (overwrite, metadata refreshed), rename (first free "name-N.ext"), skip (discard). Never overwrites
+ * unless asked. `focus` = optional client-computed focal point.
+ */
+export function finalizeUpload(tmpPath, requested, policy = 'rename', focus = null, meta = readMeta(), thumbTmp = null) {
+  let target = requested;
+  let status = 'created';
+  if (exists(requested)) {
+    if (policy === 'skip') {
+      fs.rmSync(tmpPath, { force: true });
+      if (thumbTmp) fs.rmSync(thumbTmp, { force: true });
+      return { status: 'skipped', requested, file: requested };
+    }
+    if (policy === 'replace') status = 'replaced';
+    else { target = freeName(requested); status = 'renamed'; }
+  }
+  fs.renameSync(tmpPath, photoPath(target));
+  // The thumbnail always follows the photo: a new one replaces it, otherwise a stale one is dropped.
+  if (thumbTmp && validThumb(thumbTmp)) storeThumb(target, thumbTmp);
+  else {
+    if (thumbTmp) fs.rmSync(thumbTmp, { force: true });
+    removeThumb(target);
+  }
+  const m = describe(target, status === 'replaced' && meta[target]?.hidden ? { hidden: true } : {}, { resetFocus: true });
+  m.uploadedAt = new Date().toISOString();
+  if (focus && isUnit(focus.focusX) && isUnit(focus.focusY)) Object.assign(m, { focusX: round4(focus.focusX), focusY: round4(focus.focusY) });
+  meta[target] = m;
+  const st = fs.statSync(photoPath(target));
+  return { status, requested, ...entry(target, st, m) };
+}
+
+/** Remove abandoned temp uploads (aborted requests) older than an hour. */
+export function cleanupTempUploads(maxAgeMs = 3600_000) {
+  let files = [];
+  try { files = fs.readdirSync(paths.photos); } catch { return; }
+  for (const f of files) {
+    if (!f.startsWith(TMP_PREFIX)) continue;
+    try {
+      const p = photoPath(f);
+      if (Date.now() - fs.statSync(p).mtimeMs > maxAgeMs) fs.rmSync(p, { force: true });
+    } catch { /* ignore */ }
+  }
+}
+
+/**
+ * multer middleware: field "photos[]" or "photos", jpg/png/webp, ≤ 100 MB each. Files land under a hidden temp
+ * name and are moved into place by finalizeUpload() (so a half-written upload is never served or listed).
+ * With req.conflictPolicy === 'skip', files whose name is taken are not even stored (req.skippedPhotos).
+ * Optional thumbnails (field "thumbs[]" / "thumb", JPEG ≤ 2 MB) pair with photos by order: file.seq.
+ */
+export function uploadMiddleware({ maxBytes = MAX_UPLOAD_BYTES } = {}) {
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      fs.mkdirSync(paths.photos, { recursive: true });
+      cb(null, paths.photos);
+    },
+    filename: (req, file, cb) => cb(null, `${TMP_PREFIX}${crypto.randomBytes(8).toString('hex')}.tmp`),
+  });
+  return multer({
+    storage,
+    limits: { fileSize: maxBytes, files: 50 },
+    fileFilter: (req, file, cb) => {
+      if (THUMB_FIELDS.has(file.fieldname)) {
+        file.seq = req.thumbSeq = (req.thumbSeq ?? -1) + 1;
+        if (file.mimetype !== 'image/jpeg') return cb(Object.assign(new Error('Thumbnails must be JPEG'), { status: 415 }));
+        return cb(null, true);
+      }
+      const okField = PHOTO_FIELDS.has(file.fieldname);
+      const ext = path.extname(fixLatin1(file.originalname || '')).toLowerCase();
+      if (!okField) return cb(Object.assign(new Error(`Unexpected field ${file.fieldname}`), { status: 400 }));
+      file.seq = req.photoSeq = (req.photoSeq ?? -1) + 1;
+      if (!ALLOWED_MIME.has(file.mimetype) || (ext && !ALLOWED_EXT.has(ext))) {
+        return cb(Object.assign(new Error(`Unsupported file type: ${fixLatin1(file.originalname)} (only JPG, PNG or WebP)`), { status: 415 }));
+      }
+      file.targetName = uploadName(file.originalname, file.mimetype, { multipart: true });
+      if (req.conflictPolicy === 'skip' && exists(file.targetName)) {
+        (req.skippedPhotos ||= []).push({ seq: file.seq, file: file.targetName });
+        return cb(null, false);
+      }
+      cb(null, true);
+    },
+  }).any();
+}
+
+/** multer middleware for PUT /photos/:file/thumb: one JPEG in field "thumb", ≤ 2 MB, kept in memory. */
+export function thumbMiddleware() {
+  return multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: MAX_THUMB_BYTES, files: 1 },
+    fileFilter: (req, file, cb) => {
+      if (file.fieldname !== 'thumb') return cb(Object.assign(new Error(`Unexpected field ${file.fieldname}`), { status: 400 }));
+      if (file.mimetype !== 'image/jpeg') return cb(Object.assign(new Error('Thumbnails must be JPEG'), { status: 415 }));
+      cb(null, true);
+    },
+  }).single('thumb');
+}

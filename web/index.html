@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en" translate="no">
+  <head>
+    <meta name="google" content="notranslate" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#000000" />
+    <title>Calendario</title>
+    <!-- Inter/Outfit are bundled locally. The colour-emoji web font is only an optional, non-blocking fallback
+         for systems without fonts-noto-color-emoji (installed by deploy/install.sh): offline it is simply skipped. -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
+  </head>
+  <body>
+    <canvas id="gl" aria-hidden="true"></canvas>
+    <div id="app" class="preset-bigCalendar side-left booting">
+      <div class="photo-area"><div class="ph-stack"></div><div class="scrim"></div></div>
+      <section class="side">
+        <div class="side-top">
+          <div id="clock"></div>
+          <div id="highlights"></div>
+        </div>
+        <div class="side-mid">
+          <div id="sched" style="display: none"></div>
+          <div id="message" class="card msg" style="display: none"></div>
+          <div id="todo" class="card todo" style="display: none"></div>
+          <div id="countdowns" style="display: none"></div>
+          <div id="side-agenda"></div>
+        </div>
+        <div class="side-bottom"><div id="weather"></div></div>
+        <div class="photo-meta" style="display: none"></div>
+      </section>
+      <section class="main">
+        <div id="calendar"></div>
+        <div id="agenda"></div>
+        <div class="main-strip">
+          <div id="sched-strip" style="display: none"></div>
+          <div id="cd-strip" style="display: none"></div>
+        </div>
+        <div id="news" style="display: none"></div>
+      </section>
+    </div>
+    <div id="night" aria-hidden="true"></div>
+    <div id="alerts" aria-live="polite"></div>
+    <div id="identify" aria-hidden="true"></div>
+    <div id="screen-note" aria-hidden="true"></div>
+    <div id="status" aria-hidden="true"></div>
+    <script type="module" src="/display/main.ts"></script>
+  </body>
+</html>

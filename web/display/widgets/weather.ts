@@ -1,0 +1,87 @@
+// Weather block: current conditions, meta row, hourly strip and daily forecast pills.
+import type { WeatherResponse } from '../../shared/types';
+import { diffDays, formatTime, weekdayName, zonedParts } from '../../shared/i18n';
+import { ctx } from '../ctx';
+import { esc, setHTML } from '../dom';
+import { ICON, weatherIcon, windArrow } from '../icons';
+
+const r = (n: number | null | undefined) => (n === null || n === undefined || Number.isNaN(n) ? '–' : String(Math.round(n)));
+const r1 = (n: number | null | undefined, lang: string) =>
+  n === null || n === undefined || Number.isNaN(n) ? '–' : (Math.round(n * 10) / 10).toLocaleString(lang === 'en' ? 'en-GB' : 'es-ES');
+
+export class Weather {
+  constructor(private root: HTMLElement, private opts: { hourly?: boolean; days?: boolean; compact?: boolean } = {}) {
+    root.classList.add('weather');
+    if (opts.compact) root.classList.add('compact');
+  }
+
+  render(w: WeatherResponse | null, todayKey: string): void {
+    const { cfg, lang, tz, t } = ctx;
+    const wc = cfg.weather;
+    this.root.style.display = wc.enabled && w ? '' : 'none';
+    if (!wc.enabled || !w || !w.current) return;
+    const c = w.current;
+    const f24 = cfg.datetime.format24;
+    const speedUnit = wc.units === 'imperial' ? 'mph' : 'km/h';
+    const windVal = wc.units === 'imperial' ? c.windKmh / 1.609 : c.windKmh;
+
+    const nowMs = Date.now();
+    const sunsetMs = w.today?.sunset ? Date.parse(w.today.sunset) : NaN;
+    const sunriseMs = w.today?.sunrise ? Date.parse(w.today.sunrise) : NaN;
+    const showSunset = Number.isFinite(sunsetMs) && (nowMs < sunsetMs || !Number.isFinite(sunriseMs));
+    const sunHtml = Number.isFinite(sunsetMs) || Number.isFinite(sunriseMs)
+      ? `<span class="m">${showSunset ? ICON.sunset : ICON.sunrise}<b>${esc(formatTime(new Date(showSunset ? sunsetMs : sunriseMs), tz, f24, cfg.datetime.showAmPm))}</b></span>`
+      : '';
+
+    const meta = [
+      `<span class="m">${ICON.thermo}<em>${esc(t('feelsLike'))}</em><b>${r(c.feelsLike)}°</b></span>`,
+      `<span class="m">${ICON.drop}<b>${r(c.humidity)}%</b></span>`,
+      `<span class="m">${windArrow(c.windDir)}<b>${r(windVal)}</b><em>${speedUnit}${c.windDirLabel ? ' ' + esc(c.windDirLabel) : ''}</em></span>`,
+      sunHtml,
+    ];
+    if (wc.showPrecipChance && w.today && w.today.precipChance >= 10) {
+      meta.push(`<span class="m">${ICON.umbrella}<b>${r(w.today.precipChance)}%</b></span>`);
+    }
+    if (w.indoor && (w.indoor.temp !== null || w.indoor.humidity !== null)) {
+      meta.push(
+        `<span class="m indoor">${ICON.home}<b>${w.indoor.temp !== null ? r1(w.indoor.temp, lang) + '°' : ''}</b>${w.indoor.humidity !== null ? `<em>${r(w.indoor.humidity)}%</em>` : ''}</span>`,
+      );
+    }
+
+    const hi = w.today ? `<span class="hilo"><b>${r(w.today.max)}°</b><i>/</i>${r(w.today.min)}°</span>` : '';
+    let html = `<div class="wx-now">
+        <div class="wx-icon">${weatherIcon(c.code, c.isDay, { animated: !ctx.lite })}</div>
+        <div class="wx-temp">${r(c.temp)}<span class="deg">°</span></div>
+        <div class="wx-desc"><b>${esc(c.description || '')}</b>${hi}<span class="loc">${esc(w.locationName || wc.locationName || '')}</span></div>
+      </div>
+      <div class="wx-meta">${meta.filter(Boolean).join('')}</div>`;
+
+    if (wc.showHourly && this.opts.hourly !== false && w.hourly?.length) {
+      const hrs = w.hourly.slice(0, 8).map((h) => {
+        const d = new Date(h.time);
+        const p = zonedParts(d, tz);
+        const lbl = f24 ? `${p.hour}h` : `${p.hour % 12 === 0 ? 12 : p.hour % 12}${p.hour < 12 ? 'a' : 'p'}`;
+        const pc = wc.showPrecipChance && h.precipChance >= 20 ? `<span class="p">${r(h.precipChance)}%</span>` : '<span class="p"></span>';
+        return `<div class="h"><span class="hl">${lbl}</span>${weatherIcon(h.code, h.isDay)}<span class="hv">${r(h.temp)}°</span>${pc}</div>`;
+      });
+      html += `<div class="wx-hourly">${hrs.join('')}</div>`;
+    }
+
+    if (this.opts.days !== false && w.daily?.length) {
+      const days = w.daily.filter((d) => d.date >= todayKey).slice(0, wc.forecastDays);
+      const all = days.flatMap((d) => [d.min, d.max]);
+      const lo = Math.min(...all), hiT = Math.max(...all);
+      const span = Math.max(1, hiT - lo);
+      const pills = days.map((d) => {
+        const isToday = diffDays(todayKey, d.date) === 0;
+        const name = isToday ? t('today') : weekdayName(lang, d.date, 'short');
+        const a = ((d.min - lo) / span) * 100, b = ((d.max - lo) / span) * 100;
+        const pc = wc.showPrecipChance && d.precipChance >= 20 ? `<span class="p">${ICON.drop}${r(d.precipChance)}%</span>` : '';
+        return `<div class="dp${isToday ? ' today' : ''}"><span class="dn">${esc(name)}</span>${weatherIcon(d.code, true)}
+          <span class="dmx">${r(d.max)}°</span><span class="rng"><i style="left:${a.toFixed(0)}%;right:${(100 - b).toFixed(0)}%"></i></span><span class="dmn">${r(d.min)}°</span>${pc}</div>`;
+      });
+      html += `<div class="wx-days">${pills.join('')}</div>`;
+    }
+    setHTML(this.root, html);
+  }
+}

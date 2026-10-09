@@ -1,0 +1,169 @@
+import { useEffect, useState } from 'preact/hooks';
+import type { AdminStatus } from '../../shared/types';
+import { api, ApiError } from '../api';
+import { Icon } from '../components/icons';
+import { Button, Card, Empty, PageHeader, StatusDot } from '../components/ui';
+import { formatDuration, relTime, t } from '../i18n';
+import type { SectionProps } from './common';
+
+export function StatusSection({ cfg }: SectionProps) {
+  const [st, setSt] = useState<AdminStatus | null>(null);
+  const [err, setErr] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [, tick] = useState(0);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      setSt(await api.status());
+      setErr('');
+    } catch (e) {
+      setErr((e as ApiError).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => {
+    load();
+    const a = setInterval(load, 15000);
+    const b = setInterval(() => tick((n) => n + 1), 5000);
+    return () => {
+      clearInterval(a);
+      clearInterval(b);
+    };
+  }, []);
+
+  const srcMeta = (id: string) => cfg.calendar.sources.find((s) => s.id === id);
+  const okCount = st?.sources.filter((s) => s.ok).length ?? 0;
+
+  return (
+    <>
+      <PageHeader title={t('Estado')} desc={t('Salud de las fuentes y pantallas conectadas. Se actualiza cada 15 s.')}>
+        <Button icon="refresh" loading={loading} onClick={load}>
+          {t('Actualizar')}
+        </Button>
+      </PageHeader>
+      {err && !st ? (
+        <Card>
+          <Empty icon="alert" title={t('No se pudo obtener el estado')}>
+            {err}
+          </Empty>
+        </Card>
+      ) : (
+        <>
+          <div class="stats">
+            <div class="stat">
+              <span class="stat__icon">
+                <Icon name="monitor" size={18} />
+              </span>
+              <div>
+                <div class="stat__value">{st ? st.displays : '—'}</div>
+                <div class="stat__label">{t('Pantallas conectadas')}</div>
+              </div>
+            </div>
+            <div class="stat">
+              <span class="stat__icon">
+                <Icon name="calendar" size={18} />
+              </span>
+              <div>
+                <div class="stat__value">
+                  {st ? `${okCount}/${st.sources.length}` : '—'}
+                </div>
+                <div class="stat__label">{t('Calendarios OK')}</div>
+              </div>
+            </div>
+            <div class="stat">
+              <span class="stat__icon">
+                <Icon name="cloud" size={18} />
+              </span>
+              <div>
+                <div class="stat__value stat__value--text">
+                  {st ? <StatusDot state={st.weather.ok ? 'ok' : 'error'} /> : null} {st ? relTime(st.weather.updatedAt) : '—'}
+                </div>
+                <div class="stat__label">{t('Tiempo')}</div>
+              </div>
+            </div>
+            <div class="stat">
+              <span class="stat__icon">
+                <Icon name="news" size={18} />
+              </span>
+              <div>
+                <div class="stat__value stat__value--text">
+                  {st ? <StatusDot state={st.news.ok ? 'ok' : 'error'} /> : null} {st ? relTime(st.news.updatedAt) : '—'}
+                </div>
+                <div class="stat__label">
+                  {t('Noticias')}
+                  {st?.news.count != null && ` · ${st.news.count}`}
+                </div>
+              </div>
+            </div>
+            <div class="stat">
+              <span class="stat__icon">
+                <Icon name="activity" size={18} />
+              </span>
+              <div>
+                <div class="stat__value">{st ? formatDuration(st.uptime) : '—'}</div>
+                <div class="stat__label">{t('Servidor activo')}</div>
+              </div>
+            </div>
+          </div>
+          {st?.news.error && (
+            <div class="test-result is-err">
+              <Icon name="alert" size={14} /> {t('Noticias')}: {st.news.error}
+            </div>
+          )}
+          <Card title={t('Fuentes de calendario')} icon="calendar">
+            {!st ? (
+              <div class="skeleton-list">
+                <div class="skeleton" />
+                <div class="skeleton" />
+              </div>
+            ) : st.sources.length === 0 ? (
+              <Empty icon="calendar" title={t('No hay calendarios configurados')} />
+            ) : (
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>{t('Calendario')}</th>
+                      <th>{t('Estado')}</th>
+                      <th class="num">{t('Eventos')}</th>
+                      <th>{t('Última descarga')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {st.sources.map((s) => {
+                      const m = srcMeta(s.id);
+                      return (
+                        <tr>
+                          <td>
+                            <span class="dot-color" style={{ background: m?.color ?? '#888' }} /> {m?.emoji} <strong>{s.name}</strong>
+                          </td>
+                          <td>
+                            {s.ok ? (
+                              <span class="ok-text">
+                                <StatusDot state="ok" /> OK
+                              </span>
+                            ) : (
+                              <span class="err-text" title={s.error ?? ''}>
+                                <StatusDot state={s.lastFetch ? 'error' : 'idle'} /> {s.error || t('Pendiente')}
+                              </span>
+                            )}
+                          </td>
+                          <td class="num">{s.count}</td>
+                          <td class="muted" title={s.lastFetch ?? ''}>
+                            {relTime(s.lastFetch)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </>
+      )}
+    </>
+  );
+}

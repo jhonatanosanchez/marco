@@ -1,0 +1,71 @@
+// Static index of individual settings for the command palette (Ctrl/Cmd+K).
+// label = Spanish source string (translated with t()), keywords = extra words in es/en/pt, anchor = element id.
+export interface SettingEntry {
+  label: string;
+  route: string;
+  anchor?: string;
+  keywords?: string;
+}
+
+export const SETTINGS_INDEX: SettingEntry[] = [
+  // Pantalla
+  { label: 'Plantilla de diseño', route: 'layout', anchor: 'layout-presets', keywords: 'layout preset agenda calendario grande reloj grande template' },
+  { label: 'Panel lateral (izquierda/derecha, anchura)', route: 'layout', anchor: 'layout-side', keywords: 'side panel width columna lateral largura' },
+  { label: 'Fotos de fondo', route: 'background', anchor: 'bg-photos', keywords: 'background wallpaper fondo stock galería intervalo brillo fotos orden aleatorio order random shuffle newest name' },
+  { label: 'Efecto ambiental (aurora, partículas)', route: 'background', anchor: 'bg-ambient', keywords: 'ambient aurora particles three webgl animación' },
+  { label: 'Nombre de la pantalla', route: 'screen', anchor: 'scr-general', keywords: 'name nombre nome' },
+  { label: 'Idioma de la pantalla', route: 'screen', anchor: 'scr-general', keywords: 'language idioma lingua español english português' },
+  { label: 'Orientación (horizontal / vertical)', route: 'screen', anchor: 'scr-general', keywords: 'orientation portrait landscape vertical rotar' },
+  { label: 'Tamaño de letra', route: 'screen', anchor: 'scr-general', keywords: 'font size escala texto grande' },
+  { label: 'Tema claro / oscuro', route: 'screen', anchor: 'scr-look', keywords: 'theme dark light tema' },
+  { label: 'Color de acento', route: 'screen', anchor: 'scr-look', keywords: 'accent color cor' },
+  { label: 'Modo noche (horario y brillo)', route: 'screen', anchor: 'scr-night', keywords: 'night dim noche noturno brillo atenuar' },
+  { label: 'CSS personalizado', route: 'screen', anchor: 'scr-css', keywords: 'custom css estilos avanzado' },
+  { label: 'Reloj (digital / analógico, segundos, 24 h)', route: 'datetime', anchor: 'dt-clock', keywords: 'clock seconds segundos 12h 24h ampm reloj' },
+  { label: 'Zona horaria', route: 'datetime', anchor: 'dt-clock', keywords: 'timezone fuso horario lisboa madrid' },
+  { label: 'Formato de fecha', route: 'datetime', anchor: 'dt-format', keywords: 'date format fecha data' },
+  // Contenido
+  { label: 'Añadir calendario iCal (URL .ics)', route: 'calendars', anchor: 'cal-sources', keywords: 'ics ical url airbnb booking icloud outlook fuente source' },
+  { label: 'Cuentas de Google Calendar', route: 'calendars', anchor: 'cal-google', keywords: 'google account cuenta oauth vincular' },
+  { label: 'Calendarios visibles en esta pantalla', route: 'calendars', anchor: 'cal-screen-sources', keywords: 'sources filter screen mostrar ocultar fuentes por pantalla' },
+  { label: 'Vista del calendario (mes, semana, agenda)', route: 'calendars', anchor: 'cal-view', keywords: 'view month week agenda semanas weeks start lunes' },
+  { label: 'Eventos máximos por día', route: 'calendars', anchor: 'cal-view', keywords: 'max events per day más' },
+  { label: 'Eventos locales', route: 'local', anchor: 'local-list', keywords: 'local events eventos familia recurrente repetir crear evento' },
+  { label: 'Cumpleaños', route: 'birthdays', anchor: 'bday-list', keywords: 'birthday aniversário cumple edad age' },
+  { label: 'Importar cumpleaños (CSV)', route: 'birthdays', anchor: 'bday-list', keywords: 'csv import pegar paste' },
+  { label: 'Mostrar la edad en los cumpleaños', route: 'birthdays', anchor: 'bday-settings', keywords: 'age edad idade show' },
+  { label: 'Ocultar eventos por palabra clave', route: 'filters', anchor: 'flt-rules', keywords: 'hide filter ocultar no disponible blocked' },
+  { label: 'Renombrar eventos', route: 'filters', anchor: 'flt-rules', keywords: 'rename replace cambiar título' },
+  { label: 'Forzar emoji o color de una serie', route: 'filters', anchor: 'flt-rules', keywords: 'style emoji color override' },
+  { label: 'Vista previa de los próximos 14 días', route: 'filters', anchor: 'flt-preview', keywords: 'preview próximos eventos' },
+  { label: 'Iconos automáticos (emoji por palabra clave)', route: 'icons', anchor: 'ico-rules', keywords: 'icon rules emoji keyword' },
+  { label: 'Cuentas atrás', route: 'countdowns', anchor: 'cd-list', keywords: 'countdown faltan días navidad viaje contagem' },
+  { label: 'Cuentas atrás automáticas (cumpleaños, eventos marcados)', route: 'countdowns', anchor: 'cd-auto', keywords: 'auto include birthdays flagged' },
+  { label: 'Ubicación del tiempo', route: 'weather', anchor: 'wx-main', keywords: 'weather location city ciudad lat lon open-meteo' },
+  { label: 'Previsión por horas y días', route: 'weather', anchor: 'wx-main', keywords: 'forecast hourly days previsión' },
+  { label: 'Sensores de Home Assistant para el tiempo', route: 'weather', anchor: 'wx-ha', keywords: 'indoor temperatura humedad sensor' },
+  { label: 'Fuentes de noticias (RSS)', route: 'news', anchor: 'news-feeds', keywords: 'rss feed news noticias titulares' },
+  { label: 'Lista de tareas', route: 'todo', keywords: 'todo tasks tareas pendientes' },
+  { label: 'Mensaje personalizado', route: 'message', keywords: 'message mensaje bienvenida' },
+  // Avisos
+  { label: 'Enviar un aviso ahora', route: 'alerts', anchor: 'al-send', keywords: 'announce alert send aviso notificación anuncio' },
+  { label: 'Avisos activos', route: 'alerts', anchor: 'al-active', keywords: 'active alerts quitar' },
+  { label: 'Mensajes programados (basura, recordatorios)', route: 'alerts', anchor: 'al-sched', keywords: 'scheduled recurring basura lixo recordatorio' },
+  { label: 'Sonido y volumen de los avisos', route: 'alerts', anchor: 'al-screen', keywords: 'sound chime volumen volume' },
+  // Integraciones
+  { label: 'Galería de fotos', route: 'photos', keywords: 'photos upload subir galería' },
+  { label: 'Conexión con Home Assistant', route: 'homeassistant', anchor: 'ha-conn', keywords: 'home assistant token url' },
+  { label: 'Tokens de API', route: 'api', anchor: 'api-tokens', keywords: 'token api bearer webhook' },
+  { label: 'Ejemplo de Home Assistant (rest_command)', route: 'api', anchor: 'api-examples', keywords: 'yaml rest_command automation curl' },
+  // Sistema
+  { label: 'Pantallas (crear, duplicar, predeterminada)', route: 'screens', anchor: 'scr-list', keywords: 'screens profiles salón cocina slug' },
+  { label: 'Pantallas conectadas', route: 'displays', keywords: 'displays connected kiosk raspberry ip resolución' },
+  { label: 'Exportar configuración', route: 'backups', anchor: 'bk-export', keywords: 'export backup descargar json' },
+  { label: 'Importar configuración', route: 'backups', anchor: 'bk-import', keywords: 'import restore subir json' },
+  { label: 'Copias automáticas', route: 'backups', anchor: 'bk-auto', keywords: 'backups automatic restore restaurar versiones' },
+  { label: 'Registro de actividad', route: 'activity', keywords: 'activity log logins registro' },
+  { label: 'Cambiar contraseña', route: 'security', anchor: 'sec-password', keywords: 'password contraseña palavra-passe' },
+  { label: 'Emails de Google permitidos', route: 'security', anchor: 'sec-google', keywords: 'google login email permitir' },
+  { label: 'Cerrar sesión en todos los dispositivos', route: 'security', anchor: 'sec-sessions', keywords: 'logout sessions' },
+  { label: 'Estado de las fuentes', route: 'status', keywords: 'status health salud errores' },
+];

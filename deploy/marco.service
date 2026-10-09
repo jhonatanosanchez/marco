@@ -1,0 +1,31 @@
+# systemd unit for Marco.
+# install.sh replaces @USER@, @GROUP@, @APP_DIR@ and @NODE@ and copies it to
+# /etc/systemd/system/marco.service
+[Unit]
+Description=Marco (wall calendar display + admin panel)
+Documentation=file://@APP_DIR@/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+Group=@GROUP@
+WorkingDirectory=@APP_DIR@
+EnvironmentFile=-@APP_DIR@/.env
+Environment=NODE_ENV=production
+ExecStart=@NODE@ server/index.js
+Restart=always
+RestartSec=5
+# Bounded memory so Chromium on the same Pi has room
+Environment=NODE_OPTIONS=--max-old-space-size=256
+# Basic hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=marco
+
+[Install]
+WantedBy=multi-user.target

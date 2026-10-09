@@ -1,0 +1,389 @@
+// rotating config backups, export bundles and import preview/apply helpers.
+// See docs/API.md and docs/ARCHITECTURE.md. Files live in data/backups/:
+//   config-<YYYYMMDDTHHMMSSZ>-r<revision>-<reason>.json   (reason: save | manual | restore | import; rotated, keep 20)
+//   config-v1-premigration.json                            (written once by the v1 → v2 migration; never rotated)
+import fs from 'node:fs';
+import path from 'node:path';
+import { paths, writeFileAtomic } from './store.js';
+import { validateConfig, mergeDefaults, isV1 } from './validate.js';
+import { RESERVED_SOURCE_IDS, defaultConfig, defaultScreenProfile } from './defaults.js';
+import { stableStringify } from './lib/text.js';
+import { countNoun, countChanged, summaryWord } from './lib/i18n.js';
+
+export const KEEP_BACKUPS = 20;
+export const COALESCE_MS = 120_000;
+export const BACKUP_ID_RE = /^config-(\d{8}T\d{6}Z-r\d+-(save|manual|restore|import)|v1-premigration)\.json$/;
+const ROTATED_RE = /^config-(\d{8})T(\d{6})Z-r(\d+)-(save|manual|restore|import)\.json$/;
+export const PREMIGRATION_ID = 'config-v1-premigration.json';
+
+const stamp = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+
+function parseName(name) {
+  const m = ROTATED_RE.exec(name);
+  if (!m) return null;
+  const [, ymd, hms, rev, reason] = m;
+  const iso = `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}T${hms.slice(0, 2)}:${hms.slice(2, 4)}:${hms.slice(4, 6)}Z`;
+  return { createdAt: new Date(iso).toISOString(), revision: Number(rev), reason };
+}
+
+function rotatedFiles() {
+  let names = [];
+  try { names = fs.readdirSync(paths.backups); } catch { return []; }
+  // Name order == chronological order (fixed-width UTC stamp first); revision breaks ties within one second.
+  return names.filter((n) => ROTATED_RE.test(n)).sort((a, b) => {
+    const pa = parseName(a);
+    const pb = parseName(b);
+    return a.slice(0, 23) === b.slice(0, 23) ? pa.revision - pb.revision : a < b ? -1 : 1;
+  });
+}
+
+function rotate() {
+  const files = rotatedFiles();
+  for (const f of files.slice(0, Math.max(0, files.length - KEEP_BACKUPS))) {
+    try { fs.unlinkSync(path.join(paths.backups, f)); } catch { /* ignore */ }
+  }
+}
+
+/** Write the given config (object) as a backup with `reason`. Returns its BackupInfo. */
+export function writeBackup(cfg, reason, now = new Date()) {
+  fs.mkdirSync(paths.backups, { recursive: true });
+  const id = `config-${stamp(now)}-r${Number(cfg?.revision) || 0}-${reason}.json`;
+  writeFileAtomic(path.join(paths.backups, id), JSON.stringify(cfg, null, 2));
+  rotate();
+  return backupInfo(id);
+}
+
+/**
+ * Called by saveConfig() before the config file is overwritten. Copies the current file unless the newest
+ * backup is a `save` backup younger than COALESCE_MS (bursts of saves keep the state before the burst).
+ * @returns {object|null} BackupInfo of the new backup, or null when coalesced / nothing to back up
+ */
+export function backupBeforeSave(current, now = new Date()) {
+  if (!current) return null;
+  const files = rotatedFiles();
+  const newest = files.length ? parseName(files[files.length - 1]) : null;
+  if (newest && newest.reason === 'save' && now.getTime() - Date.parse(newest.createdAt) < COALESCE_MS
+    && now.getTime() >= Date.parse(newest.createdAt)) return null;
+  let raw;
+  try { raw = JSON.parse(fs.readFileSync(paths.config, 'utf8')); } catch { raw = current; }
+  return writeBackup(raw, 'save', now);
+}
+
+/** BackupInfo for a file id (null when missing). Content is read to count screens/sources. */
+export function backupInfo(id) {
+  const file = path.join(paths.backups, id);
+  let st;
+  try { st = fs.statSync(file); } catch { return null; }
+  const meta = parseName(id) || { createdAt: st.mtime.toISOString(), revision: 0, reason: 'migration' };
+  let screens = 0;
+  let sources = 0;
+  try {
+    const c = JSON.parse(fs.readFileSync(file, 'utf8'));
+    screens = Array.isArray(c.screens) ? c.screens.length : 1;
+    sources = Array.isArray(c.calendar?.sources) ? c.calendar.sources.length : 0;
+    if (id === PREMIGRATION_ID && Number.isInteger(c.revision)) meta.revision = c.revision;
+  } catch { /* unreadable: counts stay 0 */ }
+  return { id, createdAt: meta.createdAt, revision: meta.revision, reason: meta.reason, size: st.size, screens, sources };
+}
+
+/** Every backup, newest first (the pre-migration copy included). */
+export function listBackups() {
+  const ids = rotatedFiles().reverse();
+  if (fs.existsSync(path.join(paths.backups, PREMIGRATION_ID))) ids.push(PREMIGRATION_ID);
+  return ids.map(backupInfo).filter(Boolean)
+    .sort((a, b) => (a.createdAt === b.createdAt ? b.revision - a.revision : a.createdAt < b.createdAt ? 1 : -1));
+}
+
+/** Absolute path of a backup file, or null when the id is not a valid / existing backup. */
+export function backupPath(id) {
+  if (typeof id !== 'string' || !BACKUP_ID_RE.test(id)) return null;
+  const file = path.join(paths.backups, id);
+  return fs.existsSync(file) ? file : null;
+}
+
+export function readBackup(id) {
+  const file = backupPath(id);
+  if (!file) return null;
+  return JSON.parse(fs.readFileSync(file, 'utf8'));
+}
+
+export function deleteBackup(id) {
+  const file = backupPath(id);
+  if (!file) return false;
+  fs.unlinkSync(file);
+  return true;
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Export / import (§6.2, §6.3)
+// ---------------------------------------------------------------------------------------------------------
+
+/** Secrets included in an export when asked (never sessionSecret / sessionEpoch). */
+export function exportSecrets(sec) {
+  return structuredClone({
+    ...(sec.passwordHash ? { passwordHash: sec.passwordHash } : {}),
+    homeassistant: { ...(sec.homeassistant?.token ? { token: sec.homeassistant.token } : {}) },
+    google: { accounts: sec.google?.accounts || {} },
+    apiTokens: sec.apiTokens || [],
+  });
+}
+
+export function makeBundle(cfg, { appVersion, secrets = null, now = new Date() }) {
+  return {
+    format: 'marco-backup',
+    formatVersion: 1,
+    exportedAt: now.toISOString(),
+    appVersion,
+    config: structuredClone(cfg),
+    ...(secrets ? { secrets: exportSecrets(secrets) } : {}),
+  };
+}
+
+const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+/** Accepts an ExportBundle or a bare v1/v2 config. Returns { raw, secrets, appVersion, exportedAt } or null. */
+export function unwrapBundle(bundle) {
+  if (!isObj(bundle)) return null;
+  if (bundle.format === 'marco-backup') {
+    if (!isObj(bundle.config)) return null;
+    return {
+      raw: bundle.config,
+      secrets: isObj(bundle.secrets) ? bundle.secrets : null,
+      appVersion: typeof bundle.appVersion === 'string' ? bundle.appVersion.slice(0, 40) : null,
+      exportedAt: typeof bundle.exportedAt === 'string' ? bundle.exportedAt.slice(0, 40) : null,
+    };
+  }
+  // Bare config: must look like one (screens[] or v1 sections).
+  if (Array.isArray(bundle.screens) || isObj(bundle.calendar) || isObj(bundle.screen)) {
+    return { raw: bundle, secrets: null, appVersion: null, exportedAt: null };
+  }
+  return null;
+}
+
+/** Sanitised secrets from a bundle (only well-formed parts; unknown keys dropped). */
+export function sanitizeImportedSecrets(s) {
+  if (!isObj(s)) return {};
+  const out = {};
+  if (typeof s.passwordHash === 'string' && /^scrypt\$[A-Za-z0-9+/=]+\$[A-Za-z0-9+/=]+$/.test(s.passwordHash)) out.passwordHash = s.passwordHash;
+  if (isObj(s.homeassistant) && typeof s.homeassistant.token === 'string' && s.homeassistant.token.length <= 1000) {
+    out.haToken = s.homeassistant.token;
+  }
+  if (isObj(s.google) && isObj(s.google.accounts)) {
+    const acc = {};
+    for (const [email, a] of Object.entries(s.google.accounts).slice(0, 20)) {
+      if (/^[^\s@]{1,64}@[^\s@]{1,255}$/.test(email) && isObj(a)) acc[email.toLowerCase()] = a;
+    }
+    out.googleAccounts = acc;
+  }
+  if (Array.isArray(s.apiTokens)) {
+    out.apiTokens = s.apiTokens.filter((t) => isObj(t) && typeof t.id === 'string' && /^[a-f0-9]{64}$/.test(t.hash || '')
+      && typeof t.name === 'string').slice(0, 20).map((t) => ({
+      id: t.id.slice(0, 40), name: t.name.slice(0, 60), hash: t.hash, prefix: String(t.prefix || '').slice(0, 8),
+      createdAt: typeof t.createdAt === 'string' ? t.createdAt : new Date().toISOString(),
+      lastUsedAt: typeof t.lastUsedAt === 'string' ? t.lastUsedAt : null,
+      lastUsedIp: typeof t.lastUsedIp === 'string' ? t.lastUsedIp.slice(0, 64) : null,
+      useCount: Number.isInteger(t.useCount) && t.useCount >= 0 ? t.useCount : 0,
+    }));
+  }
+  return out;
+}
+
+/** Validate an import bundle → { ok, errors, value, fromVersion, … } (value = sanitised v2 config). */
+export function parseImport(bundle) {
+  const u = unwrapBundle(bundle);
+  if (!u) return { ok: false, errors: [{ path: '', message: 'not a marco backup or config' }] };
+  const fromVersion = isV1(u.raw) ? 1 : Number(u.raw.version) || 2;
+  const { ok, errors, value } = validateConfig(mergeDefaults(structuredClone(u.raw)));
+  return { ok, errors, value, fromVersion, secrets: u.secrets, appVersion: u.appVersion, exportedAt: u.exportedAt };
+}
+
+const same = (a, b) => stableStringify(a) === stableStringify(b);
+const named = (x) => x.name || x.title || x.id;
+
+/** added / removed / changed (by id) between two lists of { id, name }. */
+function diffById(before = [], after = []) {
+  const a = new Map(before.map((x) => [x.id, x]));
+  const b = new Map(after.map((x) => [x.id, x]));
+  return {
+    added: [...b.values()].filter((x) => !a.has(x.id)).map(named),
+    removed: [...a.values()].filter((x) => !b.has(x.id)).map(named),
+    changed: [...b.values()].filter((x) => a.has(x.id) && !same(a.get(x.id), x)).map(named),
+  };
+}
+
+/** "+2 fuentes, −1 fuente, 1 modificada" / "+2 sources, −1 source, 1 modified" in the admin's language. */
+function listSummary(d, noun, l) {
+  const parts = [];
+  if (d.added.length) parts.push(`+${countNoun(d.added.length, noun, l)}`);
+  if (d.removed.length) parts.push(`−${countNoun(d.removed.length, noun, l)}`);
+  if (d.changed.length) parts.push(countChanged(d.changed.length, noun, l));
+  return parts.join(', ');
+}
+
+/** Top-level keys that make up a v2 config (except version/revision). */
+export const IMPORT_SECTIONS = ['screens', 'defaultScreen', 'calendar', 'datetime', 'weather', 'news', 'todo', 'localEvents',
+  'birthdays', 'eventRules', 'countdowns', 'schedules', 'homeassistant', 'auth'];
+
+/** Short localized summary of what changes per section (ImportPreview.sections); `l` = es | en | pt. */
+export function sectionSummaries(cur, next, l = 'en') {
+  const out = [];
+  const modified = summaryWord('modified', l);
+  for (const key of IMPORT_SECTIONS) {
+    const changed = !same(cur[key], next[key]);
+    let summary = changed ? modified : summaryWord('unchanged', l);
+    if (changed) {
+      if (key === 'screens') summary = listSummary(diffById(cur.screens, next.screens), 'screen', l) || modified;
+      else if (key === 'calendar') {
+        const parts = [];
+        const s = listSummary(diffById(cur.calendar.sources, next.calendar.sources), 'source', l);
+        if (s) parts.push(s);
+        if (!same(cur.calendar.iconRules, next.calendar.iconRules)) parts.push(countNoun(next.calendar.iconRules.length, 'iconRule', l));
+        summary = parts.join('; ') || modified;
+      } else if (key === 'defaultScreen') {
+        summary = `→ ${next.screens.find((s) => s.id === next.defaultScreen)?.name || next.defaultScreen}`;
+      } else if (key === 'news') {
+        summary = listSummary(diffById(cur.news.feeds, next.news.feeds), 'feed', l) || modified;
+      } else if (next[key] && Array.isArray(next[key].items)) {
+        const d = diffById(cur[key].items, next[key].items);
+        summary = listSummary(d, 'item', l) || summaryWord('settingsModified', l);
+      }
+    }
+    out.push({ key, changed, summary });
+  }
+  return out;
+}
+
+/**
+ * Enabled scheduled messages that would lose every target screen on a partial import (they get disabled
+ * on save, since an empty target list means "all screens").
+ *   screensOnly:   current messages when only `screens` is taken from the bundle
+ *   schedulesOnly: imported messages when only `schedules` is taken
+ */
+export function orphanSchedules(current, imported) {
+  const lost = (items, screens) => {
+    const ids = new Set(screens.map((s) => s.id));
+    return items.filter((m) => m.enabled && m.screenIds.length && !m.screenIds.some((x) => ids.has(x)))
+      .map((m) => `${m.emoji ? `${m.emoji} ` : ''}${m.title || m.id}`);
+  };
+  return {
+    screensOnly: lost(current.schedules.items, imported.screens),
+    schedulesOnly: lost(imported.schedules.items, current.screens),
+  };
+}
+
+/** ImportPreview (web/shared/types.ts) for `bundle` against the current config. */
+export function importPreview(bundle, current, l = 'en') {
+  const p = parseImport(bundle);
+  const empty = { added: [], removed: [], changed: [] };
+  if (!p.value) {
+    return {
+      ok: false, errors: p.errors, fromVersion: 0, appVersion: null, exportedAt: null, hasSecrets: false,
+      sections: [], screens: empty, sources: empty, orphanSchedules: { screensOnly: [], schedulesOnly: [] },
+      counts: { localEvents: 0, birthdays: 0, eventRules: 0, countdowns: 0, schedules: 0 },
+    };
+  }
+  const v = p.value;
+  const userSources = (c) => c.calendar.sources.filter((s) => !RESERVED_SOURCE_IDS.includes(s.id));
+  return {
+    ok: p.ok,
+    errors: p.errors,
+    fromVersion: p.fromVersion,
+    appVersion: p.appVersion,
+    exportedAt: p.exportedAt,
+    hasSecrets: Boolean(p.secrets && Object.keys(sanitizeImportedSecrets(p.secrets)).length),
+    sections: sectionSummaries(current, v, l),
+    screens: diffById(current.screens, v.screens),
+    sources: diffById(userSources(current), userSources(v)),
+    orphanSchedules: orphanSchedules(current, v),
+    counts: {
+      localEvents: v.localEvents.items.length,
+      birthdays: v.birthdays.items.length,
+      eventRules: v.eventRules.items.length,
+      countdowns: v.countdowns.items.length,
+      schedules: v.schedules.items.length,
+    },
+  };
+}
+
+/**
+ * Merge an imported (validated) config into the current one. `sections` limits which top-level keys are
+ * taken (others kept). `screens` and `defaultScreen` travel together (a default id must exist).
+ */
+export function mergeImport(current, imported, sections) {
+  if (!Array.isArray(sections) || !sections.length) return { ...structuredClone(imported), revision: current.revision };
+  const take = new Set(sections.filter((s) => IMPORT_SECTIONS.includes(s)));
+  if (take.has('screens')) take.add('defaultScreen');
+  const out = structuredClone(current);
+  for (const k of take) out[k] = structuredClone(imported[k]);
+  if (!out.screens.some((s) => s.id === out.defaultScreen)) out.defaultScreen = out.screens[0].id;
+  return out;
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Repair (restore of old backups)
+// ---------------------------------------------------------------------------------------------------------
+
+/** "a.b[2].c" → ['a', 'b', 2, 'c'] */
+function splitPath(p) {
+  const out = [];
+  for (const part of String(p).split('.')) {
+    const m = /^([^[\]]*)((?:\[\d+\])*)$/.exec(part);
+    if (!m) return null;
+    if (m[1]) out.push(m[1]);
+    for (const i of m[2].matchAll(/\[(\d+)\]/g)) out.push(Number(i[1]));
+  }
+  return out;
+}
+
+function getIn(o, segs) {
+  let x = o;
+  for (const s of segs) { if (x == null) return undefined; x = x[s]; }
+  return x;
+}
+
+/** Fix the value behind one validation error path. Returns true when something changed. */
+function fixPath(cfg, errPath) {
+  const segs = splitPath(errPath);
+  if (!segs || !segs.length) return false;
+  let k = -1;
+  segs.forEach((s, i) => { if (typeof s === 'number') k = i; });
+  const isScreen = k === 1 && segs[0] === 'screens';
+  if (k >= 0 && !isScreen) {
+    // Broken list item (event, rule, feed…): drop it.
+    const list = getIn(cfg, segs.slice(0, k));
+    if (!Array.isArray(list) || segs[k] >= list.length) return false;
+    list.splice(segs[k], 1);
+    return true;
+  }
+  // Plain setting: reset it to its default (screen settings → default screen profile).
+  const base = isScreen ? getIn(cfg, segs.slice(0, 2)) : cfg;
+  const rest = isScreen ? segs.slice(2) : segs;
+  if (!base || !rest.length) return false;
+  const def = getIn(isScreen ? defaultScreenProfile() : defaultConfig(), rest);
+  const parent = getIn(base, rest.slice(0, -1));
+  if (!parent || typeof parent !== 'object') return false;
+  const leaf = rest[rest.length - 1];
+  if (stableStringify(parent[leaf]) === stableStringify(def)) return false;
+  if (def === undefined) delete parent[leaf];
+  else parent[leaf] = structuredClone(def);
+  return true;
+}
+
+/**
+ * Make an (already sanitised) config valid by dropping list items that still fail validation and
+ * resetting other failing settings to their defaults. Used when restoring old backups.
+ * @returns {{ ok: boolean, value: object|null, fixed: string[], errors: object[] }}
+ */
+export function repairConfig(cfg) {
+  let cur = structuredClone(cfg);
+  const fixed = [];
+  for (let i = 0; i < 300; i++) {
+    const r = validateConfig(cur);
+    if (r.ok) return { ok: true, value: r.value, fixed, errors: [] };
+    cur = r.value;
+    const e = r.errors.find((x) => fixPath(cur, x.path));
+    if (!e) return { ok: false, value: null, fixed, errors: r.errors };
+    fixed.push(e.path);
+  }
+  return { ok: false, value: null, fixed, errors: [{ path: '', message: 'could not repair' }] };
+}
