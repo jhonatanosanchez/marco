@@ -12,6 +12,12 @@ All notable changes to this project are documented here. The format is based on
   server and the web UI. Existing installs get the new keywords and categories once, added after their own rules;
   nothing is removed or reordered, and rules deleted afterwards stay deleted (marker file `data/.iconrules-v2`).
 
+### Changed
+- New logo: two arches, one with the sun and one with the moon, inside an M-shaped frame. It replaces the calendar
+  badge in the admin sidebar, login, setup wizard and the display's welcome and pairing screens, and comes as a
+  favicon set (`favicon.svg`, 32 px PNG, 180 px `apple-touch-icon.png`, 512 px icon). Lockups for light and dark
+  backgrounds are in `docs/`. The display page title is now "Marco".
+
 ### Security
 - Open display streams follow every credential change, not only *Regenerate link* / *Revoke*: each stream keeps a hash
   of the key or device token it opened with and is re-checked after config saves, imports, session revocation and on

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { applyScreen, defaultScreenOf, projectScreen } from '../shared/screens';
 import type { AppConfig, AuthMeResponse, DisplayInfo, Lang, SetupStatus, StoredConfig } from '../shared/types';
 import { api, ApiError } from './api';
+import { BrandMark } from './components/BrandMark';
 import { CommandPalette, type PaletteItem } from './components/CommandPalette';
 import { confirmDialog, DialogHost, toast, ToastHost } from './components/feedback';
 import { Icon, type IconName } from './components/icons';
@@ -657,10 +658,7 @@ export function App() {
     <div class={`shell ${previewSide ? 'has-preview' : ''} ${navOpen ? 'nav-open' : ''}`} style={rootStyle} data-lang={lang}>
       <aside class="sidebar">
         <div class="brand">
-          <div class="cal-badge cal-badge--sm">
-            <span class="cal-badge__m">{new Date().toLocaleDateString(undefined, { month: 'short' }).replace('.', '')}</span>
-            <span class="cal-badge__d">{new Date().getDate()}</span>
-          </div>
+          <BrandMark size={40} />
           <div>
             <strong>{t('Calendario familiar')}</strong>
             <span class="muted small">{t('Panel de control')}</span>

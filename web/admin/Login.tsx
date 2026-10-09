@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import type { AuthMeResponse } from '../shared/types';
 import { api, ApiError } from './api';
+import { BrandMark } from './components/BrandMark';
 import { GoogleG, Icon } from './components/icons';
 import { t } from './i18n';
 
@@ -29,7 +30,6 @@ export function Login({ me, onDone, initialError }: { me: AuthMeResponse; onDone
     }
   };
 
-  const now = new Date();
   return (
     <div class="login">
       <div class="login__bg" aria-hidden="true">
@@ -39,10 +39,7 @@ export function Login({ me, onDone, initialError }: { me: AuthMeResponse; onDone
       </div>
       <div class={`login__card ${shake ? 'shake' : ''}`} key={shake}>
         <div class="login__logo">
-          <div class="cal-badge">
-            <span class="cal-badge__m">{now.toLocaleDateString(undefined, { month: 'short' }).replace('.', '')}</span>
-            <span class="cal-badge__d">{now.getDate()}</span>
-          </div>
+          <BrandMark size={72} />
         </div>
         <h1>{t('Panel de la pantalla')}</h1>
         <p class="muted">{t('Gestiona calendarios, fotos, tiempo y todo lo que se ve en casa.')}</p>

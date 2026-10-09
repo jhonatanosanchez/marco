@@ -1,12 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="128" height="128" role="img" aria-label="Marco">
-  <title>Marco</title>
-  <rect x="4" y="4" width="56" height="56" rx="15" fill="#ff5a4e"/>
-  <rect x="14" y="14" width="36" height="36" rx="7" fill="#fff8f1"/>
-  <path d="M14 21a7 7 0 0 1 7-7h22a7 7 0 0 1 7 7v2H14z" fill="#ffd3cd"/>
-  <rect x="22" y="10" width="4" height="9" rx="2" fill="#c9372c"/>
-  <rect x="38" y="10" width="4" height="9" rx="2" fill="#c9372c"/>
-  <circle cx="32" cy="37" r="6" fill="#ffb02e"/>
-  <g stroke="#ffb02e" stroke-width="2.4" stroke-linecap="round">
-    <path d="M32 26.5v2.5M32 45v2.5M21.5 37h2.5M40 37h2.5M24.6 29.6l1.8 1.8M37.6 42.6l1.8 1.8M24.6 44.4l1.8-1.8M37.6 31.4l1.8-1.8"/>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Marco"><title>Marco</title><defs><linearGradient id="g1d" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe08a"/><stop offset="1" stop-color="#ffa45c"/></linearGradient><clipPath id="k1a"><path d="M120 404 V236 A54 54 0 0 1 228 236 V404 Z"/></clipPath><clipPath id="k1b"><path d="M284 404 V236 A54 54 0 0 1 392 236 V404 Z"/></clipPath></defs><g transform="translate(256 256) scale(1.06) translate(-256 -290)"><path d="M120 404 V236 A54 54 0 0 1 228 236 V404 Z" fill="url(#g1d)"/><path d="M284 404 V236 A54 54 0 0 1 392 236 V404 Z" fill="#1d2550"/><g clip-path="url(#k1a)"><circle cx="174" cy="372" r="40" fill="#fff6e6"/></g><g clip-path="url(#k1b)"><circle cx="338" cy="268" r="26" fill="#fff6e6"/><circle cx="352" cy="256" r="24" fill="#1d2550"/><circle cx="308" cy="330" r="5" fill="#fff6e6"/><circle cx="366" cy="352" r="4" fill="#fff6e6"/></g><path d="M92 236 A82 82 0 0 1 256 236 A82 82 0 0 1 420 236 V432 H92 Z M256 236 V432" fill="none" stroke="#ff5a4e" stroke-width="56" stroke-linejoin="round"/></g></svg>

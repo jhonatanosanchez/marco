@@ -1,5 +1,6 @@
 // Fresh install (server needs setup): a welcome screen with the admin URL + QR code instead of an empty dashboard.
 // Polls /api/setup/status and reloads the page as soon as the wizard is completed in the admin.
+import { logoSvg } from '../../shared/logo';
 import { qrSvg } from '../../shared/qr';
 import type { Lang, SetupStatus } from '../../shared/types';
 
@@ -71,7 +72,7 @@ export function showWelcome(status: SetupStatus, lang: Lang): void {
     <div class="wl-bg" aria-hidden="true"><span class="wl-blob wl-blob--a"></span><span class="wl-blob wl-blob--b"></span><span class="wl-blob wl-blob--c"></span></div>
     <div class="wl-card">
       <div class="wl-main">
-        <div class="wl-brand"><span class="wl-logo" aria-hidden="true"><span class="wl-logo__m"></span><span class="wl-logo__d"></span></span>Marco</div>
+        <div class="wl-brand">${logoSvg('wl-logo')}Marco</div>
         <h1>${esc(T.hello)}</h1>
         <p class="wl-lead">${esc(T.ready)}</p>
         <div class="wl-url">${esc(url)}</div>
@@ -86,10 +87,7 @@ export function showWelcome(status: SetupStatus, lang: Lang): void {
       ${qr ? `<div class="wl-qr"><div class="wl-qr__img">${qr}</div><span>${esc(T.scan)}</span></div>` : ''}
     </div>
     <div class="wl-clock" aria-hidden="true"></div>`;
-  const now = new Date();
   const loc = lang === 'en' ? 'en-GB' : lang === 'pt' ? 'pt-PT' : 'es-ES';
-  (el.querySelector('.wl-logo__m') as HTMLElement).textContent = now.toLocaleDateString(loc, { month: 'short' }).replace('.', '');
-  (el.querySelector('.wl-logo__d') as HTMLElement).textContent = String(now.getDate());
   const clock = el.querySelector('.wl-clock') as HTMLElement;
   const tick = () => {
     clock.textContent = new Date().toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' });

@@ -3,6 +3,7 @@
 //   - 'invalid': "This link is no longer valid" (regenerated link / revoked device) + the same pairing code
 // and never any family data. The page polls /api/pair/status with the secret session id every ~2 s; once an admin
 // claims the code it stores the device token and starts normally.
+import { logoSvg } from '../../shared/logo';
 import { qrSvg } from '../../shared/qr';
 import type { Lang, PairStartResponse, PairStatusResponse } from '../../shared/types';
 import { clearCaches, saveDeviceToken } from '../identity';
@@ -146,7 +147,7 @@ export function showPairing(kind: 'pair' | 'invalid', lang: Lang): void {
     <div class="wl-bg" aria-hidden="true"><span class="wl-blob wl-blob--a"></span><span class="wl-blob wl-blob--b"></span><span class="wl-blob wl-blob--c"></span></div>
     <div class="wl-card">
       <div class="wl-main">
-        <div class="wl-brand"><span class="wl-logo" aria-hidden="true"><span class="wl-logo__m"></span><span class="wl-logo__d"></span></span>Marco</div>
+        <div class="wl-brand">${logoSvg('wl-logo')}Marco</div>
         ${kind === 'invalid' ? '<div class="wl-badge" aria-hidden="true">!</div>' : ''}
         <h1>${esc(title)}</h1>
         <p class="wl-lead">${esc(kind === 'invalid' ? T.invalidLead : T.pairLead)}</p>
@@ -162,10 +163,7 @@ export function showPairing(kind: 'pair' | 'invalid', lang: Lang): void {
       <div class="wl-qr"><div class="wl-qr__img"></div><span>${esc(T.scan)}</span></div>
     </div>
     <div class="wl-clock" aria-hidden="true"></div>`;
-  const now = new Date();
   const loc = lang === 'en' ? 'en-GB' : lang === 'pt' ? 'pt-PT' : 'es-ES';
-  (root.querySelector('.wl-logo__m') as HTMLElement).textContent = now.toLocaleDateString(loc, { month: 'short' }).replace('.', '');
-  (root.querySelector('.wl-logo__d') as HTMLElement).textContent = String(now.getDate());
   const clock = root.querySelector('.wl-clock') as HTMLElement;
   const tick = () => {
     clock.textContent = new Date().toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' });

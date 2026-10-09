@@ -4,6 +4,7 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { passwordProblem, passwordScore, MIN_PASSWORD } from '../shared/password';
+import { BrandMark } from './components/BrandMark';
 import { CopyField, Qr } from './components/share';
 import { REPO_URL } from '../shared/project';
 import type { Lang, LayoutPreset, SetupRequest, SetupStatus, TestIcsResponse } from '../shared/types';
@@ -973,10 +974,7 @@ export function SetupWizard({ status: initial, onDone, onLang }: { status: Setup
       </div>
       <header class="wz-top">
         <div class="wz-brand">
-          <div class="cal-badge cal-badge--sm">
-            <span class="cal-badge__m">{now.toLocaleDateString(lang, { month: 'short' }).replace('.', '')}</span>
-            <span class="cal-badge__d">{now.getDate()}</span>
-          </div>
+          <BrandMark size={36} />
           <span>Marco</span>
         </div>
         <span class="wz-top__step">{t('Paso {n} de {total}', { n: step + 1, total: STEPS.length })}</span>
