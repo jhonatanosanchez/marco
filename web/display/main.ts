@@ -469,8 +469,10 @@ function denyAccess(status: number): void {
   intervals.length = 0;
   liveStream?.close();
   heartbeat.stop();
+  // keep the language the screen was showing; the browser's language may differ
+  const deniedLang = state.config ? ctx.lang : pairingLang(params);
   for (const k of ['config', 'events', 'weather', 'news', 'photos', 'countdowns'] as const) state[k] = null;
-  showPairing(status === 403 ? 'invalid' : 'pair', pairingLang(params));
+  showPairing(status === 403 ? 'invalid' : 'pair', deniedLang);
 }
 
 /** True (and the access screen shown) when `e` is a 401 / 403 from the display API. */
