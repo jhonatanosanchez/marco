@@ -735,6 +735,8 @@ remove_kiosk() {
   for f in "$RUN_HOME/.config/autostart/marco-kiosk.desktop" "$RUN_HOME/.local/bin/marco-kiosk" "$RUN_HOME/.local/bin/marco-schedule"; do
     if [ -e "$f" ]; then run rm -f "$f"; fi
   done
+  # The kiosk settings hold the private link: kept unless --purge
+  if [ "$PURGE" = 1 ] && [ -d "$RUN_HOME/.config/marco" ]; then run rm -rf "$RUN_HOME/.config/marco"; fi
   return 0
 }
 
@@ -1011,7 +1013,7 @@ main() {
   inspect_dir
   if [ "$MODE" = kiosk ] && [ -z "$KIOSK_URL" ]; then
     if [ -r "$RUN_HOME/.config/marco/kiosk.env" ] && grep -q '^KIOSK_URL=' "$RUN_HOME/.config/marco/kiosk.env"; then
-      : # keep the saved link
+      SAVED_LINK=1
     elif interactive; then
       echo "Paste the screen's private link (Admin > Screen > Settings > Private link), e.g. http://homeserver.lan:3000/d/..." > "$TTY"
       ask "Link: " ""
@@ -1033,6 +1035,7 @@ main() {
   echo "  User:     $RUN_USER$([ "${NEW_USER:-0}" = 1 ] && echo " (will be created)")"
   if [ -n "$EXISTING" ]; then echo "  Found:    an existing install ($EXISTING${EXISTING_VERSION:+, version $EXISTING_VERSION})"; fi
   echo "  Source:   $(source_label)"
+  if [ "${SAVED_LINK:-0}" = 1 ]; then echo "  Link:     the one saved in $RUN_HOME/.config/marco/kiosk.env"; fi
   if [ -n "$KIOSK_URL" ]; then echo "  Link:     $(printf '%s' "$KIOSK_URL" | sed -E 's|/d/[^/?#]+|/d/<private link>|')"; fi
   if [ "$DRY" = 1 ]; then echo "  Dry run:  nothing will be changed"; fi
   echo
