@@ -5,6 +5,26 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-09
+
+A realistic weather effect over the photo, a polling mode for hosts without a live stream, and a language fix for
+the pairing screen.
+
+### Added
+- **Weather effect** (*Background → Weather effect*, `background.weatherFx`): *Off*, *Simple* (the light rain and
+  snow particles from earlier versions, still the default) or *Realistic*: drops on the glass that bend the photo
+  only inside each drop, faint rain streaks, layered snow and soft sun rays on clear days. No blur or tint, so the
+  calendar stays easy to read, and no flashes at night. *Realistic* needs WebGL and the WebGL photo transition;
+  `?lite=1` turns the effect off.
+- Demo URL parameters `?wx=clear|rain|snow|drizzle|thunder` and `?wxfx=off|simple|rich` to preview the weather and
+  the effect without waiting for the forecast.
+- **Poll mode for displays**: when `GET /api/health` returns `live: 'poll'`, the display skips the live stream and
+  checks the config revision every 90 seconds. Self-hosted servers return `live: 'sse'` and keep the live stream.
+
+### Fixed
+- A screen whose private link was regenerated or whose paired device was revoked now keeps the language it was
+  showing on the "This link is no longer valid" and pairing screens, instead of switching to the browser's language.
+
 ## [0.3.0] - 2026-10-09
 
 Private display links and pairing, a one-line installer with the `marco` command, release packages, more icon
