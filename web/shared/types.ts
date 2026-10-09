@@ -404,6 +404,8 @@ export interface HealthResponse {
   ok: boolean;
   uptime: number;
   version: string;
+  /** How displays get live updates: 'sse' = /api/stream, 'poll' = config revision poll. Absent (old servers) = 'sse'. */
+  live?: 'sse' | 'poll';
 }
 
 /** SSE /api/stream?screen=&client= event payloads (docs/ARCHITECTURE.md) */

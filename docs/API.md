@@ -68,7 +68,7 @@ saved without `security` (old admin builds, backups or exports from before 0.3) 
 
 | Method & path | Response |
 |---|---|
-| `GET /api/health` | `{ ok, uptime, version }` |
+| `GET /api/health` | `{ ok, uptime, version, live }`; `live` is `'sse'` here. A server that answers `'poll'` gets no `/api/stream` connection: the display checks `/api/display/config` every 90 s and refetches events and countdowns when `revision` changes. A missing field means `'sse'` |
 | `GET /api/display/config?screen=` | `DisplayConfig`: flat view of one screen; `calendar.sources` only as `{ id, name, color, emoji, kind }`; enabled `schedules` for this screen |
 | `GET /api/events?screen=&from=YYYY-MM-DD&to=YYYY-MM-DD` | `{ generatedAt, hash, events: CalEvent[], errors: [{ sourceId, message }] }` |
 | `GET /api/weather?screen=` | `{ updatedAt, locationName, current, today, daily[], hourly[], indoor }` (localized descriptions, cache 10 min) |

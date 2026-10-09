@@ -29,7 +29,7 @@ export function publicRouter({ version }) {
   const noStore = (req, res, next) => { if (!res.get('cache-control')) res.set('cache-control', 'private, no-store'); next(); };
   r.use(noStore);
 
-  r.get('/health', (req, res) => res.json({ ok: true, uptime: Math.round(process.uptime()), version }));
+  r.get('/health', (req, res) => res.json({ ok: true, uptime: Math.round(process.uptime()), version, live: 'sse' }));
 
   r.get('/display/config', (req, res) => res.json(displayConfigFor(getConfig(), req)));
 

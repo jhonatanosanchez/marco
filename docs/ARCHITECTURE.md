@@ -174,6 +174,8 @@ flagged by a local event or a style rule (nearest occurrence per title), sorted 
   15 min, photos per interval; the DOM is patched in place. Day rollover at midnight re-renders the grid.
 - Offline tolerant: last data is cached in `localStorage` per screen; a small status dot appears when the server is
   unreachable; SSE reconnects automatically.
+- Live mode comes from `GET /api/health`: `live: 'poll'` replaces the SSE stream with a config revision check every
+  90 s (no announcements, identify, night or remote reload in that mode). No field or `'sse'` keeps the stream.
 - Raspberry Pi friendly: WebGL capped at 30 fps and `devicePixelRatio ≤ 1`, paused when hidden; `?lite=1` or
   `ambient: none` + `transition: fade` disables three.js entirely; CSS transforms/opacity only.
 - Photos are cropped around their focal point; displays report the bands covered by the clock and weather cards in the

@@ -23,6 +23,7 @@ import type { WeatherFxLayer } from './gl/weatherFxLayer';
 import { precipOf, sunnyOf } from './icons';
 import { mockAnnouncements, mockConfig, mockCountdowns, mockEvents, mockNews, mockPhotos, mockWeather } from './mock';
 import { loadCache, on, saveCache, set, state } from './store';
+import { detectLiveMode, startConfigPoll } from './live';
 import { connectStream } from './stream';
 import { current, onTick, setClockOffset, setTimezone, startTicker, type Tick } from './time';
 import { Agenda } from './widgets/agenda';
@@ -785,6 +786,26 @@ async function goLive(): Promise<void> {
   if (streamStarted) return;
   streamStarted = true;
   heartbeat.start();
+  // A server without SSE (live: 'poll' in /api/health) gets a config revision poll instead of the stream.
+  const mode = await detectLiveMode({
+    health: () => api.health(),
+    answered: (e) => e instanceof ApiError && e.status > 0,
+    cancelled: () => accessDenied,
+  });
+  if (!mode || accessDenied) return;
+  if (mode === 'poll') {
+    // No hello here, so no version reload either: the nightly 04:00 reload picks up a new build.
+    liveStream = startConfigPoll({
+      revision: () => state.config?.revision,
+      fetchConfig,
+      changed: () => {
+        void fetchEvents();
+        void fetchCountdowns();
+      },
+    });
+    heartbeat.soon();
+    return;
+  }
   liveStream = connectStream({
     hello: (d) => {
       setOnline(true);
