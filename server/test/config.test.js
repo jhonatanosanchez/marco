@@ -131,7 +131,7 @@ test('migration v1 → v2 keeps every value (global vs screens[0])', async () =>
   const { name, ...scr } = V1.screen;
   assert.deepEqual(s.screen, scr);
   assert.deepEqual(s.layout, V1.layout);
-  assert.deepEqual(s.background, { ...V1.background, order: 'random', panelBlur: 18, panelShade: 0.5 }); // new keys back-filled with defaults
+  assert.deepEqual(s.background, { ...V1.background, order: 'random', panelBlur: 18, panelShade: 0.5, weatherFx: 'simple' }); // new keys back-filled with defaults
   assert.deepEqual(s.message, V1.message);
   const { sources, iconRules, ...calView } = V1.calendar;
   assert.deepEqual(s.calendar, { ...calView, sourceIds: null });
@@ -213,6 +213,24 @@ test('background.order: default random, back-filled into stored screens, validat
   assert.ok(bad.errors.some((e) => /background\.order/.test(e.path)));
   // v1 / merged configs get it too
   assert.equal(validateConfig(mergeDefaults({ revision: 1, background: { source: 'gallery' } })).value.screens[0].background.order, 'random');
+});
+
+test('background.weatherFx: default simple, back-filled into stored screens, validated', () => {
+  assert.equal(defaultConfig().screens[0].background.weatherFx, 'simple');
+  const stored = defaultConfig();
+  delete stored.screens[0].background.weatherFx;
+  const v = validateConfig(stored);
+  assert.equal(v.ok, true);
+  assert.equal(v.value.screens[0].background.weatherFx, 'simple');
+  for (const fx of ['off', 'simple', 'rich']) {
+    stored.screens[0].background.weatherFx = fx;
+    assert.equal(validateConfig(stored).value.screens[0].background.weatherFx, fx);
+  }
+  stored.screens[0].background.weatherFx = 'storm';
+  const bad = validateConfig(stored);
+  assert.equal(bad.ok, false);
+  assert.ok(bad.errors.some((e) => /background\.weatherFx/.test(e.path)));
+  assert.equal(validateConfig(mergeDefaults({ revision: 1, background: { source: 'gallery' } })).value.screens[0].background.weatherFx, 'simple');
 });
 
 test('icon rules v2: one-time additive merge into an existing config', async () => {

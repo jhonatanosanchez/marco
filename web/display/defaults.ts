@@ -12,7 +12,7 @@ export const DEFAULT_CONFIG: DisplayConfig = {
   layout: { preset: 'bigCalendar', sidePanel: 'left', sideWidth: 0.36 },
   background: {
     enabled: true, source: 'stock', stockTopic: 'nature', order: 'random', intervalSec: 120, brightness: 0.85, showMeta: false,
-    cover: true, transition: 'webgl', ambient: 'aurora',
+    cover: true, transition: 'webgl', ambient: 'aurora', weatherFx: 'simple',
   },
   calendar: {
     enabled: true, view: 'month', weeks: 5, weekStart: 1, showLocation: false, showEndTime: false, showDayXofY: true,

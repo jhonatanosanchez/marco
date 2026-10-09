@@ -71,7 +71,8 @@ calendars, weather and news feeds *you* connect.
 - **Highlights and countdowns:** "In 18 min · Client call", "Check-out · Tomorrow", "🎃 Halloween party · Tomorrow!",
   "✈️ Trip to Madeira · In 12 days".
 - **Weather:** current conditions, hourly and daily forecast from [Open-Meteo](https://open-meteo.com/) (no API key),
-  or your own [Home Assistant](https://www.home-assistant.io/) weather entity and indoor sensors; animated rain/snow.
+  or your own [Home Assistant](https://www.home-assistant.io/) weather entity and indoor sensors; animated rain/snow, or an optional
+  realistic effect with drops on the glass, layered snow and sun rays on clear days (the photo is never blurred).
 - **News ticker** from any RSS/Atom feed, a to-do list and a message of the day.
 - **Photo background:** stock photos or your own gallery, WebGL transitions, slow zoom, a soft "aurora" ambient
   effect, and **smart cropping** that keeps the subject (faces, pets) in the part of the screen not covered by the
@@ -383,7 +384,8 @@ token and some activity history. Your real `data/` folder is never touched.
 ![The kitchen screen of the demo: light theme, agenda, to-do list and live weather](docs/screenshots/display-kitchen-live.webp)
 
 Just want to see the display? Any running instance shows a built-in sample dataset at `/?demo=1`
-(add `&lang=es`, `&preset=agenda`, `&theme=light`, `&announce=success`, `&sched=1`, `&now=2026-10-09T10:42`).
+(add `&lang=es`, `&preset=agenda`, `&theme=light`, `&announce=success`, `&sched=1`, `&now=2026-10-09T10:42`,
+`&wx=rain|snow|clear` with `&wxfx=rich` to see the weather effect).
 
 **Demo video.** A 48-second tour of the demo: the living room screen with photo transitions, an alert and a scheduled
 message, the kitchen and portrait screens, and pairing a new screen.
@@ -627,6 +629,9 @@ disable password login if you want.
 
 - **Stock** photos come from [picsum.photos](https://picsum.photos/) (free, no key). **Gallery** uses your own photos;
   **Mixed** alternates both. Set interval, brightness, transition and ambient effect in *Background*.
+- **Weather effect** (*Background*, `background.weatherFx`): *Off*, *Simple* (light rain/snow particles, the default)
+  or *Realistic* (drops on the glass that bend the photo, faint rain streaks, layered snow, soft sun rays on clear
+  days). Both draw only over the photo and need WebGL; `?lite=1` turns them off.
 - **Photo order** (*Background*): *Random* (shuffled, without repeating the previous batch), *Newest first* or
   *By name*. The sequential orders continue where the screen left off and start over at the end.
 - **Choose which photos are shown**: every photo in the gallery has an eye toggle to take it out of the rotation (or
@@ -776,6 +781,7 @@ Back up the whole folder (or use *Export*) to keep everything.
 | `?demo=1` | Built-in sample data (no server data needed) |
 | `?lang=en\|es\|pt` | Override the language |
 | `?preset=…` `?view=month\|agenda\|week` `?theme=dark\|light` `?side=left\|right` `?clock=analog` | Override layout options (handy for testing) |
+| `?wxfx=off\|simple\|rich` | Override the weather effect; with `?demo=1`, `?wx=rain\|snow\|clear\|thunder` forces the weather |
 | `?client=<name>` | Name of this device in *Connected displays* (the kiosk script sets it) |
 
 ## Security

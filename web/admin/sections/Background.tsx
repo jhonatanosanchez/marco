@@ -16,6 +16,7 @@ function intervalLabel(s: number) {
 
 export function BackgroundSection({ cfg, set, errors }: SectionProps) {
   const b = cfg.background;
+  const fx = b.weatherFx ?? 'simple';
   const usesGallery = b.source !== 'stock';
   const [gallery, setGallery] = useState<AdminPhoto[] | null>(null);
   useEffect(() => {
@@ -137,6 +138,29 @@ export function BackgroundSection({ cfg, set, errors }: SectionProps) {
             </button>
           ))}
         </div>
+      </Card>
+      <Card id="bg-weather" scope="screen" title={t('Efecto del tiempo')} icon="cloud" desc={t('Animación sobre la foto según el tiempo actual. Solo con WebGL, no se usa con ?lite=1.')}>
+        <Field
+          hint={
+            fx === 'off'
+              ? t('Sin lluvia ni nieve sobre la foto.')
+              : fx === 'rich'
+                ? t('Gotas en el cristal, nieve en capas y rayos de sol en los días despejados. La foto no se desenfoca. Algo más exigente para la Raspberry Pi.')
+                : t('Partículas finas de lluvia o nieve. Lo más ligero.')
+          }
+          error={errors['background.weatherFx']}
+        >
+          <Segmented
+            full
+            value={fx}
+            options={[
+              { value: 'off', label: t('Desactivado') },
+              { value: 'simple', label: t('Sencillo') },
+              { value: 'rich', label: t('Realista') },
+            ]}
+            onChange={(v) => set((d) => void (d.background.weatherFx = v))}
+          />
+        </Field>
       </Card>
     </>
   );

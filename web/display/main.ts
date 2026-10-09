@@ -19,7 +19,8 @@ import type { AmbientLayer } from './gl/ambientLayer';
 import type { Engine } from './gl/engine';
 import type { PhotoLayer } from './gl/photoLayer';
 import type { PrecipLayer } from './gl/precipLayer';
-import { precipOf } from './icons';
+import type { WeatherFxLayer } from './gl/weatherFxLayer';
+import { precipOf, sunnyOf } from './icons';
 import { mockAnnouncements, mockConfig, mockCountdowns, mockEvents, mockNews, mockPhotos, mockWeather } from './mock';
 import { loadCache, on, saveCache, set, state } from './store';
 import { connectStream } from './stream';
@@ -83,6 +84,7 @@ let engine: Engine | null = null;
 let photoLayer: PhotoLayer | null = null;
 let ambient: AmbientLayer | null = null;
 let precip: PrecipLayer | null = null;
+let wxfx: WeatherFxLayer | null = null;
 
 let glLoading: Promise<void> | null = null;
 /** three.js is loaded lazily so ?lite=1 / no-WebGL screens never download or parse it. */
@@ -91,17 +93,20 @@ function initGL(): Promise<void> {
   if (glLoading) return glLoading;
   glLoading = (async () => {
   try {
-    const [{ Engine }, { PhotoLayer }, { PrecipLayer }, { AmbientLayer }] = await Promise.all([
-      import('./gl/engine'), import('./gl/photoLayer'), import('./gl/precipLayer'), import('./gl/ambientLayer'),
+    const [{ Engine }, { PhotoLayer }, { PrecipLayer }, { AmbientLayer }, { WeatherFxLayer }] = await Promise.all([
+      import('./gl/engine'), import('./gl/photoLayer'), import('./gl/precipLayer'), import('./gl/ambientLayer'), import('./gl/weatherFxLayer'),
     ]);
     engine = Engine.create($('#gl') as HTMLCanvasElement);
     if (!engine) throw new Error('no webgl2');
     photoLayer = new PhotoLayer(() => photoArea);
     precip = new PrecipLayer(() => photoArea);
+    wxfx = new WeatherFxLayer(() => photoArea);
+    wxfx.night = nightNow;
     ambient = new AmbientLayer(() => mainEl);
     engine.add(ambient);
     engine.add(photoLayer);
     engine.add(precip);
+    engine.add(wxfx);
     engine.onLost = () => {
       disableGL();
       scheduleGLRetry();
@@ -143,6 +148,7 @@ function disableGL(): void {
   photoLayer = null;
   ambient = null;
   precip = null;
+  wxfx = null;
   document.documentElement.classList.remove('gl', 'gl-ambient');
   photos.setGL(null);
   photos.applyConfig();
@@ -212,6 +218,8 @@ function applyConfig(raw: DisplayConfig): void {
   if (pa === 'aurora' || pa === 'particles' || pa === 'none') cfg.background.ambient = pa;
   const ptr = params.get('transition');
   if (ptr === 'webgl' || ptr === 'fade' || ptr === 'none') cfg.background.transition = ptr;
+  const pfx = params.get('wxfx');
+  if (pfx === 'off' || pfx === 'simple' || pfx === 'rich') cfg.background.weatherFx = pfx;
   // the top-bottom preset has a shorter calendar: cap the number of week rows so chips stay readable
   if (effectivePreset(cfg) === 'topBottom') cfg.calendar.weeks = Math.min(cfg.calendar.weeks, 4);
   // Small landscape screens (e.g. 1280×720 on the Pi): one week fewer so text can be bigger.
@@ -281,7 +289,9 @@ function applyGL(wantAmbient: boolean, accent: string, light: boolean): void {
       ambient.setColors(accent, hueShift(accent, 165), bg, light);
     }
     root.classList.toggle('gl-ambient', wantAmbient);
-    if (precip) precip.enabled = cfg.background.enabled;
+    const fx = cfg.background.weatherFx ?? 'simple';
+    if (precip) precip.enabled = cfg.background.enabled && fx === 'simple';
+    if (wxfx) wxfx.enabled = cfg.background.enabled && fx === 'rich';
   }
 }
 
@@ -322,7 +332,10 @@ function renderCountdowns(tick: Tick): void {
 
 function renderWeather(tick: Tick): void {
   weather.render(state.weather, tick.dayKey);
-  if (precip) precip.mode = state.weather?.current && ctx.cfg.weather.enabled ? precipOf(state.weather.current.code) : null;
+  const cur = ctx.cfg.weather.enabled ? state.weather?.current : undefined;
+  const pm = cur ? precipOf(cur.code) : null;
+  if (precip) precip.mode = pm;
+  if (wxfx) wxfx.mode = pm ?? (cur && sunnyOf(cur.code, cur.isDay) ? 'sun' : null);
 }
 
 function renderAll(): void {
@@ -426,6 +439,7 @@ function updateNight(tick: Tick): void {
   night.style.opacity = on ? String(Math.min(0.95, Math.max(0, 1 - dim))) : '0';
   document.documentElement.classList.toggle('night', on);
   if (engine) engine.fps = on ? 15 : 30;
+  if (wxfx) wxfx.night = on;
 }
 
 function setOnline(ok: boolean): void {
@@ -500,9 +514,7 @@ async function fetchEvents(): Promise<void> {
 
 async function fetchWeather(): Promise<void> {
   if (state.demo) {
-    const w = mockWeather(current().now);
-    const code = Number(params.get('wx'));
-    if (params.get('wx') && Number.isFinite(code)) w.current.code = code;
+    const w = mockWeather(current().now, params.get('wx'));
     return set('weather', w);
   }
   try {

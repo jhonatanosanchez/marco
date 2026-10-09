@@ -117,6 +117,24 @@ export const ROWS4: [string, string, string][] = [
   ['Por nombre', 'By name', 'Por nome'],
   ['Al azar, sin repetir las fotos de la tanda anterior.', 'Shuffled, without repeating the photos of the previous batch.', 'Ao acaso, sem repetir as fotos do lote anterior.'],
   ['Sigue donde lo dejó y vuelve a empezar al terminar.', 'Continues where it left off and starts over at the end.', 'Continua onde ficou e recomeça ao chegar ao fim.'],
+  // weather effect over the photo
+  ['Efecto del tiempo', 'Weather effect', 'Efeito do tempo'],
+  [
+    'Animación sobre la foto según el tiempo actual. Solo con WebGL, no se usa con ?lite=1.',
+    'Animation over the photo that follows the current weather. WebGL only, not used with ?lite=1.',
+    'Animação sobre a foto de acordo com o tempo atual. Só com WebGL, não é usada com ?lite=1.',
+  ],
+  ['Desactivado', 'Off', 'Desligado'],
+  ['Sencillo', 'Simple', 'Simples'],
+  ['Realista', 'Realistic', 'Realista'],
+  ['Sin lluvia ni nieve sobre la foto.', 'No rain or snow over the photo.', 'Sem chuva nem neve sobre a foto.'],
+  ['Partículas finas de lluvia o nieve. Lo más ligero.', 'Fine rain or snow particles. The lightest option.', 'Partículas finas de chuva ou neve. A opção mais leve.'],
+  [
+    'Gotas en el cristal, nieve en capas y rayos de sol en los días despejados. La foto no se desenfoca. Algo más exigente para la Raspberry Pi.',
+    'Drops on the glass, layered snow and sun rays on clear days. The photo is not blurred. A bit heavier on a Raspberry Pi.',
+    'Gotas no vidro, neve em camadas e raios de sol nos dias limpos. A foto não é desfocada. Um pouco mais exigente para o Raspberry Pi.',
+  ],
+  ['Efecto del tiempo (lluvia, nieve, sol)', 'Weather effect (rain, snow, sun)', 'Efeito do tempo (chuva, neve, sol)'],
 ];
 
 /** Singular forms (vars.n === 1) for the count strings above. */

@@ -175,7 +175,25 @@ function sortKey(e: CalEvent) {
   return e.allDay ? e.start : new Date(e.start).toISOString();
 }
 
-export function mockWeather(now = new Date()): WeatherResponse {
+// ?wx=clear|rain|snow|drizzle|thunder (or any WMO code) forces the current weather, e.g. for screenshots
+const DEMO_WX: Record<string, [number, string]> = {
+  clear: [0, L('Clear sky', 'Despejado', 'Céu limpo')],
+  rain: [63, L('Rain', 'Lluvia', 'Chuva')],
+  snow: [73, L('Snow', 'Nieve', 'Neve')],
+  drizzle: [53, L('Drizzle', 'Llovizna', 'Chuvisco')],
+  thunder: [95, L('Thunderstorm', 'Tormenta', 'Trovoada')],
+};
+
+export function mockWeather(now = new Date(), wx?: string | null): WeatherResponse {
+  const w = baseWeather(now);
+  if (wx && DEMO_WX[wx]) {
+    [w.current.code, w.current.description] = DEMO_WX[wx];
+    if (wx === 'clear') w.current.isDay = true; // sun rays need daylight
+  } else if (wx && Number.isFinite(Number(wx))) w.current.code = Number(wx);
+  return w;
+}
+
+function baseWeather(now: Date): WeatherResponse {
   const T = dateKeyInTz(now, TZ);
   const p = zonedParts(now, TZ);
   const hourly = [];

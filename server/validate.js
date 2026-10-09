@@ -226,6 +226,7 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
     ambient: oneOf(ctx, `${p}.background.ambient`, bg.ambient, D.background.ambient, ['aurora', 'particles', 'none']),
     panelBlur: num(ctx, `${p}.background.panelBlur`, bg.panelBlur, D.background.panelBlur, 0, 40, true),
     panelShade: num(ctx, `${p}.background.panelShade`, bg.panelShade, D.background.panelShade, 0, 1),
+    weatherFx: oneOf(ctx, `${p}.background.weatherFx`, bg.weatherFx, D.background.weatherFx, ['off', 'simple', 'rich']),
   };
 
   const ca = obj(ctx, `${p}.calendar`, x.calendar);

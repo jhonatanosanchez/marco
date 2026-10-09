@@ -48,7 +48,7 @@ export function defaultScreenProfile({ id = 's_main', slug = 'living-room', name
     background: {
       enabled: true, source: 'stock', stockTopic: 'nature', order: 'random', intervalSec: 120, brightness: 0.85, showMeta: false,
       cover: true, transition: 'webgl', ambient: 'aurora',
-      panelBlur: 18, panelShade: 0.5,
+      panelBlur: 18, panelShade: 0.5, weatherFx: 'simple',
     },
     calendar: {
       enabled: true, view: 'month', weeks: 5, weekStart: 1, showLocation: false, showEndTime: false,

@@ -47,6 +47,8 @@ export interface BackgroundConfig {
   /** frosted weather card: backdrop blur (px at 1080p, 0 = off) and darkness (0..1, 0.5 = default) */
   panelBlur?: number;
   panelShade?: number;
+  /** effect over the photo for the current weather: none, light rain/snow particles, or drops on the glass with sun rays */
+  weatherFx?: 'off' | 'simple' | 'rich';
 }
 
 export interface CalendarSource {

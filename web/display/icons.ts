@@ -85,6 +85,11 @@ export function precipOf(code: number): 'rain' | 'snow' | null {
   return null;
 }
 
+/** Clear or mostly clear sky in daylight: the rich weather effect shows sun rays. */
+export function sunnyOf(code: number, isDay: boolean): boolean {
+  return isDay && (code === 0 || code === 1);
+}
+
 export function weatherIcon(code: number, isDay = true, opts: { animated?: boolean; cls?: string } = {}): string {
   const k = wmoKind(code);
   let body = '';

@@ -13,6 +13,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { label: 'Panel lateral (izquierda/derecha, anchura)', route: 'layout', anchor: 'layout-side', keywords: 'side panel width columna lateral largura' },
   { label: 'Fotos de fondo', route: 'background', anchor: 'bg-photos', keywords: 'background wallpaper fondo stock galería intervalo brillo fotos orden aleatorio order random shuffle newest name' },
   { label: 'Efecto ambiental (aurora, partículas)', route: 'background', anchor: 'bg-ambient', keywords: 'ambient aurora particles three webgl animación' },
+  { label: 'Efecto del tiempo (lluvia, nieve, sol)', route: 'background', anchor: 'bg-weather', keywords: 'weather effect rain snow sun drops lluvia nieve sol gotas webgl' },
   { label: 'Nombre de la pantalla', route: 'screen', anchor: 'scr-general', keywords: 'name nombre nome' },
   { label: 'Idioma de la pantalla', route: 'screen', anchor: 'scr-general', keywords: 'language idioma lingua español english português' },
   { label: 'Orientación (horizontal / vertical)', route: 'screen', anchor: 'scr-general', keywords: 'orientation portrait landscape vertical rotar' },
