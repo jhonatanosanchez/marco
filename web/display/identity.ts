@@ -1,13 +1,70 @@
-// Display identity (docs/ARCHITECTURE.md): which screen profile this display shows (?screen=) and a stable
-// client id (?client= from the kiosk, else persisted in localStorage, else generated).
+// Display identity (docs/ARCHITECTURE.md): how this display gets in (private link /d/<key>, paired-device token in
+// localStorage, or nothing: open mode / admin session), which screen profile it shows (?screen=, ignored with a
+// key or device token — those are bound to a screen) and a stable client id (?client= from the kiosk, else
+// persisted in localStorage, else generated).
 
 const params = new URLSearchParams(location.search);
 
-/** Requested screen key (slug or id) as typed in the URL; '' = default screen. */
-export const screenKey = (params.get('screen') || '').trim().slice(0, 64);
+/** Private-link key from the path (/d/<key>); '' when the page was opened at / or /pair. */
+export const linkKey = (() => {
+  const m = /^\/d\/([^/?#]+)/.exec(location.pathname);
+  try {
+    return m ? decodeURIComponent(m[1]).trim().slice(0, 64) : '';
+  } catch {
+    return '';
+  }
+})();
 
-/** Storage namespace for per-screen caches (`cs.cache.<ns>.config` …). */
-export const screenNs = screenKey ? screenKey.toLowerCase().replace(/[^a-z0-9_-]/g, '_') : '_default';
+const DEVICE_LS = 'marco.deviceToken';
+/** Paired-device token (stored by the pairing screen). */
+export function storedDeviceToken(): string {
+  try {
+    const v = localStorage.getItem(DEVICE_LS) || '';
+    return /^md_[A-Za-z0-9_-]{43}$/.test(v) ? v : '';
+  } catch {
+    return '';
+  }
+}
+export function saveDeviceToken(token: string): void {
+  try {
+    localStorage.setItem(DEVICE_LS, token);
+  } catch { /* storage disabled: the screen pairs again after a reload */ }
+}
+export function clearDeviceToken(): void {
+  try {
+    localStorage.removeItem(DEVICE_LS);
+  } catch { /* ignore */ }
+}
+
+/** The credential this display presents (X-Marco-Key / ?k=): the link key wins over a stored device token. */
+export const credential = linkKey || storedDeviceToken();
+export const credentialKind: 'key' | 'device' | '' = linkKey ? 'key' : credential ? 'device' : '';
+
+/** Requested screen key (slug or id) as typed in the URL; '' = default screen (or the one bound to the credential). */
+export const screenKey = credential ? '' : (params.get('screen') || '').trim().slice(0, 64);
+
+/** Storage namespace for per-screen caches (`cs.cache.<ns>.config` …). Never contains the key itself. */
+export const screenNs = linkKey ? `k_${linkKey.slice(0, 6).replace(/[^A-Za-z0-9]/g, '_')}` : credential ? '_device'
+  : screenKey ? screenKey.toLowerCase().replace(/[^a-z0-9_-]/g, '_') : '_default';
+
+/** Forget every cached data set (a revoked link or device must not keep showing family data). */
+export function clearCaches(): void {
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('cs.cache.')) localStorage.removeItem(k);
+    }
+  } catch { /* ignore */ }
+}
+
+/** Request headers carrying the credential (fetch). */
+export const authHeaders = (): Record<string, string> => (credential ? { 'X-Marco-Key': credential } : {});
+
+/** Same-origin media URL with ?k= (an <img> / WebGL texture cannot send headers). Other URLs unchanged. */
+export function mediaUrl(url: string): string {
+  if (!credential || !url.startsWith('/media/')) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}k=${encodeURIComponent(credential)}`;
+}
 
 const CLIENT_RE = /^[A-Za-z0-9_-]{8,64}$/;
 

@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { paths, writeFileAtomic } from './store.js';
 import { fold, stableStringify } from './lib/text.js';
+import { redactSecrets, hasSecrets } from './lib/redact.js';
 
 const MAX_ENTRIES = 5000; // kept after compaction
 const COMPACT_AT = 6000; // lines in file before rewriting it
@@ -52,6 +53,11 @@ export function actorFrom(req) {
 function capData(data) {
   let s;
   try { s = JSON.stringify(data); } catch { return { truncated: true }; }
+  // Safety net: display keys / device tokens never land in the log, whatever a caller passes.
+  if (s !== undefined && hasSecrets(s)) {
+    s = redactSecrets(s);
+    try { data = JSON.parse(s); } catch { return { redacted: true }; }
+  }
   if (s === undefined || s.length <= MAX_DATA_CHARS) return data;
   return { truncated: true, preview: s.slice(0, 300) };
 }

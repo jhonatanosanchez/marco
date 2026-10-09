@@ -65,6 +65,10 @@ function readJson(file, { strict = false } = {}) {
   }
 }
 
+/** A stored config without security.displayAccess predates private display links (→ migrated to 'open'). */
+export const isLegacyAccess = (raw) => Boolean(raw && typeof raw === 'object' && !Array.isArray(raw)
+  && !(raw.security && typeof raw.security === 'object' && ['private', 'open'].includes(raw.security.displayAccess)));
+
 function loadConfig() {
   const raw = readJson(paths.config);
   if (!raw) {
@@ -74,16 +78,29 @@ function loadConfig() {
   }
   // v1 (single screen) → v2 (screens[]): keep an untouched copy of the old file, then persist the migrated one.
   const migrate = isV1(raw);
+  // Configs saved before private display links existed (0.3) keep their displays working without a key:
+  // display access 'open' (the admin recommends switching). Fresh installs get the 'private' default.
+  const legacyAccess = isLegacyAccess(raw);
+  if (legacyAccess) raw.security = { ...(raw.security && typeof raw.security === 'object' ? raw.security : {}), displayAccess: 'open' };
   // Back-fill new keys from defaults, then sanitise. Invalid stored values fall back to defaults (logged).
   const { value, errors } = validateConfig(mergeDefaults(migrateConfig(raw)));
   if (errors.length) console.warn('[store] config had invalid values (defaults used):', errors.map((e) => `${e.path}: ${e.message}`).join('; '));
+  if (legacyAccess && !migrate) {
+    try {
+      writeFileAtomic(paths.config, JSON.stringify(value, null, 2));
+      console.log('[store] display access set to "open" for this existing install (switch to private links in the admin: Security)');
+      migratedOnLoad = { ...(migratedOnLoad || {}), displayAccess: 'open' };
+    } catch (err) {
+      console.error('[store] display access migration could not be persisted:', err.message);
+    }
+  }
   if (migrate) {
     try {
       const dest = path.join(paths.backups, 'config-v1-premigration.json');
       if (!fs.existsSync(dest)) fs.copyFileSync(paths.config, dest);
       writeFileAtomic(paths.config, JSON.stringify(value, null, 2));
       console.log(`[store] config migrated to v${value.version} (${value.screens.length} screen); v1 copy in ${dest}`);
-      migratedOnLoad = { from: Number(raw.version) || 1, to: value.version };
+      migratedOnLoad = { from: Number(raw.version) || 1, to: value.version, ...(legacyAccess ? { displayAccess: 'open' } : {}) };
     } catch (err) {
       console.error('[store] config migration could not be persisted:', err.message);
     }
@@ -112,6 +129,11 @@ export const getSecrets = () => secrets;
  * @param {{ reason?: string, req?: any, backup?: boolean }} [opts] reason/req are passed to 'config' listeners
  */
 export function saveConfig(input, { reason = 'server', req = null, backup = true } = {}) {
+  // A config without `security` (old admin build, backup or export from before 0.3) keeps the current display
+  // access mode: restoring an old backup must neither open private displays nor lock out open-mode kiosks.
+  if (input && typeof input === 'object' && !Array.isArray(input) && input.security === undefined && config?.security) {
+    input = { ...input, security: structuredClone(config.security) };
+  }
   const { ok, errors, value } = validateConfig(input);
   if (!ok) return { ok, errors, config };
   value.revision = (config?.revision || 0) + 1;

@@ -101,6 +101,9 @@ El único tráfico saliente va a los calendarios, al tiempo y a las fuentes de n
 - **Varias pantallas** (salón, cocina, pasillo…), cada una con su propio diseño, fondo, calendarios y widgets, y una
   página de **Pantallas conectadas** (resolución, navegador, versión, recargar / identificar / modo noche por
   dispositivo).
+- **Enlaces privados y vinculación de pantallas** — cada pantalla tiene un enlace imposible de adivinar (`/d/<clave>`,
+  código QR, regenerar con un clic) y los dispositivos nuevos se vinculan con un código de 6 caracteres; los
+  dispositivos vinculados se pueden renombrar o revocar.
 - **Avisos** — envíalos al momento o prográmalos; **tokens de API y webhooks** para Home Assistant y scripts.
 - **Copias de seguridad** (automáticas, exportar/importar con vista previa), **registro de actividad**, **paleta de
   comandos** (Ctrl/Cmd + K), diseño adaptado al móvil, en inglés / español / portugués.
@@ -125,7 +128,7 @@ flowchart LR
   subgraph home["Tu red doméstica"]
     server["Servidor de Marco<br/>Node.js · Pi / servidor doméstico / NAS / Docker<br/>data/ = configuración, fotos, copias"]
     tv["Pantalla de pared<br/>Raspberry Pi + Chromium en modo kiosco"]
-    tablet["Tablet de la cocina / navegador de la TV<br/>/?screen=kitchen"]
+    tablet["Tablet de la cocina / navegador de la TV<br/>/d/&lt;clave privada&gt;"]
     phone["Móvil u ordenador<br/>/admin/"]
     ha["Home Assistant<br/>(opcional)"]
   end
@@ -144,8 +147,8 @@ flowchart LR
 - Un pequeño **servidor Node.js** (sin base de datos ni módulos nativos) descarga y guarda en caché tus calendarios,
   el tiempo y las noticias, almacena tus ajustes y fotos en una carpeta `data/` y sirve dos aplicaciones web.
 - Las **pantallas** son simplemente navegadores: una Raspberry Pi en modo kiosco, una tablet antigua, el navegador de
-  una smart TV. Abre `/` (o `/?screen=<slug>` para otro perfil de pantalla). Reciben los cambios al instante mediante
-  Server-Sent Events.
+  una smart TV. Cada una abre el **enlace privado** de su pantalla (`/d/<clave>`) o se **vincula** con un código.
+  Reciben los cambios al instante mediante Server-Sent Events.
 - El **panel de administración** en `/admin/` funciona desde cualquier móvil u ordenador de tu red.
 
 Más detalles: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) y [docs/API.md](docs/API.md).
@@ -165,7 +168,8 @@ locales, cumpleaños, cuentas atrás, filtros, una fuente de alquiler vacacional
 localmente), fotos de ejemplo de picsum.photos con puntos focales, un token de API y algo de historial de actividad. Tu
 carpeta `data/` real nunca se toca.
 
-- Pantalla: <http://localhost:3000/> · pantalla de la cocina: <http://localhost:3000/?screen=kitchen>
+- Pantalla: la demo muestra el **enlace privado** de cada pantalla (`http://localhost:3000/d/<clave>`);
+  <http://localhost:3000/pair> muestra un código para probar *Pantallas conectadas → Vincular una pantalla*
 - Administración: <http://localhost:3000/admin/> — contraseña **`demo-calendar`**
 - Opciones: `--port 3080`, `--lang es` (o `pt`), `--no-photos`, `--data ./demo-data --keep`
 
@@ -235,7 +239,7 @@ Una instalación nueva no tiene contraseña de administración ni ajustes propio
 |---|---|
 | ![Asistente, paso 1: bienvenida e idioma](docs/screenshots/setup-1-welcome.png) | ![Paso 2: contraseña con medidor de seguridad](docs/screenshots/setup-2-password.png) |
 | ![Paso 3: búsqueda de ciudad, zona horaria, unidades y formato de hora](docs/screenshots/setup-3-location.png) | ![Paso 4: festivos por país, fuentes iCal con botón Probar, notas sobre Google](docs/screenshots/setup-4-calendars.png) |
-| ![Paso 5: nombre de la pantalla, diseño, color, fotos y efecto ambiental](docs/screenshots/setup-5-look.png) | ![Paso 6: URL de la pantalla con botón de copiar y código QR, resumen y consejos](docs/screenshots/setup-6-done.png) |
+| ![Paso 5: nombre de la pantalla, diseño, color, fotos y efecto ambiental](docs/screenshots/setup-5-look.png) | ![Paso 6: el enlace privado de la pantalla con botón de copiar y código QR, resumen y consejos](docs/screenshots/setup-6-done.png) |
 
 1. **Bienvenida**: elige el idioma (English, Español, Português).
 2. **Contraseña del panel**: al menos 10 caracteres, nada obvio (`password123`, `1234567890`, `qwertyuiop`…),
@@ -248,10 +252,11 @@ Una instalación nueva no tiene contraseña de administración ni ajustes propio
    o vincula la cuenta después si el servidor tiene [un cliente OAuth de Google](#conectar-google-calendar).
 5. **Aspecto**: nombre de la pantalla, diseño, color de acento, tema claro u oscuro, fotos de fondo (stock ahora, tu
    galería más tarde) y efecto ambiental.
-6. **Listo**: la URL de la pantalla para abrir en la tele o la Raspberry Pi (botón de copiar + código QR; si hiciste
-   la configuración en el propio servidor como `localhost`, usa su dirección de la red local), un resumen
-   y consejos (`?lite=1` para dispositivos lentos, el comando del instalador solo kiosco). Ya tienes la sesión
-   iniciada y entras al panel.
+6. **Listo**: el **enlace privado** de la pantalla para abrir en la tele o la Raspberry Pi (botón de copiar + código
+   QR; si hiciste la configuración en el propio servidor como `localhost`, usa su dirección de la red local), un
+   resumen y consejos (`?lite=1` para dispositivos lentos, el comando del instalador solo kiosco con el enlace
+   privado). Ya tienes la sesión iniciada y entras al panel. Una pantalla que mostraba la bienvenida pasa a mostrar un
+   [código de vinculación](#enlaces-privados-y-vinculación-de-pantallas).
 
 <img src="docs/screenshots/setup-mobile.png" alt="El asistente de configuración en un móvil" width="260" align="right">
 
@@ -284,6 +289,48 @@ sugiere cambiarla.
 
 <br clear="right">
 
+## Enlaces privados y vinculación de pantallas
+
+Desde la 0.3 todas las pantallas son **privadas** por defecto: un navegador solo muestra el calendario si ha abierto el
+**enlace privado** de la pantalla o se ha **vinculado** desde el panel. Si no, muestra un código de vinculación y nada
+más. Así Marco es seguro en redes compartidas (wifi de un piso compartido, oficina) y puedes acceder desde Internet
+detrás de HTTPS.
+
+| | |
+|---|---|
+| ![Pantalla → Ajustes → Enlace privado: enlace, código QR, regenerar y el comando para la Raspberry Pi](docs/screenshots/admin-private-link.png) | ![Vincular una pantalla: código, pantalla y nombre del dispositivo](docs/screenshots/admin-pairing-dialog.png) |
+| ![Una pantalla nueva sin clave muestra un código de vinculación y un código QR](docs/screenshots/display-pairing.png) | ![Enlace regenerado o dispositivo revocado: «Este enlace ya no es válido»](docs/screenshots/display-invalid-link.png) |
+
+- **Enlace privado** — *Pantalla → Ajustes → Enlace privado* muestra el enlace de la pantalla seleccionada, p. ej.
+  `http://homeserver.lan:3000/d/3f6c0a52-9d1e-4b7a-a2c4-0e5b8f1d2c37`, con **Copiar**, un **código QR**, **Abrir**,
+  **Regenerar enlace** y el comando listo para pegar en la Raspberry Pi. Guárdalo como marcador en una tablet, úsalo
+  como URL del kiosco o escanea el QR con el dispositivo. El enlace es la llave: quien lo tenga ve esa pantalla (y solo
+  esa: `?screen=` se ignora), así que úsalo solo en tus dispositivos.
+- **Vinculación** — sin teclear enlaces largos en una tele: abre la dirección normal (`http://homeserver.lan:3000/` o
+  `/pair`) en el dispositivo nuevo y mostrará un **código de 6 caracteres** grande y un código QR. En el móvil abre
+  *Pantallas conectadas → Vincular una pantalla* (o escanea el QR: abre el panel con el código ya escrito), escribe el
+  código, elige la pantalla y un nombre. El dispositivo arranca en un par de segundos y guarda su propia llave en el
+  almacenamiento del navegador: ideal para tablets, teles y navegadores que sigues usando. El kiosco de la Raspberry Pi
+  abre Chromium en modo incógnito (nada sobrevive a un reinicio), así que a él dale el enlace privado.
+- **Dispositivos vinculados** — *Pantallas conectadas* los lista con la pantalla que muestran y cuándo se vieron por
+  última vez; **Editar** los renombra o los pasa a otra pantalla y **Revocar** les corta el acceso.
+- **Regenerar / revocar** — *Regenerar enlace* cambia la clave al instante; las pantallas que usaban el enlace antiguo
+  (o un dispositivo revocado) pasan a «Este enlace ya no es válido», borran sus datos en caché y ofrecen un código de
+  vinculación nuevo.
+- **Modo de acceso a las pantallas** (*Seguridad → Acceso a las pantallas*): **Privado** (por defecto en las
+  instalaciones nuevas) o **Abierto (red local)**, el comportamiento de la 0.2, en el que `/` y `/?screen=<slug>`
+  funcionan sin clave. **Al actualizar desde la 0.2 se mantiene Abierto** para que ningún kiosco se quede en blanco, y
+  el panel recomienda cambiarlo: primero abre en cada pantalla su enlace privado (o vincúlala); al guardar Privado, las
+  pantallas sin clave muestran un código de vinculación. La vista previa del panel y *Ver pantalla* siguen funcionando
+  con tu sesión en ambos modos.
+
+![Pantallas conectadas: cómo entró cada pantalla y los dispositivos vinculados](docs/screenshots/admin-displays-paired.png)
+
+La clave es un **UUIDv4** aleatorio (122 bits aleatorios): fácil de leer y teclear en una Pi (hexadecimal en
+minúsculas, sin letras ambiguas) e imposible de adivinar. Los cálculos de fuerza bruta, qué se registra (nada secreto)
+y el modelo de amenazas completo están en [SECURITY.md](SECURITY.md#private-display-links-and-pairing-threat-model)
+(en inglés).
+
 ## Kiosco con Raspberry Pi
 
 Probado con Raspberry Pi OS **Bookworm** (64 bits, escritorio) en Pi 4/5; una Pi 3 funciona con `?lite=1`.
@@ -302,7 +349,12 @@ Instala Node.js 22 (si hace falta), Chromium y utilidades para el kiosco, ejecut
 `.env` con un `SESSION_SECRET` aleatorio, instala y arranca el servicio de systemd `marco`, añade el kiosco al inicio automático del escritorio (se
 admiten labwc, Wayfire y LXDE), desactiva el apagado de pantalla y activa el inicio de sesión automático en el
 escritorio. Tras reiniciar, la pantalla muestra la bienvenida con un código QR: escanéalo con el móvil para usar el
-[asistente de configuración](#primeros-pasos-el-asistente-de-configuración).
+[asistente de configuración](#primeros-pasos-el-asistente-de-configuración). Al terminar, la pantalla muestra un
+**código de vinculación**: vincúlala desde el móvil para empezar ya, o simplemente reinicia. En una instalación todo en
+uno el kiosco abre **por sí solo el enlace privado de la pantalla predeterminada**: lo lee de la carpeta de datos local
+cada vez que arranca Chromium (así recoge un enlace regenerado en el siguiente reinicio);
+`--url "http://localhost:3000/?screen=kitchen"` elige otra pantalla del mismo modo. Una vinculación sola no sobrevive a
+un reinicio ahí: el navegador del kiosco va en modo incógnito.
 
 ### B. Servidor en otra máquina, la Pi solo lo muestra (solo kiosco)
 
@@ -310,13 +362,17 @@ Ejecuta el servidor en un servidor doméstico, NAS o host Docker ([Inicio rápid
 
 ```bash
 git clone https://github.com/mr-reb00t/marco.git ~/marco
-~/marco/deploy/install.sh --kiosk-only --url http://192.168.1.50:3000/
+~/marco/deploy/install.sh --kiosk-only --url http://homeserver.lan:3000/d/3f6c0a52-9d1e-4b7a-a2c4-0e5b8f1d2c37
 sudo reboot
 ```
 
+Usa el **enlace privado** de la pantalla que debe mostrar esta Pi: en *Pantalla → Ajustes → Enlace privado* tienes el
+comando exacto listo para copiar (el enlace decide la pantalla). Aquí no sirve vincular con código: el navegador del
+kiosco va en modo incógnito y lo olvidaría en el siguiente reinicio.
+
 Esto instala solo Chromium + el inicio automático del kiosco (sin Node.js ni servidor), copia el script del kiosco a
 `~/.local/bin/` (después puedes borrar el clon), desactiva el apagado de pantalla y oculta el cursor.
-Usa `--url "http://192.168.1.50:3000/?screen=kitchen"` para otro perfil de pantalla.
+En el modo de acceso **abierto** sigue funcionando `--url "http://homeserver.lan:3000/?screen=kitchen"`.
 
 ### Opciones del instalador
 
@@ -325,14 +381,15 @@ Usa `--url "http://192.168.1.50:3000/?screen=kitchen"` para otro perfil de panta
 | *(ninguna)* | Servidor + kiosco en esta máquina |
 | `--no-kiosk` | Solo servidor (sin Chromium ni inicio automático) |
 | `--kiosk-only --url <url>` | Solo kiosco, mostrando un servidor que se ejecuta en otra máquina |
-| `--url <url>` | Todo en uno, pero mostrando una URL concreta (p. ej. `http://localhost:3000/?screen=kitchen&lite=1`) |
+| `--url <url>` | Todo en uno, pero mostrando una URL concreta (p. ej. el enlace privado `http://localhost:3000/d/<clave>?lite=1`) |
 | `--user <name>` | Usuario que ejecuta el servicio y la sesión de escritorio (por defecto: el usuario actual) |
 | `--skip-apt` | No instala paquetes del sistema |
 
 ### Consejos para el kiosco
 
 - La configuración del kiosco está en `~/.config/marco/kiosk.env` (`KIOSK_URL`, `KIOSK_CLIENT`,
-  `KIOSK_EXTRA_ARGS`); el registro es `/tmp/marco-kiosk.log`. El script espera al servidor, reinicia
+  `KIOSK_EXTRA_ARGS`); tras *Regenerar enlace*, pon el enlace privado nuevo en `KIOSK_URL` (o vuelve a ejecutar el
+  instalador con `--url <enlace nuevo>`); el registro es `/tmp/marco-kiosk.log`. El script espera al servidor, reinicia
   Chromium si se cierra y añade `client=<hostname>` para que el dispositivo conserve su nombre en *Pantallas
   conectadas*.
 - **¿Demasiado grande o demasiado pequeño?** Añade `KIOSK_EXTRA_ARGS="--force-device-scale-factor=0.8"` (o `1.25`) a
@@ -509,14 +566,15 @@ iniciada con la contraseña se añade solo). Después, si quieres, puedes desact
 
 Crea varias **pantallas** en *Sistema → Pantallas* ("Salón", "Cocina", "Pasillo"…). Cada una tiene su propio diseño,
 tema, fondo, widgets y conjunto de calendarios; los calendarios, las reglas y las integraciones son compartidos. Un
-dispositivo muestra una pantalla con `http://<server-ip>:3000/?screen=<slug>`; sin `?screen` muestra la predeterminada
-(★). El selector **Editando: Salón ▾** de la cabecera de la administración elige qué pantalla editan las páginas que
+dispositivo muestra una pantalla con su [enlace privado](#enlaces-privados-y-vinculación-de-pantallas) o vinculándolo a
+ella (en modo abierto también con `http://<server-ip>:3000/?screen=<slug>`; sin `?screen`, la predeterminada ★). El selector **Editando: Salón ▾** de la cabecera de la administración elige qué pantalla editan las páginas que
 se configuran por pantalla.
 
 *Sistema → Pantallas conectadas* muestra todos los navegadores que están mostrando una pantalla (IP, navegador,
-resolución, densidad de píxeles, WebGL, versión, último latido) con los botones **Recargar**, **Identificar** (muestra
-el nombre de la pantalla en letras grandes durante 10 s) y **Noche / Día / Auto**. Las pantallas desactualizadas se
-señalan; *Recargar* las arregla.
+resolución, densidad de píxeles, WebGL, versión, último latido y cómo entró: enlace privado, dispositivo vinculado o
+sin clave) con los botones **Recargar**, **Identificar** (muestra el nombre de la pantalla en letras grandes durante
+10 s) y **Noche / Día / Auto**, además de **Vincular una pantalla** y la lista de dispositivos vinculados. Las
+pantallas desactualizadas se señalan; *Recargar* las arregla.
 
 ### Avisos y mensajes programados
 
@@ -617,7 +675,8 @@ les da valor.
 ```
 data/
 ├── config.json          # todos los ajustes (pantallas, calendarios, reglas, eventos, cumpleaños…)
-├── secrets.json         # hash de la contraseña, secreto de sesión, tokens de Google y Home Assistant, hashes de los tokens de API (modo 600)
+├── secrets.json         # hash de la contraseña, secreto de sesión, tokens de Google y Home Assistant, hashes de los tokens de API,
+│                        #   claves de los enlaces privados, hashes de las llaves de los dispositivos vinculados (modo 600)
 ├── photos/              # galería (+ .thumbs/ y .meta.json con los puntos focales y las fotos ocultas)
 ├── backups/             # copias de seguridad de la configuración automáticas y manuales
 ├── cache/               # cachés de las fuentes
@@ -632,7 +691,9 @@ Haz copia de seguridad de toda la carpeta (o usa *Exportar*) para conservarlo to
 
 | Parámetro | Efecto |
 |---|---|
-| `?screen=<slug>` | Muestra ese perfil de pantalla (la pantalla predeterminada si no se indica o no existe) |
+| `/d/<clave>` | Enlace privado de una pantalla (la clave decide la pantalla) |
+| `/pair` | Muestra un código de vinculación (también en modo abierto) |
+| `?screen=<slug>` | Muestra ese perfil de pantalla (la predeterminada si no se indica o no existe); solo en modo abierto o con sesión del panel |
 | `?lite=1` | Sin efectos WebGL (dispositivos lentos) |
 | `?demo=1` | Datos de ejemplo integrados (no necesita datos del servidor) |
 | `?lang=en\|es\|pt` | Fuerza el idioma |
@@ -641,11 +702,14 @@ Haz copia de seguridad de toda la carpeta (o usa *Exportar*) para conservarlo to
 
 ## Seguridad
 
-Marco está pensado para una **red doméstica de confianza**.
+Marco se diseñó para una red doméstica; desde la 0.3 las pantallas son **privadas por defecto**.
 
-- **Público en tu red local** (sin inicio de sesión): la pantalla `/` y su API (`/api/display/*`, `/api/events`,
-  `/api/weather`, `/api/news`, `/api/photos`, `/api/countdowns`, `/api/stream`). Nunca contienen URL de calendarios,
-  tokens ni contraseñas, pero sí muestran tus eventos: **no los expongas a Internet**.
+- **Pantallas** (`/`, `/d/<clave>` y la API de la pantalla: `/api/display/*`, `/api/events`, `/api/weather`,
+  `/api/news`, `/api/photos`, `/api/countdowns`, `/api/stream`, `/media/*`): necesitan la clave del enlace privado, la
+  llave de un dispositivo vinculado o una sesión del panel; si no, responden `401`/`403` sin datos. Las claves se
+  comparan en tiempo constante, nunca se registran y no salen en el referer (`Referrer-Policy: no-referrer`) ni en
+  cachés (`no-store`). En modo **abierto** (instalaciones actualizadas desde la 0.2 hasta que lo cambies) la API de la
+  pantalla no pide nada: entonces **no la expongas a Internet**.
 - **Protegido**: la administración (`/admin/`, `/api/admin/*`) requiere una sesión (contraseña y/o cuentas de Google
   permitidas); los webhooks requieren un token de tipo bearer.
 - Una instalación nueva **no tiene contraseña por defecto**; la crea el
@@ -653,9 +717,10 @@ Marco está pensado para una **red doméstica de confianza**.
   accesible desde fuera de tu red local antes de terminar la configuración.
 - Los nombres de host desconocidos se rechazan (protección contra DNS rebinding); añade tu dominio con `PUBLIC_URL` /
   `ALLOWED_HOSTS`.
-- Si quieres acceso remoto, usa un **proxy inverso con HTTPS** que solo exponga las rutas de administración, inicio
-  de sesión y configuración inicial ([ejemplo de Caddy](deploy/Caddyfile.example)), una **contraseña segura** y
-  `TRUST_PROXY` siempre que el proxy no se conecte desde loopback (otro host o Docker).
+- Si quieres acceso remoto, usa un **proxy inverso con HTTPS** ([ejemplo de Caddy](deploy/Caddyfile.example)): en modo
+  privado las pantallas también pueden pasar por él; en modo abierto expón solo las rutas de administración, inicio de
+  sesión y configuración inicial. Usa una **contraseña segura** y `TRUST_PROXY` siempre que el proxy no se conecte
+  desde loopback (otro host o Docker). En redes que no controlas, usa HTTPS para que nadie pueda capturar una clave.
 - Las URL de calendarios, RSS y Home Assistant que introduces en la administración las descarga **el servidor**,
   direcciones de la red local incluidas.
 - Mantén en privado `.env`, `data/secrets.json`, las exportaciones con secretos y `data/backups/`.

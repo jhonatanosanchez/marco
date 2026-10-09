@@ -19,19 +19,25 @@
 calendar.example.com {
 	encode zstd gzip
 
-	# Recommended: expose ONLY the admin panel, the Google login and the first-run setup to the Internet.
+	# Display access PRIVATE (default since 0.3: Admin -> Security -> Display access): every display needs its
+	# private link (/d/<key>) or a paired-device token, so the whole app can be exposed — remote screens (a tablet at
+	# grandma's, a phone) open their private link over HTTPS. Nothing to add: everything below is proxied.
+	#
+	# Display access OPEN (installs upgraded from 0.2 until you switch): the display (/) and its API have no
+	# authentication and must stay on your LAN. Then expose ONLY the admin panel, the Google login and the first-run
+	# setup by uncommenting these lines:
 	#   /api/setup/*  works only until the admin password exists, and from outside the LAN always needs the setup
 	#                 token (open https://calendar.example.com/admin/?setup=<token>); afterwards it answers 409.
-	#   /media/*      family photos: the server only sends them to LAN clients or a signed-in admin (the admin's
-	#                 gallery needs them), everyone else gets 404.
-	# The display (/) and the public display API (/api/display, /api/events, /api/photos, /api/stream…) have no
-	# authentication and are meant for your LAN: from outside -> 404.
-	# To call the webhook API from outside your LAN, add /api/hooks/* to the list below.
-	@external_not_admin {
-		not remote_ip private_ranges
-		not path /admin /admin/* /auth/* /api/auth/* /api/admin/* /api/setup/* /assets/* /favicon* /media/*
-	}
-	respond @external_not_admin 404
+	#   /media/*      family photos: the server only sends them to LAN clients or a signed-in admin.
+	#   To call the webhook API from outside your LAN, add /api/hooks/* to the list.
+	# @external_not_admin {
+	# 	not remote_ip private_ranges
+	# 	not path /admin /admin/* /auth/* /api/auth/* /api/admin/* /api/setup/* /assets/* /favicon* /media/*
+	# }
+	# respond @external_not_admin 404
+	#
+	# Private links travel as ?k= only on /api/stream and /media/* (where browsers cannot send headers). Caddy writes
+	# no access log unless you add a `log` directive; if you do, keep the query string out of it.
 
 	reverse_proxy 127.0.0.1:3000 {
 		# Server-Sent Events (/api/stream) must not be buffered
@@ -39,7 +45,9 @@ calendar.example.com {
 	}
 }
 
-# --- nginx alternative (same rules) ----------------------------------------------
+# --- nginx alternative (open display access: LAN-only display; with PRIVATE access proxy everything) ------------
+# Do not log query strings (?k= on /api/stream and /media/*): e.g. `access_log off;` in those locations, or a
+# log_format without $request_uri / $args.
 # geo $cs_lan {                       # in the http {} block: 1 for LAN clients
 #   default 0;
 #   127.0.0.0/8 1; 10.0.0.0/8 1; 172.16.0.0/12 1; 192.168.0.0/16 1; ::1 1; fc00::/7 1;

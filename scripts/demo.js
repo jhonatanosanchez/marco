@@ -3,7 +3,7 @@
 // (local events, birthdays, countdowns, filters, two screens, sample photos, an API token, activity…).
 // Nothing touches your real data/ folder.
 //
-//   npm run demo                       # http://localhost:3000/  ·  admin: http://localhost:3000/admin/ (password: demo-calendar)
+//   npm run demo                       # admin: http://localhost:3000/admin/ (password: demo-calendar); the display links are printed
 //   npm run demo -- --port 3080        # another port
 //   npm run demo -- --lang es          # Spanish (also: pt)
 //   npm run demo -- --no-photos        # skip downloading sample photos from picsum.photos
@@ -207,7 +207,17 @@ for (const [min, rev, reason] of [[60 * 26, 11, 'save'], [60 * 5, 12, 'manual'],
 }
 
 const demoToken = `cs_${crypto.randomBytes(24).toString('base64url')}`;
+// Private display links (one per screen) + one paired device: the demo runs in private display-access mode.
+const displayKeys = Object.fromEntries(value.screens.map((s) => [s.id, { key: crypto.randomUUID(), createdAt: ago(60 * 24 * 12).toISOString() }]));
+const deviceToken = `md_${crypto.randomBytes(32).toString('base64url')}`;
 write('secrets.json', {
+  displayKeys,
+  devices: [{
+    id: 'dv_demo0000001', name: L('Hall tablet', 'Tablet del recibidor', 'Tablet da entrada'), screenId: 's_kitchen',
+    hash: crypto.createHash('sha256').update(deviceToken).digest('hex'), prefix: deviceToken.slice(0, 7),
+    createdAt: ago(60 * 24 * 3).toISOString(), lastSeenAt: ago(4).toISOString(), lastIp: '192.168.1.63',
+    userAgent: 'Mozilla/5.0 (Linux; Android 14; SM-X200) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+  }],
   passwordHash: await hashPassword(PASSWORD),
   passwordIsDefault: false,
   sessionSecret: crypto.randomBytes(32).toString('hex'),
@@ -227,6 +237,7 @@ const act = (min, type, actor, data, level = 'info', ip = '192.168.1.42') => {
   return JSON.stringify({ id: `${t.toString(36)}${(seq++).toString(36).padStart(3, '0')}aa`, ts: new Date(t).toISOString(), type, level, actor, ip, ...(data ? { data } : {}) });
 };
 write('activity.jsonl', [
+  act(60 * 24 * 3, 'display.paired', 'password', { id: 'dv_demo0000001', name: L('Hall tablet', 'Tablet del recibidor', 'Tablet da entrada'), screen: 'kitchen' }, 'warn'),
   act(60 * 30, 'auth.login', 'password', { method: 'password' }),
   act(60 * 29, 'config.saved', 'password', { revision: 10, sections: ['calendar', 'birthdays'] }),
   act(60 * 26, 'token.created', 'password', { id: 'tk_demo00000001', name: 'Home Assistant', prefix: demoToken.slice(0, 8) }),
@@ -304,7 +315,8 @@ const child = spawn(process.execPath, [path.join(ROOT, 'server', 'index.js')], {
 console.log(`
   Marco demo
   ──────────
-  Display:   http://localhost:${PORT}/            (kitchen screen: http://localhost:${PORT}/?screen=kitchen)
+${value.screens.map((s) => `  Display:   http://localhost:${PORT}/d/${displayKeys[s.id].key}   (${s.name}: private link)`).join('\n')}
+  Pairing:   http://localhost:${PORT}/pair        (shows a code to type in the admin → Connected screens → Pair a screen)
   Admin:     http://localhost:${PORT}/admin/      password: ${PASSWORD}
   API token: ${demoToken}
   Data dir:  ${dataDir}${keep ? '' : '  (deleted on exit; use --keep to keep it)'}

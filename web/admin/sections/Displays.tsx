@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { DisplayInfo, DisplaysResponse, NightCommand } from '../../shared/types';
 import { api, ApiError } from '../api';
 import { confirmDialog, toast } from '../components/feedback';
+import { OpenModeCallout, openPairDialog, PairedDevicesCard } from '../components/DisplayAccess';
 import { Icon } from '../components/icons';
 import { Button, Callout, Card, Empty, PageHeader, StatusDot } from '../components/ui';
 import { fmtDateTime } from '../dates';
@@ -42,6 +43,7 @@ function DisplayCard({ d, serverVersion, onCmd, onForget, busy }: { d: DisplayIn
             <span class="mono">{d.clientId.length > 14 ? `…${d.clientId.slice(-8)}` : d.clientId}</span> · {d.ip || '—'}
           </span>
         </div>
+        <AccessBadge d={d} />
         <span class={`badge ${d.connected ? 'badge--ok' : 'badge--soft'}`}>{d.connected ? t('En línea') : t('Desconectada')}</span>
       </header>
       <dl class="disp__facts">
@@ -126,7 +128,16 @@ function DisplayCard({ d, serverVersion, onCmd, onForget, busy }: { d: DisplayIn
   );
 }
 
-export function DisplaysSection({ saved }: SectionProps) {
+/** How the display got in: private link, paired device (its name), admin session or no key (open mode). */
+function AccessBadge({ d }: { d: DisplayInfo }) {
+  const a = d.access ?? 'open';
+  if (a === 'key') return <span class="badge badge--access" title={t('Entra con el enlace privado de la pantalla')}>🔗 {t('Enlace privado')}</span>;
+  if (a === 'device') return <span class="badge badge--access" title={t('Dispositivo vinculado')}>🔑 {d.deviceName || t('Vinculada')}</span>;
+  if (a === 'session') return <span class="badge badge--access">{t('Sesión del panel')}</span>;
+  return <span class="badge badge--access badge--warn-soft" title={t('Entra sin clave (modo abierto)')}>{t('Sin clave')}</span>;
+}
+
+export function DisplaysSection({ saved, go }: SectionProps) {
   const [data, setData] = useState<DisplaysResponse | null>(null);
   const [err, setErr] = useState('');
   const [filter, setFilter] = useState('');
@@ -184,6 +195,9 @@ export function DisplaysSection({ saved }: SectionProps) {
   return (
     <>
       <PageHeader title={t('Pantallas conectadas')} desc={t('Dispositivos que muestran el calendario ahora mismo. Se actualiza cada 5 s.')}>
+        <Button variant="primary" icon="link" onClick={() => openPairDialog()}>
+          {t('Vincular una pantalla')}
+        </Button>
         <Button icon="refresh" onClick={() => run('_all', { action: 'reload', ...target }, label('reload'))} loading={busy._all === 'reload'} disabled={!onlineHere.length}>
           {t('Recargar todas')}
         </Button>
@@ -191,6 +205,8 @@ export function DisplaysSection({ saved }: SectionProps) {
           {t('Identificar todas')}
         </Button>
       </PageHeader>
+
+      {saved.security?.displayAccess === 'open' && <OpenModeCallout go={go} />}
 
       {outdated.length > 0 && (
         <Callout kind="warn">
@@ -239,7 +255,13 @@ export function DisplaysSection({ saved }: SectionProps) {
       ) : list.length === 0 ? (
         <Card>
           <Empty icon="monitor" title={t('Ninguna pantalla conectada')}>
-            {t('Abre')} <code>{location.origin}/?screen={saved.screens.find((s) => s.id === (filter || saved.defaultScreen))?.slug}</code> {t('en el dispositivo y aparecerá aquí.')}
+            {saved.security?.displayAccess === 'open' ? (
+              <>
+                {t('Abre')} <code>{location.origin}/?screen={saved.screens.find((s) => s.id === (filter || saved.defaultScreen))?.slug}</code> {t('en el dispositivo y aparecerá aquí.')}
+              </>
+            ) : (
+              t('Abre en el dispositivo el enlace privado de la pantalla (Pantalla → Ajustes) o vincúlalo con un código y aparecerá aquí.')
+            )}
           </Empty>
         </Card>
       ) : (
@@ -256,6 +278,7 @@ export function DisplaysSection({ saved }: SectionProps) {
           ))}
         </div>
       )}
+      <PairedDevicesCard saved={saved} onChanged={load} />
       <p class="muted small center">
         <StatusDot state={online.length ? 'ok' : 'idle'} /> {t('{n} en línea', { n: online.length })} · {t('servidor v{v}', { v: data?.serverVersion ?? '—' })}
       </p>

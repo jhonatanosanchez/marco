@@ -5,8 +5,9 @@
 # Usage:
 #   ./deploy/install.sh                          # server + kiosk on this machine (all-in-one Pi)
 #   ./deploy/install.sh --no-kiosk               # server only (home server / NAS / any Debian box)
-#   ./deploy/install.sh --kiosk-only --url http://<server-ip>:3000/   # kiosk only: this Pi just shows a remote server
-#   ./deploy/install.sh --url "http://localhost:3000/?screen=kitchen"  # all-in-one, but show another screen profile
+#   ./deploy/install.sh --kiosk-only --url http://<server>:3000/d/<key>   # kiosk only: this Pi shows a remote server
+#                                       # (the screen's private link: Admin → Screen → Settings → Private link)
+#   ./deploy/install.sh --url "http://localhost:3000/d/<key>"           # all-in-one, but show another screen profile
 #   ./deploy/install.sh --user pi                # user that runs the service and the desktop session
 #   ./deploy/install.sh --skip-apt               # do not install system packages
 #

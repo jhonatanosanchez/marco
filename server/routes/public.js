@@ -1,4 +1,5 @@
-// Public display API (no auth, LAN only). Never exposes secrets, tokens or calendar URLs.
+// Display API (display key / device token / admin session in private mode — app.js applies displayAuth; anyone
+// in open mode). Never exposes secrets, tokens or calendar URLs.
 import { Router } from 'express';
 import { getConfig } from '../store.js';
 import { getEvents } from '../calendars.js';
@@ -8,6 +9,7 @@ import { getPhotos } from '../photos.js';
 import { sseHandler } from '../sse.js';
 import { streamInit, streamHello, onStreamOpen, onStreamClose } from '../displays.js';
 import { resolveScreen, displayConfig as projectDisplayConfig } from '../screens.js';
+import { requestScreen } from '../displayAccess.js';
 import { addDays, localDate, isDateStr, daysBetween } from '../lib/tz.js';
 
 /** GET /api/display/config payload for `screenKey` (slug or id; empty → default screen). */
@@ -16,14 +18,20 @@ export function displayConfig(cfg, screenKey) {
   return projectDisplayConfig(cfg, screen, { fallback });
 }
 
+/** Display config for a request (screen bound to its key / device, else ?screen=). */
+function displayConfigFor(cfg, req) {
+  const { screen, fallback } = requestScreen(cfg, req);
+  return projectDisplayConfig(cfg, screen, { fallback });
+}
+
 export function publicRouter({ version }) {
   const r = Router();
-  const noStore = (req, res, next) => { res.set('cache-control', 'no-store'); next(); };
+  const noStore = (req, res, next) => { if (!res.get('cache-control')) res.set('cache-control', 'private, no-store'); next(); };
   r.use(noStore);
 
   r.get('/health', (req, res) => res.json({ ok: true, uptime: Math.round(process.uptime()), version }));
 
-  r.get('/display/config', (req, res) => res.json(displayConfig(getConfig(), req.query.screen)));
+  r.get('/display/config', (req, res) => res.json(displayConfigFor(getConfig(), req)));
 
   r.get('/events', async (req, res, next) => {
     try {
@@ -40,7 +48,7 @@ export function publicRouter({ version }) {
       if (from > maxDate) from = maxDate;
       if (to < from) to = from;
       if (daysBetween(from, to) > 400) to = addDays(from, 400);
-      res.json(await getEvents({ from, to, screen: resolveScreen(getConfig(), req.query.screen).screen }));
+      res.json(await getEvents({ from, to, screen: requestScreen(getConfig(), req).screen }));
     } catch (err) {
       next(err);
     }
@@ -48,7 +56,7 @@ export function publicRouter({ version }) {
 
   r.get('/weather', async (req, res) => {
     try {
-      res.json(await getWeather({ lang: resolveScreen(getConfig(), req.query.screen).screen.screen.language }));
+      res.json(await getWeather({ lang: requestScreen(getConfig(), req).screen.screen.language }));
     } catch (err) {
       res.status(502).json({ error: err.message });
     }
@@ -64,7 +72,7 @@ export function publicRouter({ version }) {
 
   r.get('/photos', async (req, res, next) => {
     try {
-      const { screen } = resolveScreen(getConfig(), req.query.screen);
+      const { screen } = requestScreen(getConfig(), req);
       const after = typeof req.query.after === 'string' ? req.query.after : '';
       res.json({ photos: await getPhotos(Number(req.query.count) || 20, screen.background, { key: screen.id, after }) });
     } catch (err) {
@@ -72,7 +80,7 @@ export function publicRouter({ version }) {
     }
   });
 
-  // SSE: GET /api/stream?screen=<slug|id>&client=<clientId> (both optional; docs/ARCHITECTURE.md).
+  // SSE: GET /api/stream?screen=<slug|id>&client=<clientId>[&k=<key|device token>] (docs/ARCHITECTURE.md).
   r.get('/stream', sseHandler({ init: streamInit, hello: streamHello, onOpen: onStreamOpen, onClose: onStreamClose }));
   return r;
 }

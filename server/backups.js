@@ -125,6 +125,10 @@ export function exportSecrets(sec) {
     homeassistant: { ...(sec.homeassistant?.token ? { token: sec.homeassistant.token } : {}) },
     google: { accounts: sec.google?.accounts || {} },
     apiTokens: sec.apiTokens || [],
+    // Private display links and paired devices (token hashes only): an import on a new server keeps every
+    // screen's link and paired device working.
+    displayKeys: sec.displayKeys || {},
+    devices: sec.devices || [],
   });
 }
 
@@ -160,6 +164,8 @@ export function unwrapBundle(bundle) {
   return null;
 }
 
+const DISPLAY_KEY_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
 /** Sanitised secrets from a bundle (only well-formed parts; unknown keys dropped). */
 export function sanitizeImportedSecrets(s) {
   if (!isObj(s)) return {};
@@ -183,6 +189,25 @@ export function sanitizeImportedSecrets(s) {
       lastUsedAt: typeof t.lastUsedAt === 'string' ? t.lastUsedAt : null,
       lastUsedIp: typeof t.lastUsedIp === 'string' ? t.lastUsedIp.slice(0, 64) : null,
       useCount: Number.isInteger(t.useCount) && t.useCount >= 0 ? t.useCount : 0,
+    }));
+  }
+  if (isObj(s.displayKeys)) {
+    const keys = {};
+    for (const [screenId, v] of Object.entries(s.displayKeys).slice(0, 50)) {
+      if (/^[A-Za-z0-9_-]{1,64}$/.test(screenId) && isObj(v) && typeof v.key === 'string' && DISPLAY_KEY_RE.test(v.key)) {
+        keys[screenId] = { key: v.key, createdAt: typeof v.createdAt === 'string' ? v.createdAt.slice(0, 40) : new Date().toISOString() };
+      }
+    }
+    if (Object.keys(keys).length) out.displayKeys = keys;
+  }
+  if (Array.isArray(s.devices)) {
+    out.devices = s.devices.filter((d) => isObj(d) && /^dv_[a-f0-9]{12}$/.test(d.id || '') && /^[a-f0-9]{64}$/.test(d.hash || '')
+      && typeof d.screenId === 'string' && typeof d.name === 'string').slice(0, 50).map((d) => ({
+      id: d.id, name: d.name.slice(0, 60), screenId: d.screenId.slice(0, 64), hash: d.hash, prefix: String(d.prefix || '').slice(0, 7),
+      createdAt: typeof d.createdAt === 'string' ? d.createdAt.slice(0, 40) : new Date().toISOString(),
+      lastSeenAt: typeof d.lastSeenAt === 'string' ? d.lastSeenAt.slice(0, 40) : null,
+      lastIp: typeof d.lastIp === 'string' ? d.lastIp.slice(0, 64) : null,
+      userAgent: typeof d.userAgent === 'string' ? d.userAgent.slice(0, 300) : '',
     }));
   }
   return out;

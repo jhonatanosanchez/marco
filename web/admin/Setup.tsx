@@ -4,7 +4,7 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { passwordProblem, passwordScore, MIN_PASSWORD } from '../shared/password';
-import { qrSvg } from '../shared/qr';
+import { CopyField, Qr } from './components/share';
 import { REPO_URL } from '../shared/project';
 import type { Lang, LayoutPreset, SetupRequest, SetupStatus, TestIcsResponse } from '../shared/types';
 import { api, ApiError } from './api';
@@ -137,68 +137,6 @@ function regionName(cc: string, lang: Lang): string {
   }
 }
 
-async function copyText(text: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch {
-    /* fall back */
-  }
-  // Plain-http LAN pages have no async clipboard API.
-  const ta = document.createElement('textarea');
-  ta.value = text;
-  ta.setAttribute('readonly', '');
-  ta.style.position = 'fixed';
-  ta.style.opacity = '0';
-  document.body.appendChild(ta);
-  ta.select();
-  let ok = false;
-  try {
-    ok = document.execCommand('copy');
-  } catch {
-    ok = false;
-  }
-  ta.remove();
-  return ok;
-}
-
-function CopyField({ value, mono = true, label }: { value: string; mono?: boolean; label?: string }) {
-  const [done, setDone] = useState(false);
-  return (
-    <div class={`copy-field ${mono ? 'copy-field--mono' : ''}`}>
-      <code title={value}>{value}</code>
-      <button
-        type="button"
-        class={`btn btn--default btn--sm ${done ? 'is-done' : ''}`}
-        aria-label={label ?? t('Copiar')}
-        onClick={async () => {
-          if (await copyText(value)) {
-            setDone(true);
-            setTimeout(() => setDone(false), 1600);
-          }
-        }}
-      >
-        <Icon name={done ? 'check' : 'copy'} size={15} />
-        <span>{done ? t('Copiado') : t('Copiar')}</span>
-      </button>
-    </div>
-  );
-}
-
-function Qr({ text, label }: { text: string; label: string }) {
-  const svg = useMemo(() => {
-    try {
-      return qrSvg(text, { dark: '#0b0d11', light: '#ffffff', title: label });
-    } catch {
-      return '';
-    }
-  }, [text, label]);
-  if (!svg) return null;
-  return <div class="qr" dangerouslySetInnerHTML={{ __html: svg }} />;
-}
-
 function StrengthMeter({ pw }: { pw: string }) {
   const score = passwordScore(pw);
   const labels = ['', t('Débil'), t('Aceptable'), t('Buena'), t('Muy buena')];
@@ -268,7 +206,7 @@ export function SetupWizard({ status: initial, onDone, onLang }: { status: Setup
   // submit
   const [busy, setBusy] = useState(false);
   const [submitErr, setSubmitErr] = useState('');
-  const [done, setDone] = useState<{ slug: string; name: string } | null>(null);
+  const [done, setDone] = useState<{ slug: string; name: string; displayPath?: string | null } | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   const needToken = !!status.tokenRequired && status.tokenValid !== true;
@@ -502,7 +440,9 @@ export function SetupWizard({ status: initial, onDone, onLang }: { status: Setup
   const lanIp = isLocalhost ? status.lanAddresses?.[0] : undefined;
   const portPart = location.port ? `:${location.port}` : '';
   const origin = lanIp ? `${location.protocol}//${lanIp}${portPart}` : location.origin;
-  const displayUrl = `${origin}/`;
+  // Private display access (fresh installs): the Done step shows the screen's private link instead of the bare URL.
+  const displayUrl = done?.displayPath ? `${origin}${done.displayPath}` : `${origin}/`;
+  const privateLink = !!done?.displayPath;
   const adminUrl = `${origin}/admin/`;
   // Same path as the README's kiosk-only instructions (the repository is cloned to ~/marco on the Pi).
   const kioskCmd = `~/marco/deploy/install.sh --kiosk-only --url ${displayUrl}`;
@@ -951,7 +891,9 @@ export function SetupWizard({ status: initial, onDone, onLang }: { status: Setup
     );
   } else if (done) {
     title = t('¡Todo listo!');
-    lead = t('Abre esta dirección en la tele, la Raspberry Pi o una tablet. Los cambios del panel aparecen en la pantalla al instante.');
+    lead = privateLink
+      ? t('Abre este enlace privado en la tele, la Raspberry Pi o una tablet: es la llave de esta pantalla, no lo publiques. Los cambios del panel aparecen en la pantalla al instante.')
+      : t('Abre esta dirección en la tele, la Raspberry Pi o una tablet. Los cambios del panel aparecen en la pantalla al instante.');
     const sumRows: [IconName, string, string][] = [
       ['monitor', t('Pantalla'), done.name],
       ['globe', t('Ubicación'), place && !skipLoc ? `${place.name} · ${tz}` : tz],
@@ -963,11 +905,14 @@ export function SetupWizard({ status: initial, onDone, onLang }: { status: Setup
       <>
         <div class="wz-done">
           <div class="wz-done__qr">
-            <Qr text={displayUrl} label={t('Código QR de la dirección de la pantalla')} />
+            <Qr text={displayUrl} label={privateLink ? t('Código QR del enlace privado') : t('Código QR de la dirección de la pantalla')} />
             <span class="muted small">{t('Escanéalo con el móvil')}</span>
           </div>
           <div class="wz-done__main">
-            <Field label={t('Dirección de la pantalla')}>
+            <Field
+              label={privateLink ? t('Enlace privado de la pantalla') : t('Dirección de la pantalla')}
+              hint={privateLink ? t('¿Otra pantalla? Abre {url} en ella y vincúlala con el código que muestra (Pantallas conectadas → Vincular).', { url: `${origin}/` }) : undefined}
+            >
               <CopyField value={displayUrl} />
             </Field>
             {isLocalhost && !lanIp && <Callout kind="warn">{t('Estás en «localhost»: en otros dispositivos usa la IP de este ordenador (p. ej. {url}).', { url: `http://192.168.1.50${portPart}/` })}</Callout>}

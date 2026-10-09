@@ -162,6 +162,76 @@ export interface AuthConfig {
   passwordLoginEnabled: boolean;
 }
 
+// ---- display access: private links + paired devices (docs/API.md "Display access") ----
+
+/** 'private': displays need their private link (/d/<key>) or a paired-device token. 'open': legacy LAN mode. */
+export type DisplayAccessMode = 'private' | 'open';
+export type DisplayAccessVia = 'key' | 'device' | 'session' | 'open';
+
+export interface SecurityConfig {
+  displayAccess: DisplayAccessMode;
+}
+
+/** GET /api/admin/display-links item: one private link per saved screen. */
+export interface DisplayLink {
+  screenId: string;
+  slug: string;
+  name: string;
+  /** UUIDv4 */
+  key: string;
+  /** "/d/<key>" */
+  path: string;
+  createdAt: string;
+}
+
+export interface DisplayLinksResponse {
+  mode: DisplayAccessMode;
+  links: DisplayLink[];
+}
+
+export interface PairedDevice {
+  id: string;
+  name: string;
+  /** first characters of the token ("md_abcd"), for recognising it */
+  prefix: string;
+  screenId: string;
+  screenSlug: string;
+  screenName: string;
+  createdAt: string;
+  lastSeenAt: string | null;
+  lastIp: string | null;
+  userAgent: string;
+  connected: boolean;
+  clientIds: string[];
+}
+
+export interface DevicesResponse {
+  mode: DisplayAccessMode;
+  devices: PairedDevice[];
+}
+
+/** POST /api/pair/start */
+export interface PairStartResponse {
+  /** secret: only this display knows it; the token is handed out to it alone */
+  sessionId: string;
+  /** 6 characters, shown on the screen and typed in the admin */
+  code: string;
+  expiresAt: string;
+  pollMs: number;
+}
+
+/** POST /api/pair/status { sessionId } */
+export type PairStatusResponse =
+  | { status: 'waiting'; code: string; expiresAt: string }
+  | { status: 'paired'; token: string; screen: { id: string; slug: string; name: string }; device: { id: string; name: string } }
+  | { status: 'expired' };
+
+export interface PairClaimRequest {
+  code: string;
+  screenId: string;
+  name?: string;
+}
+
 /**
  * FLAT per-screen VIEW of the v2 config (docs/ARCHITECTURE.md): global sections merged with ONE screen's sections,
  * in the historical v1 shape (+ the new global keys). This is what admin sections edit (`SectionProps.cfg`);
@@ -192,6 +262,7 @@ export interface AppConfig {
   schedules: { items: ScheduledMessage[] };
   homeassistant: HomeAssistantConfig;
   auth: AuthConfig;
+  security: SecurityConfig;
 }
 
 /** GET /api/display/config[?screen=<slug|id>] */
@@ -401,7 +472,9 @@ export interface SetupRequest {
 export interface SetupCompleteResponse {
   ok: true;
   user: AuthUser;
-  screen: { slug: string; name: string };
+  /** displayPath: the screen's private link ("/d/<key>") */
+  screen: { id?: string; slug: string; name: string; displayPath?: string | null };
+  displayAccess?: DisplayAccessMode;
 }
 
 export interface GoogleAccount {
@@ -684,6 +757,7 @@ export interface StoredConfig {
   schedules: { items: ScheduledMessage[] };
   homeassistant: HomeAssistantConfig;
   auth: AuthConfig;
+  security: SecurityConfig;
 }
 
 export interface ValidationError {
@@ -808,6 +882,10 @@ export interface DisplayInfo {
   uptimeSec: number | null;
   lastError: string | null;
   photoFrame?: PhotoFrame | null;
+  /** how the display got in: private link, paired device, admin session or open mode (no key) */
+  access?: DisplayAccessVia;
+  deviceId?: string | null;
+  deviceName?: string | null;
 }
 
 export interface DisplaysResponse {
@@ -977,6 +1055,11 @@ export type ActivityType =
   | 'token.rejected'
   | 'display.connected'
   | 'display.command'
+  | 'display.link_regenerated'
+  | 'display.paired'
+  | 'display.pair_failed'
+  | 'display.device_updated'
+  | 'display.device_revoked'
   | 'activity.cleared';
 
 export interface ActivityEntry {

@@ -215,7 +215,7 @@ test('admin routes: backups, restore, export/import with secrets → logged out,
     assert.equal((await call('GET', '/api/admin/config')).status, 401);
     assert.equal((await call('POST', '/api/auth/login', { password: 'otra-clave' })).status, 200);
     const imp = (await call('GET', '/api/admin/activity?type=config.imported')).json.items[0];
-    assert.deepEqual(imp.data.secrets, ['google', 'apiTokens', 'password']); // no HA token in this bundle
+    assert.deepEqual(imp.data.secrets, ['google', 'apiTokens', 'devices', 'password']); // no HA token / display keys in this bundle
     assert.equal(imp.level, 'warn');
 
     assert.deepEqual((await call('DELETE', '/api/admin/activity')).json, { ok: true });

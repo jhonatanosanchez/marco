@@ -3,12 +3,13 @@
 //   eventsAdminRouter() mounted at /api/admin (session required):
 //     POST /events/preview          → EventsPreviewResponse
 //     POST /birthdays/parse-csv     → BirthdayCsvResult
-//   eventsPublicRouter() mounted at /api (no auth, LAN):
+//   eventsPublicRouter() mounted at /api (display access: key / device token / session, or open mode):
 //     GET  /countdowns?screen=      → CountdownsResponse
 import { Router } from 'express';
 import { requireAuth } from '../auth.js';
 import { getConfig } from '../store.js';
 import { resolveScreen } from '../screens.js';
+import { requestScreen } from '../displayAccess.js';
 import { validateConfig, isValidDate } from '../validate.js';
 import { previewEvents } from '../calendars.js';
 import { getCountdowns } from '../countdowns.js';
@@ -111,8 +112,8 @@ export function eventsPublicRouter() {
   // docs/ARCHITECTURE.md — countdown chips for a screen (unknown ?screen → default screen).
   r.get('/countdowns', async (req, res, next) => {
     try {
-      res.set('cache-control', 'no-store');
-      const { screen } = resolveScreen(getConfig(), req.query.screen);
+      res.set('cache-control', 'private, no-store');
+      const { screen } = requestScreen(getConfig(), req);
       res.json(await getCountdowns({ screen }));
     } catch (err) {
       next(err);

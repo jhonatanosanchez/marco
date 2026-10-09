@@ -6,6 +6,7 @@ import { CommandPalette, type PaletteItem } from './components/CommandPalette';
 import { confirmDialog, DialogHost, toast, ToastHost } from './components/feedback';
 import { Icon, type IconName } from './components/icons';
 import { ScreenSwitcher } from './components/ScreenSwitcher';
+import { openPairDialog, PairDialogHost } from './components/DisplayAccess';
 import { Button, setScopeScreenName } from './components/ui';
 import { getLang, initialLang, setLang, nScreens, t } from './i18n';
 import { setIntent } from './intent';
@@ -269,6 +270,22 @@ export function App() {
     };
   }, [loggedIn]);
 
+  /* ---------- pairing deep link: the QR on a waiting display opens /admin/#pair=<code> */
+  useEffect(() => {
+    const take = () => {
+      const m = /^#\/?pair=([A-Za-z0-9 -]{1,12})/.exec(location.hash);
+      if (!m) return false;
+      history.replaceState(null, '', `${location.pathname}${location.search}#/displays`);
+      setRoute('displays');
+      openPairDialog(m[1]);
+      return true;
+    };
+    take();
+    const on = () => void take();
+    window.addEventListener('hashchange', on);
+    return () => window.removeEventListener('hashchange', on);
+  }, []);
+
   /* ---------- routing */
   useEffect(() => {
     const on = () => {
@@ -492,6 +509,7 @@ export function App() {
       { id: 'a-night-on', group: gActions, icon: 'moon', label: t('Modo noche ahora'), keywords: 'night dim noche', run: () => displayCommand('night', 'on') },
       { id: 'a-night-off', group: gActions, icon: 'sun', label: t('Quitar modo noche'), keywords: 'night day día', run: () => displayCommand('night', 'off') },
       { id: 'a-night-auto', group: gActions, icon: 'clock', label: t('Modo noche automático'), keywords: 'night auto horario', run: () => displayCommand('night', 'auto') },
+      { id: 'a-pair', group: gActions, icon: 'link', label: t('Vincular una pantalla'), keywords: 'pair code código vincular emparelhar device dispositivo', run: () => openPairDialog() },
       { id: 'a-identify', group: gActions, icon: 'target', label: t('Identificar pantallas'), keywords: 'identify nombre', run: () => displayCommand('identify') },
       { id: 'a-new-screen', group: gActions, icon: 'plus', label: t('Nueva pantalla'), keywords: 'screen create crear', run: run('screens', 'new') },
       { id: 'a-new-bday', group: gActions, icon: 'cake', label: t('Añadir cumpleaños'), keywords: 'birthday add', run: run('birthdays', 'add') },
@@ -839,6 +857,7 @@ export function App() {
         </div>
       )}
       {palette && <CommandPalette items={paletteItems} onClose={() => setPalette(false)} />}
+      <PairDialogHost saved={saved} defaultScreenId={screenId} onPaired={() => window.dispatchEvent(new Event('marco:paired'))} />
       <ToastHost />
       <DialogHost />
     </div>

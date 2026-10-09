@@ -140,7 +140,11 @@ test('complete: validates, applies the settings, logs in, writes activity; then 
 
     r = await call('POST', '/api/setup/complete', body());
     assert.equal(r.status, 200, JSON.stringify(r.json));
-    assert.deepEqual(r.json.screen, { slug: 'cocina', name: 'Cocina' });
+    const { displayPath, ...doneScreen } = r.json.screen;
+    assert.deepEqual(doneScreen, { id: 's_main', slug: 'cocina', name: 'Cocina' });
+    // fresh install → private display access: the Done step gets the screen's private link
+    assert.equal(r.json.displayAccess, 'private');
+    assert.match(displayPath, /^\/d\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     // logged in right away
     const me = (await call('GET', '/api/auth/me')).json;
     assert.equal(me.needsSetup, false);

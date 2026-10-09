@@ -67,7 +67,9 @@ export function describeActivity(e: ActivityEntry): { icon: IconName; text: stri
     case 'config.exported':
       return { icon: 'download', text: d.secrets ? t('Configuración exportada (con secretos)') : t('Configuración exportada') };
     case 'config.migrated':
-      return { icon: 'wand', text: t('Configuración migrada al formato multipantalla') };
+      return d.from
+        ? { icon: 'wand', text: t('Configuración migrada al formato multipantalla') }
+        : { icon: 'wand', text: t('Instalación existente: pantallas en modo abierto (sin clave). Recomendado: enlaces privados.') };
     case 'backup.created':
       return { icon: 'archive', text: t('Copia de seguridad creada') };
     case 'backup.deleted':
@@ -95,6 +97,16 @@ export function describeActivity(e: ActivityEntry): { icon: IconName; text: stri
       const label = a === 'reload' ? t('recargar') : a === 'identify' ? t('identificar') : a === 'night' ? `${t('modo noche')} ${str(d.mode)}` : a;
       return { icon: 'monitor', text: t('Orden a pantallas: {action}', { action: label }) + (d.delivered != null ? ` · ${nScreens(Number(d.delivered))}` : '') };
     }
+    case 'display.link_regenerated':
+      return { icon: 'link', text: t('Enlace privado regenerado: {screen}', { screen: str(d.screen) }) + (Number(d.disconnected) ? ` · ${nScreens(Number(d.disconnected))}` : '') };
+    case 'display.paired':
+      return { icon: 'link', text: t('Pantalla vinculada: {name} → {screen}', { name: q(d.name), screen: str(d.screen) }) };
+    case 'display.pair_failed':
+      return { icon: 'alert', text: t('Código de vinculación incorrecto') };
+    case 'display.device_updated':
+      return { icon: 'edit', text: t('Dispositivo editado: {name}', { name: q(d.name) }) };
+    case 'display.device_revoked':
+      return { icon: 'trash', text: t('Dispositivo revocado: {name}', { name: q(d.name) }) };
     case 'activity.cleared':
       return { icon: 'trash', text: t('Registro de actividad vaciado') };
     default:

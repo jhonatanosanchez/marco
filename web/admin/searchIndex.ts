@@ -21,6 +21,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { label: 'Color de acento', route: 'screen', anchor: 'scr-look', keywords: 'accent color cor' },
   { label: 'Modo noche (horario y brillo)', route: 'screen', anchor: 'scr-night', keywords: 'night dim noche noturno brillo atenuar' },
   { label: 'CSS personalizado', route: 'screen', anchor: 'scr-css', keywords: 'custom css estilos avanzado' },
+  { label: 'Enlace privado', route: 'screen', anchor: 'scr-link', keywords: 'private link url qr kiosk raspberry enlace privado ligação privada key clave' },
   { label: 'Reloj (digital / analógico, segundos, 24 h)', route: 'datetime', anchor: 'dt-clock', keywords: 'clock seconds segundos 12h 24h ampm reloj' },
   { label: 'Zona horaria', route: 'datetime', anchor: 'dt-clock', keywords: 'timezone fuso horario lisboa madrid' },
   { label: 'Formato de fecha', route: 'datetime', anchor: 'dt-format', keywords: 'date format fecha data' },
@@ -60,6 +61,8 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   // Sistema
   { label: 'Pantallas (crear, duplicar, predeterminada)', route: 'screens', anchor: 'scr-list', keywords: 'screens profiles salón cocina slug' },
   { label: 'Pantallas conectadas', route: 'displays', keywords: 'displays connected kiosk raspberry ip resolución' },
+  { label: 'Dispositivos vinculados', route: 'displays', anchor: 'disp-paired', keywords: 'paired devices pair code revoke revocar vincular emparelhar' },
+  { label: 'Acceso a las pantallas', route: 'security', anchor: 'sec-display', keywords: 'display access private open privado abierto aberto key clave enlace' },
   { label: 'Exportar configuración', route: 'backups', anchor: 'bk-export', keywords: 'export backup descargar json' },
   { label: 'Importar configuración', route: 'backups', anchor: 'bk-import', keywords: 'import restore subir json' },
   { label: 'Copias automáticas', route: 'backups', anchor: 'bk-auto', keywords: 'backups automatic restore restaurar versiones' },

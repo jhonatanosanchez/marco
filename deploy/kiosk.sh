@@ -3,8 +3,10 @@
 # Launched by the desktop session autostart (labwc / wayfire / LXDE-pi), see deploy/install.sh.
 #
 # Optional variables (put them in ~/.config/marco/kiosk.env):
-#   KIOSK_URL        URL to show (default http://localhost:$PORT/). Another machine: http://192.168.1.50:3000/
-#                    ?screen=<slug> picks a screen profile, ?lite=1 disables the WebGL effects (slow Pis).
+#   KIOSK_URL        URL to show: the screen's private link, e.g. http://homeserver.lan:3000/d/<key>
+#                    (Admin → Screen → Settings → Private link). Default http://localhost:$PORT/: on an all-in-one
+#                    install the kiosk then opens the default screen's private link (read from the local data folder;
+#                    add ?screen=<slug> for another one). ?lite=1 disables the WebGL effects (slow Pis).
 #   KIOSK_CLIENT     Name of this display in the admin panel (default: hostname)
 #   PORT             Local server port (default: read from ../.env, else 3000)
 #   KIOSK_EXTRA_ARGS Extra Chromium flags, e.g. "--force-device-scale-factor=0.75" to fit more on a small screen
@@ -24,7 +26,7 @@ PORT="${PORT:-3000}"
 KIOSK_URL="${KIOSK_URL:-http://localhost:${PORT}/}"
 # Stable identity for the admin's "Connected displays" page: Chromium runs --incognito, so localStorage does not
 # survive restarts; append client=<hostname> unless the URL already has one.
-# (Another screen profile: KIOSK_URL="http://localhost:3000/?screen=kitchen")
+# (Another screen profile: its private link, KIOSK_URL="http://localhost:3000/d/<key>"; open mode: ?screen=kitchen)
 KIOSK_CLIENT="${KIOSK_CLIENT:-$(hostname 2>/dev/null || echo kiosk)}"
 KIOSK_CLIENT="$(printf '%s' "$KIOSK_CLIENT" | tr -c 'A-Za-z0-9_-' '-' | cut -c1-64)"
 case "$KIOSK_URL" in
@@ -104,6 +106,45 @@ until http_ok "$HEALTH_URL"; do
   waited=$((waited + 2))
 done
 
+# --- Private display link (all-in-one) ----------------------------------------------
+# With private display access a keyless http://localhost URL only shows a pairing code, and this incognito browser
+# forgets pairings when it restarts. On an all-in-one install the server's data folder is on this machine (and owned
+# by this user): use the screen's private link from it, unless KIOSK_URL already carries a key (/d/<key>).
+local_link() {
+  case "$KIOSK_URL" in
+    http://localhost:*|http://localhost/*|http://127.0.0.1:*|http://127.0.0.1/*) ;;
+    *) return 1 ;;
+  esac
+  case "$KIOSK_URL" in *"/d/"*) return 1 ;; esac
+  command -v node >/dev/null 2>&1 || return 1
+  local data="${MARCO_DATA_DIR:-}"
+  if [ -z "$data" ] && [ -f "$APP_DIR/.env" ]; then
+    data="$(grep -E '^DATA_DIR=' "$APP_DIR/.env" | tail -n1 | cut -d= -f2- | tr -d '"'"'"' ' || true)"
+  fi
+  data="${data:-$APP_DIR/data}"
+  case "$data" in /*) ;; *) data="$APP_DIR/$data" ;; esac
+  [ -r "$data/secrets.json" ] && [ -r "$data/config.json" ] || return 1
+  node -e '
+    const fs = require("fs"), path = require("path");
+    const [dir, url] = process.argv.slice(1);
+    const cfg = JSON.parse(fs.readFileSync(path.join(dir, "config.json"), "utf8"));
+    const sec = JSON.parse(fs.readFileSync(path.join(dir, "secrets.json"), "utf8"));
+    if ((cfg.security || {}).displayAccess !== "private") process.exit(1);
+    const u = new URL(url);
+    const want = (u.searchParams.get("screen") || "").toLowerCase();
+    const list = Array.isArray(cfg.screens) ? cfg.screens : [];
+    const scr = (want && list.find((s) => s.slug === want || String(s.id).toLowerCase() === want))
+      || list.find((s) => s.id === cfg.defaultScreen) || list[0];
+    const key = scr && sec.displayKeys && sec.displayKeys[scr.id] && sec.displayKeys[scr.id].key;
+    if (typeof key !== "string" || !/^[0-9a-f-]{36}$/.test(key)) process.exit(1);
+    u.pathname = "/d/" + key;
+    u.searchParams.delete("screen");
+    process.stdout.write(u.toString());
+  ' "$data" "$KIOSK_URL" 2>/dev/null
+}
+# The kiosk log never shows the key.
+redact_url() { printf '%s' "$1" | sed -E 's|/d/[^/?#]+|/d/<private-link>|'; }
+
 # --- Chromium flags ----------------------------------------------------------------
 PROFILE_DIR="$HOME/.cache/marco-kiosk"
 mkdir -p "$PROFILE_DIR"
@@ -136,9 +177,12 @@ trap 'log "Exiting"; pkill -P $$ || true; exit 0' INT TERM
 
 fails=0
 while true; do
-  log "Launching $BROWSER -> $KIOSK_URL"
+  # Resolved on every launch, so a regenerated link is picked up when Chromium restarts.
+  URL="$(local_link || true)"
+  URL="${URL:-$KIOSK_URL}"
+  log "Launching $BROWSER -> $(redact_url "$URL")"
   start_ts=$(date +%s)
-  "$BROWSER" "${FLAGS[@]}" "${EXTRA[@]}" "$KIOSK_URL" >/dev/null 2>&1 9>&- || true
+  "$BROWSER" "${FLAGS[@]}" "${EXTRA[@]}" "$URL" >/dev/null 2>&1 9>&- || true
   run_for=$(( $(date +%s) - start_ts ))
   if [ "$run_for" -lt 30 ]; then
     fails=$((fails + 1))

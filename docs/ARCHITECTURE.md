@@ -23,7 +23,9 @@ display and the server guarantee. The HTTP endpoints and event formats are in [A
 | Folder | Content |
 |---|---|
 | `server/` | API and logic: ICS + recurrences (`node-ical`, `rrule`), Google Calendar, weather, RSS, photos, auth, SSE, backups, activity |
-| `server/routes/` | Express routers: `public.js` (display API), `admin.js`, `screens.js`, `announce.js`, `hooks.js`, `system.js`, `localEvents.js` |
+| `server/app.js` | `createApp()`: the whole Express stack (host guard, sessions, CSRF, display access, routers, static files); `server/index.js` adds the store, listen and shutdown |
+| `server/displayAccess.js`, `server/pairing.js` | Private display links, paired devices and pairing codes (see *Display access* below) |
+| `server/routes/` | Express routers: `public.js` (display API), `admin.js`, `screens.js`, `announce.js`, `hooks.js`, `system.js`, `localEvents.js`, `access.js` (links, devices, pairing) |
 | `server/test/` | `node --test` suites and fixtures |
 | `web/index.html`, `web/display/` | The display (vanilla TypeScript + three.js) |
 | `web/admin/` | The admin panel (Preact + TypeScript) |
@@ -41,7 +43,7 @@ failing source never breaks the others.
 | Path | Content |
 |---|---|
 | `config.json` | The whole configuration (schema v2 below). Bumped `revision` on every save. |
-| `secrets.json` | Password hash (scrypt; absent on a fresh install → setup wizard, `server/setup.js`), `setupCompletedAt`, session secret/epoch, Google refresh tokens per account, Home Assistant token, API tokens (SHA-256 hashes). Mode 600. Never sent to displays. |
+| `secrets.json` | Password hash (scrypt; absent on a fresh install → setup wizard, `server/setup.js`), `setupCompletedAt`, session secret/epoch, Google refresh tokens per account, Home Assistant token, API tokens (SHA-256 hashes), `displayKeys` (one private-link key per screen id), `devices` (paired devices: name, screen, SHA-256 of the token, last seen). Mode 600. Never sent to displays. |
 | `photos/` | Gallery images; `photos/.thumbs/` thumbnails (480 px); `photos/.meta.json` size + focal point per file |
 | `cache/` | Source and feed caches |
 | `backups/` | Rotating config backups (20 newest) + `config-v1-premigration.json` |
@@ -72,7 +74,8 @@ The stored config has **global** sections shared by every screen and a list of *
   "countdowns": { "items": [Countdown], "includeBirthdays": true, "birthdayDays": 30, "includeFlagged": true, "horizonDays": 365 },
   "schedules":  { "items": [ScheduledMessage] },
   "homeassistant": { "enabled": false, "url": "http://homeassistant.local:8123" },   // token in secrets.json
-  "auth":       { "allowedGoogleEmails": [], "passwordLoginEnabled": true }
+  "auth":       { "allowedGoogleEmails": [], "passwordLoginEnabled": true },
+  "security":   { "displayAccess": "private" }      // "open" = legacy LAN mode (installs upgraded from 0.2)
 }
 ```
 
@@ -179,6 +182,36 @@ flagged by a local event or a style rule (nearest occurrence per title), sorted 
   remaining time corrected with the server clock. Scheduled messages show as a banner while their window is active.
 - Identity: `clientId` from `?client=`, else `localStorage`, else generated. `deploy/kiosk.sh` appends
   `client=<hostname>` because the kiosk runs incognito. If the server version changes, the display reloads once.
+- Access (`web/display/identity.ts`): the credential is the key in the path (`/d/<key>`), else a paired-device token
+  from `localStorage` (`marco.deviceToken`). Every fetch sends it as `X-Marco-Key`; the SSE URL and same-origin
+  `/media/*` photo URLs carry it as `?k=`. The first config fetch happens before cached data is shown: `401` → pairing
+  screen, `403` → "This link is no longer valid" (cached data is wiped; a revoked device token is forgotten). The SSE
+  `revoked` event does the same while running. Paired → the token is stored and the page reloads at `/`.
+
+## Display access
+
+`config.security.displayAccess` (`private` | `open`) decides who may read the display API
+(`server/displayAccess.js`):
+
+| Request carries | private | open |
+|---|---|---|
+| a valid display key (UUIDv4) | the key's screen | the key's screen |
+| a valid device token (`md_…`) | the device's screen | the device's screen |
+| an unknown / revoked key or token | `403 invalid_key` | `403 invalid_key` |
+| an admin session cookie | any screen (`?screen=`) | any screen |
+| nothing | `401 key_required` | default screen / `?screen=` (as in 0.2) |
+
+- A credential always decides the screen; `?screen=` is ignored with it. `/media/*` follows the same rules (in open
+  mode keyless media stays LAN-only). `/api/health`, `/api/setup/*`, `/api/pair/*` and the webhooks are outside it.
+- Keys: one per screen in `secrets.displayKeys`, created with the screen, dropped when the screen is deleted,
+  replaced by *Regenerate link* (SSE clients that used the old key get `revoked` and are closed).
+- Pairing (`server/pairing.js`, memory only): `POST /api/pair/start` → `{ sessionId, code }`; the display polls
+  `POST /api/pair/status` with the secret `sessionId`; an admin claims the 6-character code
+  (`POST /api/admin/pair/claim`) for a screen → a device with a random 256-bit token is created (only its hash is
+  stored) and handed to the polling display once. Codes live 10 minutes, are single use and claimable only while the
+  display polled in the last 15 s. Devices of a deleted screen move to the default screen.
+- New installs start `private`; a stored config without `security` (saved by 0.2 or older) is migrated to `open` on
+  load, and a save without `security` (old admin build, old backup or export) keeps the current mode.
 
 ## Admin panel
 
@@ -197,8 +230,8 @@ flagged by a local event or a style rule (nearest occurrence per title), sorted 
 
 ## Security model
 
-See [SECURITY.md](../SECURITY.md). In short: the display API is unauthenticated and meant for the LAN, never returns
-URLs/tokens; the admin uses a session cookie (`SameSite=Lax`) plus a JSON content-type CSRF guard on mutating routes;
+See [SECURITY.md](../SECURITY.md). In short: the display API needs a private-link key, a paired-device token or an
+admin session (open mode: unauthenticated, LAN) and never returns URLs/tokens; the admin uses a session cookie (`SameSite=Lax`) plus a JSON content-type CSRF guard on mutating routes;
 webhooks use hashed bearer tokens with rate limiting; uploaded file names are sanitised. Network trust lives in
 `server/lib/net.js`: the Host allowlist (DNS rebinding), `isLanClient` (private address, not relayed by an untrusted
 proxy, not the container gateway in strict mode) used by the setup wizard, the weak-`ADMIN_PASSWORD` rule and the

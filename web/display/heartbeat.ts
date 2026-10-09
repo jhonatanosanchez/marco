@@ -48,16 +48,26 @@ export function buildHeartbeat(src: HeartbeatSource): DisplayHeartbeat {
 export class Heartbeat {
   private timer: ReturnType<typeof setInterval> | null = null;
   private pending: ReturnType<typeof setTimeout> | null = null;
+  private stopped = false;
 
   constructor(private src: HeartbeatSource, private onResponse?: (now: string) => void) {}
 
   start(): void {
-    if (this.timer) return;
+    if (this.timer || this.stopped) return;
     this.timer = setInterval(() => void this.send(), 60_000);
+  }
+
+  stop(): void {
+    if (this.timer) clearInterval(this.timer);
+    if (this.pending) clearTimeout(this.pending);
+    this.timer = null;
+    this.pending = null;
+    this.stopped = true;
   }
 
   /** Send soon (coalesces bursts, e.g. hello + command in the same second). */
   soon(delayMs = 300): void {
+    if (this.stopped) return;
     if (this.pending) clearTimeout(this.pending);
     this.pending = setTimeout(() => {
       this.pending = null;
@@ -66,7 +76,7 @@ export class Heartbeat {
   }
 
   async send(): Promise<void> {
-    if (this.src.demo() || isPreview) return;
+    if (this.src.demo() || isPreview || this.stopped) return;
     try {
       const r = await api.heartbeat(buildHeartbeat(this.src));
       if (r?.now) this.onResponse?.(r.now);

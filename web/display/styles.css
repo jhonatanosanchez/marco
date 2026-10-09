@@ -1154,3 +1154,30 @@ body {
   #welcome h1 { font-size: 13vmin; }
   .wl-qr__img { width: 46vmin; height: 46vmin; }
 }
+
+/* ---------------------------------------------------------------- pairing / invalid link (widgets/pairing.ts) */
+#welcome.wl--pair h1 { font-size: 8.4vmin; }
+.wl-code {
+  display: inline-flex; align-items: center; margin: 3vmin 0 3.2vmin;
+  padding: 1.6vmin 3.2vmin; border-radius: 2vmin;
+  font-family: var(--font-num); font-weight: 700; font-size: 9vmin; line-height: 1; letter-spacing: .14em;
+  font-variant-numeric: tabular-nums;
+  background: rgba(255, 90, 78, .16); border: 1px solid rgba(255, 90, 78, .45); color: #fff;
+  white-space: pre;
+}
+.wl--pair.is-paired .wl-code { background: rgba(46, 196, 182, .2); border-color: rgba(46, 196, 182, .6); }
+.wl-badge {
+  display: grid; place-items: center; width: 5.4vmin; height: 5.4vmin; margin-top: 2.6vmin; border-radius: 50%;
+  background: rgba(255, 194, 61, .16); border: 1px solid rgba(255, 194, 61, .55); color: #ffc23d;
+  font-family: var(--font-num); font-weight: 800; font-size: 3.2vmin;
+}
+#welcome.wl--invalid h1 { font-size: 6.6vmin; margin-top: 2vmin; }
+.wl--invalid .wl-code { margin: 2.4vmin 0 2.6vmin; font-size: 7.4vmin; }
+#welcome.wl--invalid h1 { background: linear-gradient(100deg, #fff 30%, #ffe7b0 70%, #ffc23d); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.wl--invalid .wl-lead { max-width: 52ch; }
+.wl-status { font-variant-numeric: tabular-nums; }
+@media (orientation: portrait) {
+  #welcome.wl--pair h1 { font-size: 10vmin; }
+  .wl-badge { margin-inline: auto; }
+  .wl-code { font-size: 11vmin; }
+}

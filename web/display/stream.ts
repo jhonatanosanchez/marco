@@ -1,6 +1,6 @@
 // SSE client for /api/stream?screen=&client= with manual exponential-backoff reconnect (docs/ARCHITECTURE.md).
 import type { Announcement, IdentifyPayload, NightCommand, StreamHello } from '../shared/types';
-import { clientId, isPreview, screenKey } from './identity';
+import { clientId, credential, isPreview, screenKey } from './identity';
 
 export interface StreamHandlers {
   hello?: (d: Partial<StreamHello>) => void;
@@ -12,6 +12,8 @@ export interface StreamHandlers {
   announceClear?: (d: { id: string | null }) => void;
   identify?: (d: IdentifyPayload) => void;
   night?: (d: { mode: NightCommand }) => void;
+  /** link regenerated / device revoked / display access switched to private */
+  revoked?: (d: { code: string }) => void;
   open?: () => void;
   down?: () => void;
 }
@@ -21,6 +23,8 @@ export function streamUrl(): string {
   if (screenKey) q.set('screen', screenKey);
   q.set('client', clientId);
   if (isPreview) q.set('preview', '1');
+  // EventSource cannot send headers: the credential travels as ?k= (never logged by the server).
+  if (credential) q.set('k', credential);
   return `/api/stream?${q.toString()}`;
 }
 
@@ -89,6 +93,11 @@ export function connectStream(h: StreamHandlers): { close(): void } {
     listen('announce-clear', (d) => h.announceClear?.({ id: typeof d?.id === 'string' ? d.id : null }));
     listen('identify', (d) => h.identify?.(d));
     listen('night', (d) => (d?.mode === 'on' || d?.mode === 'off' || d?.mode === 'auto') && h.night?.(d));
+    listen('revoked', (d) => {
+      closed = true;
+      es?.close();
+      h.revoked?.({ code: typeof d?.code === 'string' ? d.code : 'invalid_key' });
+    });
     es.addEventListener('ping', () => kick());
     es.onmessage = () => kick();
   };

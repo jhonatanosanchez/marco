@@ -92,6 +92,8 @@ calendars, weather and news feeds *you* connect.
   conversion, automatic focal point with a manual editor, duplicate-name handling.
 - **Multiple screens** (living room, kitchen, hallway…) each with its own layout, background, calendars and widgets,
   and a **Connected displays** page (resolution, browser, version, reload / identify / night mode per device).
+- **Private display links & pairing** — every screen has an unguessable link (`/d/<key>`, QR code, one-click
+  regenerate) and new devices can be paired with a 6-character code; paired devices can be renamed or revoked.
 - **Alerts** — send now or schedule; **API tokens & webhooks** for Home Assistant and scripts.
 - **Backups** (automatic, export/import with preview), **activity log**, **command palette** (Ctrl/Cmd + K),
   phone-friendly layout, English / Spanish / Portuguese.
@@ -116,7 +118,7 @@ flowchart LR
   subgraph home["Your home network"]
     server["Marco server<br/>Node.js · Pi / home server / NAS / Docker<br/>data/ = config, photos, backups"]
     tv["Wall display<br/>Raspberry Pi + Chromium kiosk"]
-    tablet["Kitchen tablet / TV browser<br/>/?screen=kitchen"]
+    tablet["Kitchen tablet / TV browser<br/>/d/&lt;private key&gt;"]
     phone["Phone or laptop<br/>/admin/"]
     ha["Home Assistant<br/>(optional)"]
   end
@@ -134,8 +136,9 @@ flowchart LR
 
 - One small **Node.js server** (no database, no native modules) fetches and caches your calendars, weather and news,
   stores your settings and photos in a `data/` folder and serves two web apps.
-- **Displays** are just browsers: a Raspberry Pi in kiosk mode, an old tablet, a smart-TV browser. Open `/` (or
-  `/?screen=<slug>` for another screen profile). They receive changes instantly through Server-Sent Events.
+- **Displays** are just browsers: a Raspberry Pi in kiosk mode, an old tablet, a smart-TV browser. Each one opens its
+  screen's **private link** (`/d/<key>`) or is **paired** with a code. They receive changes instantly through
+  Server-Sent Events.
 - The **admin panel** at `/admin/` works from any phone or computer on your network.
 
 More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/API.md](docs/API.md).
@@ -154,7 +157,8 @@ fictional family: two screens ("Living room" and "Kitchen"), local events, birth
 vacation-rental feed and a school calendar (served locally), sample photos from picsum.photos with focal points, an API
 token and some activity history. Your real `data/` folder is never touched.
 
-- Display: <http://localhost:3000/> · kitchen screen: <http://localhost:3000/?screen=kitchen>
+- Display: the demo prints each screen's **private link** (`http://localhost:3000/d/<key>`); <http://localhost:3000/pair>
+  shows a pairing code to try *Connected screens → Pair a screen*
 - Admin: <http://localhost:3000/admin/> — password **`demo-calendar`**
 - Options: `--port 3080`, `--lang es` (or `pt`), `--no-photos`, `--data ./demo-data --keep`
 
@@ -220,7 +224,7 @@ display (`http://<server-ip>:3000/`) shows a welcome screen with the admin addre
 |---|---|
 | ![Setup wizard, step 1: welcome and language](docs/screenshots/setup-1-welcome.png) | ![Step 2: admin password with strength meter](docs/screenshots/setup-2-password.png) |
 | ![Step 3: city search, time zone, units and clock format](docs/screenshots/setup-3-location.png) | ![Step 4: public holidays by country, iCal feeds with a Test button, Google notes](docs/screenshots/setup-4-calendars.png) |
-| ![Step 5: screen name, layout, accent colour, photos and ambient effect](docs/screenshots/setup-5-look.png) | ![Step 6: display URL with copy button and QR code, summary and tips](docs/screenshots/setup-6-done.png) |
+| ![Step 5: screen name, layout, accent colour, photos and ambient effect](docs/screenshots/setup-5-look.png) | ![Step 6: the screen's private link with copy button and QR code, summary and tips](docs/screenshots/setup-6-done.png) |
 
 1. **Welcome** — pick the language (English, Español, Português).
 2. **Admin password** — at least 10 characters, nothing obvious (`password123`, `1234567890`, `qwertyuiop`…), typed
@@ -233,9 +237,10 @@ display (`http://<server-ip>:3000/`) shows a welcome screen with the admin addre
    the account after setup when the server has [a Google OAuth client](#connecting-google-calendar).
 5. **Look** — screen name, layout, accent colour, light/dark theme, background photos (stock now, your gallery
    later) and the ambient effect.
-6. **Done** — the display URL to open on the TV / Raspberry Pi (copy button + QR code; when you ran the wizard on the
-   server itself as `localhost`, it uses the server's LAN address), a summary and tips (`?lite=1` for slow devices,
-   the kiosk-only installer command). You are logged in and land in the panel.
+6. **Done** — the screen's **private link** to open on the TV / Raspberry Pi (copy button + QR code; when you ran the
+   wizard on the server itself as `localhost`, it uses the server's LAN address), a summary and tips (`?lite=1` for
+   slow devices, the kiosk-only installer command with the private link). You are logged in and land in the panel.
+   A display that was showing the welcome screen switches to a [pairing code](#private-display-links--pairing).
 
 <img src="docs/screenshots/setup-mobile.png" alt="The setup wizard on a phone" width="260" align="right">
 
@@ -268,6 +273,44 @@ changing it.
 
 <br clear="right">
 
+## Private display links & pairing
+
+Since 0.3 every screen is **private** by default: a browser only shows the calendar once it has opened the screen's
+**private link** or has been **paired** from the admin. Without one it shows a pairing code and nothing else. That
+makes Marco safe on shared networks (flat-share Wi-Fi, office) and lets you reach it from the Internet behind HTTPS.
+
+| | |
+|---|---|
+| ![Screen → Settings → Private link: link, QR code, regenerate and the Raspberry Pi command](docs/screenshots/admin-private-link.png) | ![Pair a screen: code, screen and device name](docs/screenshots/admin-pairing-dialog.png) |
+| ![A new display without a key shows a pairing code and a QR code](docs/screenshots/display-pairing.png) | ![A regenerated link or revoked device: “This link is no longer valid”](docs/screenshots/display-invalid-link.png) |
+
+- **Private link** — *Screen → Settings → Private link* shows the selected screen's link, e.g.
+  `http://homeserver.lan:3000/d/3f6c0a52-9d1e-4b7a-a2c4-0e5b8f1d2c37`, with **Copy**, a **QR code**, **Open**,
+  **Regenerate link** and the ready-to-paste Raspberry Pi command. Bookmark it on a tablet, use it as the kiosk URL, or
+  scan the QR with the device. The link is the key: whoever has it sees that screen (and only that one — `?screen=` is
+  ignored), so keep it to your own devices.
+- **Pairing** — no long links to type on a TV: open the plain address (`http://homeserver.lan:3000/` or `/pair`) on the
+  new device and it shows a big **6-character code** and a QR code. On your phone open *Connected screens → Pair a
+  screen* (or scan the QR: it opens the admin with the code filled in), type the code, pick the screen and a name. The
+  device starts within two seconds and keeps its own device token in the browser's storage — ideal for tablets, TVs
+  and browsers you keep using. The Raspberry Pi kiosk runs Chromium in incognito mode (nothing survives a restart),
+  so give it the private link instead.
+- **Paired devices** — *Connected screens* lists them with the screen they show and when they were last seen; **Edit**
+  renames or moves one to another screen, **Revoke** cuts it off.
+- **Regenerate / revoke** — *Regenerate link* replaces the key at once; screens using the old link (or a revoked
+  device) switch to “This link is no longer valid”, wipe their cached data and offer a new pairing code.
+- **Display access mode** (*Security → Display access*): **Private** (default for new installs) or **Open (local
+  network)** — the 0.2 behaviour, where `/` and `/?screen=<slug>` work without a key. **Upgrading from 0.2 keeps Open**
+  so no kiosk goes blank, and the admin recommends switching: open each display's private link (or pair it) first;
+  when you save Private, keyless displays show a pairing code. The admin preview and *View screen* keep working with
+  your admin session either way.
+
+![Connected screens: how each display got in, and the paired devices](docs/screenshots/admin-displays-paired.png)
+
+The key is a random **UUIDv4** (122 random bits): easy to read and type on a Pi (lower-case hex, no ambiguous
+letters) and impossible to guess. Brute-force math, what is logged (nothing secret) and the full threat model are in
+[SECURITY.md](SECURITY.md#private-display-links-and-pairing-threat-model).
+
 ## Raspberry Pi kiosk
 
 Tested with Raspberry Pi OS **Bookworm** (64-bit, desktop) on Pi 4/5; a Pi 3 works with `?lite=1`.
@@ -286,7 +329,12 @@ It installs Node.js 22 (if needed), Chromium and kiosk helpers, runs `npm ci` + 
 a random `SESSION_SECRET`, installs and starts the
 `marco` systemd service, adds the kiosk to the desktop autostart (labwc, Wayfire and LXDE are supported),
 disables screen blanking and enables desktop auto-login. After the reboot the screen shows the welcome screen with a
-QR code: scan it with your phone to run the [setup wizard](#first-steps-the-setup-wizard).
+QR code: scan it with your phone to run the [setup wizard](#first-steps-the-setup-wizard). When you finish, the
+screen shows a **pairing code**: pair it from the phone to start right away, or just reboot. On an all-in-one install
+the kiosk opens the **default screen's private link by itself** — it reads it from the local data folder each time
+Chromium starts (so a regenerated link is picked up on the next restart); `--url "http://localhost:3000/?screen=kitchen"`
+picks another screen the same way. Pairings alone do not survive a restart there: the kiosk browser runs in incognito
+mode.
 
 ### B. Server elsewhere, the Pi only shows it (kiosk-only)
 
@@ -294,13 +342,17 @@ Run the server on a home server, NAS or Docker host ([Quick start](#quick-start)
 
 ```bash
 git clone https://github.com/mr-reb00t/marco.git ~/marco
-~/marco/deploy/install.sh --kiosk-only --url http://192.168.1.50:3000/
+~/marco/deploy/install.sh --kiosk-only --url http://homeserver.lan:3000/d/3f6c0a52-9d1e-4b7a-a2c4-0e5b8f1d2c37
 sudo reboot
 ```
 
+Use the **private link** of the screen this Pi should show: *Screen → Settings → Private link* has the exact command
+ready to copy (the link decides the screen). Pairing is not an option here: the kiosk browser runs in incognito mode
+and would forget it at the next restart.
+
 This installs only Chromium + the kiosk autostart (no Node.js, no server), copies the kiosk script to
 `~/.local/bin/` (you can delete the clone afterwards), turns off screen blanking and hides the cursor.
-Use `--url "http://192.168.1.50:3000/?screen=kitchen"` for another screen profile.
+In **open** display-access mode `--url "http://homeserver.lan:3000/?screen=kitchen"` still works.
 
 ### Installer options
 
@@ -309,13 +361,14 @@ Use `--url "http://192.168.1.50:3000/?screen=kitchen"` for another screen profil
 | *(none)* | Server + kiosk on this machine |
 | `--no-kiosk` | Server only (no Chromium, no autostart) |
 | `--kiosk-only --url <url>` | Kiosk only, showing a server running elsewhere |
-| `--url <url>` | All-in-one, but show a specific URL (e.g. `http://localhost:3000/?screen=kitchen&lite=1`) |
+| `--url <url>` | All-in-one, but show a specific URL (e.g. the private link `http://localhost:3000/d/<key>?lite=1`) |
 | `--user <name>` | User that runs the service and the desktop session (default: current user) |
 | `--skip-apt` | Do not install system packages |
 
 ### Kiosk tips
 
-- Kiosk settings live in `~/.config/marco/kiosk.env` (`KIOSK_URL`, `KIOSK_CLIENT`, `KIOSK_EXTRA_ARGS`);
+- Kiosk settings live in `~/.config/marco/kiosk.env` (`KIOSK_URL`, `KIOSK_CLIENT`, `KIOSK_EXTRA_ARGS`); after
+  *Regenerate link*, put the new private link in `KIOSK_URL` (or run the installer again with `--url <new link>`);
   the log is `/tmp/marco-kiosk.log`. The script waits for the server, restarts Chromium if it exits and adds
   `client=<hostname>` so the device keeps its name in *Connected displays*.
 - **Too big / too small?** Add `KIOSK_EXTRA_ARGS="--force-device-scale-factor=0.8"` (or `1.25`) to `kiosk.env`.
@@ -476,12 +529,14 @@ disable password login if you want.
 
 Create several **screens** in *System → Screens* ("Living room", "Kitchen", "Hallway"…). Each has its own layout,
 theme, background, widgets and set of calendars; calendars, rules and integrations are shared. A device shows a screen
-with `http://<server-ip>:3000/?screen=<slug>`; without `?screen` it shows the default one (★).
+through that screen's [private link](#private-display-links--pairing) or by being paired to it (in open mode also
+`http://<server-ip>:3000/?screen=<slug>`; without `?screen` the default one ★).
 The **Editing: Living room ▾** switcher in the admin header selects which screen the per-screen pages edit.
 
 *System → Connected displays* lists every browser showing a screen (IP, browser, resolution, pixel ratio, WebGL,
-version, last heartbeat) with **Reload**, **Identify** (shows the screen name in big letters for 10 s) and
-**Night / Day / Auto** buttons. Outdated displays are flagged; *Reload* fixes them.
+version, last heartbeat, and how it got in: private link, paired device or no key) with **Reload**, **Identify**
+(shows the screen name in big letters for 10 s) and **Night / Day / Auto** buttons, plus **Pair a screen** and the
+list of paired devices. Outdated displays are flagged; *Reload* fixes them.
 
 ### Alerts and scheduled messages
 
@@ -578,7 +633,8 @@ them in.
 ```
 data/
 ├── config.json          # all settings (screens, calendars, rules, events, birthdays…)
-├── secrets.json         # password hash, session secret, Google & Home Assistant tokens, API token hashes (mode 600)
+├── secrets.json         # password hash, session secret, Google & Home Assistant tokens, API token hashes,
+│                        #   private-link keys per screen, paired-device token hashes (mode 600)
 ├── photos/              # gallery (+ .thumbs/ and .meta.json with focal points, hidden flags)
 ├── backups/             # automatic and manual configuration backups
 ├── cache/               # feed caches
@@ -593,7 +649,9 @@ Back up the whole folder (or use *Export*) to keep everything.
 
 | Parameter | Effect |
 |---|---|
-| `?screen=<slug>` | Show that screen profile (default screen if absent or unknown) |
+| `/d/<key>` | A screen's private link (the key decides the screen) |
+| `/pair` | Show a pairing code (also in open mode) |
+| `?screen=<slug>` | Show that screen profile (default screen if absent or unknown); open mode or admin session only |
 | `?lite=1` | No WebGL effects (slow devices) |
 | `?demo=1` | Built-in sample data (no server data needed) |
 | `?lang=en\|es\|pt` | Override the language |
@@ -602,19 +660,22 @@ Back up the whole folder (or use *Export*) to keep everything.
 
 ## Security
 
-Marco is designed for a **trusted home network**.
+Marco was designed for a home network; since 0.3 the displays are **private by default**.
 
-- **Public on your LAN** (no login): the display `/` and its API (`/api/display/*`, `/api/events`, `/api/weather`,
-  `/api/news`, `/api/photos`, `/api/countdowns`, `/api/stream`). They never contain calendar URLs, tokens or passwords,
-  but they do show your events — **do not expose them to the Internet**.
+- **Displays** (`/`, `/d/<key>` and the display API: `/api/display/*`, `/api/events`, `/api/weather`, `/api/news`,
+  `/api/photos`, `/api/countdowns`, `/api/stream`, `/media/*`) need the screen's private-link key, a paired-device
+  token or an admin session; otherwise they answer `401`/`403` with no data. Keys are compared in constant time, never
+  logged, kept out of referrers (`Referrer-Policy: no-referrer`) and caches (`no-store`). In **open** mode (upgraded
+  0.2 installs until you switch) the display API has no login — then **do not expose it to the Internet**.
 - **Protected**: the admin (`/admin/`, `/api/admin/*`) needs a session (password and/or allowed Google accounts);
   webhooks need a bearer token.
 - A fresh install has **no default password**; the [setup wizard](#first-steps-the-setup-wizard) creates it. Set
   `SETUP_TOKEN` if the server is reachable from outside your LAN before you finish setup.
 - Unknown host names are refused (DNS-rebinding protection); add your domain with `PUBLIC_URL` / `ALLOWED_HOSTS`.
-- If you want remote access, use an **HTTPS reverse proxy** that only exposes the admin/login/setup routes
-  ([Caddy example](deploy/Caddyfile.example)), a **strong password**, and `TRUST_PROXY` whenever the proxy does not
-  connect from loopback (another host, or Docker).
+- If you want remote access, use an **HTTPS reverse proxy** ([Caddy example](deploy/Caddyfile.example)) — in private
+  mode the displays can go through it too; in open mode expose only the admin/login/setup routes — a **strong
+  password**, and `TRUST_PROXY` whenever the proxy does not connect from loopback (another host, or Docker). On
+  networks you do not control, use HTTPS so nobody can sniff a display key.
 - Calendar, RSS and Home Assistant URLs you enter in the admin are fetched **by the server**, LAN addresses included.
 - Keep `.env`, `data/secrets.json`, exports with secrets and `data/backups/` private.
 

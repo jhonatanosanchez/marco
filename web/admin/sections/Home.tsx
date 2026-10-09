@@ -25,6 +25,7 @@ function greeting(name: string) {
 const WARN_TEXT: Record<string, { text: string; route: string; kind: 'warn' | 'error' | 'info' }> = {
   default_password: { text: 'Estás usando la contraseña inicial. Cámbiala en Seguridad.', route: 'security', kind: 'error' },
   env_password: { text: 'La contraseña viene de ADMIN_PASSWORD. Te recomendamos cambiarla en Seguridad.', route: 'security', kind: 'info' },
+  display_access_open: { text: 'Las pantallas están en modo abierto: cualquiera que llegue a este servidor puede ver el calendario sin clave. Recomendado: enlaces privados y vinculación.', route: 'security/sec-display', kind: 'warn' },
   source_errors: { text: 'Hay calendarios con errores de descarga.', route: 'status', kind: 'warn' },
   no_displays: { text: 'Ninguna pantalla conectada ahora mismo.', route: 'displays', kind: 'info' },
   outdated_displays: { text: 'Alguna pantalla ejecuta una versión antigua: recárgala.', route: 'displays', kind: 'warn' },

@@ -3,16 +3,68 @@
 All endpoints speak JSON. TypeScript types for every request and response live in
 [`web/shared/types.ts`](../web/shared/types.ts). See [ARCHITECTURE.md](ARCHITECTURE.md) for the data model.
 
-- **Public (display) endpoints** need no authentication and are meant for your LAN. They never return calendar URLs,
-  Google accounts, tokens or Home Assistant credentials.
+- **Display endpoints** need the screen's **display key** (private link), a **paired-device token** or an admin
+  session — unless display access is set to *open* (legacy LAN mode). See [Display access](#display-access). They
+  never return calendar URLs, Google accounts, tokens or Home Assistant credentials.
 - **Admin endpoints** need a session cookie (log in with `POST /api/auth/login`). Mutating requests must send
   `Content-Type: application/json` (CSRF guard; photo uploads are the multipart exception).
 - **Webhooks** need `Authorization: Bearer <token>` (create tokens in *Admin → API & webhooks*).
 
-Every display endpoint accepts `?screen=<slug|id>` (case-insensitive). Absent → default screen; unknown → default
-screen with `screenFallback: true` in the config.
+Without a key or device token, every display endpoint accepts `?screen=<slug|id>` (case-insensitive). Absent → default
+screen; unknown → default screen with `screenFallback: true` in the config. With a key or device token the screen is
+the one bound to it and `?screen=` is ignored.
 
-## Public (display) API
+## Display access
+
+`config.security.displayAccess` is `"private"` (default for new installs) or `"open"` (installs upgraded from 0.2 keep
+it until you switch in *Security*).
+
+**Credentials** — send one of them with every display request:
+
+| Credential | Format | Where it comes from |
+|---|---|---|
+| Display key | UUIDv4, e.g. `3f6c0a52-9d1e-4b7a-a2c4-0e5b8f1d2c37` (case-insensitive) | The screen's private link `/d/<key>` (*Screen → Settings → Private link*) |
+| Device token | `md_` + 43 base64url characters (256 bits) | Pairing (below); stored by the display in `localStorage` |
+| Admin session | `cs_session` cookie | Logged-in admin (preview iframe, *View screen*) |
+
+Header `X-Marco-Key: <key or token>` for `fetch`; `?k=<key or token>` is accepted only by `/api/stream` (EventSource
+cannot send headers) and `/media/*` (images). Keys and tokens are compared in constant time and never logged.
+
+| Situation | Response |
+|---|---|
+| private mode, no credential, no session | `401 { error, code: "key_required" }` |
+| unknown / regenerated key, revoked device token (any mode, also with a session) | `403 { error, code: "invalid_key" }` |
+| open mode, no credential | as before 0.3 (no authentication; `/media/*` only for LAN clients or a session, else `404`) |
+
+Display responses carry `Cache-Control: private, no-store`; every response carries `Referrer-Policy: no-referrer`.
+`GET /d/<key>` serves the display page (`Cache-Control: private, no-store`, `X-Robots-Tag: noindex`); the page reads
+the key from its path. `GET /pair` serves the display page in pairing mode.
+
+**Pairing** (no authentication for the display side; rate-limited):
+
+| Method & path | Notes |
+|---|---|
+| `POST /api/pair/start` | `{}` → `PairStartResponse` `{ sessionId, code, expiresAt, pollMs }`. `sessionId`: 32 random bytes (base64url), known only to this display; `code`: 6 characters from `23456789ABCDEFGHJKMNPQRSTUVWXYZ`, unique among pending codes, valid 10 min. `429` after 10 starts per IPv4 address / IPv6 /64 in 10 min; `503` with 100 pending codes |
+| `POST /api/pair/status` | `{ sessionId }` → `{ status: "waiting", code, expiresAt }` · `{ status: "paired", token, screen: { id, slug, name }, device: { id, name } }` (exactly once, then the session is gone) · `404 { status: "expired" }`. Poll every `pollMs` (2 s): a code can only be claimed while its display polled within the last 15 s |
+| `POST /api/admin/pair/claim` | Admin session. `{ code, screenId, name? }` (code case-insensitive, spaces/dashes ignored) → `{ device: PairedDevice }`. `404 { code: "invalid_code" }` unknown / expired / already used / display not waiting; `400 { code: "unknown_screen" }`; `429 { code: "rate_limited" }` after 10 wrong codes per admin session + address, or 50 wrong codes overall, in 10 minutes (then even a right code waits) |
+
+The admin's QR on the pairing screen opens `/admin/#pair=<code>`, which opens the *Pair a screen* dialog prefilled.
+
+**Links and devices** (admin session):
+
+| Method & path | Notes |
+|---|---|
+| `GET /api/admin/display-links` | `{ mode, links: [{ screenId, slug, name, key, path: "/d/<key>", createdAt }] }` (keys are created for screens that have none) |
+| `POST /api/admin/display-links/:screenId/regenerate` | New key → `{ link }`. The old key stops working at once; SSE clients that used it get `revoked { code: "invalid_key" }` and are closed |
+| `GET /api/admin/devices` | `{ mode, devices: PairedDevice[] }` — `{ id, name, prefix, screenId, screenSlug, screenName, createdAt, lastSeenAt, lastIp, userAgent, connected, clientIds }` (never the token or its hash) |
+| `PATCH /api/admin/devices/:id` | `{ name?, screenId? }` → `{ device }` (moving to another screen reloads the device) |
+| `DELETE /api/admin/devices/:id` | Revoke: the token stops working; connected streams get `revoked` and are closed |
+
+Saving the config with `security.displayAccess` switched from `open` to `private` sends `revoked
+{ code: "key_required" }` to every display that was connected without a key (they show the pairing code). A config
+saved without `security` (old admin builds, backups or exports from before 0.3) keeps the current mode.
+
+## Display API
 
 | Method & path | Response |
 |---|---|
@@ -24,7 +76,7 @@ screen with `screenFallback: true` in the config.
 | `GET /api/photos?screen=&count=20&after=` | `{ photos: [{ url, author?, title?, source: "stock"\|"gallery", file?, focusX?, focusY? }] }` — gallery photos follow the screen's `background.order` (`random` \| `newest` \| `name`); hidden photos are never returned. `after` = gallery `file` the display showed last: sequential orders continue right after it (wrapping around), `random` avoids starting with it. Without `after`, the server remembers where the previous batch for that screen ended. Falls back to stock when no gallery photo is in rotation |
 | `GET /api/countdowns?screen=` | `{ generatedAt, today, hash, items: [{ id, title, emoji, color, date, days, origin, age? }] }` |
 | `POST /api/display/heartbeat` | Body `DisplayHeartbeat` (≤ 4 kB: clientId, screen, version, resolution, dpr, webgl, night state, photo frame…) → `HeartbeatResponse` |
-| `GET /api/stream?screen=&client=` | Server-Sent Events, see below |
+| `GET /api/stream?screen=&client=&k=` | Server-Sent Events, see below |
 | `GET /media/photos/<file>`, `GET /media/thumbs/<file>` | Gallery images and thumbnails |
 
 `CalEvent`: `{ id, sourceId, title, start, end, allDay, location, color, emoji, kind, multiDay, age? }` — `start`/`end`
@@ -44,6 +96,7 @@ are ISO strings with offset, or `YYYY-MM-DD` for all-day events (`end` exclusive
 | `identify` | `{ name, slug, clientId, durationSec }` | show the screen name full-screen |
 | `night` | `{ mode: "on" \| "off" \| "auto" }` | night mode override |
 | `ping` | `{ t }` | every 25 s |
+| `revoked` | `{ code: "invalid_key" \| "key_required" }` | the link was regenerated, the device revoked, the screen deleted, or display access switched to private for a keyless display; the server then closes the stream |
 
 Displays whose screen has alerts disabled do not receive `announce`.
 
@@ -69,7 +122,7 @@ installs) and setup is skipped; the panel then offers to change it (`passwordFro
 |---|---|
 | `GET /api/setup/status` | `SetupStatus`: `{ needsSetup, googleConfigured, version, suggestedLanguage }`; while `needsSetup` also `tokenRequired`, `tokenValid` (when an `x-setup-token` header was sent; `null` otherwise — a wrong token counts towards the lockout below, `429` while locked), `defaults` and, for LAN clients, `lanAddresses` (real LAN interfaces only; empty in a container unless `LAN_ADDRESS` is set) |
 | `POST /api/setup/test-ics` | `{ url }` → `TestIcsResponse` (the wizard's "Test" button). Unauthenticated, so it refuses loopback, link-local / cloud-metadata, multicast and unspecified destinations (also after redirects) and returns only generic errors (`address not allowed`, `HTTP <status>`, `could not load the calendar`) |
-| `POST /api/setup/complete` | `SetupRequest` → `{ ok, user, screen: { slug, name } }` and a session cookie (logged in) |
+| `POST /api/setup/complete` | `SetupRequest` → `{ ok, user, screen: { id, slug, name, displayPath }, displayAccess }` and a session cookie (logged in). `displayPath` = the screen's private link `/d/<key>` |
 
 `SetupRequest`: `{ password, passwordConfirm, language: es|en|pt, screenName, location?: { name, lat, lon, timezone },
 timezone? (when the location is skipped), units?: metric|imperial, format24?, calendars?: [{ name, url, kind: holidays|generic }] (≤ 20), photos?: { source:
@@ -143,7 +196,7 @@ Rules for the mutating setup endpoints:
 
 | Method & path | Notes |
 |---|---|
-| `GET /api/admin/displays` | Connected and known displays (screen, IP, browser, resolution, dpr, WebGL, version, outdated…) |
+| `GET /api/admin/displays` | Connected and known displays (screen, IP, browser, resolution, dpr, WebGL, version, outdated, `access`: `key` \| `device` \| `session` \| `open`, `deviceId`, `deviceName`…) |
 | `POST /api/admin/displays/command` | `{ action: "reload"\|"identify"\|"night", mode?, clientIds?, screens? }` → `{ ok, delivered }` |
 | `DELETE /api/admin/displays/:clientId` | Forget an offline display |
 | `POST /api/admin/refresh-displays` | `{ screens? }` — hard reload |
@@ -157,7 +210,7 @@ Rules for the mutating setup endpoints:
 |---|---|
 | `GET /api/admin/backups` · `POST /api/admin/backups` | List / create a manual backup |
 | `GET /api/admin/backups/:id` · `POST /api/admin/backups/:id/restore` · `DELETE /api/admin/backups/:id` | Download / restore (current config backed up first) / delete |
-| `POST /api/admin/export` | `{ includeSecrets }` → `marco-YYYY-MM-DD.json` (secrets = password hash, HA token, Google accounts, API tokens; never the session secret) |
+| `POST /api/admin/export` | `{ includeSecrets }` → `marco-YYYY-MM-DD.json` (secrets = password hash, HA token, Google accounts, API tokens, display keys, paired devices (token hashes); never the session secret) |
 | `POST /api/admin/import/preview` | `{ bundle, lang? }` (export bundle or a bare config) → per-section summary in `lang` (es/en/pt; default: `Accept-Language`, else English), nothing saved |
 | `POST /api/admin/import/apply` | `{ bundle, sections?, includeSecrets? }` → `{ ok, config, loggedOut? }` |
 | `GET /api/admin/activity?type=&level=&q=&actor=&before=&limit=` | Newest first, paged with `before=<id>` |

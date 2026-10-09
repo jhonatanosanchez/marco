@@ -4,6 +4,7 @@ import { coverPosition, coverWindow, freeBand, type PhotoFrame } from '../../sha
 import type { Photo } from '../../shared/types';
 import { ctx } from '../ctx';
 import { el, esc, reducedMotion } from '../dom';
+import { mediaUrl } from '../identity';
 import type { PhotoLayer } from '../gl/photoLayer';
 
 const MAX_TEX = 2560;
@@ -152,7 +153,7 @@ export class Photos {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.decoding = 'async';
-    img.src = url;
+    img.src = mediaUrl(url);
     try {
       await img.decode();
     } catch (e) {

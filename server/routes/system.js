@@ -14,6 +14,7 @@ import {
   mergeImport, sanitizeImportedSecrets, repairConfig,
 } from '../backups.js';
 import { logActivity, listActivity, clearActivity, recentActivity } from '../activity.js';
+import { syncDisplayKeys } from '../displayAccess.js';
 import { listDisplays, getServerVersion } from '../displays.js';
 import { listAnnouncements } from '../announce.js';
 import { schedulesNow } from '../schedules.js';
@@ -32,6 +33,8 @@ export function dashboardWarnings({ secrets, sources, displays, cfg }) {
   const w = [];
   if (secrets.passwordIsDefault && cfg.auth.passwordLoginEnabled) w.push('default_password');
   else if (secrets.passwordFromEnv && cfg.auth.passwordLoginEnabled) w.push('env_password'); // ADMIN_PASSWORD: offer to change it
+  // Upgraded installs keep display access 'open' (no key): recommend private links + pairing.
+  if (cfg.security?.displayAccess === 'open') w.push('display_access_open');
   if (sources.some((s) => s.enabled !== false && s.ok === false)) w.push('source_errors');
   if (!displays.some((d) => d.connected)) w.push('no_displays');
   if (displays.some((d) => d.connected && d.outdated)) w.push('outdated_displays');
@@ -127,6 +130,8 @@ export function systemRouter({ version = getServerVersion() } = {}) {
         if (s.haToken !== undefined) { x.homeassistant.token = s.haToken; applied.push('homeassistant'); }
         if (s.googleAccounts) { x.google.accounts = s.googleAccounts; applied.push('google'); }
         if (s.apiTokens) { x.apiTokens = s.apiTokens; applied.push('apiTokens'); }
+        if (s.displayKeys) { x.displayKeys = { ...(x.displayKeys || {}), ...s.displayKeys }; applied.push('displayKeys'); }
+        if (s.devices) { x.devices = s.devices; applied.push('devices'); }
         if (s.passwordHash && s.passwordHash !== x.passwordHash) {
           x.passwordHash = s.passwordHash;
           x.passwordIsDefault = false;
@@ -136,6 +141,8 @@ export function systemRouter({ version = getServerVersion() } = {}) {
         }
       });
     }
+    // Keys of screens that are not in the imported config are dropped; devices of missing screens move to the default.
+    if (applied.includes('displayKeys') || applied.includes('devices')) syncDisplayKeys();
     logActivity('config.imported', {
       req,
       level: applied.length ? 'warn' : 'info',

@@ -6,6 +6,7 @@ import { resolveScreen } from './screens.js';
 import { listClients, broadcast, send, matches } from './sse.js';
 import { logActivityThrottled } from './activity.js';
 import { activeFor } from './announce.js';
+import { deviceName } from './displayAccess.js';
 
 export const MAX_DISPLAYS = 100;
 const PRUNE_OFFLINE_MS = 30 * 24 * 3600_000;
@@ -103,20 +104,37 @@ function blankEntry(clientId, now) {
     clientId, screenKey: '', screenId: '', ip: '', userAgent: '', firstSeen: now, lastSeen: now,
     viewport: null, screenRes: null, dpr: null, webgl: null, lite: null, version: null, build: null,
     night: null, nightOverride: null, uptimeSec: null, lastError: null, lastConnectAt: null,
-    streams: 0, connectedAt: null,
+    streams: 0, connectedAt: null, access: 'open', deviceId: null,
   };
 }
 
-/** Values for sseHandler's `init`: parse ?screen / ?client of the stream request. */
+/** How a request was let in (displayAccess.js), as remembered for a stream / registry entry. */
+function accessOf(req) {
+  const a = req?.displayAccess;
+  if (!a) return { via: 'open', screenId: null, deviceId: null };
+  return { via: a.via, screenId: a.screenId || null, deviceId: a.device?.id || null };
+}
+
+/** Screen id bound to the request's key / device token (null: none, or that screen no longer exists). */
+function boundScreen(cfg, req) {
+  const id = req?.displayAccess?.screenId;
+  return id && cfg.screens.some((s) => s.id === id) ? id : null;
+}
+
+/** Values for sseHandler's `init`: parse ?screen / ?client of the stream request (a key / device decides the screen). */
 export function streamInit(req) {
-  const screenKey = typeof req.query?.screen === 'string' ? req.query.screen.trim().slice(0, 64) : '';
+  const bound = boundScreen(getConfig(), req);
+  const screenKey = bound || (typeof req.query?.screen === 'string' ? req.query.screen.trim().slice(0, 64) : '');
   const raw = typeof req.query?.client === 'string' ? req.query.client.trim() : '';
   const anonymous = !CLIENT_ID_RE.test(raw) || raw.startsWith('anon-');
   const clientId = anonymous ? `anon-${++anonSeq}` : raw;
   const { screen } = resolveScreen(getConfig(), screenKey);
   // Admin preview iframes get live updates but are not listed as connected displays.
   const preview = req.query?.preview === '1';
-  return { screenKey, screenId: screen.id, clientId: preview ? `anon-preview-${++anonSeq}` : clientId, anonymous: anonymous || preview, preview };
+  return {
+    screenKey, screenId: screen.id, clientId: preview ? `anon-preview-${++anonSeq}` : clientId, anonymous: anonymous || preview, preview,
+    access: accessOf(req),
+  };
 }
 
 /** StreamHello payload for a new SSE client. */
@@ -161,6 +179,8 @@ export function onStreamOpen(client) {
   d.userAgent = client.userAgent;
   d.screenKey = client.screenKey;
   d.screenId = client.screenId;
+  d.access = client.access?.via || 'open';
+  d.deviceId = client.access?.deviceId || null;
   d.lastSeen = nowIso;
   d.lastConnectAt = nowIso;
   prune(nowMs);
@@ -263,10 +283,13 @@ export function recordHeartbeat(body, req) {
   }
   // Prefer the screen of the open stream; else resolve what the display says it asked for.
   const stream = listClients().find((c) => c.clientId === hb.clientId);
-  const screenId = stream?.screenId || resolveScreen(cfg, hb.screen).screen.id;
+  const bound = boundScreen(cfg, req);
+  const screenId = stream?.screenId || bound || resolveScreen(cfg, hb.screen).screen.id;
+  const access = accessOf(req);
   Object.assign(d, {
-    screenKey: stream ? stream.screenKey : hb.screen,
+    screenKey: stream ? stream.screenKey : bound || hb.screen,
     screenId,
+    ...(req?.displayAccess ? { access: access.via, deviceId: access.deviceId } : {}),
     ip: req?.ip || d.ip,
     userAgent: String(req?.get?.('user-agent') || d.userAgent || '').slice(0, 300),
     lastSeen: nowIso,
@@ -306,6 +329,10 @@ function toInfo(d, cfg) {
     uptimeSec: d.uptimeSec ?? null,
     lastError: d.lastError ?? null,
     photoFrame: d.photoFrame ?? null,
+    // How the display got in: private link ('key'), paired device ('device'), admin session or open (no key).
+    access: d.access || 'open',
+    deviceId: d.deviceId || null,
+    deviceName: d.deviceId ? deviceName(d.deviceId) : null,
   };
 }
 

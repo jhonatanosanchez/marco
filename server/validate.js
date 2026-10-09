@@ -430,7 +430,7 @@ export function migrateConfig(raw) {
     screens: [screenProfile],
   };
   for (const k of Object.keys(SCREEN_SPLIT_KEYS)) if (isObj(c[k])) out[k] = omit(c[k], SCREEN_SPLIT_KEYS[k]);
-  for (const k of ['homeassistant', 'auth']) if (k in c) out[k] = c[k];
+  for (const k of ['homeassistant', 'auth', 'security']) if (k in c) out[k] = c[k];
   return out;
 }
 
@@ -556,6 +556,11 @@ export function validateConfig(input) {
     passwordLoginEnabled: bool(ctx, 'auth.passwordLoginEnabled', au.passwordLoginEnabled, D.auth.passwordLoginEnabled),
   };
 
+  const se = obj(ctx, 'security', c.security);
+  const security = {
+    displayAccess: oneOf(ctx, 'security.displayAccess', se.displayAccess, D.security.displayAccess, ['private', 'open']),
+  };
+
   // ---- F1 screens
   let rawScreens = arr(ctx, 'screens', c.screens, D.screens, MAX_SCREENS);
   if (!rawScreens.length) { ctx.err('screens', 'at least one screen'); rawScreens = D.screens; }
@@ -582,7 +587,7 @@ export function validateConfig(input) {
   const revision = Number.isInteger(c.revision) && c.revision > 0 ? c.revision : 1;
   const value = {
     version: CONFIG_VERSION, revision, defaultScreen, screens,
-    calendar, datetime, weather, news, todo, localEvents, birthdays, eventRules, countdowns, schedules, homeassistant, auth,
+    calendar, datetime, weather, news, todo, localEvents, birthdays, eventRules, countdowns, schedules, homeassistant, auth, security,
   };
   return { ok: ctx.errors.length === 0, errors: ctx.errors, value };
 }

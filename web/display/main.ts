@@ -7,12 +7,12 @@ import type {
   Announcement, CountdownsResponse, DisplayConfig, EventsResponse, NewsResponse, NightCommand, WeatherResponse,
 } from '../shared/types';
 import { addDays, startOfWeek } from '../shared/i18n';
-import { api } from './api';
+import { api, ApiError } from './api';
 import { parseColor, toHex } from './color';
 import { ctx, setCtxConfig } from './ctx';
 import { normalizeConfig } from './defaults';
 import { Heartbeat, noteError } from './heartbeat';
-import { clientId, screenKey } from './identity';
+import { clearDeviceToken, clientId, credential, credentialKind, screenKey, storedDeviceToken } from './identity';
 import { $ } from './dom';
 import { type NEvent, normalizeEvents } from './eventModel';
 import type { AmbientLayer } from './gl/ambientLayer';
@@ -35,6 +35,7 @@ import { News } from './widgets/news';
 import { Photos } from './widgets/photos';
 import { Weather } from './widgets/weather';
 import { checkSetup, showWelcome, waitForSetup } from './widgets/welcome';
+import { pairingLang, showPairing } from './widgets/pairing';
 
 const params = ctx.params;
 const forceDemo = params.get('demo') === '1';
@@ -433,6 +434,39 @@ function setOnline(ok: boolean): void {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Display access (private links / paired devices): 401 → pairing screen, 403 → "link no longer valid"
+// ---------------------------------------------------------------------------------------------
+let accessDenied = false;
+let liveStream: { close(): void } | null = null;
+
+/** Stop everything, forget cached data and show the pairing / invalid-link screen (no family data). */
+function denyAccess(status: number): void {
+  if (accessDenied || state.demo) return;
+  accessDenied = true;
+  // A dead private link (kiosk URL) but this browser was paired since: use the device token instead.
+  if (status === 403 && credentialKind === 'key' && storedDeviceToken()) {
+    location.replace(`/${location.search}`);
+    return;
+  }
+  if (status === 403 && credentialKind === 'device') clearDeviceToken();
+  intervals.forEach(clearInterval);
+  intervals.length = 0;
+  liveStream?.close();
+  heartbeat.stop();
+  for (const k of ['config', 'events', 'weather', 'news', 'photos', 'countdowns'] as const) state[k] = null;
+  showPairing(status === 403 ? 'invalid' : 'pair', pairingLang(params));
+}
+
+/** True (and the access screen shown) when `e` is a 401 / 403 from the display API. */
+function deniedBy(e: unknown): boolean {
+  if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
+    denyAccess(e.status);
+    return true;
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------------------------
 // Data
 // ---------------------------------------------------------------------------------------------
 function eventsRange(): [string, string] {
@@ -458,6 +492,7 @@ async function fetchEvents(): Promise<void> {
       saveCache('events', r);
     }
   } catch (e) {
+    if (deniedBy(e)) return;
     console.warn('[events]', (e as Error).message);
     setOnline(false);
   }
@@ -475,6 +510,7 @@ async function fetchWeather(): Promise<void> {
     set('weather', r);
     saveCache('weather', r);
   } catch (e) {
+    if (deniedBy(e)) return;
     console.warn('[weather]', (e as Error).message);
   }
 }
@@ -486,6 +522,7 @@ async function fetchNews(): Promise<void> {
     set('news', r);
     saveCache('news', r);
   } catch (e) {
+    if (deniedBy(e)) return;
     console.warn('[news]', (e as Error).message);
   }
 }
@@ -495,6 +532,7 @@ async function fetchPhotos(): Promise<void> {
   try {
     set('photos', await api.photos(20, photos.lastGalleryFile));
   } catch (e) {
+    if (deniedBy(e)) return;
     console.warn('[photos]', (e as Error).message);
     if (!state.photos) set('photos', mockPhotos());
   }
@@ -509,6 +547,7 @@ async function fetchCountdowns(): Promise<void> {
       saveCache('countdowns', r);
     }
   } catch (e) {
+    if (deniedBy(e)) return;
     // older server without /api/countdowns (404) or offline: keep what we have
     console.warn('[countdowns]', (e as Error).message);
   }
@@ -522,6 +561,7 @@ async function fetchConfig(): Promise<boolean> {
     set('config', c);
     return true;
   } catch (e) {
+    if (deniedBy(e)) return false;
     console.warn('[config]', (e as Error).message);
     setOnline(false);
     return false;
@@ -654,11 +694,32 @@ async function boot(): Promise<void> {
   const setup = await checkSetup();
   if (setup) {
     const pl = params.get('lang');
+    heartbeat.stop();
     showWelcome(setup, pl === 'es' || pl === 'en' || pl === 'pt' ? pl : setup.suggestedLanguage);
     waitForSetup();
     return;
   }
-  // Show last known data immediately (offline tolerance), then go live.
+  // /pair always shows the pairing screen for a browser without a key (also in open mode).
+  if (location.pathname === '/pair' && !credential) {
+    heartbeat.stop();
+    showPairing('pair', pairingLang(params));
+    return;
+  }
+  // Ask the server first (short timeout): a revoked link or a private install without a key must never flash
+  // cached family data. Offline → last known data (offline tolerance), then go live.
+  let first: DisplayConfig | null = null;
+  try {
+    first = await api.configQuick();
+  } catch (e) {
+    if (deniedBy(e)) return;
+  }
+  if (first) {
+    setOnline(true);
+    saveCache('config', first);
+    set('config', first);
+    void goLive();
+    return;
+  }
   const cached = loadCache<DisplayConfig>('config');
   if (cached) {
     set('events', loadCache<EventsResponse>('events'));
@@ -668,6 +729,7 @@ async function boot(): Promise<void> {
     set('config', cached);
   }
   const ok = await fetchConfig();
+  if (accessDenied) return;
   if (!ok && !cached) {
     if (import.meta.env.DEV) {
       console.info('[display] /api unreachable — running with the built-in demo dataset');
@@ -700,6 +762,7 @@ async function boot(): Promise<void> {
 
 let streamStarted = false;
 async function goLive(): Promise<void> {
+  if (accessDenied) return;
   startPolling();
   void fetchEvents();
   void fetchWeather();
@@ -709,7 +772,7 @@ async function goLive(): Promise<void> {
   if (streamStarted) return;
   streamStarted = true;
   heartbeat.start();
-  connectStream({
+  liveStream = connectStream({
     hello: (d) => {
       setOnline(true);
       setServerNow(d.now);
@@ -743,6 +806,8 @@ async function goLive(): Promise<void> {
       setNightCommand(d.mode);
       heartbeat.soon();
     },
+    // Link regenerated / device revoked → "no longer valid"; switched to private without a key → pairing.
+    revoked: (d) => denyAccess(d.code === 'key_required' ? 401 : 403),
     open: () => setOnline(true),
     down: () => setOnline(false),
   });

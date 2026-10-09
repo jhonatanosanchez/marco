@@ -1,13 +1,14 @@
 // API client for the public display endpoints (docs/API.md).
-// Every per-screen endpoint gets `?screen=<key>` when the display was opened with one.
+// Every per-screen endpoint gets `?screen=<key>` when the display was opened with one; every request carries the
+// display credential (private-link key or paired-device token) in X-Marco-Key.
 import type {
   CountdownsResponse, DisplayConfig, DisplayHeartbeat, EventsResponse, HealthResponse, HeartbeatResponse, NewsResponse,
   PhotosResponse, WeatherResponse,
 } from '../shared/types';
-import { withScreen } from './identity';
+import { authHeaders, withScreen } from './identity';
 
 export class ApiError extends Error {
-  constructor(message: string, public status = 0) {
+  constructor(message: string, public status = 0, public code = '') {
     super(message);
   }
 }
@@ -17,9 +18,18 @@ async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 1500
   const tm = setTimeout(() => ctl.abort(), timeoutMs);
   try {
     const r = await fetch(path, {
-      ...init, signal: ctl.signal, cache: 'no-store', headers: { Accept: 'application/json', ...(init.headers || {}) },
+      ...init, signal: ctl.signal, cache: 'no-store', headers: { Accept: 'application/json', ...authHeaders(), ...(init.headers || {}) },
     });
-    if (!r.ok) throw new ApiError(`${path} → HTTP ${r.status}`, r.status);
+    if (!r.ok) {
+      // 401 key_required / 403 invalid_key: the display shows the pairing / "link no longer valid" screen.
+      let code = '';
+      if (r.status === 401 || r.status === 403) {
+        try {
+          code = String(((await r.json()) as { code?: string }).code || '');
+        } catch { /* not JSON */ }
+      }
+      throw new ApiError(`${path} → HTTP ${r.status}`, r.status, code);
+    }
     const ct = r.headers.get('content-type') || '';
     if (!ct.includes('json')) throw new ApiError(`${path} → not JSON`, r.status);
     return (await r.json()) as T;
@@ -37,6 +47,8 @@ export function getJSON<T>(path: string, timeoutMs = 15000): Promise<T> {
 
 export const api = {
   config: () => getJSON<DisplayConfig>(withScreen('/api/display/config')),
+  /** First config fetch at boot: short timeout so an unreachable server falls back to the cache quickly. */
+  configQuick: () => getJSON<DisplayConfig>(withScreen('/api/display/config'), 5000),
   events: (from: string, to: string) =>
     getJSON<EventsResponse>(withScreen(`/api/events?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)),
   weather: () => getJSON<WeatherResponse>(withScreen('/api/weather')),

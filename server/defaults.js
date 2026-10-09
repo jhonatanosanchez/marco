@@ -104,5 +104,8 @@ export function defaultConfig() {
     schedules: { items: [] },
     homeassistant: { enabled: false, url: 'http://homeassistant.local:8123' },
     auth: { allowedGoogleEmails: [], passwordLoginEnabled: true },
+    // 'private': every display needs its private link (/d/<key>) or a paired-device token (server/displayAccess.js).
+    // 'open': legacy LAN mode (/ and /?screen= work without a key). Configs saved before 0.3 load as 'open'.
+    security: { displayAccess: 'private' },
   });
 }

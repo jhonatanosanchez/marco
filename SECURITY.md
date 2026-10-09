@@ -12,13 +12,19 @@ You should get an answer within a week.
 
 ## Deployment model (what is and is not protected)
 
-Marco is designed for a **home network (LAN)**:
+Marco was designed for a **home network (LAN)**. Since 0.3 the displays are **private by default**, so it can also be
+used on shared networks or behind an HTTPS reverse proxy on the Internet:
 
-- The display (`/`) and the display API (`/api/display/*`, `/api/events`, `/api/weather`, `/api/news`, `/api/photos`,
-  `/api/countdowns`, `/api/stream`, `/api/display/heartbeat`) have **no authentication**, so any browser on your LAN can
-  show the calendar. They never return calendar URLs, tokens, passwords or Home Assistant credentials, but they do
-  return your events, so do not expose them to the Internet. Gallery photos (`/media/*`) are only sent to LAN clients
-  or a signed-in admin.
+- **Display access** (`config.security.displayAccess`, *Admin → Security → Display access*):
+  - `private` (default for new installs): the display API (`/api/display/*` incl. the heartbeat, `/api/events`,
+    `/api/weather`, `/api/news`, `/api/photos`, `/api/countdowns`, `/api/stream`) and `/media/*` answer only to a
+    request carrying the screen's **display key** (private link `/d/<key>`), a **paired-device token**, or a signed-in
+    admin. Otherwise `401` (no key) / `403` (unknown, regenerated or revoked key/token) and no data.
+  - `open` (installs upgraded from 0.2 keep it so no kiosk goes blank; the admin recommends switching): the display API
+    has **no authentication**, as before, and must stay on your LAN. Gallery photos (`/media/*`) are still only sent
+    to LAN clients, valid keys or a signed-in admin.
+  - Either way the display API never returns calendar URLs, tokens, passwords or Home Assistant credentials — but it
+    does return your events, names and photos, which is what the keys protect.
 - **Host names**: the server only answers to IP addresses, `localhost`, single-label names, `*.local` / `*.lan` /
   `*.home.arpa` / `*.internal`, the `PUBLIC_URL` host and `ALLOWED_HOSTS` (`421` otherwise; `/api/health` and the
   bearer-token webhooks are exempt). This stops DNS-rebinding attacks, where a website a LAN user visits points its
@@ -48,6 +54,74 @@ Marco is designed for a **home network (LAN)**:
   iCal test (`/api/setup/test-ics`), refuses loopback, link-local / cloud-metadata, multicast and unspecified
   destinations on every redirect hop and returns only generic errors.
 
-If you need remote access, put an HTTPS reverse proxy in front and expose only the admin, login and setup routes (see
-`deploy/Caddyfile.example`), use a strong password, set `PUBLIC_URL` to your domain, and set `TRUST_PROXY` whenever
-the proxy does not connect from loopback (another host, or Docker).
+If you need remote access, put an HTTPS reverse proxy in front (see `deploy/Caddyfile.example`), use a strong
+password, set `PUBLIC_URL` to your domain, and set `TRUST_PROXY` whenever the proxy does not connect from loopback
+(another host, or Docker). Expose the display routes (`/`, `/d/*`, `/pair`, `/api/display/*`, `/api/stream`…) only in
+**private** display-access mode; in open mode expose only the admin, login and setup routes.
+
+## Private display links and pairing: threat model
+
+**What is protected**: the family's calendar, names, birthdays, photos, to-dos and messages shown on the screens.
+
+**Credentials**
+
+| Credential | Entropy | Stored as | Lifetime |
+|---|---|---|---|
+| Display key (private link `/d/<key>`) | UUIDv4 from the OS CSPRNG (`crypto.randomUUID`): **122 random bits** | plain, in `data/secrets.json` (mode 600) — the admin must be able to show the link again | until *Regenerate link* or the screen is deleted |
+| Device token (pairing) | `md_` + 32 random bytes: **256 bits** | SHA-256 hash only | until revoked |
+| Pairing session id | 32 random bytes: **256 bits** | SHA-256 hash, memory only | ≤ 10 minutes |
+| Pairing code | 6 symbols from a 31-symbol alphabet: 31⁶ ≈ **8.9 × 10⁸** | memory only | ≤ 10 minutes, single use |
+
+Why a UUIDv4 for the key: it is the format people expect in such links, lower-case hex is easy to read and type on a
+Raspberry Pi with a keyboard (no ambiguous upper/lower case), it validates with a strict pattern, and 122 random bits
+are far beyond guessing (base64url with 128 bits would only be slightly shorter). Comparisons hash both sides
+(SHA-256) and use `crypto.timingSafeEqual` over every stored entry, so timing reveals neither which key matched nor
+how much of it.
+
+**Brute force**
+
+- *Display keys*: 2¹²² ≈ 5.3 × 10³⁶ values. Even at 10 000 requests/second for a whole year (3.2 × 10¹¹ guesses, far
+  more than a Pi can answer) against 20 screens, the chance of hitting any key is about 1.2 × 10⁻²⁴. No rate limit is
+  needed (and none would help an attacker with a botnet anyway); device tokens (2²⁵⁶) even less.
+- *Pairing codes*: the code only labels a waiting display; **it never yields a token**. The token is handed to whoever
+  polls with the 256-bit session id that `/api/pair/start` returned to that display, so reading a code over someone's
+  shoulder gives nothing. Claiming a code needs an **admin session** (and passes the CSRF guard). Claims are limited to
+  10 wrong codes per admin session + address and 50 wrong codes overall per 10 minutes (after that every claim gets
+  `429`, even with a right code, so there is no oracle), codes are single use, live 10 minutes and can only be claimed
+  while their display polled within the last 15 s. With at most 100 pending codes, one guess succeeds with probability
+  ≤ 100 / 31⁶ ≈ 1.1 × 10⁻⁷, and the global cap (7 200 wrong guesses per day) bounds it to ≈ 0.08 % per day — and a
+  "success" would only pair a stranger's waiting display to the guesser's own calendar.
+- *Starting pairing sessions* is unauthenticated: 10 per IPv4 address / IPv6 /64 per 10 minutes and at most 100
+  pending in total. Flooding it can delay pairing (`503`, the display retries), never grant access; private links keep
+  working.
+
+**Attackers and mitigations**
+
+- *Someone else on the same network* (shared Wi-Fi, guest network, flat share, office): private mode answers nothing
+  without a key. Use HTTPS on networks you do not control: on plain HTTP anyone who can sniff the traffic can read the
+  key (WPA2-Personal users with the same passphrase can decrypt each other's traffic).
+- *Internet scanners* (when exposed): same as above; the host-name allowlist (`PUBLIC_URL` / `ALLOWED_HOSTS`) and
+  `X-Robots-Tag: noindex` on `/d/*` apply, and nothing on `/`, `/pair` or the API reveals data without a key.
+- *A leaked link* (shared screenshot, photo of the kiosk's address bar, browser history on a shared computer): the
+  link shows that one screen only. *Regenerate link* revokes it at once: connected displays using it receive
+  `revoked` over SSE, wipe their cached data and show "This link is no longer valid".
+- *A lost or given-away tablet*: revoke its paired device (each device has its own token; the activity log records
+  pairings and revocations).
+- *Leaking through referrers, caches and logs*: every response sends `Referrer-Policy: no-referrer`; keyed responses
+  are `Cache-Control: private, no-store`; keys, device tokens and pairing session ids never enter the activity log or
+  the server log (URLs are redacted, the activity log redacts any `/d/…`, `?k=` or `md_…` it would otherwise store).
+  `?k=` appears in URLs only for the SSE stream and photos, where browsers cannot send headers: if your reverse proxy
+  writes access logs, leave out the query string (Caddy logs nothing by default; for nginx use a `log_format` without
+  `$request_uri`/`$args`, or `access_log off` for `/api/stream` and `/media/`).
+- *Social engineering of the pairing dialog* ("type this code to fix your screen"): pairing gives the code's display a
+  token for the screen the admin picks. Only type codes shown on your own screens; the new device appears in
+  *Connected screens → Paired devices*, where it can be revoked.
+- *Malicious websites in a family member's browser* (CSRF, DNS rebinding): admin actions (claim, regenerate, revoke)
+  need the session cookie (`SameSite=Lax`), JSON bodies and a matching `Origin`; unknown host names get `421`. The
+  pairing status endpoint needs the secret session id.
+
+**Residual risks**: the private link is a bearer secret — whoever has it sees that screen until it is regenerated.
+Device tokens live in the display browser's `localStorage`, readable by scripts on the same origin (custom CSS is the
+only user-supplied content the display injects, and it is CSS only). Anybody standing in front of the screen sees
+what it shows. In open mode none of the above applies to the display API.
+

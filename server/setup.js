@@ -25,6 +25,7 @@ import { isHttpUrl, slugify } from './validate.js';
 import { isValidTimeZone } from './lib/tz.js';
 import { LANGS, langFromHeader } from './lib/i18n.js';
 import { DEFAULT_SOURCES } from './defaults.js';
+import { displayAccessMode, displayKeyFor } from './displayAccess.js';
 
 let generatedToken = null;
 
@@ -357,7 +358,13 @@ export function setupRouter({ version }) {
         },
       });
       const scr = saved.config.screens.find((s) => s.id === saved.config.defaultScreen) || saved.config.screens[0];
-      res.json({ ok: true, user: { email: 'admin', name: 'Admin', picture: '', method: 'password' }, screen: { slug: scr.slug, name: scr.name } });
+      // The Done step shows the screen's private link (+ QR) in private mode instead of the bare address.
+      const key = displayKeyFor(scr.id);
+      res.json({
+        ok: true, user: { email: 'admin', name: 'Admin', picture: '', method: 'password' },
+        screen: { id: scr.id, slug: scr.slug, name: scr.name, displayPath: key ? `/d/${key}` : null },
+        displayAccess: displayAccessMode(saved.config),
+      });
     } catch (err) {
       next(err);
     } finally {

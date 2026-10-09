@@ -1,14 +1,15 @@
 import { useState } from 'preact/hooks';
 import { api, ApiError } from '../api';
 import { toast } from '../components/feedback';
-import { GoogleG } from '../components/icons';
+import { GoogleG, Icon } from '../components/icons';
+import { PrivateLinkCard } from '../components/DisplayAccess';
 import { Button, Callout, Card, Chips, ColorPicker, Field, PageHeader, Segmented, Slider, Textarea, TextInput, ToggleRow } from '../components/ui';
 import { t } from '../i18n';
 import { EMAIL_RE } from '../util';
 import { MIN_PASSWORD, passwordProblem } from '../../shared/password';
 import type { SectionProps } from './common';
 
-export function ScreenSection({ cfg, set, errors }: SectionProps) {
+export function ScreenSection({ cfg, set, errors, screenId, saved, go }: SectionProps) {
   const s = cfg.screen;
   const nm = s.nightMode;
   return (
@@ -48,6 +49,7 @@ export function ScreenSection({ cfg, set, errors }: SectionProps) {
           </Field>
         </div>
       </Card>
+      <PrivateLinkCard screenId={screenId} saved={saved} mode={saved.security?.displayAccess ?? 'open'} go={go} />
       <Card id="scr-look" scope="screen" title={t('Apariencia')} icon="palette">
         <div class="grid grid--2">
           <Field label={t('Tema')}>
@@ -87,7 +89,7 @@ export function ScreenSection({ cfg, set, errors }: SectionProps) {
   );
 }
 
-export function SecuritySection({ cfg, set, errors, me }: SectionProps) {
+export function SecuritySection({ cfg, set, errors, me, saved, go }: SectionProps) {
   const a = cfg.auth;
   const [cur, setCur] = useState('');
   const [next, setNext] = useState('');
@@ -132,6 +134,7 @@ export function SecuritySection({ cfg, set, errors, me }: SectionProps) {
           </div>
         </Card>
       )}
+      <DisplayAccessCard mode={cfg.security?.displayAccess ?? 'open'} savedMode={saved.security?.displayAccess ?? 'open'} onChange={(v) => set((d) => void (d.security = { ...(d.security ?? {}), displayAccess: v }))} go={go} />
       <Card id="sec-google" title={t('Inicio de sesión con Google')} icon="google">
         {!me.googleConfigured && <Callout kind="warn">{t('Google no está configurado en el servidor (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET).')}</Callout>}
         <Field
@@ -201,8 +204,61 @@ export function SecuritySection({ cfg, set, errors, me }: SectionProps) {
         </div>
       </Card>
       <Callout>
-        {t('El panel solo es accesible desde tu red local. Las URLs de los calendarios y los tokens nunca se envían a la pantalla.')}
+        {t('Las URLs de los calendarios, los tokens y las claves de las pantallas nunca se envían a otras pantallas ni aparecen en el registro de actividad.')}
       </Callout>
     </>
+  );
+}
+
+function DisplayAccessCard({ mode, savedMode, onChange, go }: { mode: 'private' | 'open'; savedMode: 'private' | 'open'; onChange: (v: 'private' | 'open') => void; go: (r: string) => void }) {
+  const opts: { v: 'private' | 'open'; icon: 'key' | 'wifi'; title: string; body: string; badge?: string }[] = [
+    {
+      v: 'private',
+      icon: 'key',
+      title: t('Privado'),
+      badge: t('Recomendado'),
+      body: t('Cada pantalla entra con su enlace privado (/d/…) o vinculándola con un código. Sin clave no se ve nada: seguro en redes compartidas o si Marco es accesible desde Internet.'),
+    },
+    {
+      v: 'open',
+      icon: 'wifi',
+      title: t('Abierto (red local)'),
+      body: t('Como antes de la versión 0.3: cualquiera que llegue a la dirección del servidor ve el calendario sin clave. Úsalo solo en una red doméstica de confianza.'),
+    },
+  ];
+  return (
+    <Card id="sec-display" title={t('Acceso a las pantallas')} icon="monitor" desc={t('Quién puede ver el calendario familiar en una pantalla.')}>
+      <div class="access-mode" role="radiogroup" aria-label={t('Acceso a las pantallas')}>
+        {opts.map((o) => (
+          <button type="button" role="radio" aria-checked={mode === o.v} class={`access-mode__opt ${mode === o.v ? 'is-active' : ''}`} onClick={() => onChange(o.v)}>
+            <Icon name={o.icon} size={18} />
+            <div>
+              <strong>
+                {o.title}
+                {o.badge && <span class="badge badge--soft">{o.badge}</span>}
+              </strong>
+              <p>{o.body}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+      {mode === 'open' && savedMode === 'open' && (
+        <Callout kind="warn">{t('Las pantallas están en modo abierto: cualquiera que llegue a este servidor puede ver el calendario sin clave. Recomendado: enlaces privados y vinculación.')}</Callout>
+      )}
+      {mode === 'private' && savedMode === 'open' && (
+        <Callout kind="warn">
+          {t('Al guardar, las pantallas que ahora entran sin clave mostrarán un código de vinculación. Abre en cada una su enlace privado (Pantalla → Ajustes) o vincúlala desde Pantallas conectadas.')}
+        </Callout>
+      )}
+      {mode === 'open' && savedMode === 'private' && (
+        <Callout kind="warn">{t('Al guardar, cualquiera que llegue a la dirección del servidor podrá ver el calendario sin clave.')}</Callout>
+      )}
+      <p class="muted small">
+        {t('Los enlaces privados están en Pantalla → Ajustes; los dispositivos vinculados, en Pantallas conectadas.')}{' '}
+        <button type="button" class="link-btn" onClick={() => go('screen/scr-link')}>
+          {t('Ver el enlace de esta pantalla')}
+        </button>
+      </p>
+    </Card>
   );
 }

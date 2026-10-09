@@ -16,6 +16,11 @@ import type {
   DashboardResponse,
   DisplayCommandRequest,
   DisplaysResponse,
+  DisplayLink,
+  DisplayLinksResponse,
+  DevicesResponse,
+  PairClaimRequest,
+  PairedDevice,
   EventsPreviewRequest,
   EventsPreviewResponse,
   ExportBundle,
@@ -159,6 +164,14 @@ export const api = {
   displays: () => request<DisplaysResponse>('GET', '/api/admin/displays'),
   displayCommand: (body: DisplayCommandRequest) => request<{ ok: true; delivered: number }>('POST', '/api/admin/displays/command', body),
   forgetDisplay: (clientId: string) => request<{ ok: true }>('DELETE', `/api/admin/displays/${encodeURIComponent(clientId)}`),
+
+  // ---- display access: private links, paired devices, pairing (docs/API.md "Display access") ----
+  displayLinks: () => request<DisplayLinksResponse>('GET', '/api/admin/display-links'),
+  regenerateLink: (screenId: string) => request<{ link: DisplayLink }>('POST', `/api/admin/display-links/${encodeURIComponent(screenId)}/regenerate`, {}),
+  devices: () => request<DevicesResponse>('GET', '/api/admin/devices'),
+  updateDevice: (id: string, body: { name?: string; screenId?: string }) => request<{ device: PairedDevice }>('PATCH', `/api/admin/devices/${encodeURIComponent(id)}`, body),
+  revokeDevice: (id: string) => request<{ ok: true }>('DELETE', `/api/admin/devices/${encodeURIComponent(id)}`),
+  claimPairing: (body: PairClaimRequest) => request<{ device: PairedDevice }>('POST', '/api/admin/pair/claim', body),
 
   eventsPreview: (body: EventsPreviewRequest) => request<EventsPreviewResponse>('POST', '/api/admin/events/preview', body),
   parseBirthdaysCsv: (text: string) => request<BirthdayCsvResult>('POST', '/api/admin/birthdays/parse-csv', { text }),
