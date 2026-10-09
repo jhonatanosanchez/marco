@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { passwordProblem, passwordScore, MIN_PASSWORD } from '../shared/password';
 import { BrandMark } from './components/BrandMark';
 import { CopyField, Qr } from './components/share';
-import { REPO_URL } from '../shared/project';
+import { kioskInstallCommand, REPO_URL } from '../shared/project';
 import type { Lang, LayoutPreset, SetupRequest, SetupStatus, TestIcsResponse } from '../shared/types';
 import { api, ApiError } from './api';
 import { Icon, type IconName } from './components/icons';
@@ -445,8 +445,7 @@ export function SetupWizard({ status: initial, onDone, onLang }: { status: Setup
   const displayUrl = done?.displayPath ? `${origin}${done.displayPath}` : `${origin}/`;
   const privateLink = !!done?.displayPath;
   const adminUrl = `${origin}/admin/`;
-  // Same path as the README's kiosk-only instructions (the repository is cloned to ~/marco on the Pi).
-  const kioskCmd = `~/marco/deploy/install.sh --kiosk-only --url ${displayUrl}`;
+  const kioskCmd = kioskInstallCommand(displayUrl);
   const now = new Date();
   const timePreview = (() => {
     try {

@@ -12,7 +12,23 @@ All notable changes to this project are documented here. The format is based on
   server and the web UI. Existing installs get the new keywords and categories once, added after their own rules;
   nothing is removed or reordered, and rules deleted afterwards stay deleted (marker file `data/.iconrules-v2`).
 
+- **One-line installer**: `curl -fsSL https://marcohome.app/install | bash` (`install.sh` at the repository root).
+  It asks what the device should do (all in one, server only, or screen only for a server elsewhere), or takes
+  `--mode all|server|kiosk --url <private link> --port --dir --version --yes`. It checks the system (Debian 12/13,
+  Raspberry Pi OS Bookworm/Trixie, Ubuntu 22.04+; x86_64, arm64, armv7), the Raspberry Pi model, the desktop
+  (labwc, wayfire, X11) and the read-only overlay, installs Node.js 22 when needed, downloads the prebuilt release
+  and verifies its SHA-256, sets up the systemd service and the kiosk, and ends with the admin address and a QR code.
+  `--dry-run` prints every action without changing anything. Until a release is published it builds from git.
+- **`marco` command**: `marco status`, `logs [-f]`, `restart`, `update` (checksum verified, switched atomically,
+  rolled back if the new version does not start), `url` (admin address and each screen's private link with QR
+  codes), `version`, `uninstall` (keeps your data unless `--purge`).
+- **Release packages**: tagging `v*` builds `marco-<version>.tar.gz` (server, built web interface, deploy scripts,
+  no `node_modules`) with a `.sha256` and publishes a GitHub release with the notes from this changelog.
+
 ### Changed
+- `deploy/install.sh` is now a thin wrapper around `install.sh` for git checkouts (same options as before, plus
+  `--dry-run`). The private-link card and the setup wizard show the one-line kiosk command.
+- Kiosk: Chromium starts with `--force-device-scale-factor=1` (override it in `KIOSK_EXTRA_ARGS`).
 - New logo: two arches, one with the sun and one with the moon, inside an M-shaped frame. It replaces the calendar
   badge in the admin sidebar, login, setup wizard and the display's welcome and pairing screens, and comes as a
   favicon set (`favicon.svg`, 32 px PNG, 180 px `apple-touch-icon.png`, 512 px icon). Lockups for light and dark

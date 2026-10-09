@@ -1,6 +1,6 @@
 # systemd unit for Marco.
-# install.sh replaces @USER@, @GROUP@, @APP_DIR@ and @NODE@ and copies it to
-# /etc/systemd/system/marco.service
+# install.sh replaces @USER@, @GROUP@, @APP_DIR@, @DATA_DIR@, @ENV_FILE@ and @NODE@ and copies it to
+# /etc/systemd/system/marco.service. Settings in the .env file override the Environment= lines.
 [Unit]
 Description=Marco (wall calendar display + admin panel)
 Documentation=file://@APP_DIR@/README.md
@@ -12,8 +12,9 @@ Type=simple
 User=@USER@
 Group=@GROUP@
 WorkingDirectory=@APP_DIR@
-EnvironmentFile=-@APP_DIR@/.env
 Environment=NODE_ENV=production
+Environment=DATA_DIR=@DATA_DIR@
+EnvironmentFile=-@ENV_FILE@
 ExecStart=@NODE@ server/index.js
 Restart=always
 RestartSec=5

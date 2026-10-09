@@ -8,6 +8,7 @@ import { fmtDateTime } from '../dates';
 import { relTime, t } from '../i18n';
 import { confirmDialog, toast } from './feedback';
 import { Icon } from './icons';
+import { kioskInstallCommand } from '../../shared/project';
 import { CopyField, Qr } from './share';
 import { Button, Callout, Card, Empty, Field, Modal, Select, TextInput } from './ui';
 
@@ -31,7 +32,7 @@ export function shareOrigin(data: Pick<DisplayLinksResponse, 'lanAddresses' | 'p
   return ip ? `${location.protocol}//${ip}${location.port ? `:${location.port}` : ''}` : '';
 }
 
-export const kioskCommand = (url: string) => `~/marco/deploy/install.sh --kiosk-only --url ${url}`;
+export const kioskCommand = kioskInstallCommand;
 
 /* ------------------------------------------------------------------ private link card (per screen) */
 
@@ -127,7 +128,7 @@ export function PrivateLinkCard({ screenId, saved, mode, go }: { screenId: strin
                 <span class="muted small">{t('Creado {when}', { when: relTime(link.createdAt) })}</span>
               </div>
               {origin && (
-                <Field label={t('Raspberry Pi solo como pantalla (comando)')} hint={t('En la Pi, con el repositorio clonado en ~/marco.')}>
+                <Field label={t('Raspberry Pi solo como pantalla (comando)')} hint={t('Ejecútalo en la Pi (Raspberry Pi OS con escritorio).')}>
                   <CopyField value={kioskCommand(url)} />
                 </Field>
               )}

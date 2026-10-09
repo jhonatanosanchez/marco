@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Starts Chromium in kiosk mode showing Marco.
-# Launched by the desktop session autostart (labwc / wayfire / LXDE-pi), see deploy/install.sh.
+# Launched by the desktop session autostart (labwc / wayfire / LXDE-pi), set up by install.sh.
 #
 # Optional variables (put them in ~/.config/marco/kiosk.env):
 #   KIOSK_URL        URL to show: the screen's private link, e.g. http://homeserver.lan:3000/d/<key>
@@ -10,6 +10,7 @@
 #   KIOSK_CLIENT     Name of this display in the admin panel (default: hostname)
 #   PORT             Local server port (default: read from ../.env, else 3000)
 #   KIOSK_EXTRA_ARGS Extra Chromium flags, e.g. "--force-device-scale-factor=0.75" to fit more on a small screen
+#                    (the default scale is 1, so the layout does not depend on the desktop's zoom setting)
 #   KIOSK_WAIT_SEC   Max seconds to wait for /api/health before opening anyway (default 120)
 set -euo pipefail
 
@@ -157,6 +158,7 @@ FLAGS=(
   --no-first-run
   --check-for-update-interval=31536000
   --disable-features=Translate
+  --disable-translate
   --overscroll-history-navigation=0
   --enable-gpu-rasterization
   --ignore-gpu-blocklist
@@ -164,6 +166,7 @@ FLAGS=(
   --disable-pinch
   --password-store=basic
   --autoplay-policy=no-user-gesture-required
+  --force-device-scale-factor=1
   --user-data-dir="$PROFILE_DIR"
 )
 if [ "$IS_WAYLAND" = 1 ]; then

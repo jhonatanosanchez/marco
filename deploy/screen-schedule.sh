@@ -69,8 +69,8 @@ case "$ACTION" in
     ;;
   status)
     echo "Method: $method"
-    [ "$method" = "wlr-randr" ] && echo "Output: $(output_name) (WAYLAND_DISPLAY=$WAYLAND_DISPLAY)" || true
-    [ "$method" = "xset" ] && echo "DISPLAY=$DISPLAY" || true
+    if [ "$method" = "wlr-randr" ]; then echo "Output: $(output_name) (WAYLAND_DISPLAY=$WAYLAND_DISPLAY)"; fi
+    if [ "$method" = "xset" ]; then echo "DISPLAY=$DISPLAY"; fi
     ;;
   *)
     echo "Usage: $0 on|off|status" >&2

@@ -58,7 +58,7 @@ export const ROWS6: [string, string, string][] = [
   ],
   ['Creado {when}', 'Created {when}', 'Criada {when}'],
   ['Raspberry Pi solo como pantalla (comando)', 'Raspberry Pi as a screen only (command)', 'Raspberry Pi só como ecrã (comando)'],
-  ['En la Pi, con el repositorio clonado en ~/marco.', 'On the Pi, with the repository cloned to ~/marco.', 'No Pi, com o repositório clonado em ~/marco.'],
+  ['Ejecútalo en la Pi (Raspberry Pi OS con escritorio).', 'Run it on the Pi (Raspberry Pi OS with desktop).', 'Executa-o no Pi (Raspberry Pi OS com ambiente de trabalho).'],
   [
     'Las pantallas están en modo abierto: cualquiera que llegue a este servidor puede ver el calendario sin clave. Recomendado: enlaces privados y vinculación.',
     'Screens are in open mode: anyone who can reach this server can see the calendar without a key. Recommended: private links and pairing.',

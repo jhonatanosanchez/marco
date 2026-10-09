@@ -26,6 +26,7 @@ jobs:
       - run: npm test
       - run: npx tsc --noEmit -p .
       - run: npm run build
+      - run: shellcheck install.sh deploy/*.sh deploy/marco scripts/*.sh
 
   docker:
     runs-on: ubuntu-latest

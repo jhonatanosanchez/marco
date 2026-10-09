@@ -30,7 +30,9 @@ display and the server guarantee. The HTTP endpoints and event formats are in [A
 | `web/index.html`, `web/display/` | The display (vanilla TypeScript + three.js) |
 | `web/admin/` | The admin panel (Preact + TypeScript) |
 | `web/shared/` | Types shared by server contracts, display and admin; i18n; emoji rules; screen projection; focal-point crop |
-| `deploy/` | Raspberry Pi installer, systemd unit, kiosk script, HDMI schedule, Caddy example |
+| `install.sh` | One-line installer (`curl -fsSL https://marcohome.app/install \| bash`): modes all / server / kiosk, prebuilt release with checksum, `--dry-run`, update with rollback, uninstall. See *Installer and releases* below |
+| `deploy/` | `marco` command, systemd unit, kiosk script, HDMI schedule, Caddy example; `deploy/install.sh` installs a git checkout in place (wrapper around `install.sh --source`) |
+| `scripts/package-release.sh`, `scripts/release-notes.js` | Release tarball and notes (used by `.github/workflows/release.yml` on `v*` tags) |
 | `scripts/demo.js` | `npm run demo` — throw-away data directory with a fictional family |
 | `data/` | Runtime data (git-ignored; `DATA_DIR` overrides the location) |
 
@@ -244,3 +246,30 @@ webhooks use hashed bearer tokens with rate limiting; uploaded file names are sa
 `server/lib/net.js`: the Host allowlist (DNS rebinding), `isLanClient` (private address, not relayed by an untrusted
 proxy, not the container gateway in strict mode) used by the setup wizard, the weak-`ADMIN_PASSWORD` rule and the
 photo routes, and the outbound address filter used by the unauthenticated setup ICS test.
+
+## Installer and releases
+
+`install.sh` at the repository root is the only installer; `deploy/install.sh` calls it with `--source <checkout>`.
+
+- **Release installs** (default): `<dir>/releases/<version>/` holds an extracted release tarball with its
+  `node_modules` (`npm ci --omit=dev`), `<dir>/current` is a symlink to the running one, `<dir>/data/` and `<dir>/.env`
+  are shared (each release links to them as `data` and `.env`). `<dir>` is `~/marco` for a normal user (the installer
+  uses sudo for the system parts) and `/opt/marco` when run as root (service user: `$SUDO_USER`, or a system user
+  `marco` for a server-only install).
+- **Updates** (`marco update`, or the installer again) download the newest `marco-<version>.tar.gz`, check it against
+  its `.sha256`, prepare it next to the running one, swap `current` (rename of a new symlink), restart and wait for
+  `/api/health`. If the new version does not answer within 45 s, `current` goes back to the previous release (kept on
+  disk) and the service restarts. Older releases are removed. Data is never touched.
+- **No release yet**: the installer clones the repository (`--version x.y.z` clones the tag `vx.y.z`), runs `npm ci`,
+  `npm run build` and `npm prune --omit=dev`, then continues as above.
+- **Checkout installs** (made with `git clone` + `deploy/install.sh`): updated in place with `git pull --ff-only`,
+  `npm ci` and `npm run build`; data stays in `<checkout>/data`.
+- `/etc/marco.conf` records mode, layout, folder and user for the `marco` command (`deploy/marco`, installed to
+  `/usr/local/bin/marco`); the installer keeps a copy of itself in `/usr/local/lib/marco/install.sh` for
+  `marco update` and `marco uninstall`.
+- **Release tarball** (`scripts/package-release.sh`, run by `.github/workflows/release.yml` on `v*` tags after tests and
+  the build): `server/` (without tests), `dist/`, `deploy/`, `install.sh`, `package.json`, `package-lock.json`,
+  `web/shared/iconRules.json`, `.env.example` and the license files. The release notes are the version's CHANGELOG
+  section (`scripts/release-notes.js`).
+- Testing hooks (not for normal use): `--tarball-url <url>` or `MARCO_TARBALL_URL` installs a given tarball (its
+  `.sha256` must sit next to it), `MARCO_REPO_URL` changes the git source.
