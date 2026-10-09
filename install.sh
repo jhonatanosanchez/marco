@@ -106,6 +106,8 @@ put_file() {
   fi
   tmp="$(mktemp)"
   cat > "$tmp"
+  # Folders in a user's home are created as that user (a root-owned ~/.config breaks the desktop session).
+  if [ "$owner" != root ]; then as_user mkdir -p "$(dirname "$dest")"; fi
   run install -D -m "$mode" "$tmp" "$dest"
   [ "$owner" = root ] || run chown "$owner:$(id -gn "$owner")" "$dest"
   rm -f "$tmp"
@@ -147,7 +149,7 @@ show_qr() {
 
 # ---- Detection -------------------------------------------------------------------------------------------
 OS_ID=""; OS_CODENAME=""; OS_NAME=""; OS_VERSION=""
-ARCH=""; PI_MODEL=""; DESKTOP=""; OVERLAY=0; SYSTEMD=0
+ARCH=""; PI_MODEL=""; DESKTOP=""; X_WM=""; OVERLAY=0; SYSTEMD=0
 
 detect() {
   if [ -r /etc/os-release ]; then
@@ -179,11 +181,23 @@ in_container() {
 }
 
 detect_desktop() {
-  local u="${RUN_USER:-$(id -un)}" s=""
+  local u="${RUN_USER:-$(id -un)}" s="" h
+  h="$(getent passwd "$u" 2>/dev/null | cut -d: -f6 || true)"
+  X_WM=""
   if have pgrep; then
     if pgrep -u "$u" -x labwc >/dev/null 2>&1; then DESKTOP="labwc"; return; fi
     if pgrep -u "$u" -x wayfire >/dev/null 2>&1; then DESKTOP="wayfire"; return; fi
-    if pgrep -x Xorg >/dev/null 2>&1; then DESKTOP="x11"; return; fi
+    if pgrep -x Xorg >/dev/null 2>&1; then
+      for s in lxsession openbox xfwm4 gnome-shell kwin_x11 marco matchbox-window-manager; do
+        if pgrep -u "$u" -x "$s" >/dev/null 2>&1; then X_WM="$s"; break; fi
+      done
+      # X started from ~/.xinitrc (console auto-login + startx, e.g. Raspberry Pi OS Lite), no display manager
+      if [ -n "$h" ] && [ -f "$h/.xinitrc" ] && ! pgrep -x lightdm >/dev/null 2>&1 && ! pgrep -x gdm3 >/dev/null 2>&1 \
+         && ! pgrep -x sddm >/dev/null 2>&1; then
+        DESKTOP="startx"; return
+      fi
+      DESKTOP="x11"; return
+    fi
   fi
   if [ -r /etc/lightdm/lightdm.conf ]; then
     s="$(grep -E '^\s*(autologin-session|user-session)\s*=' /etc/lightdm/lightdm.conf | tail -n1 | cut -d= -f2 | tr -d ' ' || true)"
@@ -200,7 +214,8 @@ desktop_label() {
   case "$DESKTOP" in
     labwc) echo "labwc (Wayland)" ;;
     wayfire) echo "wayfire (Wayland)" ;;
-    x11) echo "X11" ;;
+    x11) echo "X11${X_WM:+ ($X_WM)}" ;;
+    startx) echo "X11 started from ~/.xinitrc${X_WM:+ ($X_WM)}, no display manager" ;;
     desktop) echo "installed (session type unknown)" ;;
     *) echo "none" ;;
   esac
@@ -345,14 +360,19 @@ apt_install() {
 install_packages() {
   [ "$SKIP_APT" = 0 ] || return 0
   have apt-get || { warn "apt-get not found: install curl, tar and xz-utils yourself."; return 0; }
-  local base=(ca-certificates curl tar xz-utils openssl qrencode)
+  local base=(ca-certificates curl tar xz-utils openssl)
+  if [ "$MODE" != kiosk ]; then base+=(qrencode); fi
   if [ "$LAYOUT" = checkout ] || [ "$NEED_GIT" = 1 ]; then base+=(git); fi
   apt_install "${base[@]}"
   if [ "$MODE" != server ]; then
     if ! have chromium-browser && ! have chromium; then
       if apt-cache show chromium >/dev/null 2>&1; then apt_install chromium; else apt_install chromium-browser; fi
     fi
-    apt_install unclutter x11-xserver-utils wlr-randr wlrctl fonts-noto-color-emoji
+    case "$DESKTOP" in
+      labwc|wayfire) apt_install wlr-randr wlrctl fonts-noto-color-emoji ;;
+      x11|startx) apt_install unclutter x11-xserver-utils fonts-noto-color-emoji ;;
+      *) apt_install unclutter x11-xserver-utils wlr-randr wlrctl fonts-noto-color-emoji ;;
+    esac
   fi
 }
 
@@ -420,20 +440,25 @@ choose_source() {
     if curl -fsIL --connect-timeout 15 -o /dev/null "https://github.com/${MARCO_REPO}/releases/download/v${WANT_VERSION}/marco-${WANT_VERSION}.tar.gz" 2>/dev/null; then
       REL_SOURCE=tarball; REL_VERSION="$WANT_VERSION"
     else
-      REL_SOURCE=git; REL_VERSION="$WANT_VERSION"; NEED_GIT=1
+      REL_SOURCE=git; REL_VERSION="$WANT_VERSION"
     fi
-    return 0
+  else
+    REL_VERSION="$(latest_version)"
+    if [ -n "$REL_VERSION" ]; then REL_SOURCE=tarball; else REL_SOURCE=git; fi
   fi
-  REL_VERSION="$(latest_version)"
-  if [ -n "$REL_VERSION" ]; then REL_SOURCE=tarball
-  else REL_SOURCE=git; NEED_GIT=1
+  # A kiosk only needs a few scripts: from git they are downloaded one by one (no git needed).
+  if [ "$REL_SOURCE" = git ] && { [ "$MODE" != kiosk ] || [ "$MARCO_REPO_URL" != "https://github.com/${MARCO_REPO}.git" ]; }; then
+    NEED_GIT=1
   fi
 }
 
 source_label() {
   case "$REL_SOURCE" in
     tarball) if [ -n "$TARBALL_URL" ]; then echo "tarball $TARBALL_URL"; else echo "release v$REL_VERSION (prebuilt)"; fi ;;
-    git) if [ -n "$WANT_VERSION" ]; then echo "git tag v$WANT_VERSION, built here"; else echo "latest source from git (no release published yet), built here"; fi ;;
+    git)
+      if [ "$MODE" = kiosk ]; then echo "kiosk scripts from git (${WANT_VERSION:+v$WANT_VERSION}${WANT_VERSION:-main}; no release published yet)"
+      elif [ -n "$WANT_VERSION" ]; then echo "git tag v$WANT_VERSION, built here"
+      else echo "latest source from git (no release published yet), built here"; fi ;;
     checkout) echo "local checkout $SOURCE_DIR, built in place" ;;
   esac
 }
@@ -504,12 +529,12 @@ stage_release() {
   link_shared "$DIR/releases/$id"
   info "Installing dependencies in releases/$id..."
   if [ "$REL_SOURCE" = git ]; then
-    (cd "$DIR/releases/$id" && as_user npm ci --no-audit --no-fund --loglevel=error) || die "npm ci failed"
+    (cd "$DIR/releases/$id" && as_user npm ci --no-audit --no-fund --no-update-notifier --loglevel=error) || die "npm ci failed"
     info "Building the web interface..."
-    (cd "$DIR/releases/$id" && as_user npm run build --silent) || die "npm run build failed"
-    (cd "$DIR/releases/$id" && as_user npm prune --omit=dev --no-audit --no-fund --loglevel=error) || warn "npm prune failed (harmless)"
+    (cd "$DIR/releases/$id" && as_user npm run build --silent --no-update-notifier) || die "npm run build failed"
+    (cd "$DIR/releases/$id" && as_user npm prune --omit=dev --no-audit --no-fund --no-update-notifier --loglevel=error) || warn "npm prune failed (harmless)"
   else
-    (cd "$DIR/releases/$id" && as_user npm ci --omit=dev --no-audit --no-fund --loglevel=error) || die "npm ci failed"
+    (cd "$DIR/releases/$id" && as_user npm ci --omit=dev --no-audit --no-fund --no-update-notifier --loglevel=error) || die "npm ci failed"
   fi
   ok "Marco $REL_VERSION ready in $DIR/releases/$id"
 }
@@ -651,7 +676,18 @@ setup_kiosk() {
     fi
   fi
   # labwc (Raspberry Pi OS since late 2024)
-  add_line_once "$RUN_HOME/.config/labwc/autostart" "$kiosk_cmd >/tmp/marco-kiosk.log 2>&1 &"
+  if [ "$DESKTOP" = labwc ] || have labwc; then
+    add_line_once "$RUN_HOME/.config/labwc/autostart" "$kiosk_cmd >/tmp/marco-kiosk.log 2>&1 &"
+  fi
+  # X started from ~/.xinitrc: that file belongs to whoever set it up, so it is not edited here.
+  if [ "$DESKTOP" = startx ]; then
+    if grep -qE 'marco-kiosk|deploy/kiosk\.sh' "$RUN_HOME/.xinitrc" 2>/dev/null; then
+      ok "$RUN_HOME/.xinitrc already starts the Marco kiosk"
+    else
+      warn "This device starts X from ~/.xinitrc. To open Marco there, make its last line:"
+      warn "  exec $kiosk_cmd >/tmp/marco-kiosk.log 2>&1"
+    fi
+  fi
   # LXDE-pi (X11): the user file replaces the system one, so start from a copy of it.
   local lx="$RUN_HOME/.config/lxsession/LXDE-pi/autostart"
   if [ ! -f "$lx" ] && [ -f /etc/xdg/lxsession/LXDE-pi/autostart ]; then
@@ -674,9 +710,11 @@ setup_kiosk() {
       | put_file "$RUN_HOME/.config/autostart/marco-kiosk.desktop" 644 "$RUN_USER"
   fi
   if have raspi-config; then
-    info "Turning off screen blanking and enabling desktop auto-login (raspi-config)..."
+    info "Turning off screen blanking (raspi-config)..."
     run raspi-config nonint do_blanking 1 || warn "Could not turn off screen blanking"
-    run raspi-config nonint do_boot_behaviour B4 || warn "Could not enable desktop auto-login"
+    if [ -e /etc/lightdm/lightdm.conf ]; then
+      run raspi-config nonint do_boot_behaviour B4 || warn "Could not enable desktop auto-login"
+    fi
   else
     warn "Enable automatic login to the desktop and turn off screen blanking in your desktop settings."
   fi
@@ -765,6 +803,7 @@ do_install_release() {
         run mv -T "$DIR/.current.new" "$DIR/current"
         restart_service
         if wait_healthy; then ok "Rolled back: the previous version is running."; else warn "The previous version does not answer either."; fi
+        run rm -rf "$DIR/releases/$NEW_REL"
         die "Update failed. Logs: journalctl -u $SERVICE -n 80 --no-pager"
       fi
       warn "The server is not answering yet. Check: journalctl -u $SERVICE -n 50 --no-pager"
@@ -790,7 +829,7 @@ stage_kiosk_scripts() {
   if [ "$DRY" = 1 ]; then
     plan "get deploy/kiosk.sh and deploy/screen-schedule.sh from $(source_label)"
     plan "(as $RUN_USER) install them as $RUN_HOME/.local/bin/marco-kiosk and marco-schedule"
-    KIOSK_SRC="<release>"
+    KIOSK_SRC="download"
     return 0
   fi
   KIOSK_TMP="$(mktemp -d)"
@@ -804,9 +843,18 @@ stage_kiosk_scripts() {
     mkdir -p "$KIOSK_TMP/x"
     tar -xzf "$KIOSK_TMP/$base" -C "$KIOSK_TMP/x" --strip-components=1
     KIOSK_SRC="$KIOSK_TMP/x"
-  else
-    have git || die "git is needed (no release published yet): sudo apt install git"
+  elif [ "$NEED_GIT" = 1 ]; then
+    have git || die "git is needed: sudo apt install git"
     git clone -q --depth 1 ${WANT_VERSION:+--branch "v$WANT_VERSION"} "$MARCO_REPO_URL" "$KIOSK_TMP/x" || die "Could not clone $MARCO_REPO_URL"
+    KIOSK_SRC="$KIOSK_TMP/x"
+  else
+    local ref="main" f
+    if [ -n "$WANT_VERSION" ]; then ref="v$WANT_VERSION"; fi
+    mkdir -p "$KIOSK_TMP/x/deploy"
+    for f in deploy/kiosk.sh deploy/screen-schedule.sh deploy/marco install.sh; do
+      fetch -o "$KIOSK_TMP/x/$f" "https://raw.githubusercontent.com/${MARCO_REPO}/${ref}/$f" \
+        || { [ "$f" = deploy/marco ] || die "Download failed: $f"; }
+    done
     KIOSK_SRC="$KIOSK_TMP/x"
   fi
   as_user mkdir -p "$RUN_HOME/.local/bin"
@@ -829,8 +877,8 @@ do_install_checkout() {
     run chown -R "$RUN_USER:$(run_group)" "$app"
   fi
   info "Installing dependencies and building (npm ci, npm run build)..."
-  (cd "$app" && as_user npm ci --no-audit --no-fund --loglevel=error) || die "npm ci failed"
-  (cd "$app" && as_user npm run build --silent) || die "npm run build failed"
+  (cd "$app" && as_user npm ci --no-audit --no-fund --no-update-notifier --loglevel=error) || die "npm ci failed"
+  (cd "$app" && as_user npm run build --silent --no-update-notifier) || die "npm run build failed"
   as_user mkdir -p "$app/data"
   setup_env "$app/.env.example"
   install_service "$app" "$app/deploy/marco.service"

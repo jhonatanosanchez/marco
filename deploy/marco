@@ -74,8 +74,11 @@ cmd_logs() {
     if [ "${1:-}" = "-f" ]; then exec tail -f /tmp/marco-kiosk.log; fi
     exec tail -n 100 /tmp/marco-kiosk.log
   fi
-  if [ "${1:-}" = "-f" ]; then exec journalctl -u "$SERVICE" -f -n 50; fi
-  exec journalctl -u "$SERVICE" -n 200 --no-pager
+  local j=(journalctl)
+  # Reading the system journal needs root or the adm / systemd-journal group.
+  if [ "$(id -u)" -ne 0 ] && ! id -nG | grep -qwE 'adm|systemd-journal'; then j=(sudo journalctl); fi
+  if [ "${1:-}" = "-f" ]; then exec "${j[@]}" -u "$SERVICE" -f -n 50; fi
+  exec "${j[@]}" -u "$SERVICE" -n 200 --no-pager
 }
 
 cmd_url() {
