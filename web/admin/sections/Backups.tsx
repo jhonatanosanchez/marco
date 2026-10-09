@@ -302,6 +302,23 @@ export function BackupsSection({ dirty, replaceConfig }: SectionProps) {
                     <span>{t('Importar también los secretos que trae la copia')}</span>
                   </label>
                 )}
+                {preview.hasSecrets && impSecrets && preview.secretsImpact && (preview.secretsImpact.linksChanged.length > 0 || preview.secretsImpact.devicesRemoved.length > 0) && (
+                  <Callout kind="warn">
+                    {preview.secretsImpact.linksChanged.length > 0 && (
+                      <p>{t('Cambiará el enlace privado de: {list}. Las pantallas abiertas con el enlace actual se desconectan; vuelve a funcionar el de la copia.', { list: preview.secretsImpact.linksChanged.join(', ') })}</p>
+                    )}
+                    {preview.secretsImpact.devicesRemoved.length > 0 && (
+                      <p>{t('Se quitarán estos dispositivos vinculados (se desconectan al instante): {list}.', { list: preview.secretsImpact.devicesRemoved.join(', ') })}</p>
+                    )}
+                  </Callout>
+                )}
+                {preview.displayAccess && (
+                  <p class="muted small">
+                    {t('El acceso a las pantallas ({mode}) no cambia al importar ni al restaurar: se cambia en Seguridad.', {
+                      mode: preview.displayAccess === 'open' ? t('Abierto (red local)') : t('Privado'),
+                    })}
+                  </p>
+                )}
                 <div class="btn-row">
                   <Button variant="ghost" onClick={() => (setPreview(null), setBundle(null), setFileName(''))}>
                     {t('Cancelar')}

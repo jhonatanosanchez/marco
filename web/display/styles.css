@@ -1176,6 +1176,7 @@ body {
 #welcome.wl--invalid h1 { background: linear-gradient(100deg, #fff 30%, #ffe7b0 70%, #ffc23d); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .wl--invalid .wl-lead { max-width: 52ch; }
 .wl-status { font-variant-numeric: tabular-nums; }
+.wl-kiosk { margin-top: 1.4vmin; font-size: 1.6vmin; max-width: 60ch; }
 @media (orientation: portrait) {
   #welcome.wl--pair h1 { font-size: 10vmin; }
   .wl-badge { margin-inline: auto; }

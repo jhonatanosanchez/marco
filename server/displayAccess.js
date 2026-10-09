@@ -14,8 +14,8 @@
 // never reads the living room. Comparisons are constant-time (sha256 digests + timingSafeEqual over every entry).
 import crypto from 'node:crypto';
 import { getConfig, getSecrets, updateSecrets, flushSecrets } from './store.js';
-import { sessionValid, isLanClient } from './auth.js';
-import { listClients, send } from './sse.js';
+import { sessionValid, isLanClient, authEvents, SESSION_MAX_AGE } from './auth.js';
+import { listClients, dropClient } from './sse.js';
 import { logActivity } from './activity.js';
 import { resolveScreen } from './screens.js';
 
@@ -125,11 +125,11 @@ export function resolveDisplayAccess(req, { allowQuery = false } = {}) {
       const d = deviceForToken(cred);
       if (d) {
         touchDevice(d, req);
-        return { ok: true, via: 'device', screenId: d.screenId, device: d };
+        return { ok: true, via: 'device', screenId: d.screenId, device: d, credHash: d.hash };
       }
     } else {
       const screenId = screenForKey(cred);
-      if (screenId) return { ok: true, via: 'key', screenId };
+      if (screenId) return { ok: true, via: 'key', screenId, credHash: sha(cred.trim().toLowerCase()).toString('hex') };
     }
     return { ok: false, status: 403, code: 'invalid_key' };
   }
@@ -260,8 +260,9 @@ export function updateDevice(id, body, { req } = {}) {
   const before = { name: d.name, screenId: d.screenId };
   updateSecrets(() => Object.assign(d, patch));
   if (patch.screenId && patch.screenId !== before.screenId) {
-    // Connected streams of this device switch screen on their next config fetch: tell them to reload.
-    for (const c of listClients()) if (c.access?.deviceId === d.id) send(c, 'reload', {});
+    // A stream is bound to the screen it opened with: close this device's streams ('reload' first) so they
+    // reconnect with the new binding — a client that ignores 'reload' must not keep the old screen's events.
+    for (const c of listClients()) if (c.access?.deviceId === d.id) dropClient(c, { event: 'reload', data: {} });
   }
   logActivity('display.device_updated', { req, data: { id: d.id, name: d.name, ...(patch.name && patch.name !== before.name ? { from: before.name } : {}) } });
   return { device: deviceInfo(d) };
@@ -282,25 +283,71 @@ export function kickClients(filter, code) {
   let n = 0;
   for (const c of listClients()) {
     if (!filter(c)) continue;
-    send(c, 'revoked', { code });
-    try { c.res.end(); } catch { /* ignore */ }
+    // Removed from the registry before ending, so a broadcast in the same tick never writes to an ended stream.
+    dropClient(c, { event: 'revoked', data: { code } });
     n++;
   }
   return n;
 }
 
+const sameHash = (hex, buf) => /^[a-f0-9]{64}$/.test(hex || '') && crypto.timingSafeEqual(Buffer.from(hex, 'hex'), buf);
+
 /**
- * Config saved: keep keys in step with the screens; switching to private disconnects the displays that were
- * reading without a key (they show the pairing screen); deleted screens drop their links' streams.
+ * Re-check the credential of every open stream against the current config + secrets, and close the ones that no
+ * longer resolve to the same screen. Called after config saves, imports, session revocation and every heartbeat,
+ * so no path that changes keys, devices, sessions or the access mode can leave a stream reading:
+ *   key     — the screen's current key must still be the one the stream opened with ('invalid_key')
+ *   device  — the device must still exist ('invalid_key'); moved to another screen → 'reload' + close
+ *   session — the admin session must still be valid (epoch, login method) ('key_required')
+ *   open    — only while display access is 'open' ('key_required')
+ * Returns how many streams were closed.
  */
-export function onDisplayAccessConfig(cfg, prev) {
+export function revalidateStreams(cfg = getConfig()) {
+  const ids = new Set(cfg.screens.map((s) => s.id));
+  const k = keys();
+  const devs = new Map(devices().map((d) => [d.id, d]));
+  const mode = displayAccessMode(cfg);
+  let n = 0;
+  for (const c of listClients()) {
+    const a = c.access;
+    if (!a) continue;
+    let code = null;
+    if (a.via === 'key') {
+      const cur = k[a.screenId]?.key;
+      if (!ids.has(a.screenId) || typeof cur !== 'string' || !sameHash(a.credHash, sha(cur))) code = 'invalid_key';
+    } else if (a.via === 'device') {
+      const d = devs.get(a.deviceId);
+      if (!d || !sameHash(a.credHash, Buffer.from(String(d.hash || ''), 'hex'))) code = 'invalid_key';
+      else if (d.screenId !== a.screenId) { dropClient(c, { event: 'reload', data: {} }); n++; continue; }
+    } else if (a.via === 'session') {
+      let ok = false;
+      // The cookie expires after SESSION_MAX_AGE: a stream opened with it does not outlive it either.
+      try { ok = Boolean(a.authReq) && sessionValid(a.authReq) && Date.now() - c.since < SESSION_MAX_AGE; } catch { ok = false; }
+      if (!ok) code = 'key_required';
+    } else if (a.via === 'open') {
+      if (mode !== 'open') code = 'key_required';
+    }
+    if (code) { dropClient(c, { event: 'revoked', data: { code } }); n++; }
+  }
+  return n;
+}
+
+// Logging out everywhere / changing the password closes admin-session streams at once; a plain logout closes the
+// streams opened by that browser login.
+authEvents.on('revoked', () => { try { revalidateStreams(); } catch (err) { console.warn('[displays] revalidate:', err.message); } });
+authEvents.on('logout', (sid) => {
+  kickClients((c) => c.access?.via === 'session' && c.access.sid && c.access.sid === sid, 'key_required');
+});
+
+/**
+ * Config saved: keep keys in step with the screens, then re-check every stream: switching to private disconnects
+ * the displays that were reading without a key (they show the pairing screen); deleted screens drop their links'
+ * streams; a disabled login method closes its admin-session streams.
+ */
+export function onDisplayAccessConfig(cfg) {
   try {
     syncDisplayKeys(cfg);
-    if (displayAccessMode(cfg) === 'private' && prev && displayAccessMode(prev) === 'open') {
-      kickClients((c) => c.access?.via === 'open', 'key_required');
-    }
-    const ids = new Set(cfg.screens.map((s) => s.id));
-    kickClients((c) => c.access?.via === 'key' && !ids.has(c.access.screenId), 'invalid_key');
+    revalidateStreams(cfg);
   } catch (err) {
     console.warn('[displays] access sync failed:', err.message);
   }

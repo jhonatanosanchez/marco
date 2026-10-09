@@ -107,6 +107,14 @@ how much of it.
   `revoked` over SSE, wipe their cached data and show "This link is no longer valid".
 - *A lost or given-away tablet*: revoke its paired device (each device has its own token; the activity log records
   pairings and revocations).
+- *Revocation reaches open connections*: the SSE stream remembers a hash of the credential it was opened with and is
+  re-checked whenever keys, devices, sessions or the access mode can change (regenerate, revoke, move a device, config
+  save, import with secrets, logout / logout everywhere / password change) and on every 25 s heartbeat. A stream whose
+  credential no longer resolves to the same screen is closed (`revoked`, or `reload` for a device moved to another
+  screen), so neither a misbehaving client nor a forgotten admin tab keeps receiving announcements.
+- *Restore and import* never change the display access mode (private / open): only *Security* does. Importing a
+  bundle's secrets can bring back that bundle's private links: the import preview lists the screens whose link would
+  change and the paired devices it would drop.
 - *Leaking through referrers, caches and logs*: every response sends `Referrer-Policy: no-referrer`; keyed responses
   are `Cache-Control: private, no-store`; keys, device tokens and pairing session ids never enter the activity log or
   the server log (URLs are redacted, the activity log redacts any `/d/…`, `?k=` or `md_…` it would otherwise store).

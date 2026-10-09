@@ -10,13 +10,13 @@ import * as store from '../store.js';
 import { defaultConfig, defaultScreenProfile } from '../defaults.js';
 import { ensurePassword, hashPassword } from '../auth.js';
 import { createApp } from '../app.js';
-import { closeAll } from '../sse.js';
+import { closeAll, broadcast, listClients } from '../sse.js';
 import { _resetDisplays, setServerVersion, listDisplays } from '../displays.js';
 import { _resetAnnouncements } from '../announce.js';
 import { _resetActivityThrottle, logActivity, listActivity } from '../activity.js';
 import { createToken } from '../tokens.js';
 import {
-  syncDisplayKeys, onDisplayAccessConfig, listDisplayLinks, KEY_RE, DEVICE_TOKEN_RE, _resetDisplayAccess,
+  syncDisplayKeys, onDisplayAccessConfig, listDisplayLinks, KEY_RE, DEVICE_TOKEN_RE, _resetDisplayAccess, revalidateStreams,
 } from '../displayAccess.js';
 import {
   startPairing, pairingStatus, claimPairing, normalizeCode, _resetPairing, _pendingCount, CODE_ALPHABET, CODE_LENGTH,
@@ -56,7 +56,9 @@ async function withServer(fn, { mode = 'private' } = {}) {
   setServerVersion('0.3.0');
   await ensurePassword();
   syncDisplayKeys();
-  store.events.on('config', onDisplayAccessConfig);
+  // Same order as server/index.js: access sync, then the 'config' broadcast to every stream still registered.
+  const onConfig = (cfg, prev) => { onDisplayAccessConfig(cfg, prev); broadcast('config', { revision: cfg.revision }); };
+  store.events.on('config', onConfig);
   const app = createApp({ version: '0.3.0', dist });
   const server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -115,7 +117,7 @@ async function withServer(fn, { mode = 'private' } = {}) {
   try {
     await fn({ call, login, stream, dir, base });
   } finally {
-    store.events.off('config', onDisplayAccessConfig);
+    store.events.off('config', onConfig);
     closeAll();
     server.closeAllConnections?.();
     await new Promise((r) => server.close(r));
@@ -525,4 +527,210 @@ test('export with secrets → import on another install keeps private links and 
     assert.equal((await ctx.call('GET', '/api/display/config', { headers: { 'x-marco-key': key } })).json.screenId, 's_kitchen');
     assert.equal((await ctx.call('GET', '/api/display/config', { headers: { 'x-marco-key': token } })).json.screenId, 's_kitchen');
   });
+});
+
+// ------------------------------------------------------------------------------------------------------------------
+// Review fixes: live streams follow every credential change (no path leaves a stream reading after revocation).
+
+/** Wait until the stream has ended (server closed it). */
+const ended = async (s, ms = 2000) => {
+  const t0 = Date.now();
+  while (!s.ended()) {
+    if (Date.now() - t0 > ms) throw new Error('stream still open');
+    await new Promise((r) => setTimeout(r, 20));
+  }
+};
+/** Pair a device to `screenId` and return its token. */
+const pairDevice = (screenId, name = 'Tablet') => {
+  const st = startPairing(fakeDisplay(), Date.now());
+  const c = claimPairing(admin(), { code: st.code, screenId, name });
+  assert.ok(c.device, JSON.stringify(c));
+  return { token: pairingStatus(st.sessionId).token, id: c.device.id };
+};
+
+test('open → private with a connected kiosk and a config broadcast in the same tick: server stays up', async () => {
+  await withServer(async (ctx) => {
+    const cookie = await ctx.login();
+    const kiosk = await ctx.stream('/api/stream?client=kiosk-living');
+    await kiosk.next('hello');
+    let crashed = null;
+    const onErr = (err) => { crashed = err; };
+    process.on('uncaughtException', onErr);
+    try {
+      const cfg = (await ctx.call('GET', '/api/admin/config', { cookie })).json;
+      cfg.security.displayAccess = 'private';
+      assert.equal((await ctx.call('PUT', '/api/admin/config', { cookie, body: cfg })).status, 200);
+      assert.equal((await kiosk.next('revoked')).data.code, 'key_required');
+      await ended(kiosk);
+      // a screen with a connected private-link display is deleted (kick 'invalid_key' + broadcast)
+      const keyed = await ctx.stream(`/api/stream?client=kiosk-k&k=${keyOf('kitchen')}`);
+      await keyed.next('hello');
+      const cfg2 = (await ctx.call('GET', '/api/admin/config', { cookie })).json;
+      cfg2.screens = cfg2.screens.filter((x) => x.id !== 's_kitchen');
+      assert.equal((await ctx.call('PUT', '/api/admin/config', { cookie, body: cfg2 })).status, 200);
+      assert.equal((await keyed.next('revoked')).data.code, 'invalid_key');
+      await ended(keyed);
+      await new Promise((r) => setTimeout(r, 100));
+      assert.equal(crashed, null, String(crashed?.stack));
+      // nothing ended is left in the registry; the server still answers
+      assert.ok(listClients().every((c) => !c.res.writableEnded));
+      assert.equal((await ctx.call('GET', '/api/admin/config', { cookie })).status, 200);
+    } finally {
+      process.off('uncaughtException', onErr);
+    }
+  }, { mode: 'open' });
+});
+
+test('import with secrets: replaced keys and dropped devices close their live streams; untouched ones stay', async () => {
+  await withServer(async (ctx) => {
+    const cookie = await ctx.login();
+    const bundle = (await ctx.call('POST', '/api/admin/export', { cookie, body: { includeSecrets: true } })).json;
+    const { token } = pairDevice('s_kitchen', 'Tab2');
+    const oldKitchen = keyOf('kitchen');
+    // the bundle gets a different kitchen key; the main key is the same as now; the new device is not in it
+    bundle.secrets.displayKeys.s_kitchen.key = '0b6c1f9e-3d2a-4c8b-9e7f-1a2b3c4d5e6f';
+    const kitchen = await ctx.stream(`/api/stream?client=k1&k=${oldKitchen}`);
+    const main = await ctx.stream(`/api/stream?client=m1&k=${keyOf('living-room')}`);
+    const dev = await ctx.stream(`/api/stream?client=t1&k=${encodeURIComponent(token)}`);
+    for (const s of [kitchen, main, dev]) await s.next('hello');
+    const pv = (await ctx.call('POST', '/api/admin/import/preview', { cookie, body: { bundle } })).json;
+    assert.deepEqual(pv.secretsImpact.linksChanged, ['Kitchen']);
+    assert.deepEqual(pv.secretsImpact.devicesRemoved, ['Tab2']);
+    const ap = await ctx.call('POST', '/api/admin/import/apply', { cookie, body: { bundle, includeSecrets: true } });
+    assert.equal(ap.status, 200, ap.text);
+    assert.equal((await kitchen.next('revoked')).data.code, 'invalid_key');
+    assert.equal((await dev.next('revoked')).data.code, 'invalid_key');
+    await ended(kitchen);
+    await ended(dev);
+    // later broadcasts never reach them; the main-screen stream (same key) stays
+    broadcast('announce', { id: 'after-import', text: 'AFTER IMPORT secret' });
+    await main.next('announce');
+    assert.ok(!kitchen.events().some((e) => e.event === 'announce'));
+    assert.ok(!dev.events().some((e) => e.event === 'announce'));
+    assert.ok(!main.ended());
+    assert.equal((await ctx.call('GET', '/api/admin/devices', { cookie })).json.devices.length, 0);
+    main.close();
+  });
+});
+
+test('admin-session streams close on logout-all, password change and plain logout of the same browser', async () => {
+  await withServer(async (ctx) => {
+    // logout-all
+    let cookie = await ctx.login();
+    let s = await ctx.stream('/api/stream?screen=kitchen', { cookie });
+    await s.next('hello');
+    assert.equal((await ctx.call('POST', '/api/auth/logout-all', { cookie, body: {} })).status, 200);
+    assert.equal((await s.next('revoked')).data.code, 'key_required');
+    await ended(s);
+    assert.equal(broadcast('announce', { id: 'a1', text: 'SECRET family message' }), 0);
+    // password change: other sessions' streams close, the browser that changed it keeps working with a new cookie
+    cookie = await ctx.login();
+    const other = await ctx.login();
+    s = await ctx.stream('/api/stream?screen=kitchen', { cookie: other });
+    await s.next('hello');
+    const pw = await ctx.call('PUT', '/api/admin/password', { cookie, body: { current: 'secret-pass-123', next: 'another-pass-456' } });
+    assert.equal(pw.status, 200, pw.text);
+    assert.equal((await s.next('revoked')).data.code, 'key_required');
+    await ended(s);
+    // plain logout closes the streams opened by that login only
+    const a = await ctx.call('POST', '/api/auth/login', { body: { password: 'another-pass-456' } });
+    const b = await ctx.call('POST', '/api/auth/login', { body: { password: 'another-pass-456' } });
+    const ca = a.setCookie.map((x) => x.split(';')[0]).join('; ');
+    const cb = b.setCookie.map((x) => x.split(';')[0]).join('; ');
+    const sa = await ctx.stream('/api/stream?screen=kitchen&preview=1', { cookie: ca });
+    const sb = await ctx.stream('/api/stream?screen=kitchen&preview=1', { cookie: cb });
+    await sa.next('hello');
+    await sb.next('hello');
+    assert.equal((await ctx.call('POST', '/api/auth/logout', { cookie: ca, body: {} })).status, 200);
+    assert.equal((await sa.next('revoked')).data.code, 'key_required');
+    await new Promise((r) => setTimeout(r, 100));
+    assert.ok(!sb.ended());
+    // disabling the login method (config) also closes them
+    const cfg = (await ctx.call('GET', '/api/admin/config', { cookie: cb })).json;
+    store.updateConfig((c) => { c.auth.passwordLoginEnabled = false; c.auth.allowedGoogleEmails = ['x@example.com']; });
+    assert.equal((await sb.next('revoked')).data.code, 'key_required');
+    assert.ok(cfg);
+  });
+});
+
+test('moving a paired device to another screen closes its stream; it never gets the old screen\'s events', async () => {
+  await withServer(async (ctx) => {
+    const cookie = await ctx.login();
+    const { token, id } = pairDevice('s_kitchen');
+    const s = await ctx.stream(`/api/stream?client=tab-1&k=${encodeURIComponent(token)}`);
+    assert.equal((await s.next('hello')).data.screenId, 's_kitchen');
+    const r = await ctx.call('PATCH', `/api/admin/devices/${id}`, { cookie, body: { screenId: 's_main' } });
+    assert.equal(r.status, 200, r.text);
+    await s.next('reload');
+    await ended(s);
+    assert.equal(broadcast('announce', { id: 'k', text: 'kitchen only' }, { screenIds: ['s_kitchen'] }), 0);
+    // reconnecting follows the new binding
+    const s2 = await ctx.stream(`/api/stream?client=tab-1&k=${encodeURIComponent(token)}`);
+    assert.equal((await s2.next('hello')).data.screenId, 's_main');
+    s2.close();
+  });
+});
+
+test('revalidateStreams: every credential is re-checked against the current secrets', async () => {
+  await withServer(async (ctx) => {
+    const s = await ctx.stream(`/api/stream?client=k9&k=${keyOf('kitchen')}`);
+    await s.next('hello');
+    assert.equal(revalidateStreams(), 0);
+    // a key swapped behind the API's back (e.g. a restored secrets.json) is caught by the next check
+    store.updateSecrets((x) => { x.displayKeys.s_kitchen.key = '0b6c1f9e-3d2a-4c8b-9e7f-1a2b3c4d5e6f'; });
+    assert.equal(revalidateStreams(), 1);
+    assert.equal((await s.next('revoked')).data.code, 'invalid_key');
+  });
+});
+
+test('restore and import keep the current display access mode (both directions); preview says so', async () => {
+  for (const [mode, other] of [['open', 'private'], ['private', 'open']]) {
+    await withServer(async (ctx) => {
+      const cookie = await ctx.login();
+      const bundle = (await ctx.call('POST', '/api/admin/export', { cookie, body: { includeSecrets: false } })).json;
+      // a bundle with the other mode, and one without any security section (pre-0.3)
+      const withOther = structuredClone(bundle);
+      withOther.config.security = { displayAccess: other };
+      const legacy = structuredClone(bundle);
+      delete legacy.config.security;
+      for (const b of [withOther, legacy]) {
+        const pv = (await ctx.call('POST', '/api/admin/import/preview', { cookie, body: { bundle: b } })).json;
+        assert.equal(pv.displayAccess, mode);
+        assert.equal((await ctx.call('POST', '/api/admin/import/apply', { cookie, body: { bundle: b, includeSecrets: false } })).status, 200);
+        assert.equal(store.getConfig().security.displayAccess, mode);
+      }
+      // restore of a backup written in the other mode
+      const backupDir = path.join(ctx.dir, 'backups');
+      const cfg = structuredClone(store.getConfig());
+      cfg.security = { displayAccess: other };
+      fs.writeFileSync(path.join(backupDir, 'config-20240101T000000Z-r1-manual.json'), JSON.stringify(cfg));
+      const list = (await ctx.call('GET', '/api/admin/backups', { cookie })).json;
+      const id = (list.backups || list).find((x) => x.id.includes('20240101')).id;
+      const r = await ctx.call('POST', `/api/admin/backups/${id}/restore`, { cookie, body: {} });
+      assert.equal(r.status, 200, r.text);
+      assert.equal(store.getConfig().security.displayAccess, mode);
+      assert.equal((await ctx.call('GET', '/api/display/config')).status, mode === 'open' ? 200 : 401);
+    }, { mode });
+  }
+});
+
+test('display-links tells an admin on localhost how other devices reach the server (LAN address / PUBLIC_URL)', async () => {
+  const prev = { lan: process.env.LAN_ADDRESS, pub: process.env.PUBLIC_URL };
+  process.env.LAN_ADDRESS = '10.0.0.7';
+  process.env.PUBLIC_URL = 'http://localhost:3000';
+  try {
+    await withServer(async (ctx) => {
+      const cookie = await ctx.login();
+      let r = (await ctx.call('GET', '/api/admin/display-links', { cookie })).json;
+      assert.deepEqual(r.lanAddresses, ['10.0.0.7']);
+      assert.equal(r.publicUrl, null, 'a localhost PUBLIC_URL is no use to other devices');
+      process.env.PUBLIC_URL = 'https://calendar.example.com/';
+      r = (await ctx.call('GET', '/api/admin/display-links', { cookie })).json;
+      assert.equal(r.publicUrl, 'https://calendar.example.com');
+    });
+  } finally {
+    for (const [k, v] of [['LAN_ADDRESS', prev.lan], ['PUBLIC_URL', prev.pub]]) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  }
 });

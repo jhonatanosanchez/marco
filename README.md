@@ -302,8 +302,9 @@ makes Marco safe on shared networks (flat-share Wi-Fi, office) and lets you reac
 - **Display access mode** (*Security → Display access*): **Private** (default for new installs) or **Open (local
   network)** — the 0.2 behaviour, where `/` and `/?screen=<slug>` work without a key. **Upgrading from 0.2 keeps Open**
   so no kiosk goes blank, and the admin recommends switching: open each display's private link (or pair it) first;
-  when you save Private, keyless displays show a pairing code. The admin preview and *View screen* keep working with
-  your admin session either way.
+  when you save Private, keyless displays show a pairing code (switching back to Open brings them back by themselves
+  within ~30 s). The admin preview and *View screen* keep working with your admin session either way. Restoring a
+  backup or importing a file never changes this mode.
 
 ![Connected screens: how each display got in, and the paired devices](docs/screenshots/admin-displays-paired.png)
 

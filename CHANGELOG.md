@@ -5,6 +5,33 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Security
+- Open display streams follow every credential change, not only *Regenerate link* / *Revoke*: each stream keeps a hash
+  of the key or device token it opened with and is re-checked after config saves, imports, session revocation and on
+  every heartbeat. Importing secrets that replace a screen's key or drop a paired device now closes the streams still
+  using them (`revoked { code: "invalid_key" }`), and the import preview lists the links and devices it would change.
+- Live streams opened with an admin session (previews, "View screen") close on *Log out everywhere*, a password change,
+  an imported password, a disabled login method, a plain logout of the same browser and after the session lifetime.
+- Moving a paired device to another screen closes its stream (after `reload`), so a client that ignores `reload` no
+  longer receives the old screen's announcements.
+- Restoring a backup or importing a bundle never changes *Display access* (it used to switch to `private` for bundles
+  without a `security` section and could silently switch back to `open`). The import preview says the mode is kept.
+
+### Fixed
+- Switching an upgraded install from *Open* to *Private* (or deleting a screen) while a display was connected crashed
+  the server (`ERR_STREAM_WRITE_AFTER_END`): kicked streams are now removed from the registry before they are closed,
+  and the SSE layer never writes to an ended response.
+- A display sent to the pairing screen by the switch to *Private* comes back by itself (within ~30 s) when display
+  access is switched back to *Open*.
+- *Screens* page, dashboard and screen switcher: in private mode they no longer present `/?screen=<slug>` as a
+  screen's address; *Copy* copies the private link and the how-to explains private links, pairing and `KIOSK_URL`.
+- *Private link* card opened on the server itself (`localhost`): the link, QR code and Raspberry Pi command use
+  `PUBLIC_URL` or this machine's LAN address (`lanAddresses`/`publicUrl` in `GET /api/admin/display-links`); without
+  either the QR code and command are hidden instead of pointing other devices at `localhost`.
+- Raspberry Pi kiosks forget a pairing on restart (Chromium runs `--incognito`): the pairing / invalid-link screen
+  (when opened by `kiosk.sh`), the *Regenerate link* confirmation and the *Private* switch now say to put the private
+  link in `KIOSK_URL` instead.
+
 ## [0.3.0] — 2026-10-09 — private display links and pairing
 
 ### Added

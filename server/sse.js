@@ -49,6 +49,8 @@ export function sseHandler(hooks) {
       ...hooks.init(req),
     };
     clients.add(client);
+    // A write after end / on a reset socket emits 'error' asynchronously: never let it crash the process.
+    res.on?.('error', () => clients.delete(client));
     send(client, 'hello', hooks.hello(client));
     try { hooks.onOpen?.(client, req); } catch (err) { console.warn('[sse] onOpen:', err.message); }
     req.on('close', () => {
@@ -61,6 +63,7 @@ export function sseHandler(hooks) {
 
 /** Write one event to one client. Returns true when written. */
 export function send(client, event, data) {
+  if (!writable(client)) { clients.delete(client); return false; }
   try {
     client.res.write(`event: ${event}\ndata: ${JSON.stringify(data ?? {})}\n\n`);
     return true;
@@ -68,6 +71,19 @@ export function send(client, event, data) {
     clients.delete(client);
     return false;
   }
+}
+
+const writable = (c) => Boolean(c?.res && !c.res.writableEnded && !c.res.destroyed);
+
+/**
+ * Close a client's stream now and forget it (no later broadcast may write to it). Optionally sends one last event.
+ * @param {SseClient} client
+ * @param {{ event: string, data?: unknown }} [last]
+ */
+export function dropClient(client, last) {
+  if (last) send(client, last.event, last.data);
+  clients.delete(client);
+  try { if (!client.res.writableEnded) client.res.end(); } catch { /* ignore */ }
 }
 
 /** True when `client` matches `target` ({ screenIds?, clientIds? }; empty/absent target = everybody). */
@@ -108,12 +124,17 @@ export function reresolveClients(resolve) {
   }
 }
 
+let validator = null;
+/** Run `fn` before every heartbeat (re-checks each stream's credential: sessions expire, devices move…). */
+export function setStreamValidator(fn) { validator = fn; }
+
 function startHeartbeat() {
   if (heartbeat) return;
   heartbeat = setInterval(() => {
+    try { validator?.(); } catch (err) { console.warn('[sse] validator:', err.message); }
     for (const c of [...clients]) {
       // Named event (not an SSE comment) so the client watchdog sees it.
-      try { c.res.write(`event: ping\ndata: {"t":${Date.now()}}\n\n`); } catch { clients.delete(c); }
+      send(c, 'ping', { t: Date.now() });
     }
   }, 25_000);
   heartbeat.unref();

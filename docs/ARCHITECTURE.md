@@ -211,7 +211,15 @@ flagged by a local event or a style rule (nearest occurrence per title), sorted 
   stored) and handed to the polling display once. Codes live 10 minutes, are single use and claimable only while the
   display polled in the last 15 s. Devices of a deleted screen move to the default screen.
 - New installs start `private`; a stored config without `security` (saved by 0.2 or older) is migrated to `open` on
-  load, and a save without `security` (old admin build, old backup or export) keeps the current mode.
+  load, and a save without `security` (old admin build, old backup or export) keeps the current mode. Restores and
+  imports always keep the current mode (it is owned by the running install, not by a file).
+- Live streams: each SSE client stores how it got in (`access.via`, screen, device id, a sha256 of its key or token,
+  and for admin sessions the request + a per-login `sid`). `revalidateStreams()` re-checks them after every config
+  save, import with secrets, session-epoch rotation (`authEvents`) and on each heartbeat; a plain logout closes the
+  streams with that login's `sid`. Closed clients are removed from the registry before `res.end()`
+  (`sse.dropClient`), so a broadcast in the same tick never writes to an ended response.
+- A keyless display on the pairing screen probes `/api/display/config` every 30 s and reloads once it is allowed again
+  (display access switched back to open).
 
 ## Admin panel
 

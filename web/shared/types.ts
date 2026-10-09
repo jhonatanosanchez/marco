@@ -187,6 +187,10 @@ export interface DisplayLink {
 export interface DisplayLinksResponse {
   mode: DisplayAccessMode;
   links: DisplayLink[];
+  /** this server's LAN IPv4 addresses (LAN_ADDRESS overrides; empty inside a container) */
+  lanAddresses?: string[];
+  /** PUBLIC_URL origin when set to something else than localhost */
+  publicUrl?: string | null;
 }
 
 export interface PairedDevice {
@@ -1013,6 +1017,10 @@ export interface ImportPreview {
   appVersion: string | null;
   exportedAt: string | null;
   hasSecrets: boolean;
+  /** what importing the secrets would change in display access (null: the bundle has no links / devices) */
+  secretsImpact?: { linksChanged: string[]; devicesRemoved: string[]; devicesAdded: number } | null;
+  /** current display access mode: imports and restores always keep it */
+  displayAccess?: 'private' | 'open';
   sections: { key: string; changed: boolean; summary: string }[];
   screens: { added: string[]; removed: string[]; changed: string[] };
   sources: { added: string[]; removed: string[]; changed: string[] };

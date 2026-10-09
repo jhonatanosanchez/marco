@@ -17,7 +17,20 @@ const CODE_LENGTH = 6;
 /** Keep only code characters (upper-cased): "abc-23o" → "ABC23". */
 export const cleanCode = (v: string) => v.toUpperCase().split('').filter((c) => CODE_ALPHABET.includes(c)).join('').slice(0, CODE_LENGTH);
 
-const isLocalhost = () => /^(localhost|127\.|\[::1\])/.test(location.hostname);
+export const isLocalhost = () => /^(localhost|127\.|\[::1\])/.test(location.hostname);
+
+/**
+ * Origin other devices can reach this server at. Opened on the server itself (http://localhost) the admin uses
+ * PUBLIC_URL or this machine's LAN address (same as the setup wizard); '' when neither is known (Docker without
+ * LAN_ADDRESS): then the QR code and kiosk command are hidden instead of pointing devices at "localhost".
+ */
+export function shareOrigin(data: Pick<DisplayLinksResponse, 'lanAddresses' | 'publicUrl'> | null): string {
+  if (!isLocalhost()) return location.origin;
+  if (data?.publicUrl) return data.publicUrl;
+  const ip = data?.lanAddresses?.[0];
+  return ip ? `${location.protocol}//${ip}${location.port ? `:${location.port}` : ''}` : '';
+}
+
 export const kioskCommand = (url: string) => `~/marco/deploy/install.sh --kiosk-only --url ${url}`;
 
 /* ------------------------------------------------------------------ private link card (per screen) */
@@ -39,13 +52,15 @@ export function PrivateLinkCard({ screenId, saved, mode, go }: { screenId: strin
     load();
   }, [saved.revision]);
   const link = data?.links.find((l) => l.screenId === screenId);
-  const url = link ? `${location.origin}${link.path}` : '';
+  const origin = shareOrigin(data);
+  // What other devices open / scan / put in KIOSK_URL ("Open" below stays on this browser's own origin).
+  const url = link ? `${origin || location.origin}${link.path}` : '';
 
   const regenerate = async () => {
     if (!link) return;
     const ok = await confirmDialog({
       title: t('¿Regenerar el enlace privado?'),
-      body: t('El enlace actual deja de funcionar al instante y las pantallas que lo usan mostrarán «enlace no válido». Después abre el enlace nuevo en ellas (o vincúlalas con un código).'),
+      body: t('El enlace actual deja de funcionar al instante y las pantallas que lo usan mostrarán «enlace no válido». Después abre el enlace nuevo en ellas (o vincúlalas con un código). Un kiosco Raspberry Pi necesita el enlace nuevo en KIOSK_URL (~/.config/marco/kiosk.env) o volver a ejecutar el comando de abajo: allí la vinculación se pierde al reiniciarse.'),
       confirm: t('Regenerar enlace'),
       danger: true,
     });
@@ -87,15 +102,20 @@ export function PrivateLinkCard({ screenId, saved, mode, go }: { screenId: strin
             </Callout>
           )}
           <div class="plink">
-            <div class="plink__qr">
-              <Qr text={url} label={t('Código QR del enlace privado')} />
-              <span class="muted small">{t('Escanéalo en la tablet o el móvil de la pantalla')}</span>
-            </div>
+            {origin && (
+              <div class="plink__qr">
+                <Qr text={url} label={t('Código QR del enlace privado')} />
+                <span class="muted small">{t('Escanéalo en la tablet o el móvil de la pantalla')}</span>
+              </div>
+            )}
             <div class="plink__main">
               <Field label={t('Enlace de la pantalla')}>
                 <CopyField value={url} />
               </Field>
-              {isLocalhost() && <p class="muted small">{t('Estás en «localhost»: en otros dispositivos usa la IP o el nombre de este ordenador.')}</p>}
+              {isLocalhost() && origin && <p class="muted small">{t('Estás en «localhost»: el enlace usa la dirección de red de este ordenador ({host}) para que funcione en otros dispositivos.', { host: new URL(origin).host })}</p>}
+              {isLocalhost() && !origin && (
+                <Callout kind="warn">{t('Estás en «localhost» y no se conoce la dirección de red de este servidor: abre el panel con su IP o su nombre (o define LAN_ADDRESS) para obtener el QR y el comando de la Raspberry Pi.')}</Callout>
+              )}
               <div class="plink__actions">
                 <a class="btn btn--default btn--sm" href={link.path} target="_blank" rel="noopener noreferrer">
                   <Icon name="external" size={15} />
@@ -106,9 +126,11 @@ export function PrivateLinkCard({ screenId, saved, mode, go }: { screenId: strin
                 </Button>
                 <span class="muted small">{t('Creado {when}', { when: relTime(link.createdAt) })}</span>
               </div>
-              <Field label={t('Raspberry Pi solo como pantalla (comando)')} hint={t('En la Pi, con el repositorio clonado en ~/marco.')}>
-                <CopyField value={kioskCommand(url)} />
-              </Field>
+              {origin && (
+                <Field label={t('Raspberry Pi solo como pantalla (comando)')} hint={t('En la Pi, con el repositorio clonado en ~/marco.')}>
+                  <CopyField value={kioskCommand(url)} />
+                </Field>
+              )}
             </div>
           </div>
         </>

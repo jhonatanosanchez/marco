@@ -14,6 +14,8 @@ export function ScreenSwitcher(props: {
   emphasize?: boolean;
   errorScreens?: Set<string>;
   online?: Record<string, number>;
+  /** display access is 'open': show each screen's ?screen= address (private mode: the private link decides) */
+  openMode?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -67,7 +69,7 @@ export function ScreenSwitcher(props: {
                 <span class="scr-switch__swatch" style={{ background: s.screen.accent }} />
                 <span class="scr-switch__name">
                   <strong>{s.name}</strong>
-                  <span class="mono small muted">?screen={s.slug}</span>
+                  {props.openMode && <span class="mono small muted">?screen={s.slug}</span>}
                 </span>
                 {s.id === props.defaultId && (
                   <span class="scr-switch__star" title={t('Pantalla predeterminada')}>

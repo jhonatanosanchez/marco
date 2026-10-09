@@ -14,7 +14,7 @@ import {
   mergeImport, sanitizeImportedSecrets, repairConfig,
 } from '../backups.js';
 import { logActivity, listActivity, clearActivity, recentActivity } from '../activity.js';
-import { syncDisplayKeys } from '../displayAccess.js';
+import { syncDisplayKeys, revalidateStreams } from '../displayAccess.js';
 import { listDisplays, getServerVersion } from '../displays.js';
 import { listAnnouncements } from '../announce.js';
 import { schedulesNow } from '../schedules.js';
@@ -27,6 +27,9 @@ const LEVELS = ['info', 'warn', 'error'];
 
 /** Non-secret, human-sized summary of a stored config for activity entries. */
 const revOf = (c) => c?.revision ?? null;
+
+/** security for a restored / imported config: the current one (display access is owned by this install). */
+const keepSecurity = (cur, incoming) => ({ ...(incoming?.security || {}), ...structuredClone(cur.security) });
 
 /** Dashboard warnings (§7.1). */
 export function dashboardWarnings({ secrets, sources, displays, cfg }) {
@@ -81,7 +84,10 @@ export function systemRouter({ version = getServerVersion() } = {}) {
     if (!fixedUp.ok) return res.status(422).json({ error: 'invalid backup', details: fixedUp.errors });
     const cur = getConfig();
     writeBackup(cur, 'restore');
-    const result = saveConfig(fixedUp.value, { reason: 'restore', req, backup: false });
+    // Display access (private links / open LAN mode) belongs to the running install: a restore never changes it
+    // (an old backup must neither reopen private displays nor lock out open-mode kiosks). Switch it in Security.
+    const restored = { ...fixedUp.value, security: keepSecurity(cur, fixedUp.value) };
+    const result = saveConfig(restored, { reason: 'restore', req, backup: false });
     if (!result.ok) return res.status(400).json({ error: 'invalid config', details: result.errors });
     logActivity('config.restored', {
       req,
@@ -108,7 +114,7 @@ export function systemRouter({ version = getServerVersion() } = {}) {
 
   r.post('/import/preview', (req, res) => {
     if (!req.body || typeof req.body !== 'object' || !('bundle' in req.body)) return res.status(400).json({ error: 'bundle required' });
-    res.json(importPreview(req.body.bundle, getConfig(), requestLang(req)));
+    res.json({ ...importPreview(req.body.bundle, getConfig(), requestLang(req), getSecrets()), displayAccess: getConfig().security.displayAccess });
   });
 
   r.post('/import/apply', (req, res) => {
@@ -118,7 +124,8 @@ export function systemRouter({ version = getServerVersion() } = {}) {
     if (!parsed.ok) return res.status(400).json({ error: 'invalid', details: parsed.errors });
     if (b.sections !== undefined && !Array.isArray(b.sections)) return res.status(400).json({ error: 'sections must be an array' });
     const cur = getConfig();
-    const merged = mergeImport(cur, parsed.value, b.sections);
+    // Same as restore: an import never changes the display access mode (see keepSecurity).
+    const merged = { ...mergeImport(cur, parsed.value, b.sections), security: keepSecurity(cur, parsed.value) };
     writeBackup(cur, 'import');
     const result = saveConfig(merged, { reason: 'import', req, backup: false });
     if (!result.ok) return res.status(400).json({ error: 'invalid', details: result.errors });
@@ -143,6 +150,9 @@ export function systemRouter({ version = getServerVersion() } = {}) {
     }
     // Keys of screens that are not in the imported config are dropped; devices of missing screens move to the default.
     if (applied.includes('displayKeys') || applied.includes('devices')) syncDisplayKeys();
+    // Keys replaced / devices dropped by the import: close the streams still reading with the old credentials
+    // (same as Regenerate link / Revoke). The password case closes admin-session streams via rotateSessionEpoch.
+    if (applied.length) revalidateStreams();
     logActivity('config.imported', {
       req,
       level: applied.length ? 'warn' : 'info',

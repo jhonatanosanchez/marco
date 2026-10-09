@@ -296,8 +296,31 @@ export function orphanSchedules(current, imported) {
   };
 }
 
+/**
+ * What importing the bundle's secrets would do to display access: screens whose private link would change (old
+ * links come back / current ones stop working) and paired devices that would be dropped or added. Null when the
+ * bundle carries no display secrets.
+ */
+function secretsImpact(raw, cur, current, imported) {
+  const s = sanitizeImportedSecrets(raw);
+  if (!s.displayKeys && !s.devices) return null;
+  const name = (id) => (imported.screens.find((x) => x.id === id) || current.screens.find((x) => x.id === id))?.name || id;
+  const curKeys = isObj(cur?.displayKeys) ? cur.displayKeys : {};
+  const curDevices = Array.isArray(cur?.devices) ? cur.devices : [];
+  const linksChanged = s.displayKeys
+    ? Object.keys(s.displayKeys).filter((id) => curKeys[id]?.key && curKeys[id].key !== s.displayKeys[id].key && imported.screens.some((x) => x.id === id)).map(name)
+    : [];
+  const nextIds = new Set((s.devices || curDevices).map((d) => d.id));
+  const prevIds = new Set(curDevices.map((d) => d.id));
+  return {
+    linksChanged,
+    devicesRemoved: curDevices.filter((d) => !nextIds.has(d.id)).map((d) => d.name || d.id),
+    devicesAdded: (s.devices || []).filter((d) => !prevIds.has(d.id)).length,
+  };
+}
+
 /** ImportPreview (web/shared/types.ts) for `bundle` against the current config. */
-export function importPreview(bundle, current, l = 'en') {
+export function importPreview(bundle, current, l = 'en', currentSecrets = null) {
   const p = parseImport(bundle);
   const empty = { added: [], removed: [], changed: [] };
   if (!p.value) {
@@ -316,6 +339,7 @@ export function importPreview(bundle, current, l = 'en') {
     appVersion: p.appVersion,
     exportedAt: p.exportedAt,
     hasSecrets: Boolean(p.secrets && Object.keys(sanitizeImportedSecrets(p.secrets)).length),
+    secretsImpact: secretsImpact(p.secrets, currentSecrets, current, v),
     sections: sectionSummaries(current, v, l),
     screens: diffById(current.screens, v.screens),
     sources: diffById(userSources(current), userSources(v)),

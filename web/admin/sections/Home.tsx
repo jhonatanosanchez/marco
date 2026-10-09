@@ -171,7 +171,7 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
                     <strong>
                       {s.name} {s.isDefault && <span class="star" title={t('Pantalla predeterminada')}>★</span>}
                     </strong>
-                    <span class="muted small mono">?screen={s.slug}</span>
+                    {saved.security?.displayAccess === 'open' && <span class="muted small mono">?screen={s.slug}</span>}
                   </div>
                   <span class={`online-pill ${on ? 'is-on' : ''}`}>
                     <StatusDot state={on ? 'ok' : 'idle'} /> {on ? t('{n} en línea', { n: on }) : t('sin conexión')}

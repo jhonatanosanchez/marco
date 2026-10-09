@@ -1,6 +1,7 @@
 // Admin authentication: scrypt password, cookie-session, Google OAuth login/connect, CSRF guard.
 import crypto from 'node:crypto';
 import { promisify } from 'node:util';
+import { EventEmitter } from 'node:events';
 import cookieSession from 'cookie-session';
 import { getConfig, getSecrets, updateSecrets, updateConfig } from './store.js';
 import * as google from './google.js';
@@ -9,6 +10,12 @@ import { passwordProblem, PASSWORD_MESSAGES } from './lib/password.js';
 import { isPrivateIp, isLanClient, ipBucket, hostAllowed, hostnameOf } from './lib/net.js';
 
 export { isPrivateIp, isLanClient };
+
+/**
+ * 'revoked' () after the session epoch rotates (logout everywhere, password change, imported password);
+ * 'logout' (sid) when one browser logs out. Live admin-session streams listen (displayAccess.js).
+ */
+export const authEvents = new EventEmitter();
 
 const scryptRaw = promisify(crypto.scrypt);
 const KEYLEN = 64;
@@ -63,7 +70,7 @@ export async function ensurePassword() {
   if (weak) console.warn('[auth] ADMIN_PASSWORD does not meet the password rules (>= 10 characters, not a common password): it only works from the LAN until you change it in the panel');
 }
 
-const SESSION_MAX_AGE = 14 * 24 * 3600_000;
+export const SESSION_MAX_AGE = 14 * 24 * 3600_000;
 
 export function sessionMiddleware() {
   const envSecret = process.env.SESSION_SECRET;
@@ -115,6 +122,8 @@ export function lanOrSession(req, res, next) {
 export function startSession(req, user) {
   req.session.user = user;
   req.session.epoch = getSecrets().sessionEpoch;
+  // Per-login id: lets a plain logout close the streams this browser opened (admin previews).
+  req.session.sid = crypto.randomBytes(9).toString('base64url');
 }
 
 export function requireAuth(req, res, next) {
@@ -127,6 +136,7 @@ export function requireAuth(req, res, next) {
 export function rotateSessionEpoch() {
   const epoch = crypto.randomBytes(16).toString('hex');
   updateSecrets((s) => { s.sessionEpoch = epoch; });
+  authEvents.emit('revoked');
   return epoch;
 }
 
@@ -206,7 +216,9 @@ export async function loginHandler(req, res) {
 
 export function logoutHandler(req, res) {
   if (sessionValid(req)) logActivity('auth.logout', { req });
+  const sid = typeof req.session?.sid === 'string' ? req.session.sid : null;
   req.session = null;
+  if (sid) authEvents.emit('logout', sid);
   res.json({ ok: true });
 }
 

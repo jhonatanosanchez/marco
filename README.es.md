@@ -321,8 +321,9 @@ detrás de HTTPS.
   instalaciones nuevas) o **Abierto (red local)**, el comportamiento de la 0.2, en el que `/` y `/?screen=<slug>`
   funcionan sin clave. **Al actualizar desde la 0.2 se mantiene Abierto** para que ningún kiosco se quede en blanco, y
   el panel recomienda cambiarlo: primero abre en cada pantalla su enlace privado (o vincúlala); al guardar Privado, las
-  pantallas sin clave muestran un código de vinculación. La vista previa del panel y *Ver pantalla* siguen funcionando
-  con tu sesión en ambos modos.
+  pantallas sin clave muestran un código de vinculación (si vuelves a Abierto, regresan solas en unos 30 s). La vista
+  previa del panel y *Ver pantalla* siguen funcionando con tu sesión en ambos modos. Restaurar una copia o importar un
+  archivo nunca cambia este modo.
 
 ![Pantallas conectadas: cómo entró cada pantalla y los dispositivos vinculados](docs/screenshots/admin-displays-paired.png)
 

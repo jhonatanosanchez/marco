@@ -22,6 +22,7 @@ const TEXT: Record<Lang, Record<string, string>> = {
     offline: 'Cannot reach the server. Retrying…',
     paired: 'Paired! Starting…',
     scan: 'Scan with the phone where you use the admin',
+    kiosk: 'Raspberry Pi kiosk? It forgets a pairing when it restarts: put the screen’s private link in KIOSK_URL (~/.config/marco/kiosk.env) instead.',
   },
   es: {
     pairTitle: 'Vincula esta pantalla',
@@ -37,6 +38,7 @@ const TEXT: Record<Lang, Record<string, string>> = {
     offline: 'No se puede conectar con el servidor. Reintentando…',
     paired: '¡Vinculada! Arrancando…',
     scan: 'Escanéalo con el móvil donde usas el panel',
+    kiosk: '¿Kiosco Raspberry Pi? Olvida la vinculación al reiniciarse: pon el enlace privado de la pantalla en KIOSK_URL (~/.config/marco/kiosk.env).',
   },
   pt: {
     pairTitle: 'Emparelha este ecrã',
@@ -52,6 +54,7 @@ const TEXT: Record<Lang, Record<string, string>> = {
     offline: 'Não é possível ligar ao servidor. A tentar de novo…',
     paired: 'Emparelhado! A arrancar…',
     scan: 'Lê com o telemóvel onde usas o painel',
+    kiosk: 'Quiosque Raspberry Pi? Esquece o emparelhamento ao reiniciar: põe a ligação privada do ecrã em KIOSK_URL (~/.config/marco/kiosk.env).',
   },
 };
 
@@ -91,6 +94,30 @@ async function post<T>(url: string, body: unknown): Promise<{ status: number; js
   }
 }
 
+/**
+ * Started by deploy/kiosk.sh (it adds ?client=<hostname>; Chromium runs --incognito there, so a device token is
+ * lost on every restart): the pairing screen says to use the private link in KIOSK_URL instead.
+ */
+const kioskHint = () => new URLSearchParams(location.search).has('client');
+
+/**
+ * A keyless display on the pairing screen (kicked when the admin switched to private) comes back by itself when the
+ * admin switches display access back to open (or an admin session appears): probe the display config now and then.
+ * Not on /pair (that page shows a code on purpose, also in open mode) nor on the invalid-link screen.
+ */
+const PROBE_MS = 30_000;
+function probeAccess(kind: 'pair' | 'invalid'): void {
+  if (kind !== 'pair' || location.pathname === '/pair' || probing) return;
+  probing = true;
+  setInterval(async () => {
+    try {
+      const r = await fetch(`/api/display/config${location.search}`, { cache: 'no-store', headers: { Accept: 'application/json' } });
+      if (r.status === 200) location.reload();
+    } catch { /* offline: keep showing the code */ }
+  }, PROBE_MS);
+}
+let probing = false;
+
 const fmtCode = (c: string) => `${c.slice(0, 3)} ${c.slice(3)}`;
 
 /** Where the display goes once paired: the plain display page (keeps ?client= & co., drops a dead /d/<key>). */
@@ -101,7 +128,10 @@ function afterPairUrl(): string {
   return `/${s ? `?${s}` : ''}`;
 }
 
-/** Full-screen pairing / invalid-link screen. Never returns to the dashboard by itself except by reloading. */
+/**
+ * Full-screen pairing / invalid-link screen. Returns to the dashboard by reloading: once paired, or (keyless
+ * pairing screen) when display access is open again.
+ */
 export function showPairing(kind: 'pair' | 'invalid', lang: Lang): void {
   const T = TEXT[lang] ?? TEXT.en;
   clearCaches();
@@ -127,6 +157,7 @@ export function showPairing(kind: 'pair' | 'invalid', lang: Lang): void {
           <li><span>3</span>${esc(T.s3)}</li>
         </ol>
         <p class="wl-note wl-status"></p>
+        ${kioskHint() ? `<p class="wl-note wl-kiosk">${esc(T.kiosk)}</p>` : ''}
       </div>
       <div class="wl-qr"><div class="wl-qr__img"></div><span>${esc(T.scan)}</span></div>
     </div>
@@ -145,6 +176,7 @@ export function showPairing(kind: 'pair' | 'invalid', lang: Lang): void {
     running = true;
     void pairLoop(T);
   }
+  probeAccess(kind);
 }
 
 async function pairLoop(T: Record<string, string>): Promise<void> {

@@ -750,6 +750,7 @@ export function App() {
             emphasize={!!current.perScreen && multi}
             errorScreens={showErrors || dirty ? errorScreens : undefined}
             online={online}
+            openMode={saved?.security?.displayAccess === 'open'}
           />
           <div class="topbar__actions">
             <button type="button" class="icon-btn topbar__search" title={`${t('Buscar')} (Ctrl K)`} aria-label={t('Buscar')} onClick={() => setPalette(true)}>

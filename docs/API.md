@@ -54,10 +54,10 @@ The admin's QR on the pairing screen opens `/admin/#pair=<code>`, which opens th
 
 | Method & path | Notes |
 |---|---|
-| `GET /api/admin/display-links` | `{ mode, links: [{ screenId, slug, name, key, path: "/d/<key>", createdAt }] }` (keys are created for screens that have none) |
+| `GET /api/admin/display-links` | `{ mode, links: [{ screenId, slug, name, key, path: "/d/<key>", createdAt }], lanAddresses, publicUrl }` (keys are created for screens that have none; `lanAddresses` = this server's LAN IPv4 addresses, `publicUrl` = `PUBLIC_URL` unless it is localhost — the admin uses them for links, QR codes and kiosk commands when opened on `localhost`) |
 | `POST /api/admin/display-links/:screenId/regenerate` | New key → `{ link }`. The old key stops working at once; SSE clients that used it get `revoked { code: "invalid_key" }` and are closed |
 | `GET /api/admin/devices` | `{ mode, devices: PairedDevice[] }` — `{ id, name, prefix, screenId, screenSlug, screenName, createdAt, lastSeenAt, lastIp, userAgent, connected, clientIds }` (never the token or its hash) |
-| `PATCH /api/admin/devices/:id` | `{ name?, screenId? }` → `{ device }` (moving to another screen reloads the device) |
+| `PATCH /api/admin/devices/:id` | `{ name?, screenId? }` → `{ device }` (moving to another screen sends `reload` to the device's streams and closes them; they reconnect bound to the new screen) |
 | `DELETE /api/admin/devices/:id` | Revoke: the token stops working; connected streams get `revoked` and are closed |
 
 Saving the config with `security.displayAccess` switched from `open` to `private` sends `revoked
@@ -96,7 +96,7 @@ are ISO strings with offset, or `YYYY-MM-DD` for all-day events (`end` exclusive
 | `identify` | `{ name, slug, clientId, durationSec }` | show the screen name full-screen |
 | `night` | `{ mode: "on" \| "off" \| "auto" }` | night mode override |
 | `ping` | `{ t }` | every 25 s |
-| `revoked` | `{ code: "invalid_key" \| "key_required" }` | the link was regenerated, the device revoked, the screen deleted, or display access switched to private for a keyless display; the server then closes the stream |
+| `revoked` | `{ code: "invalid_key" \| "key_required" }` | the link was regenerated or replaced by an import, the device revoked or dropped by an import, the screen deleted, display access switched to private for a keyless display, or (`key_required`) the admin session a stream was opened with ended (logout, logout everywhere, password change); the server then closes the stream. Every stream's credential is re-checked after config saves, imports, session revocation and on each heartbeat |
 
 Displays whose screen has alerts disabled do not receive `announce`.
 
@@ -211,8 +211,8 @@ Rules for the mutating setup endpoints:
 | `GET /api/admin/backups` · `POST /api/admin/backups` | List / create a manual backup |
 | `GET /api/admin/backups/:id` · `POST /api/admin/backups/:id/restore` · `DELETE /api/admin/backups/:id` | Download / restore (current config backed up first) / delete |
 | `POST /api/admin/export` | `{ includeSecrets }` → `marco-YYYY-MM-DD.json` (secrets = password hash, HA token, Google accounts, API tokens, display keys, paired devices (token hashes); never the session secret) |
-| `POST /api/admin/import/preview` | `{ bundle, lang? }` (export bundle or a bare config) → per-section summary in `lang` (es/en/pt; default: `Accept-Language`, else English), nothing saved |
-| `POST /api/admin/import/apply` | `{ bundle, sections?, includeSecrets? }` → `{ ok, config, loggedOut? }` |
+| `POST /api/admin/import/preview` | `{ bundle, lang? }` (export bundle or a bare config) → per-section summary in `lang` (es/en/pt; default: `Accept-Language`, else English), `displayAccess` (the current mode, which the import keeps) and `secretsImpact: { linksChanged, devicesRemoved, devicesAdded } \| null` (what importing the bundle's secrets would change); nothing saved |
+| `POST /api/admin/import/apply` | `{ bundle, sections?, includeSecrets? }` → `{ ok, config, loggedOut? }`. `security.displayAccess` is never taken from the bundle (restores keep it too). Imported keys / devices close the streams of replaced keys and dropped devices |
 | `GET /api/admin/activity?type=&level=&q=&actor=&before=&limit=` | Newest first, paged with `before=<id>` |
 | `DELETE /api/admin/activity` | Clear the log |
 

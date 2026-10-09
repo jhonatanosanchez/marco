@@ -115,6 +115,19 @@ function accessOf(req) {
   return { via: a.via, screenId: a.screenId || null, deviceId: a.device?.id || null };
 }
 
+/** What a stream keeps to re-check its credential later (displayAccess.js revalidateStreams). */
+function streamAccess(req) {
+  const a = accessOf(req);
+  const d = req?.displayAccess;
+  if (d?.credHash) a.credHash = d.credHash;
+  // Admin-session streams: the request (its cookie session) is re-checked on logout / epoch rotation / heartbeat.
+  if (d?.via === 'session') {
+    Object.defineProperty(a, 'authReq', { value: req, enumerable: false });
+    a.sid = typeof req.session?.sid === 'string' ? req.session.sid : null;
+  }
+  return a;
+}
+
 /** Screen id bound to the request's key / device token (null: none, or that screen no longer exists). */
 function boundScreen(cfg, req) {
   const id = req?.displayAccess?.screenId;
@@ -133,7 +146,7 @@ export function streamInit(req) {
   const preview = req.query?.preview === '1';
   return {
     screenKey, screenId: screen.id, clientId: preview ? `anon-preview-${++anonSeq}` : clientId, anonymous: anonymous || preview, preview,
-    access: accessOf(req),
+    access: streamAccess(req),
   };
 }
 

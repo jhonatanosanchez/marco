@@ -5,8 +5,8 @@ import path from 'node:path';
 import { initStore, getConfig, events as storeEvents, paths, ROOT, migratedOnLoad, StoreError } from './store.js';
 import { ensurePassword } from './auth.js';
 import { createApp } from './app.js';
-import { syncDisplayKeys, onDisplayAccessConfig } from './displayAccess.js';
-import { broadcast, closeAll, reresolveClients } from './sse.js';
+import { syncDisplayKeys, onDisplayAccessConfig, revalidateStreams } from './displayAccess.js';
+import { broadcast, closeAll, reresolveClients, setStreamValidator } from './sse.js';
 import { startRefresher, stopRefresher, runRefresh } from './refresher.js';
 import { logActivity, changedSections } from './activity.js';
 import { resolveScreen } from './screens.js';
@@ -38,6 +38,8 @@ await ensurePassword();
 
 // Every display screen gets its private-link key (secrets.json; displayAccess.js).
 syncDisplayKeys();
+// Every heartbeat re-checks each open stream's credential (sessions expire, keys / devices change).
+setStreamValidator(() => revalidateStreams());
 const app = createApp({ version: pkg.version });
 
 // Config saved (admin, restore, import or server-side) → re-resolve each display's screen (slug renamed / screen

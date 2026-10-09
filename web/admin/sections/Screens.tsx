@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'preact/hooks';
 import { slugify, SLUG_RE } from '../../shared/screens';
-import type { DisplayInfo, ScreenProfile } from '../../shared/types';
+import type { DisplayInfo, DisplayLinksResponse, ScreenProfile } from '../../shared/types';
 import { api, ApiError } from '../api';
+import { openPairDialog, shareOrigin } from '../components/DisplayAccess';
 import { confirmDialog, toast } from '../components/feedback';
 import { Icon } from '../components/icons';
 import { Button, Callout, Card, Field, Modal, PageHeader, ReorderButtons, Select, TextInput } from '../components/ui';
@@ -95,6 +96,17 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
       .then((r) => setDisplays(r.displays))
       .catch(() => {});
   }, []);
+  // Private mode (default): a device opens its screen's private link or is paired; ?screen= only works in open mode
+  // (and in this admin's own previews).
+  const openMode = saved.security?.displayAccess === 'open';
+  const [links, setLinks] = useState<DisplayLinksResponse | null>(null);
+  useEffect(() => {
+    if (openMode) return;
+    api
+      .displayLinks()
+      .then(setLinks)
+      .catch(() => {});
+  }, [openMode, saved.revision]);
   const screens = full.screens;
   const taken = (exceptId: string) => new Set(screens.filter((s) => s.id !== exceptId).map((s) => s.slug));
   const upd = (id: string, fn: (s: ScreenProfile) => void) =>
@@ -103,7 +115,8 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
       if (s) fn(s);
     });
   const move = (a: number, b: number) => setFull((d) => void (d.screens = moveItem(d.screens, a, b)));
-  const origin = location.origin;
+  const origin = openMode ? location.origin : shareOrigin(links) || location.origin;
+  const linkOf = (id: string) => links?.links.find((l) => l.screenId === id);
 
   const duplicate = (s: ScreenProfile) => {
     if (screens.length >= 12) return toast(t('Máximo 12 pantallas'), 'error');
@@ -176,7 +189,11 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
 
   return (
     <>
-      <PageHeader title={t('Pantallas')} desc={t('Cada pantalla (salón, cocina, entrada…) tiene su propio diseño y widgets. Abre /?screen=<dirección> en cada dispositivo.')}>
+      <PageHeader title={t('Pantallas')} desc={
+          openMode
+            ? t('Cada pantalla (salón, cocina, entrada…) tiene su propio diseño y widgets. Abre /?screen=<dirección> en cada dispositivo.')
+            : t('Cada pantalla (salón, cocina, entrada…) tiene su propio diseño y widgets. Cada dispositivo abre el enlace privado de su pantalla o se vincula con un código.')
+        }>
         <Button variant="primary" icon="plus" disabled={screens.length >= 12} onClick={() => setCreating(true)}>
           {t('Nueva pantalla')}
         </Button>
@@ -190,7 +207,9 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
           const slugOk = SLUG_RE.test(s.slug) && !taken(s.id).has(s.slug);
           const ds = displays.filter((d) => d.screenId === s.id);
           const on = ds.filter((d) => d.connected).length;
-          const url = `${origin}/?screen=${s.slug}`;
+          const link = linkOf(s.id);
+          // Copy: open mode → the ?screen= address; private → the screen's private link (none until saved).
+          const url = openMode ? `${origin}/?screen=${s.slug}` : link ? `${origin}${link.path}` : '';
           return (
             <section class={`screen-card ${s.id === screenId ? 'is-current' : ''}`} style={{ '--sc': s.screen.accent } as any} key={s.id}>
               <div class="screen-card__thumb" aria-hidden="true">
@@ -226,12 +245,18 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
                   <button type="button" class="icon-btn" title={t('Generar desde el nombre')} onClick={() => upd(s.id, (x) => void (x.slug = uniqueSlug(x.name, taken(s.id))))}>
                     <Icon name="wand" size={15} />
                   </button>
-                  <button type="button" class="icon-btn" title={t('Copiar URL')} onClick={() => copy(url)}>
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    title={openMode ? t('Copiar URL') : url ? t('Copiar enlace privado') : t('Guarda la pantalla para obtener su enlace privado.')}
+                    disabled={!url}
+                    onClick={() => copy(url)}
+                  >
                     <Icon name="copy" size={15} />
                   </button>
                 </div>
                 {!slugOk && <div class="field__error">{t('Solo minúsculas, números y guiones; no puede repetirse')}</div>}
-                {slugChanged && slugOk && <div class="field__hint warn-text">{t('Las pantallas que usan ?screen={old} mostrarán la predeterminada hasta que cambies su URL.', { old: savedSlug! })}</div>}
+                {openMode && slugChanged && slugOk && <div class="field__hint warn-text">{t('Las pantallas que usan ?screen={old} mostrarán la predeterminada hasta que cambies su URL.', { old: savedSlug! })}</div>}
                 <div class="screen-card__meta">
                   <span>
                     <Icon name="layout" size={13} /> {t(PRESET_LABEL[s.layout.preset] ?? s.layout.preset)}
@@ -288,6 +313,31 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
         </Callout>
       )}
       <Card title={t('Cómo asignar una pantalla a un dispositivo')} icon="info" muted={false}>
+        {!openMode ? (
+          <ol class="howto">
+            <li>
+              {t('Abre en el dispositivo el enlace privado de su pantalla (botón copiar de arriba, o')}{' '}
+              <button type="button" class="link-btn" onClick={() => go('screen/scr-link')}>
+                {t('Pantalla → Ajustes → Enlace privado')}
+              </button>
+              {t(', con su código QR).')}
+            </li>
+            <li>
+              {t('O abre')} <code>{origin}/</code> {t('en el dispositivo y vincúlalo con el código que muestra:')}{' '}
+              <button type="button" class="link-btn" onClick={() => openPairDialog()}>
+                {t('Vincular una pantalla')}
+              </button>
+              .
+            </li>
+            <li>
+              {t('En la Raspberry Pi pon el enlace privado en')} <code>KIOSK_URL</code> {t('en')} <code>~/.config/marco/kiosk.env</code>{' '}
+              {t('y reinicia el kiosco (el kiosco olvida una vinculación al reiniciarse).')}
+            </li>
+            <li>
+              {t('Comprueba qué ve cada dispositivo en')} <a href="#/displays">{t('Pantallas conectadas')}</a>.
+            </li>
+          </ol>
+        ) : (
         <ol class="howto">
           <li>
             {t('Abre en el navegador del dispositivo')} <code>{origin}/?screen={t('cocina')}</code> {t('(cambia “{slug}” por la dirección de la pantalla).', { slug: t('cocina') })}
@@ -300,6 +350,7 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
             <a href="#/displays">{t('Pantallas conectadas')}</a>.
           </li>
         </ol>
+        )}
       </Card>
       {creating && (
         <NewScreenDialog

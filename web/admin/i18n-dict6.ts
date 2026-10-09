@@ -25,9 +25,9 @@ export const ROWS6: [string, string, string][] = [
   ['Dispositivo revocado: {name}', 'Device revoked: {name}', 'Dispositivo revogado: {name}'],
   ['¿Regenerar el enlace privado?', 'Regenerate the private link?', 'Regenerar a ligação privada?'],
   [
-    'El enlace actual deja de funcionar al instante y las pantallas que lo usan mostrarán «enlace no válido». Después abre el enlace nuevo en ellas (o vincúlalas con un código).',
-    'The current link stops working at once and screens using it will show “link no longer valid”. Then open the new link on them (or pair them with a code).',
-    'A ligação atual deixa de funcionar de imediato e os ecrãs que a usam mostrarão «ligação inválida». Depois abre a nova ligação neles (ou emparelha-os com um código).',
+    'El enlace actual deja de funcionar al instante y las pantallas que lo usan mostrarán «enlace no válido». Después abre el enlace nuevo en ellas (o vincúlalas con un código). Un kiosco Raspberry Pi necesita el enlace nuevo en KIOSK_URL (~/.config/marco/kiosk.env) o volver a ejecutar el comando de abajo: allí la vinculación se pierde al reiniciarse.',
+    'The current link stops working at once and screens using it will show “link no longer valid”. Then open the new link on them (or pair them with a code). A Raspberry Pi kiosk needs the new link in KIOSK_URL (~/.config/marco/kiosk.env) or the command below run again: there a pairing is lost when it restarts.',
+    'A ligação atual deixa de funcionar de imediato e os ecrãs que a usam mostrarão «ligação inválida». Depois abre a nova ligação neles (ou emparelha-os com um código). Um quiosque Raspberry Pi precisa da nova ligação em KIOSK_URL (~/.config/marco/kiosk.env) ou de voltar a correr o comando abaixo: aí o emparelhamento perde-se ao reiniciar.',
   ],
   ['Regenerar enlace', 'Regenerate link', 'Regenerar ligação'],
   ['Enlace regenerado · el anterior ya no funciona', 'Link regenerated · the old one no longer works', 'Ligação regenerada · a anterior já não funciona'],
@@ -47,9 +47,14 @@ export const ROWS6: [string, string, string][] = [
   ['Escanéalo en la tablet o el móvil de la pantalla', 'Scan it on the screen’s tablet or phone', 'Lê-o no tablet ou telemóvel do ecrã'],
   ['Enlace de la pantalla', 'Screen link', 'Ligação do ecrã'],
   [
-    'Estás en «localhost»: en otros dispositivos usa la IP o el nombre de este ordenador.',
-    'You are on “localhost”: on other devices use this computer’s IP or name.',
-    'Estás em «localhost»: noutros dispositivos usa o IP ou o nome deste computador.',
+    'Estás en «localhost»: el enlace usa la dirección de red de este ordenador ({host}) para que funcione en otros dispositivos.',
+    'You are on “localhost”: the link uses this computer’s network address ({host}) so it works on other devices.',
+    'Estás em «localhost»: a ligação usa o endereço de rede deste computador ({host}) para funcionar noutros dispositivos.',
+  ],
+  [
+    'Estás en «localhost» y no se conoce la dirección de red de este servidor: abre el panel con su IP o su nombre (o define LAN_ADDRESS) para obtener el QR y el comando de la Raspberry Pi.',
+    'You are on “localhost” and this server’s network address is unknown: open the admin with its IP or name (or set LAN_ADDRESS) to get the QR code and the Raspberry Pi command.',
+    'Estás em «localhost» e o endereço de rede deste servidor é desconhecido: abre o painel com o seu IP ou nome (ou define LAN_ADDRESS) para obter o QR e o comando do Raspberry Pi.',
   ],
   ['Creado {when}', 'Created {when}', 'Criada {when}'],
   ['Raspberry Pi solo como pantalla (comando)', 'Raspberry Pi as a screen only (command)', 'Raspberry Pi só como ecrã (comando)'],
@@ -140,14 +145,14 @@ export const ROWS6: [string, string, string][] = [
   ['Acceso a las pantallas', 'Display access', 'Acesso aos ecrãs'],
   ['Quién puede ver el calendario familiar en una pantalla.', 'Who can see the family calendar on a screen.', 'Quem pode ver o calendário familiar num ecrã.'],
   [
-    'Al guardar, las pantallas que ahora entran sin clave mostrarán un código de vinculación. Abre en cada una su enlace privado (Pantalla → Ajustes) o vincúlala desde Pantallas conectadas.',
-    'When you save, screens that get in without a key will show a pairing code. Open each one’s private link (Screen → Settings) or pair it from Connected screens.',
-    'Ao guardar, os ecrãs que agora entram sem chave mostrarão um código de emparelhamento. Abre em cada um a sua ligação privada (Ecrã → Definições) ou emparelha-o em Ecrãs ligados.',
+    'Al guardar, las pantallas que ahora entran sin clave mostrarán un código de vinculación. Abre en cada una su enlace privado (Pantalla → Ajustes) o vincúlala desde Pantallas conectadas. En un kiosco Raspberry Pi pon el enlace privado en KIOSK_URL (~/.config/marco/kiosk.env): allí la vinculación se pierde al reiniciarse.',
+    'When you save, screens that get in without a key will show a pairing code. Open each one’s private link (Screen → Settings) or pair it from Connected screens. On a Raspberry Pi kiosk put the private link in KIOSK_URL (~/.config/marco/kiosk.env): there a pairing is lost when it restarts.',
+    'Ao guardar, os ecrãs que agora entram sem chave mostrarão um código de emparelhamento. Abre em cada um a sua ligação privada (Ecrã → Definições) ou emparelha-o em Ecrãs ligados. Num quiosque Raspberry Pi põe a ligação privada em KIOSK_URL (~/.config/marco/kiosk.env): aí o emparelhamento perde-se ao reiniciar.',
   ],
   [
-    'Al guardar, cualquiera que llegue a la dirección del servidor podrá ver el calendario sin clave.',
-    'When you save, anyone who reaches the server’s address will be able to see the calendar without a key.',
-    'Ao guardar, qualquer pessoa que chegue ao endereço do servidor poderá ver o calendário sem chave.',
+    'Al guardar, cualquiera que llegue a la dirección del servidor podrá ver el calendario sin clave. Las pantallas que muestran un código de vinculación vuelven solas en menos de un minuto.',
+    'When you save, anyone who reaches the server’s address will be able to see the calendar without a key. Screens showing a pairing code come back by themselves within a minute.',
+    'Ao guardar, qualquer pessoa que chegue ao endereço do servidor poderá ver o calendário sem chave. Os ecrãs que mostram um código de emparelhamento voltam sozinhos em menos de um minuto.',
   ],
   [
     'Los enlaces privados están en Pantalla → Ajustes; los dispositivos vinculados, en Pantallas conectadas.',
@@ -155,4 +160,69 @@ export const ROWS6: [string, string, string][] = [
     'As ligações privadas estão em Ecrã → Definições; os dispositivos emparelhados, em Ecrãs ligados.',
   ],
   ['Ver el enlace de esta pantalla', 'See this screen’s link', 'Ver a ligação deste ecrã'],
+  [
+    'Cada pantalla (salón, cocina, entrada…) tiene su propio diseño y widgets. Cada dispositivo abre el enlace privado de su pantalla o se vincula con un código.',
+    'Each screen (living room, kitchen, hallway…) has its own layout and widgets. Each device opens its screen’s private link or is paired with a code.',
+    'Cada ecrã (sala, cozinha, entrada…) tem o seu próprio design e widgets. Cada dispositivo abre a ligação privada do seu ecrã ou é emparelhado com um código.',
+  ],
+  [
+    'Copiar enlace privado',
+    'Copy private link',
+    'Copiar ligação privada',
+  ],
+  [
+    'Abre en el dispositivo el enlace privado de su pantalla (botón copiar de arriba, o',
+    'On the device, open its screen’s private link (copy button above, or',
+    'No dispositivo, abre a ligação privada do seu ecrã (botão copiar acima, ou',
+  ],
+  [
+    'Pantalla → Ajustes → Enlace privado',
+    'Screen → Settings → Private link',
+    'Ecrã → Definições → Ligação privada',
+  ],
+  [
+    ', con su código QR).',
+    ', with its QR code).',
+    ', com o seu código QR).',
+  ],
+  [
+    'O abre',
+    'Or open',
+    'Ou abre',
+  ],
+  [
+    'en el dispositivo y vincúlalo con el código que muestra:',
+    'on the device and pair it with the code it shows:',
+    'no dispositivo e emparelha-o com o código que mostra:',
+  ],
+  [
+    'En la Raspberry Pi pon el enlace privado en',
+    'On the Raspberry Pi put the private link in',
+    'No Raspberry Pi põe a ligação privada em',
+  ],
+  [
+    'y reinicia el kiosco (el kiosco olvida una vinculación al reiniciarse).',
+    'and restart the kiosk (the kiosk forgets a pairing when it restarts).',
+    'e reinicia o quiosque (o quiosque esquece um emparelhamento ao reiniciar).',
+  ],
+  [
+    'Comprueba qué ve cada dispositivo en',
+    'Check what each device shows in',
+    'Verifica o que cada dispositivo mostra em',
+  ],
+  [
+    'Cambiará el enlace privado de: {list}. Las pantallas abiertas con el enlace actual se desconectan; vuelve a funcionar el de la copia.',
+    'The private link of {list} will change. Screens open with the current link are disconnected; the one in the file works again.',
+    'A ligação privada de {list} vai mudar. Os ecrãs abertos com a ligação atual são desligados; a do ficheiro volta a funcionar.',
+  ],
+  [
+    'Se quitarán estos dispositivos vinculados (se desconectan al instante): {list}.',
+    'These paired devices will be removed (disconnected at once): {list}.',
+    'Estes dispositivos emparelhados serão removidos (desligados de imediato): {list}.',
+  ],
+  [
+    'El acceso a las pantallas ({mode}) no cambia al importar ni al restaurar: se cambia en Seguridad.',
+    'Display access ({mode}) does not change when importing or restoring: change it in Security.',
+    'O acesso aos ecrãs ({mode}) não muda ao importar nem ao restaurar: muda-se em Segurança.',
+  ],
 ];
