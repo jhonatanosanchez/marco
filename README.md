@@ -59,8 +59,15 @@ calendars, weather and news feeds *you* connect.
 
 <img src="docs/screenshots/display-portrait-1080x1920.webp" width="280" align="right" alt="Portrait layout at 1080x1920">
 
-- **Calendar:** month (configurable number of weeks), agenda and week views; five layouts (*big calendar*,
-  *left/right*, *top/bottom*, *big time*, *agenda*), landscape or portrait, each calendar with its own colour.
+- **Calendar:** month (configurable number of weeks), agenda and week views; eleven layouts (*big calendar*,
+  *two weeks*, *left/right*, *top/bottom*, *agenda*, *today*, *per person*, *board*, *big time*, *photo frame*,
+  *bedside*), landscape or portrait, each calendar with its own colour.
+- **Layouts for every room:** *Today* shows the day hour by hour with a line for now, the next event in large type and
+  the weather for the coming hours (the kitchen in the morning). *Per person* gives each calendar its own column with
+  today and tomorrow (pick up to five in *Layout*). *Board* is a family organisation board: to-dos, countdowns, the
+  message of the day, upcoming birthdays and a short agenda. *Photo frame* leaves the photo alone with a small clock
+  card in the corner you choose. *Bedside* is a huge, very dim clock with the next event and the temperature that
+  dims further at night. *Two weeks* is the month grid with two roomy rows.
 - **Two styles per screen:** *Classic* or *Modern*, a more minimal Apple-like look with glass cards over the photo,
   a Lock Screen clock and an iOS-style month grid. The style is independent of the layout.
 - **Automatic emoji:** 🎂 birthdays, ✈️ flights, 🩺 doctor, 🎒 school, ⚽ sports, 🍽️ dinners, 💼 meetings, 🏖️
@@ -784,6 +791,7 @@ Back up the whole folder (or use *Export*) to keep everything.
 | `?demo=1` | Built-in sample data (no server data needed) |
 | `?lang=en\|es\|pt` | Override the language |
 | `?preset=…` `?view=month\|agenda\|week` `?theme=dark\|light` `?style=classic\|modern` `?side=left\|right` `?clock=analog` | Override layout options (handy for testing) |
+| `?preset=today\|people\|photoFrame\|twoWeeks\|board\|bedside` `?people=<calendar ids, comma separated>` `?corner=tl\|tr\|bl\|br` | Preview the newer layouts, the *Per person* columns and the *Photo frame* corner |
 | `?glass=clear\|tinted\|auto` `?glassOpacity=0..1` `?glassBlur=0..40` `?glassTint=dark\|light\|photo` `?glassEdge=0\|1` | Override the glass options of the Modern style |
 | `?wxfx=off\|simple\|rich` | Override the weather effect; with `?demo=1`, `?wx=rain\|snow\|clear\|thunder` forces the weather |
 | `?client=<name>` | Name of this device in *Connected displays* (the kiosk script sets it) |

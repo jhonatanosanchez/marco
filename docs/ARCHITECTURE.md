@@ -91,7 +91,14 @@ The stored config has **global** sections shared by every screen and a list of *
                   // glass (Modern only): { "appearance": "auto", "opacity": 0.5, "blur": 18, "tint": "dark", "edge": true }
                   //   appearance auto | clear | tinted, opacity 0..1 (see-through to solid), blur 0..40, tint dark | light | photo.
                   //   web/shared/glass.ts turns it (plus the current photo) into --g-* CSS variables on <html>.
-  "layout":     { "preset": "bigCalendar", "sidePanel": "left", "sideWidth": 0.36 },   // bigCalendar | leftRight | topBottom | bigTime | agenda
+  "layout":     { "preset": "bigCalendar", "sidePanel": "left", "sideWidth": 0.36, "people": null, "corner": "br" },
+                  // preset: bigCalendar | leftRight | topBottom | bigTime | agenda | today | people | photoFrame | twoWeeks | board | bedside
+                  // people: calendar ids shown as columns by 'people' (max 5; null = the first five without holidays / birthdays)
+                  // corner: where 'photoFrame' puts its clock card (tl | tr | bl | br)
+                  // today / people / photoFrame / board / bedside render into #view (web/display/widgets/views.ts, styles in
+                  //   styles-views.css + styles-modern.css). today and twoWeeks reuse the big calendar frame (#app also gets
+                  //   .preset-bigCalendar), people and board the top / bottom one (.preset-topBottom). twoWeeks is the month
+                  //   grid with weeks = 2. Each view drops whole rows that do not fit (never a row cut in half).
   "background": { "enabled": true, "source": "stock", "stockTopic": "nature", "order": "random", "intervalSec": 120, "brightness": 0.85,
                   "showMeta": false, "cover": true, "transition": "webgl", "ambient": "aurora", "panelBlur": 18, "panelShade": 0.5, "weatherFx": "simple" },
                   // source: stock | gallery | mixed · order: random | newest | name · transition: webgl | fade | none · ambient: aurora | particles | none · weatherFx: off | simple | rich

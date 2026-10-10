@@ -22,6 +22,21 @@ All notable changes to this project are documented here. The format is based on
   as it was. Everything is a few CSS variables, so it costs nothing extra on the Pi; with `?lite=1` there is still no
   blur and the cards stay solid. Preview with `?glass=clear|tinted|auto`, `&glassOpacity=0..1`, `&glassBlur=0..40`,
   `&glassTint=dark|light|photo`, `&glassEdge=0|1`.
+- **Six new layouts** (*Layout*, `layout.preset`), each in landscape and portrait, Classic and Modern, light and dark,
+  night mode and `?lite=1`:
+  - *Today* (`today`): the day hour by hour with a line for now and past events dimmed, the next event in large type
+    and the weather for the coming hours. Made for the kitchen in the morning.
+  - *Per person* (`people`): one column per calendar with today and tomorrow. Choose up to five calendars in
+    *Layout → Columns per person* (`layout.people`); holidays and birthdays go in a shared line above.
+  - *Photo frame* (`photoFrame`): the photo with a small clock, temperature and next event card in a corner of your
+    choice (`layout.corner`: `tl`, `tr`, `bl`, `br`). Made for a portrait frame.
+  - *Two weeks* (`twoWeeks`): this week and the next as a roomy grid, today highlighted.
+  - *Board* (`board`): a family organisation board with the to-do list, countdowns, the message of the day, upcoming
+    birthdays and a short agenda.
+  - *Bedside* (`bedside`): a huge, very dim clock with the next event and the temperature; deeper and dimmer during
+    the night window. No photo and no animation.
+  Preview with `?preset=today|people|photoFrame|twoWeeks|board|bedside`, `&people=<ids>` and `&corner=tl|tr|bl|br`.
+  The setup wizard still offers the five original layouts; the new ones are in *Layout*.
 
 ### Fixed
 - Modern style, *Big time* layout: the agenda card no longer runs under the news bar. It shows whole rows only and
