@@ -12,6 +12,7 @@
 #   KIOSK_EXTRA_ARGS Extra Chromium flags, e.g. "--force-device-scale-factor=0.75" to fit more on a small screen
 #                    (the default scale is 1, so the layout does not depend on the desktop's zoom setting)
 #   KIOSK_WAIT_SEC   Max seconds to wait for /api/health before opening anyway (default 120)
+#   KIOSK_LOG        Log file when not started from a terminal (default /tmp/marco-kiosk.log)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -50,6 +51,12 @@ if ! flock -n 9; then
   log "A kiosk is already running; exiting."
   exit 0
 fi
+
+# --- Log -------------------------------------------------------------------------
+# Started from a desktop autostart (wayfire, LXDE-pi, XDG) the output would go nowhere or to ~/.xsession-errors:
+# write it to the kiosk log (`marco logs` on a kiosk-only device). Run by hand in a terminal it stays there.
+KIOSK_LOG="${KIOSK_LOG:-/tmp/marco-kiosk.log}"
+if [ ! -t 1 ]; then exec >"$KIOSK_LOG" 2>&1; fi
 
 # --- Browser --------------------------------------------------------------------
 BROWSER=""
@@ -148,6 +155,13 @@ redact_url() { printf '%s' "$1" | sed -E 's|/d/[^/?#]+|/d/<private-link>|'; }
 
 # --- Chromium flags ----------------------------------------------------------------
 PROFILE_DIR="$HOME/.cache/marco-kiosk"
+# Chromium from a snap (Ubuntu: /snap/bin/chromium, or the chromium-browser script that starts it) cannot write to
+# hidden folders in the home directory: give it a folder of its own.
+BROWSER_PATH="$(command -v "$BROWSER")"
+case "$BROWSER_PATH" in
+  /snap/*) PROFILE_DIR="$HOME/snap/chromium/common/marco-kiosk" ;;
+  *) if [ -x /snap/bin/chromium ] && grep -qs '/snap/bin/' "$BROWSER_PATH"; then PROFILE_DIR="$HOME/snap/chromium/common/marco-kiosk"; fi ;;
+esac
 mkdir -p "$PROFILE_DIR"
 
 FLAGS=(
