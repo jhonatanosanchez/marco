@@ -20,7 +20,7 @@ Un *marco* de fotos que también enmarca el día de tu familia.
 
 <a href="https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4"><img src="docs/media/hero.webp" width="100%" alt="Marco en la pantalla del salón: foto de fondo, reloj, tiempo y calendario mensual; llega un aviso de Home Assistant que dice que la lavadora ha terminado"></a>
 
-[Ver el vídeo de demostración de 48 segundos (MP4, en inglés)](https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4) · [marcohome.app](https://marcohome.app)
+[Web: marcohome.app](https://marcohome.app) · [Marco Cloud](https://app.marcohome.app/signup) · [Vídeo de demostración (MP4, en inglés)](https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4)
 
 ```bash
 curl -fsSL https://marcohome.app/install | bash
@@ -28,12 +28,24 @@ curl -fsSL https://marcohome.app/install | bash
 
 </div>
 
+### Dos formas de usarlo
+
+- **En tu propio equipo (autoalojado):** una Raspberry Pi, un servidor doméstico o un NAS en tu red, instalado con
+  el comando de arriba, con [Docker](#docker) o [a mano](#instalación-manual-nodejs). Gratis y de código abierto, y
+  tus datos se quedan en casa. Todo este README trata de esta opción.
+- **Marco Cloud, si no quieres tener un servidor:** la misma aplicación y el mismo panel de administración,
+  alojados por nosotros en [app.marcohome.app](https://app.marcohome.app). Es gratis para familias, funciona sobre
+  Cloudflare y guarda tus datos en la UE. [Crea una cuenta](https://app.marcohome.app/signup), añade tus calendarios
+  y abre el enlace de tu pantalla en una tele, una tablet o una Raspberry Pi.
+
+Más sobre las dos opciones en la web: [marcohome.app](https://marcohome.app).
+
 ## Por qué
 
 Marco está inspirado en [DAKboard](https://dakboard.com/): una pantalla de pared que muestra de un vistazo el
 calendario familiar, la hora, el tiempo, fotos y noticias. Es una **alternativa gratuita, de código abierto y
-autoalojada** que ejecutas en tu propia Raspberry Pi, servidor doméstico o NAS **dentro de tu red local**. Sin cuenta,
-sin suscripción y sin nube de por medio: tu configuración, tus fotos y los datos de tus calendarios se quedan en casa.
+autoalojada** que ejecutas en tu propia Raspberry Pi, servidor doméstico o NAS **dentro de tu red local**. Si lo alojas
+tú, no hay cuenta, ni suscripción, ni nube de por medio: tu configuración, tus fotos y los datos de tus calendarios se quedan en casa.
 El único tráfico saliente va a los calendarios, al tiempo y a las fuentes de noticias que *tú* conectes.
 
 > Marco es un proyecto independiente. No está afiliado, respaldado ni vinculado de ningún modo a DAKboard;
@@ -57,6 +69,23 @@ El único tráfico saliente va a los calendarios, al tiempo y a las fuentes de n
 | ![Vista semanal](docs/screenshots/display-week.webp) | ![Tema claro, calendario a la izquierda y foto a la derecha](docs/screenshots/display-light.webp) |
 | ![Aviso a pantalla completa enviado desde Home Assistant](docs/screenshots/display-announcement.webp) | ![Reloj analógico, efecto de lluvia y un mensaje programado](docs/screenshots/display-rain.webp) |
 
+**Un diseño para cada habitación.** *Hoy*, *Por persona*, *Marco de fotos*, *Dos semanas*, *Tablero* y *Mesilla*:
+
+| | |
+|---|---|
+| ![Diseño Hoy: el día hora a hora con una línea de ahora, el próximo evento en grande y el tiempo por horas](docs/screenshots/display-today.webp) | ![Diseño Por persona: una columna por calendario con lo de hoy y lo de mañana](docs/screenshots/display-people.webp) |
+| ![Diseño Marco de fotos: la foto con una tarjeta pequeña con la hora en una esquina](docs/screenshots/display-photoframe.webp) | ![Diseño Dos semanas: la cuadrícula del mes con dos filas amplias](docs/screenshots/display-twoweeks.webp) |
+| ![Diseño Tablero: agenda, mensaje del día, cuentas atrás, tareas y cumpleaños](docs/screenshots/display-board.webp) | ![Diseño Mesilla: un reloj grande y tenue con el próximo evento y la temperatura](docs/screenshots/display-bedside.webp) |
+
+**Moderno o Clásico, por pantalla.** Moderno es el de serie; Clásico mantiene el aspecto original:
+
+![La misma pantalla con el estilo Moderno (izquierda) y el Clásico (derecha)](docs/screenshots/display-modern-vs-classic.webp)
+
+**Opciones de cristal** (estilo Moderno): cristal automático, transparente o tintado, con tono oscuro, claro o del
+color de la foto, transparencia, desenfoque y borde de luz:
+
+![El panel lateral con cinco ajustes de cristal: automático (el de serie), transparente, tintado, tono claro y tono de la foto](docs/screenshots/display-glass.webp)
+
 <img src="docs/screenshots/display-portrait-1080x1920.webp" width="280" align="right" alt="Diseño vertical de 1080x1920">
 
 - **Calendario:** vistas de mes (con número de semanas configurable), agenda y semana; once diseños (*calendario
@@ -72,6 +101,8 @@ El único tráfico saliente va a los calendarios, al tiempo y a las fuentes de n
 - **Dos estilos por pantalla:** *Moderno* (el de serie), un aspecto minimalista al estilo de Apple, con tarjetas de
   cristal sobre la foto, reloj de pantalla de bloqueo y una cuadrícula de mes como la de iOS, o *Clásico*. El estilo
   es independiente del diseño.
+- **Opciones de cristal** del estilo Moderno, por pantalla: automático (se adapta a cada foto), transparente o
+  tintado; transparencia, desenfoque, tono oscuro, claro o de la foto y borde de luz, con vista previa en *Diseño*.
 - **Emojis automáticos:** 🎂 cumpleaños, ✈️ vuelos, 🩺 médico, 🎒 colegio, ⚽ deporte, 🍽️ cenas, 💼 reuniones, 🏖️
   vacaciones, 🚗 coche, 🐾 veterinario y más, a partir de reglas de palabras clave editables (35 categorías con unas
   400 palabras clave en inglés, español y portugués de serie).
@@ -136,7 +167,11 @@ El único tráfico saliente va a los calendarios, al tiempo y a las fuentes de n
 | ![Paleta de comandos buscando el modo noche](docs/screenshots/admin-home-palette.webp) | ![Editor de eventos locales](docs/screenshots/admin-local-edit.webp) | ![Diálogo de conflicto al subir una foto con el mismo nombre](docs/screenshots/admin-photos-conflict.webp) |
 | ![Pantallas: un perfil por habitación](docs/screenshots/admin-screens.webp) | ![Página de avisos: enviar un aviso al momento](docs/screenshots/admin-alerts.webp) | ![Registro de actividad con filtros](docs/screenshots/admin-activity.webp) |
 | ![Copias de seguridad: exportar, importar y restaurar](docs/screenshots/admin-backups.webp) | ![Cuentas atrás: fechas manuales y automáticas](docs/screenshots/admin-countdowns.webp) | ![Reglas de iconos con probador en vivo](docs/screenshots/admin-icons.webp) |
-| ![Página de diseño con vista previa de la pantalla](docs/screenshots/admin-layout.webp) | ![Lista de eventos locales](docs/screenshots/admin-local.webp) | ![Página de inicio de sesión](docs/screenshots/admin-login.webp) |
+| ![Página de diseño: estilo Moderno o Clásico, cristal y vista previa de la pantalla](docs/screenshots/admin-layout.webp) | ![Lista de eventos locales](docs/screenshots/admin-local.webp) | ![Página de inicio de sesión](docs/screenshots/admin-login.webp) |
+
+| | |
+|---|---|
+| ![Página de diseño: los once diseños con miniaturas](docs/screenshots/admin-layouts.webp) | ![Ajustes de cristal con vista previa sobre una foto oscura y otra clara](docs/screenshots/admin-layout-glass.webp) |
 
 <p align="center">
   <img src="docs/screenshots/mobile-home.webp" width="230" alt="Administración en un móvil: inicio">
