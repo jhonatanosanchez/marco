@@ -717,7 +717,7 @@ export function CalendarsSection(props: SectionProps) {
             <ToggleRow
               icon="↔️"
               label={t('Desplazar los textos largos')}
-              hint={t('Los títulos que no caben se deslizan despacio para leerlos enteros.')}
+              hint={t('Los títulos que no caben se deslizan despacio para leerlos enteros: en el calendario, junto al reloj, en las cuentas atrás y en las noticias. Los que ocupan varias líneas suben línea a línea.')}
               checked={c.marquee !== false}
               onChange={(v) => set((d) => void (d.calendar.marquee = v))}
             />

@@ -17,13 +17,17 @@ export class Highlights {
     const today = tick.dayKey;
     const f24 = cfg.datetime.format24, ampm = cfg.datetime.showAmPm;
     const specs: Spec[] = [];
+    // The lead ("In 23 min") changes every minute: it is written into the pill after the reconcile, so the title next
+    // to it stays the same element and a title sliding to show its end (marquee.ts) is not restarted.
+    const leads = new Map<string, string>();
     const pill = (key: string, e: NEvent, lead: string, text: string, extra = '') => {
       const col = chipColors(e.color);
+      leads.set(key, lead);
       specs.push({
         key,
         className: `hl-pill${extra}`,
         style: `--c:${col.base};--tint:${col.tint};--deep:${col.shade}`,
-        html: `<span class="hl-lead">${esc(lead)}</span><span class="hl-em">${esc(e.emoji || '•')}</span><span class="hl-tt">${esc(text)}</span>`,
+        html: `<span class="hl-lead"></span><span class="hl-em">${esc(e.emoji || '•')}</span><span class="hl-tt">${esc(text)}</span>`,
       });
     };
 
@@ -72,6 +76,11 @@ export class Highlights {
     }
     this.root.style.display = specs.length ? '' : 'none';
     reconcile(this.root, specs.slice(0, 4), { flip: true });
+    for (const node of Array.from(this.root.children) as (HTMLElement & { __key?: string })[]) {
+      const lead = node.__key !== undefined ? leads.get(node.__key) : undefined;
+      const span = node.firstElementChild;
+      if (lead !== undefined && span && span.textContent !== lead) span.textContent = lead;
+    }
   }
 }
 

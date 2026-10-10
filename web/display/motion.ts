@@ -1,9 +1,13 @@
 // Pure helpers for the two calendar motions (no DOM, so the tests can load them with Node):
-// - marquee: a title cut short slides left until its end shows, waits, slides back, waits, and so on;
+// - marquee: a title cut short slides left until its end shows, waits, slides back, waits, and so on; a chip title
+//   clamped to a few lines scrolls up like film credits instead; the news headline slides once per item;
 // - busy days: a month-grid day with more events than lanes pages through them.
 
 /** Sliding speed in display units (1rem ≈ 10px at 1080p) per second: about 30px/s on a 1080p screen. */
 export const MARQUEE_SPEED_U = 3;
+/** Credits (clamped multi-line titles): each line moves up in this time, then stays this long before the next. */
+export const CREDITS_STEP_MS = 700;
+export const CREDITS_HOLD_MS = 1600;
 /** Pause at each end of the slide. */
 export const MARQUEE_PAUSE_MS = 2500;
 /** Overflow (px) below which a title is left alone (sub-pixel rounding, a cut descender). */
@@ -37,6 +41,76 @@ export function marqueeTiming(overflowPx: number, unitPx: number, pauseMs = MARQ
   const b = (pauseMs + move) / duration;
   const c = (2 * pauseMs + move) / duration;
   return { duration, offsets: [a, b, c], distance };
+}
+
+export interface CreditsTiming {
+  duration: number;
+  /** keyframes: where (0..1) and how far up (px) the title is; each one starts an eased move to the next */
+  frames: { offset: number; y: number }[];
+  distance: number;
+}
+
+/**
+ * A title clamped to a few lines scrolls up like film credits, one line at a time: wait, move up a line, stay, ...,
+ * until the last line shows; wait there, glide back to the start (at the side slide's speed). `linePx` is the
+ * height of a line; the last step may be shorter. Null when the hidden part is too small to bother.
+ */
+export function creditsTiming(overflowPx: number, linePx: number, unitPx: number, pauseMs = MARQUEE_PAUSE_MS): CreditsTiming | null {
+  if (!(overflowPx >= MARQUEE_MIN_PX)) return null;
+  const distance = Math.ceil(overflowPx);
+  const lh = linePx > 4 ? linePx : distance;
+  const stops: number[] = [];
+  for (let y = lh; y < distance - lh * 0.25; y += lh) stops.push(Math.round(y));
+  stops.push(distance);
+  const pts: [number, number][] = [[0, 0], [pauseMs, 0]];
+  let t = pauseMs;
+  stops.forEach((y, i) => {
+    t += CREDITS_STEP_MS;
+    pts.push([t, y]);
+    t += i === stops.length - 1 ? pauseMs : CREDITS_HOLD_MS;
+    pts.push([t, y]);
+  });
+  const speed = Math.max(8, MARQUEE_SPEED_U * (unitPx > 0 ? unitPx : 10));
+  t += Math.max(600, (distance / speed) * 1000);
+  pts.push([t, 0]);
+  // offsets from the exact times (a line pitch is rarely a whole number of pixels), so the last one is exactly 1
+  return { duration: Math.round(t), frames: pts.map(([ms, y]) => ({ offset: Math.min(1, ms / t), y })), distance };
+}
+
+/** Wait before the news headline starts to slide (its item has just come in) and the least time its end stays. */
+export const ONCE_LEAD_MS = 2000;
+export const ONCE_TAIL_MS = 2500;
+
+export interface OnceTiming {
+  /** the whole animation: as long as the item stays on screen */
+  duration: number;
+  /** keyframe offsets (0..1) where the slide starts and ends; the end then stays until the item leaves */
+  offsets: [number, number];
+  distance: number;
+}
+
+/**
+ * One slide (no return) that fits in the `windowMs` an item stays on screen: wait, slide to the end at the usual
+ * speed (faster when the window is short), stay there. Null when the title fits or the window is too short.
+ */
+export function onceTiming(overflowPx: number, unitPx: number, windowMs: number): OnceTiming | null {
+  if (!(overflowPx >= MARQUEE_MIN_PX) || !(windowMs > 0)) return null;
+  const room = windowMs - ONCE_LEAD_MS - ONCE_TAIL_MS;
+  if (room < 1000) return null;
+  const speed = Math.max(8, MARQUEE_SPEED_U * (unitPx > 0 ? unitPx : 10));
+  const distance = Math.ceil(overflowPx);
+  const move = Math.min(room, Math.max(600, (distance / speed) * 1000));
+  const duration = Math.round(windowMs);
+  return { duration, offsets: [ONCE_LEAD_MS / duration, (ONCE_LEAD_MS + move) / duration], distance };
+}
+
+/**
+ * Most lines a one-day chip in a month cell may grow to: the whole free height of the day when it is the day's only
+ * event, a couple of lines when it shares the day with others (Two weeks has taller rows: a few more).
+ */
+export function wrapLineCap(chipsThatDay: number, roomy: boolean, freeLanes: number): number {
+  if (chipsThatDay <= 1) return Math.max(1, freeLanes);
+  return roomy ? 4 : 2;
 }
 
 /** Start delay of the i-th moving title, so they do not all set off together (a few seconds apart, repeating). */

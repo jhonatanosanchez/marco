@@ -75,7 +75,7 @@ test('people columns: at most five ids, no duplicates, only valid ids', () => {
 
 test('Two weeks, Board and Bedside polish: spare chip lines, fixed board columns, night mode not dimmed twice', () => {
   const cal = read('web/display/widgets/calendar.ts');
-  assert.match(cal, /const maxSpan = this\.roomy \?/);
+  assert.match(cal, /const maxSpan = wrapLineCap\(day\.length, this\.roomy,/);
   assert.match(read('web/display/widgets/views.ts'), /box\.style\.setProperty\('--bd-n', String\(n\)\)/);
   const css = read('web/display/styles-views.css');
   assert.match(css, /\.night #app\.preset-bedside\.bedside-late \{/);

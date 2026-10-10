@@ -931,7 +931,7 @@ Back up the whole folder (or use *Export*) to keep everything.
 | `?ambient=aurora\|particles\|none` | Override the ambient backdrop behind the calendar |
 | `?demo=1&pair=1` `?demo=1&pair=invalid` `&pairLen=6\|8` | Preview the pairing screen or the “link no longer valid” screen with a sample code (no server needed) |
 | `?empty=1` `?photos=0` | With `?demo=1`: no events, countdowns or to-dos, or no background photo (to check the empty states) |
-| `?marquee=0\|1` `?rotate=0\|1` | Turn off (or on) the long titles that slide and the busy days that take turns showing their events (*Calendars → Calendar view*); with `?demo=1`, `&busy=1` adds a busy day and long titles to try them |
+| `?marquee=0\|1` `?rotate=0\|1` | Turn off (or on) the long titles that slide (calendar chips, the pills next to the clock, countdowns, the news headline; titles on several lines move up a line at a time) and the busy days that take turns showing their events (*Calendars → Calendar view*); with `?demo=1`, `&busy=1` adds a busy day and long titles to try them |
 | `?client=<name>` | Name of this device in *Connected displays* (the kiosk script sets it) |
 
 ## Security

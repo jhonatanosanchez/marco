@@ -201,6 +201,24 @@ export function mockEvents(now = new Date()): EventsResponse {
       ['Call grandma', 'Llamar a la abuela', 'Ligar à avó', 20, 0, 'c_fam'],
     ];
     for (const [en, es, pt, h, m, src] of busy) out.push(ev(src, L(en, es, pt), D(2), { at: [h, m], dur: 45 }));
+    // the next event, in about 25 minutes, with a title too long for the side panel's pill and for its day cell
+    const soon = new Date(now.getTime() + 25 * 60000);
+    const sp = zonedParts(soon, TZ);
+    out.push(ev('c_work', L(
+      'Website update review with the agency and the whole content team before launch',
+      'Revisión de la actualización de la web con la agencia y todo el equipo de contenidos antes del lanzamiento',
+      'Revisão da atualização do site com a agência e toda a equipa de conteúdos antes do lançamento',
+    ), dateKeyInTz(soon, TZ), { at: [sp.hour, sp.minute], dur: Math.max(5, Math.min(60, 1439 - sp.hour * 60 - sp.minute)) }));
+    // a long timed event alone on its day (the first free day from next week on): it may use the whole free height
+    // of the cell
+    const busyKey = (k: string) => out.some((e) => (e.allDay ? e.start <= k && k < e.end : dateKeyInTz(new Date(e.start), TZ) === k));
+    let free = D(5);
+    for (let i = 5; i < 30 && busyKey(D(i)); i++) free = D(i + 1);
+    out.push(ev('c_fam', L(
+      'Late flight back from the conference in Lyon with a connection in Barcelona, pick up the car at the long-stay car park',
+      'Vuelo de vuelta de la conferencia de Lyon con escala en Barcelona, recoger el coche en el aparcamiento de larga estancia',
+      'Voo de regresso da conferência em Lyon com escala em Barcelona, levantar o carro no parque de longa duração',
+    ), free, { at: [21, 45], dur: 60 }));
   }
 
   // Sort: allDay first, then start
@@ -293,6 +311,17 @@ export function mockNews(): NewsResponse {
     ['Public library now opens on Sundays', 'The new schedule includes free workshops for kids and an English-language book club.'],
     ['Forecast: first autumn rain on the way', 'Showers are expected from Saturday, with a noticeable drop in temperatures.'],
   ];
+  // ?busy=1: a headline too long for one line (it slides once while it shows)
+  if (BUSY) {
+    items.unshift([
+      L('Reclaiming the space: how a small studio brings human presence back to the offices of a city that works from home',
+        'Recuperar el espacio: cómo un pequeño estudio devuelve la presencia humana a las oficinas de una ciudad que trabaja desde casa',
+        'Recuperar o espaço: como um pequeno estúdio devolve a presença humana aos escritórios de uma cidade que trabalha a partir de casa'),
+      L('Architects and neighbours talk about what the change means for the old town.',
+        'Arquitectos y vecinos hablan de lo que el cambio supone para el casco antiguo.',
+        'Arquitetos e vizinhos falam do que a mudança significa para o centro histórico.'),
+    ]);
+  }
   return {
     updatedAt: new Date().toISOString(),
     items: items.map(([title, summary], i) => ({

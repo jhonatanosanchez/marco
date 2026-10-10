@@ -5,6 +5,15 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **Long titles slide in more places**: timed chips in the month, Two weeks and week grids, the pills next to the
+  clock ("In 23 min · …", check-outs, birthdays), countdowns, scheduled messages and the news headline. A chip title
+  cut after a few lines in a month cell now scrolls up a line at a time, like film credits, and comes back; its box
+  keeps its size, and the time stays on top when it has a line to itself. The news headline slides once, within the
+  time each item shows.
+- An event alone on its day in a month cell can use all the free height of the day instead of stopping at three
+  lines; days shared with other events keep about two lines per event.
+
 ## [0.5.1] - 2026-10-10
 
 ### Added

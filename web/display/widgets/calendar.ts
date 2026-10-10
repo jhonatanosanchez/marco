@@ -5,7 +5,7 @@ import { ctx } from '../ctx';
 import { esc, reconcile, setHTML, type Spec } from '../dom';
 import { type NEvent, sortForDay, timeLabel } from '../eventModel';
 import { refreshMarquee } from '../marquee';
-import { PAGE_MS, pageAt, pageLabel, planPages } from '../motion';
+import { PAGE_MS, pageAt, pageLabel, planPages, wrapLineCap } from '../motion';
 import type { Tick } from '../time';
 
 interface Placed {
@@ -210,8 +210,9 @@ export class MonthCalendar {
   }
 
   /**
-   * P1a: let single-day chips grow into free lanes below them (2 lines; 3 when it is the only event of the day)
-   * instead of truncating "Merca…". Only days whose chips are all visible are re-laid out, so the "+N"
+   * P1a: let single-day chips grow into free lanes below them instead of truncating "Merca…": as far down as the day
+   * is free when it is the day's only event, about 2 lines when it shares the day (what still does not fit scrolls,
+   * marquee.ts). Only days whose chips are all visible are re-laid out, so the "+N"
    * capacity logic (lanes ≥ L hidden) is unchanged. Multi-day bars keep their lanes.
    */
   private planWrap(segs: Placed[], hidden: Set<Placed>, L: number, labels: Map<Placed, { tm: string; extra: string }>): void {
@@ -260,7 +261,7 @@ export class MonthCalendar {
       for (let l = 0; l < L; l++) if (!blocked[l][2 * d] && !blocked[l][2 * d + 1]) free.push(l);
       if (free.length < day.length) continue;
       day.sort((a, b) => a.lane - b.lane);
-      const maxSpan = this.roomy ? (day.length === 1 ? 5 : 4) : day.length === 1 ? 3 : 2;
+      const maxSpan = wrapLineCap(day.length, this.roomy, free.length);
       const base = day.map((sg) => {
         const lb = labels.get(sg);
         return this.linesNeeded(sg.e, lb?.tm ?? '', lb?.extra ?? '');
@@ -271,14 +272,16 @@ export class MonthCalendar {
       let p = 0;
       day.forEach((sg, i) => {
         const scale = this.wordScale(sg.e);
-        const need = base[i] + spare;
+        // alone on its day: one more line when there is room (the estimate can be a line short, e.g. when the time
+        // and the first word do not share a line)
+        const need = base[i] + (day.length === 1 ? Math.max(spare, 1) : spare);
         const want = scale === 0 ? 1 : Math.min(maxSpan, need);
         const rest = day.length - i - 1;
         let span = 1;
         while (span < want && p + span < free.length - rest && free[p + span] === free[p] + span) span++;
         sg.lane = free[p];
         sg.span = span;
-        sg.long = scale < 1 || need > span;
+        sg.long = scale < 1 || base[i] + spare > span;
         p += span;
       });
     }

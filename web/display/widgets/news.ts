@@ -2,6 +2,7 @@
 import type { NewsItem, NewsResponse } from '../../shared/types';
 import { ctx } from '../ctx';
 import { el, esc, reducedMotion } from '../dom';
+import { refreshMarquee } from '../marquee';
 
 export class News {
   private items: NewsItem[] = [];
@@ -71,6 +72,9 @@ export class News {
       } else old.remove();
     }
     const sec = ctx.cfg.news.rotateSec;
+    // a headline too long for one line slides once to its end before the next item (marquee.ts)
+    node.dataset.mqUntil = String(Date.now() + sec * 1000);
+    refreshMarquee();
     if (anim) {
       this.bar.getAnimations().forEach((a) => a.cancel());
       this.bar.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: sec * 1000, easing: 'linear' });

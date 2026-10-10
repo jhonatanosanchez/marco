@@ -1091,6 +1091,17 @@ body {
   white-space: nowrap;
   will-change: transform;
 }
+/* Clamped chip titles scroll up (marquee.ts): same height, no clamp or "…" while set up, the inner block moves */
+.ev.wrap .tx.mqv {
+  display: flex;
+  flex-direction: column;
+  -webkit-line-clamp: unset;
+  line-clamp: none;
+  overflow: hidden;
+}
+.mqv > .mq-hd { flex: none; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mqv > .mq-box { display: block; flex: 1 1 0; min-height: 0; overflow: hidden; }
+.mqv > .mq-box > .mq-in { display: block; will-change: transform; }
 
 /* Busy days page through their events (calendar.ts): the page shown fades in, the others fade out */
 .wk > .ev.pg { transition: opacity 0.7s ease, visibility 0s linear 0s; }

@@ -114,3 +114,73 @@ test('busy days: events fill the free lanes page by page; no free lane means no 
   assert.equal(pageLabel(0, 2), '1/2');
   assert.equal(pageLabel(2, 3), '3/3');
 });
+
+test('credits: a clamped chip title moves up a line at a time, stays on its last line, then glides back', ts, () => {
+  const { creditsTiming, CREDITS_STEP_MS, CREDITS_HOLD_MS, MARQUEE_PAUSE_MS } = motion;
+  assert.equal(creditsTiming(0, 20, 10), null);
+  assert.equal(creditsTiming(2, 20, 10), null);
+  const t = creditsTiming(60, 20, 10); // three hidden lines
+  assert.equal(t.distance, 60);
+  const ys = t.frames.map((f) => f.y);
+  assert.deepEqual(ys, [0, 0, 20, 20, 40, 40, 60, 60, 0]);
+  const offs = t.frames.map((f) => f.offset);
+  assert.equal(offs[0], 0);
+  assert.equal(offs.at(-1), 1);
+  for (let i = 1; i < offs.length; i++) assert.ok(offs[i] > offs[i - 1], `offset ${i}`);
+  const ms = (i) => offs[i] * t.duration;
+  assert.ok(Math.abs(ms(1) - MARQUEE_PAUSE_MS) < 1); // waits at the start
+  assert.ok(Math.abs(ms(2) - ms(1) - CREDITS_STEP_MS) < 1); // one line up
+  assert.ok(Math.abs(ms(3) - ms(2) - CREDITS_HOLD_MS) < 1); // stays to be read
+  assert.ok(Math.abs(ms(7) - ms(6) - MARQUEE_PAUSE_MS) < 1); // waits on the last line
+  // a last line partly hidden is one more (shorter) step; a sliver is folded into the previous one
+  assert.deepEqual(creditsTiming(50, 20, 10).frames.map((f) => f.y), [0, 0, 20, 20, 40, 40, 50, 50, 0]);
+  assert.deepEqual(creditsTiming(43, 20, 10).frames.map((f) => f.y), [0, 0, 20, 20, 43, 43, 0]);
+});
+
+test('news headline: one slide that ends before the item leaves, or none when the item shows too briefly', ts, () => {
+  const { onceTiming, ONCE_LEAD_MS, ONCE_TAIL_MS } = motion;
+  assert.equal(onceTiming(0, 10, 15000), null);
+  assert.equal(onceTiming(300, 10, 5000), null); // 5 s: no room for a slide between the lead and the tail
+  const t = onceTiming(300, 10, 15000); // 15 s (the default): 10 s at the usual speed would not fit, so it is faster
+  assert.equal(t.duration, 15000);
+  assert.ok(Math.abs(t.offsets[0] * 15000 - ONCE_LEAD_MS) < 1);
+  assert.ok(t.offsets[1] * 15000 <= 15000 - ONCE_TAIL_MS + 1);
+  const slow = onceTiming(300, 10, 60000); // a long window keeps the usual speed
+  assert.ok(Math.abs((slow.offsets[1] - slow.offsets[0]) * 60000 - 10000) < 1);
+});
+
+test('month cells: a lone event may use the whole free height of its day, shared days keep a couple of lines', ts, () => {
+  const { wrapLineCap } = motion;
+  assert.equal(wrapLineCap(1, false, 5), 5);
+  assert.equal(wrapLineCap(1, true, 7), 7);
+  assert.equal(wrapLineCap(1, false, 0), 1);
+  assert.equal(wrapLineCap(2, false, 5), 2);
+  assert.equal(wrapLineCap(3, true, 9), 4);
+  assert.match(read('web/display/widgets/calendar.ts'), /wrapLineCap\(day\.length, this\.roomy, free\.length\)/);
+});
+
+test('what moves: timed chips, clamped chip titles, side panel pills, countdowns and the news headline', () => {
+  const mq = read('web/display/marquee.ts');
+  for (const sel of ["'.cal .ev:not(.wrap) > .tt'", "'.hl-tt'", "'.cd-tt'", "'.cal .ev.wrap > .tx'", "'.news-item:last-child > .news-title'"]) {
+    assert.ok(mq.includes(sel), sel);
+  }
+  // no per-frame script: transforms through the Web Animations API only
+  assert.doesNotMatch(mq, /requestAnimationFrame\(\s*function|setInterval|scrollTop\s*=/);
+  // the news item says when it leaves, so its headline's slide fits
+  assert.match(read('web/display/widgets/news.ts'), /dataset\.mqUntil = String\(Date\.now\(\) \+ sec \* 1000\)/);
+  // the pill's countdown is written in place, so a sliding title is not re-created every minute
+  assert.match(read('web/display/widgets/highlights.ts'), /<span class="hl-lead"><\/span>/);
+});
+
+test('credits keyframe offsets stay within 0..1 for line pitches that are not whole pixels', ts, () => {
+  const { creditsTiming } = motion;
+  for (const pitch of [20.17, 22.4, 18.15, 33.33]) {
+    for (const over of [10, 41, 162, 400.5]) {
+      const t = creditsTiming(over, pitch, 10.3);
+      const offs = t.frames.map((f) => f.offset);
+      assert.equal(offs[0], 0);
+      assert.equal(offs.at(-1), 1, `${pitch}/${over}`);
+      for (let i = 1; i < offs.length; i++) assert.ok(offs[i] >= offs[i - 1] && offs[i] <= 1);
+    }
+  }
+});
