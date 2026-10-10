@@ -808,9 +808,9 @@ export function App() {
     <div class={`shell ${previewSide ? 'has-preview' : ''} ${navOpen ? 'nav-open' : ''}`} style={rootStyle} data-lang={lang}>
       <aside class="sidebar">
         <div class="brand">
-          <BrandMark size={40} />
+          <BrandMark size={34} />
           <div>
-            <strong>{t('Calendario familiar')}</strong>
+            <strong class="wordmark" aria-label="Marco">marco</strong>
             <span class="muted small">{t('Panel de control')}</span>
           </div>
         </div>

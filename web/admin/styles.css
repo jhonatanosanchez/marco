@@ -210,6 +210,19 @@ button {
 .brand .small {
   display: block;
 }
+/* the wordmark as on marcohome.app: lowercase, heavy, with a coral full stop */
+.brand .wordmark {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  margin-bottom: 3px;
+  overflow: visible;
+}
+.brand .wordmark::after {
+  content: '.';
+  color: #ff5a4e;
+}
 .brand-mark-wrap {
   display: inline-block;
   flex: none;
