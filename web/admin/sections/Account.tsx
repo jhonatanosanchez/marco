@@ -59,7 +59,7 @@ export function AccountSection({ me, updateMe }: SectionProps) {
       {household && (
         <Card id="acc-household" title={t('Hogar')} icon="home" desc={owner ? t('El nombre aparece en tu cuenta y en los correos.') : t('Solo el propietario puede cambiar el nombre.')}>
           <form class="account-rename" onSubmit={rename}>
-            <Field label={t('Nombre del hogar')} htmlFor="acc-household-name" hint={`${t('Tu rol')}: ${roleLabel(household.role)}`} error={owner && name && !clean ? 'Escribe un nombre' : undefined}>
+            <Field label={t('Nombre del hogar')} htmlFor="acc-household-name" hint={`${t('Tu rol')}: ${roleLabel(household.role)}`} error={owner && name && !clean ? t('Escribe un nombre') : undefined}>
               <TextInput id="acc-household-name" value={name} onValue={setName} maxLength={HOUSEHOLD_NAME_MAX} disabled={!owner || busy} autocomplete="off" />
             </Field>
             {owner && (
