@@ -5,6 +5,8 @@ import { confirmDialog, toast } from '../components/feedback';
 import { Icon } from '../components/icons';
 import { Button, Callout, Card, Empty, Field, Modal, PageHeader, Segmented, TextInput } from '../components/ui';
 import { fmtDateTime } from '../dates';
+import { atLimit, has, runtime } from '../caps';
+import { LimitNote } from '../components/LimitNote';
 import { relTime, t } from '../i18n';
 import { takeIntent } from '../intent';
 import type { SectionProps } from './common';
@@ -134,9 +136,12 @@ export function ApiSection({ full }: SectionProps) {
       setTokens([]);
     }
   };
+  const tokensOn = has('apiTokens');
+  const hooksOn = has('webhooks');
   useEffect(() => {
-    load();
+    if (tokensOn) load();
   }, []);
+  const tokensFull = atLimit('apiTokens', tokens?.length ?? 0);
 
   const revoke = async (tk: ApiTokenInfo) => {
     const ok = await confirmDialog({
@@ -157,7 +162,9 @@ export function ApiSection({ full }: SectionProps) {
 
   // Caddy (deploy/Caddyfile.example) blocks /api/hooks/* from outside the LAN, and Home Assistant should
   // call the Pi directly: when the panel is opened through a public domain, show a LAN placeholder instead.
-  const lanPanel = isLanHost(location.hostname);
+  // On Workers (Marco Cloud) the hooks live on the panel's own public origin.
+  const workers = runtime() === 'workers';
+  const lanPanel = workers || isLanHost(location.hostname);
   const base = lanPanel ? location.origin : `http://${t('<ip-de-la-pi>')}:3000`;
   const token = fresh || 'cs_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX';
   const slugs = full.screens.map((s) => s.slug);
@@ -209,101 +216,108 @@ curl -X POST ${base}/api/hooks/night \\
   return (
     <>
       <PageHeader title={t('API y webhooks')} desc={t('Permite que Home Assistant u otros sistemas envíen avisos, recarguen las pantallas o activen el modo noche.')}>
-        <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
-          {t('Nuevo token')}
-        </Button>
+        {tokensOn && (
+          <Button variant="primary" icon="plus" disabled={tokensFull} onClick={() => setCreating(true)}>
+            {t('Nuevo token')}
+          </Button>
+        )}
       </PageHeader>
 
-      <Card title={t('Tokens de API')} icon="key" id="api-tokens" desc={t('Se guardan cifrados (hash): solo se ven una vez al crearlos.')}>
-        {err && <Callout kind="error">{err}</Callout>}
-        {tokens === null ? (
-          <div class="skeleton-list">
-            <div class="skeleton" />
-          </div>
-        ) : tokens.length === 0 ? (
-          <Empty icon="key" title={t('Ningún token todavía')}>
-            {t('Crea uno para Home Assistant y pégalo en el ejemplo de abajo.')}
-          </Empty>
-        ) : (
-          <div class="table-wrap">
-            <table class="table tokens">
-              <thead>
-                <tr>
-                  <th>{t('Nombre')}</th>
-                  <th>{t('Token')}</th>
-                  <th>{t('Creado')}</th>
-                  <th>{t('Último uso')}</th>
-                  <th class="num">{t('Usos')}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {tokens.map((tk) => (
+      {tokensOn && (
+        <Card title={t('Tokens de API')} icon="key" id="api-tokens" desc={t('Se guardan cifrados (hash): solo se ven una vez al crearlos.')}>
+          {err && <Callout kind="error">{err}</Callout>}
+          <LimitNote name="apiTokens" count={tokens?.length ?? 0} />
+          {tokens === null ? (
+            <div class="skeleton-list">
+              <div class="skeleton" />
+            </div>
+          ) : tokens.length === 0 ? (
+            <Empty icon="key" title={t('Ningún token todavía')}>
+              {t('Crea uno para Home Assistant y pégalo en el ejemplo de abajo.')}
+            </Empty>
+          ) : (
+            <div class="table-wrap">
+              <table class="table tokens">
+                <thead>
                   <tr>
-                    <td>
-                      <strong>{tk.name}</strong>
-                    </td>
-                    <td>
-                      <code class="mono small">{tk.prefix}…</code>
-                    </td>
-                    <td class="muted" title={tk.createdAt}>
-                      {fmtDateTime(tk.createdAt)}
-                    </td>
-                    <td class="muted" title={tk.lastUsedAt ?? ''}>
-                      {tk.lastUsedAt ? (
-                        <>
-                          {relTime(tk.lastUsedAt)}
-                          {tk.lastUsedIp && <span class="small"> · {tk.lastUsedIp}</span>}
-                        </>
-                      ) : (
-                        t('Nunca')
-                      )}
-                    </td>
-                    <td class="num">{tk.useCount}</td>
-                    <td class="num">
-                      <Button size="sm" variant="ghost" icon="trash" onClick={() => revoke(tk)}>
-                        {t('Revocar')}
-                      </Button>
-                    </td>
+                    <th>{t('Nombre')}</th>
+                    <th>{t('Token')}</th>
+                    <th>{t('Creado')}</th>
+                    <th>{t('Último uso')}</th>
+                    <th class="num">{t('Usos')}</th>
+                    <th />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {tokens.map((tk) => (
+                    <tr>
+                      <td>
+                        <strong>{tk.name}</strong>
+                      </td>
+                      <td>
+                        <code class="mono small">{tk.prefix}…</code>
+                      </td>
+                      <td class="muted" title={tk.createdAt}>
+                        {fmtDateTime(tk.createdAt)}
+                      </td>
+                      <td class="muted" title={tk.lastUsedAt ?? ''}>
+                        {tk.lastUsedAt ? (
+                          <>
+                            {relTime(tk.lastUsedAt)}
+                            {tk.lastUsedIp && <span class="small"> · {tk.lastUsedIp}</span>}
+                          </>
+                        ) : (
+                          t('Nunca')
+                        )}
+                      </td>
+                      <td class="num">{tk.useCount}</td>
+                      <td class="num">
+                        <Button size="sm" variant="ghost" icon="trash" onClick={() => revoke(tk)}>
+                          {t('Revocar')}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {hooksOn && (
+        <Card title={t('Ejemplos')} icon="code" id="api-examples" actions={<Segmented size="sm" value={ex} options={[{ value: 'ha', label: 'Home Assistant' }, { value: 'curl', label: 'curl' }]} onChange={setEx} />}>
+          {!fresh && <p class="muted small">{t('Sustituye cs_XXXX… por tu token (o crea uno nuevo y se rellenará solo).')}</p>}
+          {!workers && !lanPanel && (
+            <Callout kind="info">
+              {t('Estás usando el panel desde fuera de la red local. Home Assistant debe llamar a la Pi directamente por la red local (por ejemplo http://192.168.1.50:3000): desde Internet /api/hooks está bloqueado. Sustituye <ip-de-la-pi> por su IP.')}
+            </Callout>
+          )}
+          {ex === 'ha' ? <CodeBlock lang="yaml" code={yaml} /> : <CodeBlock lang="bash" code={curl} />}
+          <div class="api-ref">
+            <h4>{t('Endpoints')}</h4>
+            <ul>
+              <li>
+                <code>GET /api/hooks/ping</code>: {t('comprueba el token')}
+              </li>
+              <li>
+                <code>POST /api/hooks/announce</code>: <code>{'{ title, body, emoji, style: info|success|warning|urgent, durationSec, sound, screens: [slug] }'}</code>
+              </li>
+              <li>
+                <code>POST /api/hooks/reload</code>: <code>{'{ screens?: [slug] }'}</code>
+              </li>
+              <li>
+                <code>POST /api/hooks/night</code>: <code>{'{ mode: on|off|auto, screens?: [slug] }'}</code>
+              </li>
+            </ul>
+            <p class="muted small">
+              {t('Pantallas disponibles')}: {slugs.map((s) => <code class="slug-code">{s}</code>)} · {t('Límite: 30 peticiones por minuto y token.')}
+            </p>
           </div>
-        )}
-      </Card>
+        </Card>
+      )}
 
-      <Card title={t('Ejemplos')} icon="code" id="api-examples" actions={<Segmented size="sm" value={ex} options={[{ value: 'ha', label: 'Home Assistant' }, { value: 'curl', label: 'curl' }]} onChange={setEx} />}>
-        {!fresh && <p class="muted small">{t('Sustituye cs_XXXX… por tu token (o crea uno nuevo y se rellenará solo).')}</p>}
-        {!lanPanel && (
-          <Callout kind="info">
-            {t('Estás usando el panel desde fuera de la red local. Home Assistant debe llamar a la Pi directamente por la red local (por ejemplo http://192.168.1.50:3000): desde Internet /api/hooks está bloqueado. Sustituye <ip-de-la-pi> por su IP.')}
-          </Callout>
-        )}
-        {ex === 'ha' ? <CodeBlock lang="yaml" code={yaml} /> : <CodeBlock lang="bash" code={curl} />}
-        <div class="api-ref">
-          <h4>{t('Endpoints')}</h4>
-          <ul>
-            <li>
-              <code>GET /api/hooks/ping</code>: {t('comprueba el token')}
-            </li>
-            <li>
-              <code>POST /api/hooks/announce</code>: <code>{'{ title, body, emoji, style: info|success|warning|urgent, durationSec, sound, screens: [slug] }'}</code>
-            </li>
-            <li>
-              <code>POST /api/hooks/reload</code>: <code>{'{ screens?: [slug] }'}</code>
-            </li>
-            <li>
-              <code>POST /api/hooks/night</code>: <code>{'{ mode: on|off|auto, screens?: [slug] }'}</code>
-            </li>
-          </ul>
-          <p class="muted small">
-            {t('Pantallas disponibles')}: {slugs.map((s) => <code class="slug-code">{s}</code>)} · {t('Límite: 30 peticiones por minuto y token.')}
-          </p>
-        </div>
-      </Card>
-
-      {creating && (
+      {creating && tokensOn && (
         <NewTokenDialog
           onClose={() => setCreating(false)}
           onCreated={(c) => {

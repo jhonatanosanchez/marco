@@ -4,6 +4,8 @@ import { api, ApiError } from '../api';
 import { Icon } from '../components/icons';
 import { Button, Card, EmojiPicker, Empty, Field, NumberInput, PageHeader, ReorderButtons, Slider, Textarea, TextInput, Toggle, ToggleRow } from '../components/ui';
 import { ScopeBadge } from '../components/ui';
+import { atLimit } from '../caps';
+import { LimitNote } from '../components/LimitNote';
 import { t } from '../i18n';
 import { isHttpUrl, moveItem, uid } from '../util';
 import type { SectionProps } from './common';
@@ -78,13 +80,14 @@ export function NewsSection({ cfg, set, errors }: SectionProps) {
         id="news-feeds"
         icon="news"
         actions={
-          <Button size="sm" variant="primary" icon="plus" onClick={() => set((d) => void d.news.feeds.push({ id: uid('n'), name: '', url: '', enabled: true }))}>
+          <Button size="sm" variant="primary" icon="plus" disabled={atLimit('newsFeeds', n.feeds.length)} onClick={() => set((d) => void d.news.feeds.push({ id: uid('n'), name: '', url: '', enabled: true }))}>
             {t('Añadir feed')}
           </Button>
         }
       >
         <ToggleRow label={<>{t('Mostrar noticias')} <ScopeBadge scope="screen" /></>} checked={n.enabled} onChange={(v) => set((d) => void (d.news.enabled = v))} />
         <div class={`stack ${n.enabled ? '' : 'is-disabled'}`}>
+          <LimitNote name="newsFeeds" count={n.feeds.length} />
           {n.feeds.length === 0 ? (
             <Empty icon="news" title={t('Sin feeds')}>
               {t('Añade la URL RSS de tu periódico favorito.')}

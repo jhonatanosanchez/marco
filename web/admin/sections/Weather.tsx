@@ -3,6 +3,7 @@ import { HaEntityPicker } from '../components/HaEntityPicker';
 import { Icon } from '../components/icons';
 import { Button, Callout, Card, Field, NumberInput, PageHeader, Segmented, TextInput, ToggleRow } from '../components/ui';
 import { ScopeBadge } from '../components/ui';
+import { has } from '../caps';
 import { getLang, t } from '../i18n';
 import type { SectionProps } from './common';
 
@@ -18,7 +19,8 @@ interface GeoResult {
 
 export function WeatherSection({ cfg, set, errors }: SectionProps) {
   const w = cfg.weather;
-  const haOn = cfg.homeassistant.enabled;
+  const haOffered = has('homeassistant');
+  const haOn = haOffered && cfg.homeassistant.enabled;
   const [q, setQ] = useState('');
   const [results, setResults] = useState<GeoResult[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -44,21 +46,25 @@ export function WeatherSection({ cfg, set, errors }: SectionProps) {
       <Card id="wx-main" title={t('Tiempo')} icon="cloud">
         <ToggleRow label={<>{t('Mostrar el tiempo')} <ScopeBadge scope="screen" /></>} checked={w.enabled} onChange={(v) => set((d) => void (d.weather.enabled = v))} />
         <div class={`stack ${w.enabled ? '' : 'is-disabled'}`}>
-          <Field label={<>{t('Fuente de datos')} <ScopeBadge scope="global" /></>}>
-            <Segmented
-              full
-              value={w.provider}
-              options={[
-                { value: 'open-meteo', label: 'Open-Meteo', icon: 'globe' },
-                { value: 'homeassistant', label: 'Home Assistant', icon: 'home' },
-              ]}
-              onChange={(v) => set((d) => void (d.weather.provider = v))}
-            />
-          </Field>
-          {w.provider === 'homeassistant' && !haOn && (
-            <Callout kind="warn">
-              {t('Activa y configura Home Assistant en')} <a href="#/homeassistant">Home Assistant</a>.
-            </Callout>
+          {haOffered && (
+            <>
+              <Field label={<>{t('Fuente de datos')} <ScopeBadge scope="global" /></>}>
+                <Segmented
+                  full
+                  value={w.provider}
+                  options={[
+                    { value: 'open-meteo', label: 'Open-Meteo', icon: 'globe' },
+                    { value: 'homeassistant', label: 'Home Assistant', icon: 'home' },
+                  ]}
+                  onChange={(v) => set((d) => void (d.weather.provider = v))}
+                />
+              </Field>
+              {w.provider === 'homeassistant' && !haOn && (
+                <Callout kind="warn">
+                  {t('Activa y configura Home Assistant en')} <a href="#/homeassistant">Home Assistant</a>.
+                </Callout>
+              )}
+            </>
           )}
           <Field label={t('Ubicación')} hint={t('Busca una ciudad para rellenar las coordenadas.')}>
             <form class="search-row" onSubmit={search}>
@@ -132,31 +138,33 @@ export function WeatherSection({ cfg, set, errors }: SectionProps) {
           <ToggleRow icon="☔" label={t('Probabilidad de lluvia')} checked={w.showPrecipChance} onChange={(v) => set((d) => void (d.weather.showPrecipChance = v))} />
         </div>
       </Card>
-      <Card id="wx-ha" scope="global" title={t('Datos de Home Assistant')} icon="home" desc={t('Opcional: usa tu estación meteorológica y sensores interiores.')} muted={!haOn}>
-        <div class="grid grid--3">
-          <Field label={t('Entidad del tiempo')} error={errors['weather.haWeatherEntity']}>
-            <HaEntityPicker domain="weather" enabled={haOn} value={w.haWeatherEntity} error={!!errors['weather.haWeatherEntity']} onChange={(v) => set((d) => void (d.weather.haWeatherEntity = v))} />
-          </Field>
-          <Field label={t('Temperatura interior')}>
-            <HaEntityPicker
-              domain="sensor"
-              enabled={haOn}
-              value={w.haIndoorTempEntity}
-              filter={(e) => !e.unit || /°|c|f/i.test(e.unit)}
-              onChange={(v) => set((d) => void (d.weather.haIndoorTempEntity = v))}
-            />
-          </Field>
-          <Field label={t('Humedad interior')}>
-            <HaEntityPicker
-              domain="sensor"
-              enabled={haOn}
-              value={w.haIndoorHumidityEntity}
-              filter={(e) => !e.unit || e.unit === '%'}
-              onChange={(v) => set((d) => void (d.weather.haIndoorHumidityEntity = v))}
-            />
-          </Field>
-        </div>
-      </Card>
+      {haOffered && (
+        <Card id="wx-ha" scope="global" title={t('Datos de Home Assistant')} icon="home" desc={t('Opcional: usa tu estación meteorológica y sensores interiores.')} muted={!haOn}>
+          <div class="grid grid--3">
+            <Field label={t('Entidad del tiempo')} error={errors['weather.haWeatherEntity']}>
+              <HaEntityPicker domain="weather" enabled={haOn} value={w.haWeatherEntity} error={!!errors['weather.haWeatherEntity']} onChange={(v) => set((d) => void (d.weather.haWeatherEntity = v))} />
+            </Field>
+            <Field label={t('Temperatura interior')}>
+              <HaEntityPicker
+                domain="sensor"
+                enabled={haOn}
+                value={w.haIndoorTempEntity}
+                filter={(e) => !e.unit || /°|c|f/i.test(e.unit)}
+                onChange={(v) => set((d) => void (d.weather.haIndoorTempEntity = v))}
+              />
+            </Field>
+            <Field label={t('Humedad interior')}>
+              <HaEntityPicker
+                domain="sensor"
+                enabled={haOn}
+                value={w.haIndoorHumidityEntity}
+                filter={(e) => !e.unit || e.unit === '%'}
+                onChange={(v) => set((d) => void (d.weather.haIndoorHumidityEntity = v))}
+              />
+            </Field>
+          </div>
+        </Card>
+      )}
     </>
   );
 }

@@ -22,6 +22,8 @@ import {
   ToggleRow,
   useReorder,
 } from '../components/ui';
+import { atLimit, has, offers } from '../caps';
+import { LimitNote } from '../components/LimitNote';
 import { t } from '../i18n';
 import { allSourceOptions, guessKind, HOLIDAY_PRESETS, isHttpUrl, KIND_EMOJI, moveItem, SWATCHES, uid } from '../util';
 import type { SectionProps } from './common';
@@ -139,7 +141,7 @@ function SourceRow({
             <span>{t('Actualizar cada')}</span>
             <NumberInput value={src.refreshMin} min={1} max={1440} suffix="min" error={!!errors[`${p}.refreshMin`]} onValue={(v) => update((s) => void (s.refreshMin = v))} />
           </label>
-          {src.type === 'ics' && (
+          {src.type === 'ics' && (has('insecureTls') || !!src.insecureTls) && (
             <label class="mini-toggle" title={t('Acepta certificados HTTPS autofirmados (solo en tu red local)')}>
               <Toggle size="sm" checked={!!src.insecureTls} onChange={(v) => update((s) => void (s.insecureTls = v))} />
               <span>{t('Certificado autofirmado')}</span>
@@ -243,7 +245,7 @@ function GoogleAccounts({ cfg, set, me, dirty, save }: SectionProps) {
   const toggleCal = (email: string, c: GoogleCalendarListItem, on: boolean) =>
     set((d) => {
       if (on) {
-        if (isOn(email, c.id)) return;
+        if (isOn(email, c.id) || atLimit('sources', d.calendar.sources.length)) return;
         d.calendar.sources.push({
           id: uid('c'),
           type: 'google',
@@ -316,7 +318,7 @@ function GoogleAccounts({ cfg, set, me, dirty, save }: SectionProps) {
                       return (
                         <li>
                           <label class={`gcal ${on ? 'is-on' : ''}`}>
-                            <input type="checkbox" checked={on} onChange={(e) => toggleCal(a.email, c, e.currentTarget.checked)} />
+                            <input type="checkbox" checked={on} disabled={!on && atLimit('sources', cfg.calendar.sources.length)} onChange={(e) => toggleCal(a.email, c, e.currentTarget.checked)} />
                             <span class="check-box">
                               <Icon name="check" size={12} />
                             </span>
@@ -406,8 +408,10 @@ export function CalendarsSection(props: SectionProps) {
   const move = (from: number, to: number) => set((d) => void (d.calendar.sources = moveItem(d.calendar.sources, from, to)));
   const reorder = useReorder(move);
 
+  const atMax = atLimit('sources', sources.length);
   const addIcs = (name = '', url = '', kind: SourceKind = 'generic') =>
     set((d) => {
+      if (atLimit('sources', d.calendar.sources.length)) return;
       d.calendar.sources.push({
         id: uid('c'),
         type: 'ics',
@@ -437,7 +441,7 @@ export function CalendarsSection(props: SectionProps) {
         icon="link"
         desc={t('Cada calendario tiene su color y emoji. El orden define la prioridad en la leyenda.')}
         actions={
-          <Button icon="plus" variant="primary" size="sm" onClick={() => addIcs()}>
+          <Button icon="plus" variant="primary" size="sm" disabled={atMax} onClick={() => addIcs()}>
             {t('Añadir URL iCal')}
           </Button>
         }
@@ -468,20 +472,21 @@ export function CalendarsSection(props: SectionProps) {
             ))}
           </div>
         )}
+        <LimitNote name="sources" count={sources.length} />
         <div class="quick-add">
           <span class="muted small">{t('Añadir rápido:')}</span>
           {HOLIDAY_PRESETS.filter((p) => !sources.some((s) => s.url === p.url)).map((p) => (
-            <button type="button" class="pill" onClick={() => addIcs(t(p.name), p.url, 'holidays')}>
+            <button type="button" class="pill" disabled={atMax} onClick={() => addIcs(t(p.name), p.url, 'holidays')}>
               🎉 {t(p.name)}
             </button>
           ))}
-          <button type="button" class="pill" onClick={() => addIcs('Airbnb', '', 'airbnb')}>
+          <button type="button" class="pill" disabled={atMax} onClick={() => addIcs('Airbnb', '', 'airbnb')}>
             🏠 {t('Reservas Airbnb')}
           </button>
         </div>
       </Card>
 
-      <GoogleAccounts {...props} />
+      {offers('googleCalendar') && <GoogleAccounts {...props} />}
 
       <ScreenSourcesCard {...props} />
 

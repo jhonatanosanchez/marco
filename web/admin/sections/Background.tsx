@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import type { AdminPhoto } from '../../shared/types';
 import { api } from '../api';
 import { Callout, Card, Field, PageHeader, Segmented, Select, Slider, TextInput, ToggleRow } from '../components/ui';
+import { has } from '../caps';
 import { t } from '../i18n';
 import type { SectionProps } from './common';
 
@@ -17,7 +18,8 @@ function intervalLabel(s: number) {
 export function BackgroundSection({ cfg, set, errors }: SectionProps) {
   const b = cfg.background;
   const fx = b.weatherFx ?? 'simple';
-  const usesGallery = b.source !== 'stock';
+  const galleryOn = has('gallery');
+  const usesGallery = galleryOn && b.source !== 'stock';
   const [gallery, setGallery] = useState<AdminPhoto[] | null>(null);
   useEffect(() => {
     if (usesGallery && gallery === null) api.photos().then(setGallery, () => setGallery([]));
@@ -30,19 +32,21 @@ export function BackgroundSection({ cfg, set, errors }: SectionProps) {
       <Card id="bg-photos" scope="screen" title={t('Fotos de fondo')} icon="image">
         <ToggleRow label={t('Mostrar fotos de fondo')} checked={b.enabled} onChange={(v) => set((d) => void (d.background.enabled = v))} />
         <div class={`stack ${b.enabled ? '' : 'is-disabled'}`}>
-          <Field label={t('Origen')}>
-            <Segmented
-              full
-              value={b.source}
-              options={[
-                { value: 'stock', label: t('Stock'), icon: 'globe' },
-                { value: 'gallery', label: t('Mi galería'), icon: 'photos' },
-                { value: 'mixed', label: t('Mezcla'), icon: 'sparkles' },
-              ]}
-              onChange={(v) => set((d) => void (d.background.source = v))}
-            />
-          </Field>
-          {b.source !== 'gallery' && (
+          {galleryOn && (
+            <Field label={t('Origen')}>
+              <Segmented
+                full
+                value={b.source}
+                options={[
+                  { value: 'stock', label: t('Stock'), icon: 'globe' },
+                  { value: 'gallery', label: t('Mi galería'), icon: 'photos' },
+                  { value: 'mixed', label: t('Mezcla'), icon: 'sparkles' },
+                ]}
+                onChange={(v) => set((d) => void (d.background.source = v))}
+              />
+            </Field>
+          )}
+          {(!galleryOn || b.source !== 'gallery') && (
             <Field label={t('Tema de las fotos de stock')} hint={t('Palabra clave orientativa (p. ej. naturaleza, mar, montaña).')}>
               <TextInput value={b.stockTopic} onValue={(v) => set((d) => void (d.background.stockTopic = v))} placeholder="nature" />
             </Field>

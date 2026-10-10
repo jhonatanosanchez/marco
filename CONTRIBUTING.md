@@ -19,6 +19,7 @@ Requirements: Node.js 20 or newer (22 LTS recommended). No native modules and no
 ```bash
 npm test                 # server tests (node --test)
 npx tsc --noEmit -p .    # type check (display + admin)
+npm run contract         # if you changed web/admin/api.ts or web/shared/types.ts (CI checks it is up to date)
 npm run build            # production build
 shellcheck install.sh deploy/*.sh deploy/marco scripts/*.sh   # if you changed a shell script
 ```

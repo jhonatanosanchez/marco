@@ -7,6 +7,7 @@ import { toast } from '../components/feedback';
 import { Icon } from '../components/icons';
 import { Button, Callout, Card, Empty, StatusDot } from '../components/ui';
 import { daysBetween, eventDay, eventTimeLabel, fmtDay, relDays, todayIn } from '../dates';
+import { has, runtime } from '../caps';
 import { formatDuration, locale, nScreens, relTime, t } from '../i18n';
 import type { SectionProps } from './common';
 
@@ -36,6 +37,8 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
   const [dash, setDash] = useState<DashboardResponse | null>(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState('');
+  const cmdsOn = has('displayCommands');
+  const annOn = has('announcements');
   const [, tick] = useState(0);
 
   const load = async () => {
@@ -91,7 +94,8 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
             {d && (
               <>
                 {' · '}
-                {t('servidor v{v}', { v: d.version })} · {t('activo {d}', { d: formatDuration(d.uptime) })}
+                {t('servidor v{v}', { v: d.version })}
+                {d.uptime != null && runtime() !== 'workers' && <> · {t('activo {d}', { d: formatDuration(d.uptime) })}</>}
               </>
             )}
           </p>
@@ -125,29 +129,35 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
         );
       })}
 
-      <Card title={t('Acciones rápidas')} icon="zap">
-        <div class="quick-actions">
-          <Button icon="refresh" loading={busy === 'reload'} onClick={() => cmd('reload', () => api.refreshDisplays(), t('Pantallas recargándose…'))}>
-            {t('Refrescar pantallas')}
-          </Button>
-          <Button icon="target" loading={busy === 'identify'} onClick={() => cmd('identify', () => api.displayCommand({ action: 'identify' }), t('Identificando pantallas'))}>
-            {t('Identificar')}
-          </Button>
-          <div class="btn-group" role="group" aria-label={t('Modo noche')}>
-            <Button icon="moon" loading={busy === 'night-on'} onClick={() => night('on')} title={t('Modo noche ahora en todas las pantallas')}>
-              {t('Noche')}
-            </Button>
-            <Button icon="sun" loading={busy === 'night-off'} onClick={() => night('off')} title={t('Quitar el modo noche ahora')}>
-              {t('Día')}
-            </Button>
-            <Button icon="clock" loading={busy === 'night-auto'} onClick={() => night('auto')} title={t('Volver al horario automático')}>
-              {t('Auto')}
-            </Button>
-          </div>
-        </div>
-        <div class="divider-line" />
-        <AnnounceForm compact screens={saved.screens} onSent={() => setTimeout(load, 800)} />
-      </Card>
+      {(cmdsOn || annOn) && (
+        <Card title={t('Acciones rápidas')} icon="zap">
+          {cmdsOn && (
+            <>
+              <div class="quick-actions">
+                <Button icon="refresh" loading={busy === 'reload'} onClick={() => cmd('reload', () => api.refreshDisplays(), t('Pantallas recargándose…'))}>
+                  {t('Refrescar pantallas')}
+                </Button>
+                <Button icon="target" loading={busy === 'identify'} onClick={() => cmd('identify', () => api.displayCommand({ action: 'identify' }), t('Identificando pantallas'))}>
+                  {t('Identificar')}
+                </Button>
+                <div class="btn-group" role="group" aria-label={t('Modo noche')}>
+                  <Button icon="moon" loading={busy === 'night-on'} onClick={() => night('on')} title={t('Modo noche ahora en todas las pantallas')}>
+                    {t('Noche')}
+                  </Button>
+                  <Button icon="sun" loading={busy === 'night-off'} onClick={() => night('off')} title={t('Quitar el modo noche ahora')}>
+                    {t('Día')}
+                  </Button>
+                  <Button icon="clock" loading={busy === 'night-auto'} onClick={() => night('auto')} title={t('Volver al horario automático')}>
+                    {t('Auto')}
+                  </Button>
+                </div>
+              </div>
+              {annOn && <div class="divider-line" />}
+            </>
+          )}
+          {annOn && <AnnounceForm compact screens={saved.screens} onSent={() => setTimeout(load, 800)} />}
+        </Card>
+      )}
 
       <div class="dash-grid">
         <Card

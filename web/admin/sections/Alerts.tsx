@@ -7,6 +7,7 @@ import { Icon } from '../components/icons';
 import { Button, Card, EmojiPicker, Empty, Field, Modal, PageHeader, Slider, Textarea, TextInput, Toggle, ToggleRow, WeekdayPicker } from '../components/ui';
 import { addDays, fmtDateTime, fmtDay, todayIn, weekdayNames, weekdayOf } from '../dates';
 import { relTime, t } from '../i18n';
+import { has } from '../caps';
 import { takeIntent } from '../intent';
 import { clone, TIME_RE, uid } from '../util';
 import type { SectionProps } from './common';
@@ -202,8 +203,11 @@ export function AlertsSection({ full, setFull, cfg, set, errors, saved }: Sectio
   const tz = cfg.datetime.timezone;
   const wd = weekdayNames('short');
   const al = cfg.alerts;
+  const ann = has('announcements');
+  const schedOn = has('schedules');
 
   const load = async () => {
+    if (!ann) return;
     try {
       setData(await api.announcements());
       setErr('');
@@ -256,110 +260,116 @@ export function AlertsSection({ full, setFull, cfg, set, errors, saved }: Sectio
     <>
       <PageHeader title={t('Avisos')} desc={t('Mensajes que aparecen sobre el calendario: al momento, programados o desde Home Assistant (ver “API y webhooks”).')} />
 
-      <Card title={t('Enviar un aviso ahora')} icon="megaphone" id="al-send" scope="global">
-        <AnnounceForm screens={saved.screens} onSent={() => load()} />
-      </Card>
+      {ann && (
+        <Card title={t('Enviar un aviso ahora')} icon="megaphone" id="al-send" scope="global">
+          <AnnounceForm screens={saved.screens} onSent={() => load()} />
+        </Card>
+      )}
 
-      <Card
-        title={t('Avisos activos')}
-        icon="bell"
-        id="al-active"
-        desc={active.length ? t('{n} en pantalla ahora', { n: active.length }) : undefined}
-        actions={
-          active.length > 1 && (
-            <Button size="sm" variant="ghost" icon="x" onClick={clearAll}>
-              {t('Quitar todos')}
-            </Button>
-          )
-        }
-      >
-        {err && !data ? (
-          <div class="err-text small">{err}</div>
-        ) : active.length === 0 ? (
-          <div class="muted small">{t('No hay avisos en pantalla.')}</div>
-        ) : (
-          <ul class="ann-list">
-            {active.map((a) => (
-              <li class={`ann ann--${a.style}`}>
-                <span class="ann__emoji">{a.emoji || ALERT_STYLES.find((s) => s.value === a.style)?.emoji}</span>
-                <div class="ann__main">
-                  <strong>{a.title || a.body}</strong>
-                  {a.title && a.body && <p>{a.body}</p>}
-                  <span class="muted small">
-                    {screenNames(a.screenIds, full.screens)} · {a.via === 'hook' ? `⚡ ${a.by.replace(/^token:/, '')}` : a.by} · {relTime(a.createdAt)}
-                  </span>
-                  <Remaining a={a} />
-                </div>
-                <Button size="sm" variant="ghost" icon="x" onClick={() => clearOne(a)}>
-                  {t('Quitar')}
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      <Card
-        title={t('Mensajes programados')}
-        icon="clock"
-        id="al-sched"
-        scope="global"
-        desc={t('Se muestran automáticamente en una franja horaria, p. ej. “🗑️ Sacar la basura” martes y viernes de 20:00 a 22:00.')}
-        actions={
-          <Button size="sm" variant="primary" icon="plus" onClick={() => setEditing({ m: newSchedule(), isNew: true })} disabled={sched.length >= 100}>
-            {t('Nuevo')}
-          </Button>
-        }
-      >
-        {sched.length === 0 ? (
-          <Empty icon="clock" title={t('Sin mensajes programados')}>
-            <Button
-              variant="default"
-              icon="plus"
-              onClick={() => setEditing({ m: { ...newSchedule(), title: t('Sacar la basura') }, isNew: true })}
-            >
-              🗑️ {t('Sacar la basura (mar y vie, 20–22 h)')}
-            </Button>
-          </Empty>
-        ) : (
-          <ul class="sched-list">
-            {sched.map((m) => {
-              const on = scheduleActive(m, tz);
-              const bad = Object.keys(errors).some((k) => k.startsWith(`sched.${m.id}.`));
-              return (
-                <li class={`sched sched--${m.style} ${m.enabled ? '' : 'is-off'} ${bad ? 'has-err' : ''}`}>
-                  <button type="button" class="sched__main" onClick={() => setEditing({ m, isNew: false })}>
-                    <span class="sched__emoji">{m.emoji || '🗓️'}</span>
-                    <span class="sched__text">
-                      <strong>
-                        {m.title || t('Sin título')}
-                        {on && <span class="badge badge--ok">{t('Activo ahora')}</span>}
-                        {m.sound && <Icon name="volume" size={13} class="muted" />}
-                      </strong>
-                      <span class="muted small">
-                        {scheduleWhen(m, wd)}
-                        {full.screens.length > 1 && ` · ${screenNames(m.screenIds, full.screens)}`}
-                      </span>
+      {ann && (
+        <Card
+          title={t('Avisos activos')}
+          icon="bell"
+          id="al-active"
+          desc={active.length ? t('{n} en pantalla ahora', { n: active.length }) : undefined}
+          actions={
+            active.length > 1 && (
+              <Button size="sm" variant="ghost" icon="x" onClick={clearAll}>
+                {t('Quitar todos')}
+              </Button>
+            )
+          }
+        >
+          {err && !data ? (
+            <div class="err-text small">{err}</div>
+          ) : active.length === 0 ? (
+            <div class="muted small">{t('No hay avisos en pantalla.')}</div>
+          ) : (
+            <ul class="ann-list">
+              {active.map((a) => (
+                <li class={`ann ann--${a.style}`}>
+                  <span class="ann__emoji">{a.emoji || ALERT_STYLES.find((s) => s.value === a.style)?.emoji}</span>
+                  <div class="ann__main">
+                    <strong>{a.title || a.body}</strong>
+                    {a.title && a.body && <p>{a.body}</p>}
+                    <span class="muted small">
+                      {screenNames(a.screenIds, full.screens)} · {a.via === 'hook' ? `⚡ ${a.by.replace(/^token:/, '')}` : a.by} · {relTime(a.createdAt)}
                     </span>
-                    {bad && <span class="nav__err">!</span>}
-                  </button>
-                  <Toggle
-                    size="sm"
-                    checked={m.enabled}
-                    label={t('Activo')}
-                    onChange={(v) =>
-                      setFull((d) => {
-                        const x = d.schedules.items.find((y) => y.id === m.id);
-                        if (x) x.enabled = v;
-                      })
-                    }
-                  />
+                    <Remaining a={a} />
+                  </div>
+                  <Button size="sm" variant="ghost" icon="x" onClick={() => clearOne(a)}>
+                    {t('Quitar')}
+                  </Button>
                 </li>
-              );
-            })}
-          </ul>
-        )}
-      </Card>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
+
+      {schedOn && (
+        <Card
+          title={t('Mensajes programados')}
+          icon="clock"
+          id="al-sched"
+          scope="global"
+          desc={t('Se muestran automáticamente en una franja horaria, p. ej. “🗑️ Sacar la basura” martes y viernes de 20:00 a 22:00.')}
+          actions={
+            <Button size="sm" variant="primary" icon="plus" onClick={() => setEditing({ m: newSchedule(), isNew: true })} disabled={sched.length >= 100}>
+              {t('Nuevo')}
+            </Button>
+          }
+        >
+          {sched.length === 0 ? (
+            <Empty icon="clock" title={t('Sin mensajes programados')}>
+              <Button
+                variant="default"
+                icon="plus"
+                onClick={() => setEditing({ m: { ...newSchedule(), title: t('Sacar la basura') }, isNew: true })}
+              >
+                🗑️ {t('Sacar la basura (mar y vie, 20–22 h)')}
+              </Button>
+            </Empty>
+          ) : (
+            <ul class="sched-list">
+              {sched.map((m) => {
+                const on = scheduleActive(m, tz);
+                const bad = Object.keys(errors).some((k) => k.startsWith(`sched.${m.id}.`));
+                return (
+                  <li class={`sched sched--${m.style} ${m.enabled ? '' : 'is-off'} ${bad ? 'has-err' : ''}`}>
+                    <button type="button" class="sched__main" onClick={() => setEditing({ m, isNew: false })}>
+                      <span class="sched__emoji">{m.emoji || '🗓️'}</span>
+                      <span class="sched__text">
+                        <strong>
+                          {m.title || t('Sin título')}
+                          {on && <span class="badge badge--ok">{t('Activo ahora')}</span>}
+                          {m.sound && <Icon name="volume" size={13} class="muted" />}
+                        </strong>
+                        <span class="muted small">
+                          {scheduleWhen(m, wd)}
+                          {full.screens.length > 1 && ` · ${screenNames(m.screenIds, full.screens)}`}
+                        </span>
+                      </span>
+                      {bad && <span class="nav__err">!</span>}
+                    </button>
+                    <Toggle
+                      size="sm"
+                      checked={m.enabled}
+                      label={t('Activo')}
+                      onChange={(v) =>
+                        setFull((d) => {
+                          const x = d.schedules.items.find((y) => y.id === m.id);
+                          if (x) x.enabled = v;
+                        })
+                      }
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
+      )}
 
       <Card title={t('Avisos en esta pantalla')} icon="volume" id="al-screen" scope="screen">
         <ToggleRow label={t('Mostrar avisos y mensajes programados')} hint={t('Si lo desactivas, esta pantalla no recibe ningún aviso.')} checked={al.enabled} onChange={(v) => set((d) => void (d.alerts.enabled = v))} />
@@ -380,53 +390,55 @@ export function AlertsSection({ full, setFull, cfg, set, errors, saved }: Sectio
         </div>
       </Card>
 
-      <Card
-        title={t('Historial')}
-        icon="history"
-        id="al-history"
-        actions={
-          <Button size="sm" variant="ghost" onClick={() => setShowHist(!showHist)}>
-            {showHist ? t('Ocultar') : t('Mostrar ({n})', { n: data?.history.length ?? 0 })}
-          </Button>
-        }
-      >
-        {showHist &&
-          (!data?.history.length ? (
-            <div class="muted small">{t('Todavía no se ha enviado ningún aviso.')}</div>
-          ) : (
-            <div class="table-wrap">
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th>{t('Aviso')}</th>
-                    <th>{t('Enviado')}</th>
-                    <th>{t('Origen')}</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.history.map((a) => (
+      {ann && (
+        <Card
+          title={t('Historial')}
+          icon="history"
+          id="al-history"
+          actions={
+            <Button size="sm" variant="ghost" onClick={() => setShowHist(!showHist)}>
+              {showHist ? t('Ocultar') : t('Mostrar ({n})', { n: data?.history.length ?? 0 })}
+            </Button>
+          }
+        >
+          {showHist &&
+            (!data?.history.length ? (
+              <div class="muted small">{t('Todavía no se ha enviado ningún aviso.')}</div>
+            ) : (
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
                     <tr>
-                      <td>
-                        <span class={`style-dot style-dot--${a.style}`} /> {a.emoji} <strong>{a.title || a.body}</strong>
-                        {a.clearedAt && <span class="muted small"> · {t('retirado')}</span>}
-                      </td>
-                      <td class="muted" title={a.createdAt}>
-                        {fmtDateTime(a.createdAt)}
-                      </td>
-                      <td class="muted">{a.via === 'hook' ? `⚡ ${a.by.replace(/^token:/, '')}` : a.by}</td>
-                      <td class="num">
-                        <Button size="sm" variant="ghost" icon="refresh" onClick={() => resend(a)}>
-                          {t('Reenviar')}
-                        </Button>
-                      </td>
+                      <th>{t('Aviso')}</th>
+                      <th>{t('Enviado')}</th>
+                      <th>{t('Origen')}</th>
+                      <th />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ))}
-      </Card>
+                  </thead>
+                  <tbody>
+                    {data.history.map((a) => (
+                      <tr>
+                        <td>
+                          <span class={`style-dot style-dot--${a.style}`} /> {a.emoji} <strong>{a.title || a.body}</strong>
+                          {a.clearedAt && <span class="muted small"> · {t('retirado')}</span>}
+                        </td>
+                        <td class="muted" title={a.createdAt}>
+                          {fmtDateTime(a.createdAt)}
+                        </td>
+                        <td class="muted">{a.via === 'hook' ? `⚡ ${a.by.replace(/^token:/, '')}` : a.by}</td>
+                        <td class="num">
+                          <Button size="sm" variant="ghost" icon="refresh" onClick={() => resend(a)}>
+                            {t('Reenviar')}
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+        </Card>
+      )}
 
       {editing && (
         <ScheduleEditor

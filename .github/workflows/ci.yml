@@ -25,6 +25,7 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npx tsc --noEmit -p .
+      - run: node scripts/gen-contract.mjs --check
       - run: npm run build
       - run: shellcheck install.sh deploy/*.sh deploy/marco scripts/*.sh
 

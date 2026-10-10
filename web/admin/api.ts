@@ -32,6 +32,8 @@ import type {
   SetupStatus,
   StoredConfig,
   GoogleAccount,
+  HealthResponse,
+  HouseholdInfo,
   GoogleCalendarListItem,
   HaEntity,
   TestHomeAssistantResponse,
@@ -106,10 +108,15 @@ const q = (params: Record<string, string | number | undefined | null>) => {
 };
 
 export const api = {
+  health: () => request<HealthResponse>('GET', '/api/health', undefined, { silent401: true }),
   me: () => request<AuthMeResponse>('GET', '/api/auth/me', undefined, { silent401: true }),
   login: (password: string) => request<unknown>('POST', '/api/auth/login', { password }, { silent401: true }),
   logout: () => request<unknown>('POST', '/api/auth/logout', {}, { silent401: true }),
   logoutAll: () => request<unknown>('POST', '/api/auth/logout-all', {}, { silent401: true }),
+
+  // Marco Cloud account (features.accountMenu): the language follows the account, the household can be renamed.
+  accountLang: (lang: string) => request<{ ok: true }>('POST', '/api/account/lang', { lang }),
+  renameHousehold: (name: string) => request<{ ok: true; household: HouseholdInfo }>('PATCH', '/api/admin/household', { name }),
 
   // First-run setup wizard (no session yet; the optional setup token travels in x-setup-token).
   setupStatus: (token?: string) =>

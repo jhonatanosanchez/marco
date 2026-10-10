@@ -3,10 +3,13 @@ import type { AdminStatus } from '../../shared/types';
 import { api, ApiError } from '../api';
 import { Icon } from '../components/icons';
 import { Button, Card, Empty, PageHeader, StatusDot } from '../components/ui';
+import { has, runtime } from '../caps';
 import { formatDuration, relTime, t } from '../i18n';
 import type { SectionProps } from './common';
 
 export function StatusSection({ cfg }: SectionProps) {
+  const newsOn = has('news');
+  const showUptime = runtime() !== 'workers';
   const [st, setSt] = useState<AdminStatus | null>(null);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
@@ -83,31 +86,35 @@ export function StatusSection({ cfg }: SectionProps) {
                 <div class="stat__label">{t('Tiempo')}</div>
               </div>
             </div>
-            <div class="stat">
-              <span class="stat__icon">
-                <Icon name="news" size={18} />
-              </span>
-              <div>
-                <div class="stat__value stat__value--text">
-                  {st ? <StatusDot state={st.news.ok ? 'ok' : 'error'} /> : null} {st ? relTime(st.news.updatedAt) : '–'}
-                </div>
-                <div class="stat__label">
-                  {t('Noticias')}
-                  {st?.news.count != null && ` · ${st.news.count}`}
+            {newsOn && (
+              <div class="stat">
+                <span class="stat__icon">
+                  <Icon name="news" size={18} />
+                </span>
+                <div>
+                  <div class="stat__value stat__value--text">
+                    {st ? <StatusDot state={st.news.ok ? 'ok' : 'error'} /> : null} {st ? relTime(st.news.updatedAt) : '–'}
+                  </div>
+                  <div class="stat__label">
+                    {t('Noticias')}
+                    {st?.news.count != null && ` · ${st.news.count}`}
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="stat">
-              <span class="stat__icon">
-                <Icon name="activity" size={18} />
-              </span>
-              <div>
-                <div class="stat__value">{st ? formatDuration(st.uptime) : '–'}</div>
-                <div class="stat__label">{t('Servidor activo')}</div>
+            )}
+            {showUptime && (
+              <div class="stat">
+                <span class="stat__icon">
+                  <Icon name="activity" size={18} />
+                </span>
+                <div>
+                  <div class="stat__value">{st && st.uptime != null ? formatDuration(st.uptime) : '–'}</div>
+                  <div class="stat__label">{t('Servidor activo')}</div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
-          {st?.news.error && (
+          {newsOn && st?.news.error && (
             <div class="test-result is-err">
               <Icon name="alert" size={14} /> {t('Noticias')}: {st.news.error}
             </div>

@@ -193,6 +193,8 @@ export interface DisplayLinksResponse {
   lanAddresses?: string[];
   /** PUBLIC_URL origin when set to something else than localhost */
   publicUrl?: string | null;
+  /** Absolute origin that serves /d/<key> when it is not the admin's own (Marco Cloud) */
+  displayOrigin?: string;
 }
 
 export interface PairedDevice {
@@ -446,6 +448,10 @@ export interface Limits {
   hookCommandsPerDay?: number;
   /** bytes of custom CSS per screen */
   customCssBytes?: number;
+  /** list caps; absent = the config validator's own caps (web/admin/caps.ts BUILTIN_LIMITS) */
+  localEvents?: number;
+  birthdays?: number;
+  countdowns?: number;
 }
 
 export interface HealthResponse {
@@ -494,7 +500,12 @@ export interface AccountInfo {
   accountUrl: string;
   sessionsUrl: string;
   deleteUrl: string;
-  household: { name: string; role: 'owner' | 'member' };
+  household: HouseholdInfo;
+}
+
+export interface HouseholdInfo {
+  name: string;
+  role: 'owner' | 'member';
 }
 
 export interface AuthMeResponse {
@@ -647,7 +658,8 @@ export interface AdminStatus {
   weather: { ok: boolean; updatedAt: string | null };
   news: { ok: boolean; updatedAt: string | null; count?: number; error?: string | null };
   displays: number;
-  uptime: number;
+  /** seconds; null where there is no long-running process (Marco Cloud) */
+  uptime: number | null;
 }
 
 // =================================================================================================
@@ -1163,7 +1175,8 @@ export interface ActivityResponse {
 
 export interface DashboardResponse {
   version: string;
-  uptime: number;
+  /** seconds; null where there is no long-running process (Marco Cloud) */
+  uptime: number | null;
   revision: number;
   screens: { id: string; slug: string; name: string; isDefault: boolean; displaysOnline: number }[];
   displays: DisplayInfo[];

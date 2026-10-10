@@ -15,6 +15,8 @@ import { Login } from './Login';
 import { SetupWizard, takeSetupToken } from './Setup';
 import { Preview } from './Preview';
 import { SETTINGS_INDEX } from './searchIndex';
+import { caps as currentCaps, has, hasFeature, loadCaps, type Caps } from './caps';
+import { filterActions, filterNav, filterSettings, NAV_ITEMS, type NavMeta } from './navFilter';
 import { ActivitySection } from './sections/Activity';
 import { AlertsSection } from './sections/Alerts';
 import { ApiSection } from './sections/Api';
@@ -41,45 +43,39 @@ import { WeatherSection } from './sections/Weather';
 import { UNAUTHORIZED_EVENT } from './api';
 import { clone, produce, sectionForError, sectionForServerPath, validateAll, type Errors } from './util';
 
-interface NavItem {
-  id: string;
-  label: string;
-  icon: IconName;
-  group: string;
+interface NavItem extends NavMeta {
   comp: (p: SectionProps) => any;
-  enabled?: (c: AppConfig) => boolean;
-  /** page edits the selected screen (shows the switcher emphasised) */
-  perScreen?: boolean;
-  keywords?: string;
 }
 
-const NAV: NavItem[] = [
-  { id: 'home', label: 'Inicio', icon: 'home2', group: '', comp: HomeSection, keywords: 'dashboard resumen panel' },
-  { id: 'layout', label: 'Diseño', icon: 'layout', group: 'Pantalla', comp: LayoutSection, perScreen: true },
-  { id: 'background', label: 'Fondo', icon: 'image', group: 'Pantalla', comp: BackgroundSection, enabled: (c) => c.background.enabled, perScreen: true },
-  { id: 'screen', label: 'Ajustes', icon: 'settings', group: 'Pantalla', comp: ScreenSection, perScreen: true },
-  { id: 'datetime', label: 'Fecha y hora', icon: 'clock', group: 'Pantalla', comp: DateTimeSection, enabled: (c) => c.datetime.enabled, perScreen: true },
-  { id: 'calendars', label: 'Calendarios', icon: 'calendar', group: 'Contenido', comp: CalendarsSection, enabled: (c) => c.calendar.enabled },
-  { id: 'local', label: 'Eventos locales', icon: 'edit', group: 'Contenido', comp: LocalEventsSection, enabled: (c) => c.localEvents.enabled },
-  { id: 'birthdays', label: 'Cumpleaños', icon: 'cake', group: 'Contenido', comp: BirthdaysSection, enabled: (c) => c.birthdays.enabled },
-  { id: 'filters', label: 'Filtros y cambios', icon: 'filter', group: 'Contenido', comp: FiltersSection },
-  { id: 'icons', label: 'Iconos', icon: 'tag', group: 'Contenido', comp: IconRulesSection },
-  { id: 'countdowns', label: 'Cuentas atrás', icon: 'hourglass', group: 'Contenido', comp: CountdownsSection, enabled: (c) => c.countdowns.enabled },
-  { id: 'weather', label: 'Tiempo', icon: 'cloud', group: 'Contenido', comp: WeatherSection, enabled: (c) => c.weather.enabled },
-  { id: 'news', label: 'Noticias', icon: 'news', group: 'Contenido', comp: NewsSection, enabled: (c) => c.news.enabled },
-  { id: 'todo', label: 'Tareas', icon: 'checklist', group: 'Contenido', comp: TodoSection, enabled: (c) => c.todo.enabled },
-  { id: 'message', label: 'Mensaje', icon: 'message', group: 'Contenido', comp: MessageSection, enabled: (c) => c.message.enabled, perScreen: true },
-  { id: 'alerts', label: 'Avisos', icon: 'megaphone', group: 'Avisos', comp: AlertsSection, keywords: 'announce anuncios mensajes programados' },
-  { id: 'photos', label: 'Galería', icon: 'photos', group: 'Integraciones', comp: PhotosSection },
-  { id: 'homeassistant', label: 'Home Assistant', icon: 'home', group: 'Integraciones', comp: HomeAssistantSection, enabled: (c) => c.homeassistant.enabled },
-  { id: 'api', label: 'API y webhooks', icon: 'code', group: 'Integraciones', comp: ApiSection, keywords: 'tokens webhook' },
-  { id: 'screens', label: 'Pantallas', icon: 'monitor', group: 'Sistema', comp: ScreensSection, keywords: 'perfiles profiles' },
-  { id: 'displays', label: 'Pantallas conectadas', icon: 'wifi', group: 'Sistema', comp: DisplaysSection, keywords: 'kiosk dispositivos' },
-  { id: 'backups', label: 'Copias de seguridad', icon: 'archive', group: 'Sistema', comp: BackupsSection, keywords: 'backup export import' },
-  { id: 'activity', label: 'Actividad', icon: 'history', group: 'Sistema', comp: ActivitySection, keywords: 'log registro' },
-  { id: 'security', label: 'Seguridad', icon: 'shield', group: 'Sistema', comp: SecuritySection },
-  { id: 'status', label: 'Estado', icon: 'activity', group: 'Sistema', comp: StatusSection },
-];
+const SECTIONS: Record<string, (p: SectionProps) => any> = {
+  home: HomeSection,
+  layout: LayoutSection,
+  background: BackgroundSection,
+  screen: ScreenSection,
+  datetime: DateTimeSection,
+  calendars: CalendarsSection,
+  local: LocalEventsSection,
+  birthdays: BirthdaysSection,
+  filters: FiltersSection,
+  icons: IconRulesSection,
+  countdowns: CountdownsSection,
+  weather: WeatherSection,
+  news: NewsSection,
+  todo: TodoSection,
+  message: MessageSection,
+  alerts: AlertsSection,
+  photos: PhotosSection,
+  homeassistant: HomeAssistantSection,
+  api: ApiSection,
+  screens: ScreensSection,
+  displays: DisplaysSection,
+  backups: BackupsSection,
+  activity: ActivitySection,
+  security: SecuritySection,
+  status: StatusSection,
+};
+
+const NAV: NavItem[] = NAV_ITEMS.map((n) => ({ ...n, comp: SECTIONS[n.id] }));
 
 const parseHash = () => {
   const raw = location.hash.replace(/^#\/?/, '');
@@ -164,6 +160,7 @@ export function App() {
     return l;
   });
   const [me, setMe] = useState<AuthMeResponse | null>(null);
+  const [caps, setCapsState] = useState<Caps>(() => currentCaps());
   const [setup, setSetup] = useState<SetupStatus | null>(null);
   const [bootErr, setBootErr] = useState('');
   const [loginErr, setLoginErr] = useState<string | undefined>();
@@ -198,8 +195,10 @@ export function App() {
   /* ---------- boot & auth */
   const loadMe = useCallback(async () => {
     try {
-      const m = await api.me();
-      if (m.needsSetup) {
+      // Capabilities and the session in parallel; a server without /api/health keeps every feature on.
+      const [c, m] = await Promise.all([loadCaps(api.health), api.me()]);
+      setCapsState(c);
+      if (m.needsSetup && hasFeature(c, 'setupWizard')) {
         // Fresh install: the wizard replaces the login. First visit follows the browser language (server hint).
         const st = await api.setupStatus();
         if (st.needsSetup) {
@@ -491,6 +490,9 @@ export function App() {
     loadMe();
   };
 
+  /* ---------- pages the server offers (features in /api/health) */
+  const nav = useMemo(() => filterNav(NAV, caps), [caps]);
+
   /* ---------- command palette items */
   const paletteItems = useMemo<PaletteItem[]>(() => {
     if (!draft) return [];
@@ -499,12 +501,12 @@ export function App() {
     const gActions = t('Acciones');
     const gScreens = t('Pantallas');
     const gSettings = t('Ajustes');
-    const pageLabel = (id: string) => t(NAV.find((n) => n.id === id)?.label ?? id);
+    const pageLabel = (id: string) => t(nav.find((n) => n.id === id)?.label ?? id);
     const run = (r: string, intent?: string) => () => {
       if (intent) setIntent(r.split('/')[0], intent);
       go(r);
     };
-    items.push(
+    const actions: PaletteItem[] = [
       { id: 'a-announce', group: gActions, icon: 'megaphone', label: t('Enviar aviso'), keywords: 'announce alert notificación', run: run('alerts/al-send', 'focus') },
       { id: 'a-refresh', group: gActions, icon: 'refresh', label: t('Refrescar pantallas'), keywords: 'reload recargar', run: () => refreshDisplays() },
       { id: 'a-night-on', group: gActions, icon: 'moon', label: t('Modo noche ahora'), keywords: 'night dim noche', run: () => displayCommand('night', 'on') },
@@ -522,7 +524,8 @@ export function App() {
       { id: 'a-token', group: gActions, icon: 'key', label: t('Crear token de API'), keywords: 'token webhook home assistant', run: run('api/api-tokens', 'new') },
       { id: 'a-view', group: gActions, icon: 'external', label: t('Ver pantalla'), hint: curScreen?.name, run: () => window.open(`/?screen=${encodeURIComponent(savedSlug ?? '')}`, '_blank') },
       { id: 'a-theme', group: gActions, icon: 'moon', label: t('Cambiar tema del panel'), keywords: 'dark light theme', run: () => setAdminTheme((x) => (x === 'dark' ? 'light' : x === 'light' ? '' : 'dark')) },
-    );
+    ];
+    items.push(...filterActions(actions, caps));
     if (dirty) items.unshift({ id: 'a-save', group: gActions, icon: 'check', label: t('Guardar cambios'), keywords: 'save', run: () => save() });
     for (const s of draft.screens) {
       items.push({
@@ -538,15 +541,15 @@ export function App() {
         },
       });
     }
-    for (const n of NAV) items.push({ id: `p-${n.id}`, group: gPages, icon: n.icon, label: t(n.label), hint: n.group ? t(n.group) : undefined, keywords: n.keywords, run: run(n.id) });
-    SETTINGS_INDEX.forEach((s, i) =>
-      items.push({ id: `k-${i}`, group: gSettings, icon: NAV.find((n) => n.id === s.route)?.icon ?? 'settings', label: t(s.label), hint: pageLabel(s.route), keywords: s.keywords, run: run(s.anchor ? `${s.route}/${s.anchor}` : s.route) })
+    for (const n of nav) items.push({ id: `p-${n.id}`, group: gPages, icon: n.icon, label: t(n.label), hint: n.group ? t(n.group) : undefined, keywords: n.keywords, run: run(n.id) });
+    filterSettings(SETTINGS_INDEX, caps, nav.map((n) => n.id)).forEach((s) =>
+      items.push({ id: `k-${SETTINGS_INDEX.indexOf(s)}`, group: gSettings, icon: nav.find((n) => n.id === s.route)?.icon ?? 'settings', label: t(s.label), hint: pageLabel(s.route), keywords: s.keywords, run: run(s.anchor ? `${s.route}/${s.anchor}` : s.route) })
     );
     // individual items: birthdays, local events, rules
     for (const b of draft.birthdays.items) items.push({ id: `b-${b.id}`, group: t('Cumpleaños'), emoji: b.emoji || draft.birthdays.emoji || '🎂', label: b.name, hint: `${String(b.day).padStart(2, '0')}/${String(b.month).padStart(2, '0')}`, keywords: 'birthday cumpleaños', run: run('birthdays') });
     for (const e of draft.localEvents.items) items.push({ id: `l-${e.id}`, group: t('Eventos locales'), emoji: e.emoji || '📅', label: e.title, hint: e.date, keywords: 'evento local', run: run('local') });
     return items;
-  }, [draft, screenId, dirty, lang, savedSlug]);
+  }, [draft, screenId, dirty, lang, savedSlug, nav, caps]);
 
   /* ---------- render */
   const accent = view?.screen.accent && /^#[0-9a-f]{6}$/i.test(view.screen.accent) ? view.screen.accent : '#ff5a4e';
@@ -623,9 +626,10 @@ export function App() {
     );
   }
 
-  const current = NAV.find((n) => n.id === route) ?? NAV[0];
+  const current = nav.find((n) => n.id === route) ?? nav[0];
   const Section = current.comp;
-  const groups = [...new Set(NAV.map((n) => n.group))];
+  const groups = [...new Set(nav.map((n) => n.group))];
+  const liveCommands = has('displayCommands');
   const errCountBySection: Record<string, number> = {};
   if (showErrors || dirty) for (const k of errorKeys) errCountBySection[sectionForError(k)] = (errCountBySection[sectionForError(k)] ?? 0) + 1;
   const user = me.user;
@@ -678,7 +682,7 @@ export function App() {
                   {g === 'Pantalla' && multi && <span class="nav__title-scr">· {curScreen.name}</span>}
                 </div>
               )}
-              {NAV.filter((n) => n.group === g).map((n) => {
+              {nav.filter((n) => n.group === g).map((n) => {
                 const en = n.enabled?.(view);
                 const ec = errCountBySection[n.id];
                 const badge = n.id === 'displays' && displays ? onlineTotal : null;
@@ -758,9 +762,11 @@ export function App() {
               <Icon name="external" size={16} />
               <span>{t('Ver pantalla')}</span>
             </a>
-            <Button variant="ghost" icon="refresh" class="hide-sm hide-lg" onClick={() => refreshDisplays()}>
-              {t('Refrescar pantallas')}
-            </Button>
+            {liveCommands && (
+              <Button variant="ghost" icon="refresh" class="hide-sm hide-lg" onClick={() => refreshDisplays()}>
+                {t('Refrescar pantallas')}
+              </Button>
+            )}
             <button
               type="button"
               class={`icon-btn ${previewSide || sheet ? 'is-active' : ''}`}
@@ -789,16 +795,18 @@ export function App() {
                     <a class="menu__item show-lg" href={viewUrl} target="_blank" rel="noopener" onClick={() => setMenuOpen(false)}>
                       <Icon name="external" size={16} /> {t('Ver pantalla')} · {curScreen.name}
                     </a>
-                    <button
-                      type="button"
-                      class="menu__item show-lg"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        refreshDisplays();
-                      }}
-                    >
-                      <Icon name="refresh" size={16} /> {t('Refrescar pantallas')}
-                    </button>
+                    {liveCommands && (
+                      <button
+                        type="button"
+                        class="menu__item show-lg"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          refreshDisplays();
+                        }}
+                      >
+                        <Icon name="refresh" size={16} /> {t('Refrescar pantallas')}
+                      </button>
+                    )}
                     <a class="menu__item" href="#/displays" onClick={() => setMenuOpen(false)}>
                       <Icon name="wifi" size={16} /> {t('Pantallas conectadas')}
                     </a>

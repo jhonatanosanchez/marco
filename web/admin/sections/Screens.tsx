@@ -6,6 +6,8 @@ import { openPairDialog, shareOrigin } from '../components/DisplayAccess';
 import { confirmDialog, toast } from '../components/feedback';
 import { Icon } from '../components/icons';
 import { Button, Callout, Card, Field, Modal, PageHeader, ReorderButtons, Select, TextInput } from '../components/ui';
+import { atLimit, limit } from '../caps';
+import { LimitNote } from '../components/LimitNote';
 import { t } from '../i18n';
 import { takeIntent } from '../intent';
 import { clone, moveItem, uid } from '../util';
@@ -119,7 +121,7 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
   const linkOf = (id: string) => links?.links.find((l) => l.screenId === id);
 
   const duplicate = (s: ScreenProfile) => {
-    if (screens.length >= 12) return toast(t('Máximo 12 pantallas'), 'error');
+    if (atLimit('screens', screens.length)) return toast(t('Máximo {n} pantallas', { n: limit('screens') ?? screens.length }), 'error');
     const p = clone(s);
     p.id = uid('s');
     p.name = t('{name} (copia)', { name: s.name }).slice(0, 60);
@@ -194,10 +196,11 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
             ? t('Cada pantalla (salón, cocina, entrada…) tiene su propio diseño y widgets. Abre /?screen=<dirección> en cada dispositivo.')
             : t('Cada pantalla (salón, cocina, entrada…) tiene su propio diseño y widgets. Cada dispositivo abre el enlace privado de su pantalla o se vincula con un código.')
         }>
-        <Button variant="primary" icon="plus" disabled={screens.length >= 12} onClick={() => setCreating(true)}>
+        <Button variant="primary" icon="plus" disabled={atLimit('screens', screens.length)} onClick={() => setCreating(true)}>
           {t('Nueva pantalla')}
         </Button>
       </PageHeader>
+      <LimitNote name="screens" count={screens.length} />
       <div class="screen-cards" id="scr-list">
         {screens.map((s, i) => {
           const isDefault = s.id === full.defaultScreen;
@@ -280,7 +283,7 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
                   >
                     {s.id === screenId ? t('Editando') : t('Editar')}
                   </Button>
-                  <Button size="sm" variant="ghost" icon="copy" onClick={() => duplicate(s)}>
+                  <Button size="sm" variant="ghost" icon="copy" disabled={atLimit('screens', screens.length)} onClick={() => duplicate(s)}>
                     {t('Duplicar')}
                   </Button>
                   <a class="btn btn--ghost btn--sm" href={`/?screen=${encodeURIComponent(savedSlug ?? '')}`} target="_blank" rel="noopener">
@@ -357,7 +360,7 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
           screens={screens}
           onClose={() => setCreating(false)}
           onCreate={(p) => {
-            if (screens.length >= 12) return toast(t('Máximo 12 pantallas'), 'error');
+            if (atLimit('screens', screens.length)) return toast(t('Máximo {n} pantallas', { n: limit('screens') ?? screens.length }), 'error');
             setFull((d) => void d.screens.push(p));
             setScreenId(p.id);
             setCreating(false);

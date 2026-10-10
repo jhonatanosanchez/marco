@@ -6,6 +6,7 @@ import { OpenModeCallout, openPairDialog, PairedDevicesCard } from '../component
 import { Icon } from '../components/icons';
 import { Button, Callout, Card, Empty, PageHeader, StatusDot } from '../components/ui';
 import { fmtDateTime } from '../dates';
+import { has } from '../caps';
 import { formatDuration, relTime, nScreens, t } from '../i18n';
 import type { SectionProps } from './common';
 
@@ -103,7 +104,7 @@ function DisplayCard({ d, serverVersion, onCmd, onForget, busy }: { d: DisplayIn
         </div>
       )}
       <footer class="disp__actions">
-        {d.connected ? (
+        {d.connected && has('displayCommands') ? (
           <>
             <Button size="sm" icon="refresh" loading={busy === 'reload'} onClick={() => onCmd('reload')}>
               {t('Recargar')}
@@ -114,7 +115,7 @@ function DisplayCard({ d, serverVersion, onCmd, onForget, busy }: { d: DisplayIn
             <span class="spacer" />
             <NightMenu value={d.nightOverride} busy={busy.startsWith('night')} onPick={(m) => onCmd('night', m)} />
           </>
-        ) : (
+        ) : d.connected ? null : (
           <>
             <span class="muted small">{t('Sin conexión: las órdenes no llegarán.')}</span>
             <span class="spacer" />
@@ -198,12 +199,16 @@ export function DisplaysSection({ saved, go }: SectionProps) {
         <Button variant="primary" icon="link" onClick={() => openPairDialog()}>
           {t('Vincular una pantalla')}
         </Button>
-        <Button icon="refresh" onClick={() => run('_all', { action: 'reload', ...target }, label('reload'))} loading={busy._all === 'reload'} disabled={!onlineHere.length}>
-          {t('Recargar todas')}
-        </Button>
-        <Button icon="target" onClick={() => run('_all', { action: 'identify', ...target }, label('identify'))} loading={busy._all === 'identify'} disabled={!onlineHere.length}>
-          {t('Identificar todas')}
-        </Button>
+        {has('displayCommands') && (
+          <>
+            <Button icon="refresh" onClick={() => run('_all', { action: 'reload', ...target }, label('reload'))} loading={busy._all === 'reload'} disabled={!onlineHere.length}>
+              {t('Recargar todas')}
+            </Button>
+            <Button icon="target" onClick={() => run('_all', { action: 'identify', ...target }, label('identify'))} loading={busy._all === 'identify'} disabled={!onlineHere.length}>
+              {t('Identificar todas')}
+            </Button>
+          </>
+        )}
       </PageHeader>
 
       {saved.security?.displayAccess === 'open' && <OpenModeCallout go={go} />}
@@ -211,9 +216,11 @@ export function DisplaysSection({ saved, go }: SectionProps) {
       {outdated.length > 0 && (
         <Callout kind="warn">
           {t('{n} pantallas ejecutan una versión antigua (servidor {v}). Recárgalas para actualizar.', { n: outdated.length, v: data?.serverVersion ?? '' })}{' '}
-          <button type="button" class="link-btn" onClick={() => run('_all', { action: 'reload', clientIds: outdated.map((d) => d.clientId) }, label('reload'))}>
-            {t('Recargar ahora')}
-          </button>
+          {has('displayCommands') && (
+            <button type="button" class="link-btn" onClick={() => run('_all', { action: 'reload', clientIds: outdated.map((d) => d.clientId) }, label('reload'))}>
+              {t('Recargar ahora')}
+            </button>
+          )}
         </Callout>
       )}
 

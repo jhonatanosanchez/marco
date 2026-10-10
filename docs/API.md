@@ -90,11 +90,18 @@ The admin and the display read these fields to decide which sections, actions an
   `passwordLogin`, `apiTokens`, `webhooks`, `backups`, `importExport`, `includeSecrets`, `activity`, `setupWizard`,
   `status`, `accountMenu`. A self-hosted server turns all of them on, except `googleCalendar` and `googleLogin`
   (on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set) and `accountMenu` (always off).
-- `limits` (optional): plan limits such as `screens`, `sources` or `devices`. Absent means no limit.
+- `limits` (optional): plan limits such as `screens`, `sources` or `devices`. Absent means no limit beyond the
+  config validator's own caps (12 screens, 50 calendars, 20 news feeds, 1000 local events, 500 birthdays,
+  100 countdowns). The admin disables "add" at the limit and flags a config that goes over it.
 - `displayOrigin` (optional): absolute origin that serves `/d/<key>` and `/pair`. Absent means the same origin.
 
 Clients treat a response with no `features` field (servers older than 0.5.0) as having every feature on. A key
 missing from `features` counts as off only when `edition` is not `'self-hosted'`.
+
+Every call the admin makes is listed in `web/shared/adminContract.json` (method, path, query keys, gating feature,
+request type and top-level response keys), generated from `web/admin/api.ts` and `web/shared/types.ts` by
+`npm run contract`. A server that turns a feature off answers that feature's routes with
+`404 {"error":"feature_unavailable"}`.
 
 `CalEvent`: `{ id, sourceId, title, start, end, allDay, location, color, emoji, kind, multiDay, age? }`. `start`/`end`
 are ISO strings with offset, or `YYYY-MM-DD` for all-day events (`end` exclusive).

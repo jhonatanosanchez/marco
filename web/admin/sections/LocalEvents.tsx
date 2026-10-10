@@ -5,6 +5,8 @@ import { Icon } from '../components/icons';
 import { Button, Card, ColorPicker, EmojiPicker, Empty, Field, Modal, NumberInput, PageHeader, SearchInput, Segmented, Textarea, TextInput, Toggle, ToggleRow, WeekdayPicker } from '../components/ui';
 import { addDays, daysBetween, fmtDay, relDays, todayIn, weekdayNames, weekdayOf } from '../dates';
 import { t } from '../i18n';
+import { atLimit } from '../caps';
+import { LimitNote } from '../components/LimitNote';
 import { takeIntent } from '../intent';
 import { clone, HEX_RE, isValidDate, normalize, TIME_RE, uid } from '../util';
 import type { SectionProps } from './common';
@@ -415,10 +417,11 @@ export function LocalEventsSection({ full, setFull, errors, cfg }: SectionProps)
   return (
     <>
       <PageHeader title={t('Eventos locales')} desc={t('Eventos creados aquí mismo, sin Google ni iCal: citas, extraescolares, recordatorios recurrentes… Aparecen en todas las pantallas que muestren este calendario.')}>
-        <Button variant="primary" icon="plus" onClick={() => setEditing({ ev: newLocalEvent(today), isNew: true })} disabled={le.items.length >= 1000}>
+        <Button variant="primary" icon="plus" onClick={() => setEditing({ ev: newLocalEvent(today), isNew: true })} disabled={atLimit('localEvents', le.items.length)}>
           {t('Nuevo evento')}
         </Button>
       </PageHeader>
+      <LimitNote name="localEvents" count={le.items.length} />
 
       <Card title={t('Calendario local')} icon="calendar" scope="global" id="local-settings">
         <ToggleRow label={t('Mostrar eventos locales')} hint={t('Desactívalo para ocultarlos sin borrarlos.')} checked={le.enabled} onChange={(v) => setFull((d) => void (d.localEvents.enabled = v))} />
