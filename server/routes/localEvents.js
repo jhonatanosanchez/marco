@@ -3,18 +3,20 @@
 //   eventsAdminRouter() mounted at /api/admin (session required):
 //     POST /events/preview          → EventsPreviewResponse
 //     POST /birthdays/parse-csv     → BirthdayCsvResult
+//     GET  /countdowns?screen=      → CountdownsResponse (the admin's own copy of the display route)
 //   eventsPublicRouter() mounted at /api (display access: key / device token / session, or open mode):
-//     GET  /countdowns?screen=      → CountdownsResponse
+//     GET  /countdowns?screen=      → CountdownsResponse (an admin session still works here for one release,
+//                                     for admin builds from before 0.5; new builds use /api/admin/countdowns)
 import { Router } from 'express';
 import { requireAuth } from '../auth.js';
 import { getConfig } from '../store.js';
-import { resolveScreen } from '../screens.js';
+import { resolveScreen } from '../core/screens.js';
 import { requestScreen } from '../displayAccess.js';
-import { validateConfig, isValidDate } from '../validate.js';
+import { validateConfig, isValidDate } from '../core/validate.js';
 import { previewEvents } from '../calendars.js';
 import { getCountdowns } from '../countdowns.js';
-import { parseBirthdayCsv, MAX_CSV_BYTES } from '../csv.js';
-import { addDays, localDate } from '../lib/tz.js';
+import { parseBirthdayCsv, MAX_CSV_BYTES } from '../core/csv.js';
+import { addDays, localDate } from '../core/lib/tz.js';
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
@@ -102,6 +104,16 @@ export function eventsAdminRouter() {
     if (typeof text !== 'string') return res.status(400).json({ error: 'invalid', details: [{ path: 'text', message: 'expected string' }] });
     if (Buffer.byteLength(text, 'utf8') > MAX_CSV_BYTES) return res.status(413).json({ error: 'too large', details: [{ path: 'text', message: 'max 100 kB' }] });
     res.json(parseBirthdayCsv(text, getConfig().birthdays.items));
+  });
+
+  // Countdowns section: the chips a screen shows now (?screen = id or slug; unknown → default screen).
+  r.get('/countdowns', async (req, res, next) => {
+    try {
+      const { screen } = resolveScreen(getConfig(), typeof req.query.screen === 'string' ? req.query.screen : '');
+      res.json(await getCountdowns({ screen }));
+    } catch (err) {
+      next(err);
+    }
   });
 
   return r;

@@ -6,6 +6,8 @@ import { Icon } from '../components/icons';
 import { Button, Callout, Card, ColorPicker, EmojiPicker, Empty, Modal, PageHeader, SearchInput, Segmented, Textarea, TextInput, ToggleRow } from '../components/ui';
 import { fmtDay, monthNames, nextBirthday, relDays, todayIn } from '../dates';
 import { t } from '../i18n';
+import { atLimit, limit } from '../caps';
+import { LimitNote } from '../components/LimitNote';
 import { takeIntent } from '../intent';
 import { daysInMonth, normalize, uid } from '../util';
 import type { SectionProps } from './common';
@@ -188,11 +190,12 @@ export function BirthdaysSection({ full, setFull, errors, cfg }: SectionProps) {
       const b = d.birthdays.items.find((x) => x.id === id);
       if (b) fn(b);
     });
+  const atMax = atLimit('birthdays', bd.items.length);
   const yearNum = year.trim() ? Number(year) : null;
   const yearBad = yearNum != null && !(Number.isInteger(yearNum) && yearNum >= 1900 && yearNum <= 2100);
   const add = (e: Event) => {
     e.preventDefault();
-    if (!name.trim() || yearBad) return;
+    if (!name.trim() || yearBad || atMax) return;
     if (bd.items.some((b) => normalize(b.name) === normalize(name) && b.day === day && b.month === month)) {
       toast(t('Ese cumpleaños ya está en la lista'), 'info');
       return;
@@ -213,7 +216,7 @@ export function BirthdaysSection({ full, setFull, errors, cfg }: SectionProps) {
   return (
     <>
       <PageHeader title={t('Cumpleaños')} desc={t('Se muestran cada año en el calendario. Si indicas el año de nacimiento, la pantalla muestra la edad: “🎂 María (34)”.')}>
-        <Button icon="upload" onClick={() => setCsv(true)}>
+        <Button icon="upload" disabled={atMax} onClick={() => setCsv(true)}>
           {t('Importar CSV')}
         </Button>
       </PageHeader>
@@ -277,10 +280,11 @@ export function BirthdaysSection({ full, setFull, errors, cfg }: SectionProps) {
             }}
           />
           <input class={`input bday-add__year ${yearBad ? 'is-invalid' : ''}`} inputMode="numeric" placeholder={t('Año (opc.)')} value={year} maxLength={4} onInput={(e) => setYear(e.currentTarget.value.replace(/\D/g, ''))} />
-          <Button type="submit" variant="primary" icon="plus" disabled={!name.trim() || yearBad}>
+          <Button type="submit" variant="primary" icon="plus" disabled={!name.trim() || yearBad || atMax}>
             {t('Añadir')}
           </Button>
         </form>
+        <LimitNote name="birthdays" count={bd.items.length} />
         {bd.items.length > 8 && <SearchInput value={q} onValue={setQ} placeholder={t('Buscar persona…')} />}
         {bd.items.length === 0 ? (
           <Empty icon="cake" title={t('Aún no hay cumpleaños')}>
@@ -323,9 +327,12 @@ export function BirthdaysSection({ full, setFull, errors, cfg }: SectionProps) {
           existing={bd.items}
           onClose={() => setCsv(false)}
           onAdd={(items) => {
-            setFull((d) => void d.birthdays.items.push(...items.slice(0, Math.max(0, 500 - d.birthdays.items.length))));
+            const room = Math.max(0, (limit('birthdays') ?? Infinity) - bd.items.length);
+            const added = items.slice(0, room);
+            setFull((d) => void d.birthdays.items.push(...added));
             setCsv(false);
-            toast(t('{n} cumpleaños añadidos · guarda para publicarlos', { n: items.length }), 'ok');
+            toast(t('{n} cumpleaños añadidos · guarda para publicarlos', { n: added.length }), added.length ? 'ok' : 'info');
+            if (added.length < items.length) toast(t('Has llegado al máximo ({max}).', { max: limit('birthdays') ?? bd.items.length }), 'info');
           }}
         />
       )}

@@ -4,7 +4,7 @@ import { getConfig } from './store.js';
 import { refreshAll, getEvents, defaultWindow } from './calendars.js';
 import { getWeather } from './weather.js';
 import { getNews } from './news.js';
-import { broadcast } from './sse.js';
+import { publish } from './pollHub.js';
 
 let timer = null;
 let running = null;
@@ -26,7 +26,7 @@ export function runRefresh() {
       const win = defaultWindow(cfg.datetime.timezone);
       const { hash } = await getEvents(win);
       // Hash changes on data changes and on day rollover (window moves)
-      if (lastHash !== null && (hash !== lastHash || win.from !== lastDay)) broadcast('events', { hash });
+      if (lastHash !== null && (hash !== lastHash || win.from !== lastDay)) publish('events', { hash });
       lastHash = hash;
       lastDay = win.from;
       // Pre-warm the weather cache for every language used by a screen that shows weather.

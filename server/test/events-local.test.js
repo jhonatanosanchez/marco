@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { occurrenceDates, expandLocalEvents, expandBirthdays, birthdaysSource, localSource, nextBirthday, yearlyDate } from '../localEvents.js';
 import { buildSourceEvents, sortEvents } from '../calendars.js';
-import { defaultConfig } from '../defaults.js';
+import { defaultConfig } from '../core/defaults.js';
 import { hash } from '../lib/text.js';
 import { RULES } from './helpers.js';
 

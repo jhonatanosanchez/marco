@@ -69,7 +69,7 @@ export function wmoKind(code: number): WxKind {
   if (code === 3) return 'overcast';
   if (code === 45 || code === 48) return 'fog';
   if (code >= 51 && code <= 55) return 'drizzle';
-  if (code === 56 || code === 57 || code === 66 || code === 67) return 'sleet';
+  if (code === 56 || code === 57 || (code >= 66 && code <= 69)) return 'sleet'; // 68, 69: rain and snow (sleet)
   if (code === 61 || code === 63 || code === 80 || code === 81) return 'rain';
   if (code === 65 || code === 82) return 'heavyrain';
   if ((code >= 71 && code <= 77) || code === 85 || code === 86) return 'snow';
@@ -77,12 +77,22 @@ export function wmoKind(code: number): WxKind {
   return 'cloudy';
 }
 
-/** Precipitation type for the WebGL overlay. */
-export function precipOf(code: number): 'rain' | 'snow' | null {
+/**
+ * What the WebGL weather effect shows for a WMO code: the kind, how strong (0..1: drizzle and light snow are
+ * sparse, heavy showers dense) and whether it is a thunderstorm (lightning flashes). Sun only in daylight.
+ */
+export interface WeatherFxPlan { mode: 'rain' | 'snow' | 'sun' | 'fog' | null; level: number; storm: boolean }
+export function weatherFxOf(code: number, isDay: boolean): WeatherFxPlan {
   const k = wmoKind(code);
-  if (k === 'snow') return 'snow';
-  if (k === 'rain' || k === 'heavyrain' || k === 'drizzle' || k === 'thunder' || k === 'sleet') return 'rain';
-  return null;
+  if (k === 'drizzle') return { mode: 'rain', level: code === 55 ? 0.5 : 0.35, storm: false };
+  if (k === 'sleet') return { mode: 'rain', level: code === 57 || code === 67 || code === 69 ? 0.75 : 0.55, storm: false };
+  if (k === 'rain') return { mode: 'rain', level: code === 61 || code === 80 ? 0.6 : 0.8, storm: false };
+  if (k === 'heavyrain') return { mode: 'rain', level: 1, storm: false };
+  if (k === 'thunder') return { mode: 'rain', level: 1, storm: true };
+  if (k === 'snow') return { mode: 'snow', level: code === 71 || code === 77 || code === 85 ? 0.55 : code === 73 ? 0.8 : 1, storm: false };
+  if (k === 'fog') return { mode: 'fog', level: code === 48 ? 1 : 0.8, storm: false };
+  if (sunnyOf(code, isDay)) return { mode: 'sun', level: code === 0 ? 1 : 0.8, storm: false };
+  return { mode: null, level: 0, storm: false };
 }
 
 /** Clear or mostly clear sky in daylight: the rich weather effect shows sun rays. */

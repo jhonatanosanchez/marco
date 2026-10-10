@@ -1,6 +1,7 @@
 // Photo rotation controller: preloads + decodes the next image before showing it, then hands it to the
 // WebGL photo layer (shader transition) or to the CSS cross-fade fallback.
 import { coverPosition, coverWindow, freeBand, type PhotoFrame } from '../../shared/focus';
+import type { PhotoStats } from '../../shared/glass';
 import type { Photo } from '../../shared/types';
 import { ctx } from '../ctx';
 import { el, esc, reducedMotion } from '../dom';
@@ -264,6 +265,8 @@ export class Photos {
  * weather card with it, so dark photos stay vivid and light ones stay legible.
  */
 const toneCanvas = document.createElement('canvas');
+/** Latest measure of the photo (for the Modern glass tint / ink); null until a photo could be read. */
+export let photoStats: PhotoStats | null = null;
 function applyTone(img: HTMLImageElement): void {
   try {
     const W = 48, H = 32;
@@ -288,7 +291,18 @@ function applyTone(img: HTMLImageElement): void {
     };
     const root = document.documentElement.style;
     root.setProperty('--tone-top', region(0, 0.4).toFixed(3));
-    root.setProperty('--tone-bottom', region(0.5, 1).toFixed(3));
+    const toneBottom = region(0.5, 1);
+    root.setProperty('--tone-bottom', toneBottom.toFixed(3));
+    // whole frame: saturation-weighted colour (the dominant hue, not the grey average of everything)
+    let wr = 0, wg = 0, wb = 0, ws = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      const r = px[i], g2 = px[i + 1], b = px[i + 2];
+      const mx = Math.max(r, g2, b), mn = Math.min(r, g2, b);
+      const w = 0.05 + (mx ? (mx - mn) / mx : 0) * Math.min(1, mx / 96);
+      wr += r * w; wg += g2 * w; wb += b * w; ws += w;
+    }
+    photoStats = { tone: toneBottom, rgb: [wr / ws, wg / ws, wb / ws].map(Math.round) as [number, number, number] };
+    window.dispatchEvent(new Event('marco:photo-tone'));
   } catch {
     /* cross-origin without CORS: leave the defaults */
   }

@@ -1,7 +1,7 @@
 // birthdays CSV paste (docs/ARCHITECTURE.md)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseBirthdayCsv, parseBirthDate, CSV_ERRORS } from '../csv.js';
+import { parseBirthdayCsv, parseBirthDate, CSV_ERRORS } from '../core/csv.js';
 
 const NOW = new Date('2026-10-09T12:00:00Z');
 

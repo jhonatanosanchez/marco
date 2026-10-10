@@ -1,6 +1,6 @@
 // Icon/colour rules and calendar-kind normalisation (pure functions; unit-tested).
 import { fold } from './lib/text.js';
-import { t } from './lib/i18n.js';
+import { t } from './core/lib/i18n.js';
 import { keywordMatches } from './lib/keywords.js';
 
 export const KIND_EMOJI = { airbnb: '🏠', birthdays: '🎂', holidays: '🎉' };

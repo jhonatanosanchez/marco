@@ -4,11 +4,14 @@ import { defaultConfig, defaultScreenProfile, CONFIG_VERSION, RESERVED_SOURCE_ID
 import { isValidTimeZone } from './lib/tz.js';
 import { randomId, fold } from './lib/text.js';
 import { LANGS } from './lib/i18n.js';
+import { WEATHER_PROVIDER_IDS, OPEN_METEO_MODEL_IDS, KEY_PROVIDERS } from './weather.js';
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
+/** Screen layouts (docs/ARCHITECTURE.md); the display, the admin and server/setup.js use the same ids. */
+export const LAYOUT_PRESETS = ['bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda', 'today', 'people', 'photoFrame', 'twoWeeks', 'board', 'bedside'];
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,255}$/;
 
 export function isHttpUrl(s, protocols = ['http:', 'https:']) {
@@ -69,6 +72,12 @@ function emoji(ctx, path, v, d) {
   const s = str(ctx, path, v, d, 16).trim();
   return s;
 }
+/** The emoji field rule on its own (announcements): `{ value, errors }`, errors as { path, message }. */
+export function validateEmoji(v, path = 'emoji', d = '') {
+  const ctx = new Ctx();
+  const value = emoji(ctx, path, v, d);
+  return { value, errors: ctx.errors };
+}
 function id(ctx, path, v, prefix, seen) {
   let s = typeof v === 'string' && ID.test(v) ? v : randomId(prefix);
   while (seen.has(s)) s = randomId(prefix);
@@ -89,7 +98,7 @@ function obj(ctx, path, v) {
 
 function sanitizeSource(ctx, path, s, seen) {
   if (!isObj(s)) { ctx.err(path, 'expected object'); return null; }
-  const type = oneOf(ctx, `${path}.type`, s.type, 'ics', ['ics', 'google']);
+  const type = oneOf(ctx, `${path}.type`, s.type, 'ics', ['ics', 'google', 'microsoft']);
   const out = {
     id: id(ctx, `${path}.id`, s.id, 'c_', seen),
     type,
@@ -105,11 +114,20 @@ function sanitizeSource(ctx, path, s, seen) {
     if (!isHttpUrl(url, ['http:', 'https:', 'webcal:', 'webcals:'])) ctx.err(`${path}.url`, 'invalid URL');
     out.url = url;
     out.insecureTls = bool(ctx, `${path}.insecureTls`, s.insecureTls, false);
-  } else {
+  } else if (type === 'google') {
     out.googleCalendarId = str(ctx, `${path}.googleCalendarId`, s.googleCalendarId, 'primary', 512).trim() || 'primary';
     const acct = str(ctx, `${path}.googleAccount`, s.googleAccount, '', 320).trim().toLowerCase();
     if (!EMAIL.test(acct)) ctx.err(`${path}.googleAccount`, 'Google account email required');
     out.googleAccount = acct;
+  } else {
+    // Microsoft (Outlook.com, Hotmail, Microsoft 365) calendars, read through Microsoft Graph (server/microsoft.js, or
+    // Marco Cloud). A server without a Microsoft app keeps them in the config and reports them as not available.
+    const calId = str(ctx, `${path}.microsoftCalendarId`, s.microsoftCalendarId, '', 512).trim();
+    if (!calId) ctx.err(`${path}.microsoftCalendarId`, 'Microsoft calendar id required');
+    out.microsoftCalendarId = calId;
+    const acct = str(ctx, `${path}.microsoftAccount`, s.microsoftAccount, '', 320).trim().toLowerCase();
+    if (!EMAIL.test(acct)) ctx.err(`${path}.microsoftAccount`, 'Microsoft account email required');
+    out.microsoftAccount = acct;
   }
   return out;
 }
@@ -190,10 +208,15 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
 
   const sc = obj(ctx, `${p}.screen`, x.screen);
   const nm = obj(ctx, `${p}.screen.nightMode`, sc.nightMode);
+  const gl = obj(ctx, `${p}.screen.glass`, sc.glass);
+  const GD = D.screen.glass;
   const screen = {
     language: oneOf(ctx, `${p}.screen.language`, sc.language, D.screen.language, LANGS),
     fontScale: num(ctx, `${p}.screen.fontScale`, sc.fontScale, D.screen.fontScale, 0.5, 3),
     theme: oneOf(ctx, `${p}.screen.theme`, sc.theme, D.screen.theme, ['dark', 'light', 'auto']),
+    // display style: 'classic' (the original look) or 'modern' (glass cards, Apple-like); independent of the layout.
+    // New configs start Modern (defaults.js); a config saved before styles existed keeps the look it always had.
+    style: oneOf(ctx, `${p}.screen.style`, sc.style, 'classic', ['classic', 'modern']),
     accent: color(ctx, `${p}.screen.accent`, sc.accent, D.screen.accent),
     orientation: oneOf(ctx, `${p}.screen.orientation`, sc.orientation, D.screen.orientation, ['auto', 'landscape', 'portrait']),
     customCss: str(ctx, `${p}.screen.customCss`, sc.customCss, '', 20000).replace(/<\/style/gi, ''),
@@ -203,13 +226,25 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
       to: hhmm(ctx, `${p}.screen.nightMode.to`, nm.to, D.screen.nightMode.to),
       dim: num(ctx, `${p}.screen.nightMode.dim`, nm.dim, D.screen.nightMode.dim, 0, 1),
     },
+    // glass material of the Modern style: appearance, transparency (0 = see-through, 1 = solid), blur, tint, light edge
+    glass: {
+      appearance: oneOf(ctx, `${p}.screen.glass.appearance`, gl.appearance, GD.appearance, ['auto', 'clear', 'tinted']),
+      opacity: num(ctx, `${p}.screen.glass.opacity`, gl.opacity, GD.opacity, 0, 1),
+      blur: num(ctx, `${p}.screen.glass.blur`, gl.blur, GD.blur, 0, 40, true),
+      tint: oneOf(ctx, `${p}.screen.glass.tint`, gl.tint, GD.tint, ['dark', 'light', 'photo']),
+      edge: bool(ctx, `${p}.screen.glass.edge`, gl.edge, GD.edge),
+    },
   };
 
   const ly = obj(ctx, `${p}.layout`, x.layout);
   const layout = {
-    preset: oneOf(ctx, `${p}.layout.preset`, ly.preset, D.layout.preset, ['bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda']),
+    preset: oneOf(ctx, `${p}.layout.preset`, ly.preset, D.layout.preset, LAYOUT_PRESETS),
     sidePanel: oneOf(ctx, `${p}.layout.sidePanel`, ly.sidePanel, D.layout.sidePanel, ['left', 'right']),
     sideWidth: num(ctx, `${p}.layout.sideWidth`, ly.sideWidth, D.layout.sideWidth, 0.2, 0.6),
+    // 'people' layout: the calendars shown as columns (null = automatic, at most 5, no duplicates)
+    people: ly.people === null || ly.people === undefined ? null : [...new Set(idList(ctx, `${p}.layout.people`, ly.people, 5))],
+    // 'photoFrame' layout: corner of the clock card
+    corner: oneOf(ctx, `${p}.layout.corner`, ly.corner, D.layout.corner, ['tl', 'tr', 'bl', 'br']),
   };
 
   const bg = obj(ctx, `${p}.background`, x.background);
@@ -251,7 +286,8 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
     format24: bool(ctx, `${p}.datetime.format24`, dt.format24, D.datetime.format24),
     showSeconds: bool(ctx, `${p}.datetime.showSeconds`, dt.showSeconds, D.datetime.showSeconds),
     showAmPm: bool(ctx, `${p}.datetime.showAmPm`, dt.showAmPm, D.datetime.showAmPm),
-    dateFormat: oneOf(ctx, `${p}.datetime.dateFormat`, dt.dateFormat, D.datetime.dateFormat, ['weekday_month_d', 'weekday_d_month', 'weekday_d_dot_month']),
+    dateFormat: oneOf(ctx, `${p}.datetime.dateFormat`, dt.dateFormat, D.datetime.dateFormat, ['weekday_month_d', 'weekday_d_month', 'weekday_d_dot_month', 'weekday_month_d_y', 'weekday_mdy', 'weekday_dmy', 'weekday_iso', 'custom']),
+    dateCustom: str(ctx, `${p}.datetime.dateCustom`, dt.dateCustom, D.datetime.dateCustom, 60).replace(/[<>]/g, ''),
   };
 
   const we = obj(ctx, `${p}.weather`, x.weather);
@@ -438,8 +474,10 @@ export function migrateConfig(raw) {
 /**
  * Validate a full (v2) config object. v1 input is migrated first. Returns { ok, errors, value }.
  * `value` is always a complete, sanitised config (defaults fill gaps); callers decide whether to persist it on errors.
+ * `opts.weatherKeySet` (the admin save only): false when no weather API key is stored, so choosing a source that
+ * needs one is refused (weather.apiKey 'API key required'). Left out, keys are not checked (imports, restores).
  */
-export function validateConfig(input) {
+export function validateConfig(input, opts = {}) {
   const ctx = new Ctx();
   const D = defaultConfig();
   const c = obj(ctx, '', migrateConfig(input));
@@ -467,7 +505,8 @@ export function validateConfig(input) {
     return s;
   };
   const weather = {
-    provider: oneOf(ctx, 'weather.provider', we.provider, D.weather.provider, ['open-meteo', 'homeassistant']),
+    provider: oneOf(ctx, 'weather.provider', we.provider, D.weather.provider, WEATHER_PROVIDER_IDS),
+    model: oneOf(ctx, 'weather.model', we.model, D.weather.model, OPEN_METEO_MODEL_IDS),
     locationName: str(ctx, 'weather.locationName', we.locationName, D.weather.locationName, 80),
     lat: num(ctx, 'weather.lat', we.lat, D.weather.lat, -90, 90),
     lon: num(ctx, 'weather.lon', we.lon, D.weather.lon, -180, 180),
@@ -476,6 +515,7 @@ export function validateConfig(input) {
     haIndoorTempEntity: entity('weather.haIndoorTempEntity', we.haIndoorTempEntity),
     haIndoorHumidityEntity: entity('weather.haIndoorHumidityEntity', we.haIndoorHumidityEntity),
   };
+  if (opts.weatherKeySet === false && KEY_PROVIDERS.includes(weather.provider)) ctx.err('weather.apiKey', 'API key required');
 
   const ne = obj(ctx, 'news', c.news);
   const feedSeen = new Set();
@@ -608,7 +648,9 @@ export function mergeDefaults(stored) {
   const src = migrateConfig(isObj(stored) ? stored : {});
   const out = merge(D, src);
   if (Array.isArray(src.screens) && src.screens.length) {
-    out.screens = src.screens.map((s) => (isObj(s) ? merge(defaultScreenProfile({ id: s.id, slug: s.slug, name: s.name }), s) : s));
+    // a screen saved before display styles existed keeps the Classic look; only new screens start Modern
+    const keepStyle = (s) => (isObj(s.screen) && 'style' in s.screen ? s : { ...s, screen: { ...(isObj(s.screen) ? s.screen : {}), style: 'classic' } });
+    out.screens = src.screens.map((s) => (isObj(s) ? merge(defaultScreenProfile({ id: s.id, slug: s.slug, name: s.name }), keepStyle(s)) : s));
   }
   return out;
 }

@@ -1,9 +1,9 @@
-// Default icon rules (web/shared/iconRules.json, also read by server/defaults.js) + client-side resolver
+// Default icon rules (server/core/iconRules.js, also read by server/core/defaults.js) + client-side resolver
 // (used by the mock dataset and the admin preview).
 import type { IconRule, SourceKind } from './types';
-import RULES from './iconRules.json';
+import RULES from '../../server/core/iconRules.js';
 
-export const DEFAULT_ICON_RULES: IconRule[] = (RULES as { id: string; emoji: string; match: string[] }[]).map((r) => ({
+export const DEFAULT_ICON_RULES: IconRule[] = RULES.map((r) => ({
   id: r.id, match: r.match, emoji: r.emoji, color: null,
 }));
 

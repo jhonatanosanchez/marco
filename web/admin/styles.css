@@ -5,7 +5,7 @@
 :root {
   --accent: #ff5a4e;
   --on-accent: #fff;
-  --font: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
+  --font: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Apple Color Emoji', 'Marco Emoji', 'Noto Color Emoji', 'Segoe UI Emoji', sans-serif;
   --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
   --r-sm: 8px;
   --r: 11px;
@@ -2732,6 +2732,7 @@ input:checked + .check-box {
 }
 .modal__actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 20px;
@@ -3152,4 +3153,24 @@ input:checked + .check-box {
     animation-duration: 0.001ms !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+/* picker dialogs: X in the corner, choices stacked full width */
+.modal--picker {
+  position: relative;
+}
+.modal__x {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+.modal--picker h3 {
+  padding-right: 36px;
+}
+.modal--picker .modal__actions {
+  flex-direction: column;
+  align-items: stretch;
+}
+.modal--picker .modal__actions .btn {
+  justify-content: center;
 }

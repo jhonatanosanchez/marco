@@ -6,7 +6,10 @@ import { OpenModeCallout, openPairDialog, PairedDevicesCard } from '../component
 import { Icon } from '../components/icons';
 import { Button, Callout, Card, Empty, PageHeader, StatusDot } from '../components/ui';
 import { fmtDateTime } from '../dates';
+import { has } from '../caps';
+import { screenHref, useDisplayLinks } from '../displayLinks';
 import { formatDuration, relTime, nScreens, t } from '../i18n';
+import { withPollNote } from '../liveNote';
 import type { SectionProps } from './common';
 
 function NightMenu({ value, onPick, busy }: { value: NightCommand | null; onPick: (m: NightCommand) => void; busy?: boolean }) {
@@ -103,7 +106,7 @@ function DisplayCard({ d, serverVersion, onCmd, onForget, busy }: { d: DisplayIn
         </div>
       )}
       <footer class="disp__actions">
-        {d.connected ? (
+        {d.connected && has('displayCommands') ? (
           <>
             <Button size="sm" icon="refresh" loading={busy === 'reload'} onClick={() => onCmd('reload')}>
               {t('Recargar')}
@@ -114,7 +117,7 @@ function DisplayCard({ d, serverVersion, onCmd, onForget, busy }: { d: DisplayIn
             <span class="spacer" />
             <NightMenu value={d.nightOverride} busy={busy.startsWith('night')} onPick={(m) => onCmd('night', m)} />
           </>
-        ) : (
+        ) : d.connected ? null : (
           <>
             <span class="muted small">{t('Sin conexión: las órdenes no llegarán.')}</span>
             <span class="spacer" />
@@ -137,6 +140,9 @@ function AccessBadge({ d }: { d: DisplayInfo }) {
   return <span class="badge badge--access badge--warn-soft" title={t('Entra sin clave (modo abierto)')}>{t('Sin clave')}</span>;
 }
 
+/** "/?screen=x" → "https://host/?screen=x" (absolute URLs unchanged). */
+const absUrl = (u: string | null) => (u ? new URL(u, location.origin).href : '');
+
 export function DisplaysSection({ saved, go }: SectionProps) {
   const [data, setData] = useState<DisplaysResponse | null>(null);
   const [err, setErr] = useState('');
@@ -144,6 +150,7 @@ export function DisplaysSection({ saved, go }: SectionProps) {
   const [busy, setBusy] = useState<Record<string, string>>({});
   const [showOffline, setShowOffline] = useState(true);
   const timer = useRef<number | undefined>(undefined);
+  const links = useDisplayLinks(saved);
 
   const load = async () => {
     try {
@@ -163,7 +170,7 @@ export function DisplaysSection({ saved, go }: SectionProps) {
     setBusy((b) => ({ ...b, [key]: req.action === 'night' ? `night-${req.mode}` : req.action }));
     try {
       const r = await api.displayCommand(req);
-      toast(`${label} · ${nScreens(r.delivered)}`, r.delivered ? 'ok' : 'info');
+      toast(r.delivered ? withPollNote(`${label} · ${nScreens(r.delivered)}`) : `${label} · ${nScreens(r.delivered)}`, r.delivered ? 'ok' : 'info');
       setTimeout(load, 1200);
     } catch (e) {
       toast((e as ApiError).message, 'error');
@@ -198,12 +205,16 @@ export function DisplaysSection({ saved, go }: SectionProps) {
         <Button variant="primary" icon="link" onClick={() => openPairDialog()}>
           {t('Vincular una pantalla')}
         </Button>
-        <Button icon="refresh" onClick={() => run('_all', { action: 'reload', ...target }, label('reload'))} loading={busy._all === 'reload'} disabled={!onlineHere.length}>
-          {t('Recargar todas')}
-        </Button>
-        <Button icon="target" onClick={() => run('_all', { action: 'identify', ...target }, label('identify'))} loading={busy._all === 'identify'} disabled={!onlineHere.length}>
-          {t('Identificar todas')}
-        </Button>
+        {has('displayCommands') && (
+          <>
+            <Button icon="refresh" onClick={() => run('_all', { action: 'reload', ...target }, label('reload'))} loading={busy._all === 'reload'} disabled={!onlineHere.length}>
+              {t('Recargar todas')}
+            </Button>
+            <Button icon="target" onClick={() => run('_all', { action: 'identify', ...target }, label('identify'))} loading={busy._all === 'identify'} disabled={!onlineHere.length}>
+              {t('Identificar todas')}
+            </Button>
+          </>
+        )}
       </PageHeader>
 
       {saved.security?.displayAccess === 'open' && <OpenModeCallout go={go} />}
@@ -211,9 +222,11 @@ export function DisplaysSection({ saved, go }: SectionProps) {
       {outdated.length > 0 && (
         <Callout kind="warn">
           {t('{n} pantallas ejecutan una versión antigua (servidor {v}). Recárgalas para actualizar.', { n: outdated.length, v: data?.serverVersion ?? '' })}{' '}
-          <button type="button" class="link-btn" onClick={() => run('_all', { action: 'reload', clientIds: outdated.map((d) => d.clientId) }, label('reload'))}>
-            {t('Recargar ahora')}
-          </button>
+          {has('displayCommands') && (
+            <button type="button" class="link-btn" onClick={() => run('_all', { action: 'reload', clientIds: outdated.map((d) => d.clientId) }, label('reload'))}>
+              {t('Recargar ahora')}
+            </button>
+          )}
         </Callout>
       )}
 
@@ -257,7 +270,7 @@ export function DisplaysSection({ saved, go }: SectionProps) {
           <Empty icon="monitor" title={t('Ninguna pantalla conectada')}>
             {saved.security?.displayAccess === 'open' ? (
               <>
-                {t('Abre')} <code>{location.origin}/?screen={saved.screens.find((s) => s.id === (filter || saved.defaultScreen))?.slug}</code> {t('en el dispositivo y aparecerá aquí.')}
+                {t('Abre')} <code>{absUrl(screenHref(saved, filter || saved.defaultScreen, links))}</code> {t('en el dispositivo y aparecerá aquí.')}
               </>
             ) : (
               t('Abre en el dispositivo el enlace privado de la pantalla (Pantalla → Ajustes) o vincúlalo con un código y aparecerá aquí.')

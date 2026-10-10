@@ -20,6 +20,8 @@ import type {
   DisplayLinksResponse,
   DevicesResponse,
   PairClaimRequest,
+  PairClaimResponse,
+  GeocodeResponse,
   PairedDevice,
   EventsPreviewRequest,
   EventsPreviewResponse,
@@ -31,22 +33,35 @@ import type {
   SetupRequest,
   SetupStatus,
   StoredConfig,
+  SaveConfigRequest,
+  CountdownsResponse,
   GoogleAccount,
+  HealthResponse,
+  HouseholdInfo,
   GoogleCalendarListItem,
+  MicrosoftAccount,
+  MicrosoftCalendarListItem,
   HaEntity,
   TestHomeAssistantResponse,
+  WeatherKeyStatus,
   TestIcsResponse,
   TestRssResponse,
+  UpdateInfo,
+  UpdateSettings,
 } from '../shared/types';
 import { getLang } from './i18n';
+import { apiErrorCode, apiErrorMessage, type ApiErrorCode } from './apiErrors';
 
 export class ApiError extends Error {
   status: number;
   body: unknown;
+  /** Known error code from the body (apiErrors.ts), '' when there is none. */
+  code: ApiErrorCode | '';
   constructor(status: number, message: string, body?: unknown) {
     super(message);
     this.status = status;
     this.body = body;
+    this.code = apiErrorCode(body);
   }
 }
 
@@ -78,18 +93,7 @@ async function request<T>(method: string, url: string, body?: unknown, opts: { s
   }
   if (!res.ok) {
     if (res.status === 401 && !opts.silent401) window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
-    const details = data && typeof data === 'object' && Array.isArray((data as any).details) ? (data as any).details : null;
-    const detailText = details?.length
-      ? `: ${details
-          .slice(0, 3)
-          .map((d: any) => (d && typeof d === 'object' ? `${d.path ?? ''}: ${d.message ?? ''}` : String(d)))
-          .join('; ')}`
-      : '';
-    const msg =
-      (data && typeof data === 'object' && ((data as any).error || (data as any).message) && `${(data as any).error || (data as any).message}${detailText}`) ||
-      (typeof data === 'string' && data.length < 200 ? data : '') ||
-      `HTTP ${res.status}`;
-    throw new ApiError(res.status, String(msg), data);
+    throw new ApiError(res.status, apiErrorMessage(res.status, data), data);
   }
   return data as T;
 }
@@ -106,10 +110,15 @@ const q = (params: Record<string, string | number | undefined | null>) => {
 };
 
 export const api = {
+  health: () => request<HealthResponse>('GET', '/api/health', undefined, { silent401: true }),
   me: () => request<AuthMeResponse>('GET', '/api/auth/me', undefined, { silent401: true }),
   login: (password: string) => request<unknown>('POST', '/api/auth/login', { password }, { silent401: true }),
   logout: () => request<unknown>('POST', '/api/auth/logout', {}, { silent401: true }),
   logoutAll: () => request<unknown>('POST', '/api/auth/logout-all', {}, { silent401: true }),
+
+  // Marco Cloud account (features.accountMenu): the language follows the account, the household can be renamed.
+  accountLang: (lang: string) => request<{ ok: true }>('POST', '/api/account/lang', { lang }),
+  renameHousehold: (name: string) => request<{ ok: true; household: HouseholdInfo }>('PATCH', '/api/admin/household', { name }),
 
   // First-run setup wizard (no session yet; the optional setup token travels in x-setup-token).
   setupStatus: (token?: string) =>
@@ -120,9 +129,10 @@ export const api = {
     request<SetupCompleteResponse>('POST', '/api/setup/complete', body, { silent401: true, headers: body.token ? { 'x-setup-token': body.token } : {} }),
 
   getConfig: () => request<StoredConfig>('GET', '/api/admin/config'),
-  /** PUT the whole (v2) config. Returns the saved config (refetches if the server does not echo it). */
-  async saveConfig(cfg: StoredConfig): Promise<StoredConfig> {
-    const res = await request<any>('PUT', '/api/admin/config', cfg);
+  /** PUT the whole (v2) config. Returns the saved config (refetches if the server does not echo it).
+   *  With `baseRevision` the server answers 409 conflict when the config was saved since that revision. */
+  async saveConfig(body: SaveConfigRequest): Promise<StoredConfig> {
+    const res = await request<any>('PUT', '/api/admin/config', body);
     if (isConfig(res)) return res;
     if (res && isConfig(res.config)) return res.config;
     return api.getConfig();
@@ -137,6 +147,13 @@ export const api = {
   googleCalendars: (account: string) =>
     request<GoogleCalendarListItem[]>('GET', `/api/admin/google/calendars?account=${encodeURIComponent(account)}`),
 
+  // Marco Cloud only (features.microsoftCalendar): Outlook.com, Hotmail and Microsoft 365 calendars.
+  microsoftAccounts: () => request<MicrosoftAccount[]>('GET', '/api/admin/microsoft/accounts'),
+  removeMicrosoftAccount: (email: string) =>
+    request<unknown>('DELETE', `/api/admin/microsoft/accounts/${encodeURIComponent(email)}`),
+  microsoftCalendars: (account: string) =>
+    request<MicrosoftCalendarListItem[]>('GET', `/api/admin/microsoft/calendars?account=${encodeURIComponent(account)}`),
+
   testIcs: (url: string, insecureTls?: boolean) =>
     request<TestIcsResponse>('POST', '/api/admin/test/ics', insecureTls ? { url, insecureTls: true } : { url }),
   testRss: (url: string) => request<TestRssResponse>('POST', '/api/admin/test/rss', { url }),
@@ -145,6 +162,9 @@ export const api = {
   haEntities: (domain: 'sensor' | 'weather') =>
     request<HaEntity[]>('GET', `/api/admin/homeassistant/entities?domain=${domain}`),
   setHaToken: (token: string) => request<unknown>('PUT', '/api/admin/homeassistant/token', { token }),
+  weatherKey: () => request<WeatherKeyStatus>('GET', '/api/admin/weather/key'),
+  /** '' removes the key; a key the provider refuses answers 400 key_invalid */
+  setWeatherKey: (key: string) => request<WeatherKeyStatus>('PUT', '/api/admin/weather/key', { key }),
 
   photos: () => request<AdminPhoto[]>('GET', '/api/admin/photos'),
   deletePhoto: (file: string) => request<unknown>('DELETE', `/api/admin/photos/${encodeURIComponent(file)}`),
@@ -160,6 +180,11 @@ export const api = {
 
   // ---- v2 (docs/ARCHITECTURE.md) ----
   dashboard: () => request<DashboardResponse>('GET', '/api/admin/dashboard'),
+  // updates (self-hosted, features.updates)
+  updateInfo: () => request<UpdateInfo>('GET', '/api/admin/update'),
+  updateSettings: (patch: Partial<UpdateSettings>) => request<UpdateInfo>('PUT', '/api/admin/update/settings', patch),
+  updateCheck: () => request<UpdateInfo>('POST', '/api/admin/update/check'),
+  updateApply: () => request<UpdateInfo>('POST', '/api/admin/update/apply'),
   screenTemplate: (name: string) => request<ScreenProfile>('GET', `/api/admin/screens/template${q({ name })}`),
   displays: () => request<DisplaysResponse>('GET', '/api/admin/displays'),
   displayCommand: (body: DisplayCommandRequest) => request<{ ok: true; delivered: number }>('POST', '/api/admin/displays/command', body),
@@ -171,10 +196,14 @@ export const api = {
   devices: () => request<DevicesResponse>('GET', '/api/admin/devices'),
   updateDevice: (id: string, body: { name?: string; screenId?: string }) => request<{ device: PairedDevice }>('PATCH', `/api/admin/devices/${encodeURIComponent(id)}`, body),
   revokeDevice: (id: string) => request<{ ok: true }>('DELETE', `/api/admin/devices/${encodeURIComponent(id)}`),
-  claimPairing: (body: PairClaimRequest) => request<{ device: PairedDevice }>('POST', '/api/admin/pair/claim', body),
+  claimPairing: (body: PairClaimRequest) => request<PairClaimResponse>('POST', '/api/admin/pair/claim', body),
+  // Place search through the server (the setup wizard sends its setup token, there is no session yet).
+  geocode: (query: string, lang: string, setupToken?: string) =>
+    request<GeocodeResponse>('GET', `/api/admin/geocode${q({ q: query, lang })}`, undefined, setupToken ? { headers: { 'x-setup-token': setupToken }, silent401: true } : {}),
 
   eventsPreview: (body: EventsPreviewRequest) => request<EventsPreviewResponse>('POST', '/api/admin/events/preview', body),
   parseBirthdaysCsv: (text: string) => request<BirthdayCsvResult>('POST', '/api/admin/birthdays/parse-csv', { text }),
+  countdowns: (screen: string) => request<CountdownsResponse>('GET', `/api/admin/countdowns${q({ screen })}`),
 
   announce: (body: AnnounceRequest) => request<AnnounceResponse>('POST', '/api/admin/announce', body),
   announcements: () => request<AnnouncementsResponse>('GET', '/api/admin/announcements'),
@@ -188,6 +217,8 @@ export const api = {
   backups: () => request<BackupInfo[]>('GET', '/api/admin/backups'),
   createBackup: () => request<BackupInfo>('POST', '/api/admin/backups', {}),
   backupUrl: (id: string) => `/api/admin/backups/${encodeURIComponent(id)}`,
+  /** A backup file's content (a 401 here, as for every call, sends the admin through sign in again first). */
+  backupFile: (id: string) => request<unknown>('GET', `/api/admin/backups/${encodeURIComponent(id)}`),
   restoreBackup: (id: string) => request<{ ok: true; config: StoredConfig; repaired?: string[] }>('POST', `/api/admin/backups/${encodeURIComponent(id)}/restore`, {}),
   deleteBackup: (id: string) => request<{ ok: true }>('DELETE', `/api/admin/backups/${encodeURIComponent(id)}`),
   exportConfig: (includeSecrets: boolean) => request<ExportBundle>('POST', '/api/admin/export', { includeSecrets }),
@@ -234,7 +265,7 @@ function xhrUpload<T>(method: string, url: string, fd: FormData, onProgress?: (f
         resolve(data as T);
       } else {
         if (xhr.status === 401) window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
-        reject(new ApiError(xhr.status, (data && (data.error || data.message)) || `HTTP ${xhr.status}`, data));
+        reject(new ApiError(xhr.status, apiErrorMessage(xhr.status, data), data));
       }
     };
     xhr.onerror = () => reject(new ApiError(0, 'network'));

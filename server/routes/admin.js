@@ -3,17 +3,19 @@ import { Router } from 'express';
 import { getConfig, saveConfig, updateSecrets } from '../store.js';
 import { requireAuth, changePasswordHandler } from '../auth.js';
 import * as google from '../google.js';
+import * as microsoft from '../microsoft.js';
 import * as ha from '../homeassistant.js';
 import { testIcs, sourceStatus } from '../calendars.js';
 import { testFeed, status as newsStatus } from '../news.js';
-import { status as weatherStatus } from '../weather.js';
+import { status as weatherStatus, weatherKey, checkWeatherKey } from '../weather.js';
+import { WEATHER_KEY_RE, weatherKeyStatus } from '../core/weather.js';
 import {
   listGallery, uploadMiddleware, thumbMiddleware, deletePhoto, finalizeUpload, readMeta, writeMeta, setFocus, setHidden, getPhoto, checkNames,
   cleanupTempUploads, isUnit, isGalleryFile, isThumbField, storeThumb, validThumb, CONFLICT_POLICIES,
 } from '../photos.js';
 import fs from 'node:fs';
-import { broadcast, clientCount } from '../sse.js';
-import { isHttpUrl } from '../validate.js';
+import { publish, connectedCount } from '../pollHub.js';
+import { isHttpUrl } from '../core/validate.js';
 import { logActivity } from '../activity.js';
 import { resolveScreenList } from '../displays.js';
 
@@ -27,8 +29,19 @@ export function adminRouter({ onConfigSaved } = {}) {
   r.get('/config', (req, res) => res.json(getConfig()));
 
   r.put('/config', (req, res) => {
-    // Body = full StoredConfig (v1 bodies from an old admin build are migrated by validateConfig).
-    const result = saveConfig(req.body, { reason: 'admin', req });
+    // Body = full StoredConfig (v1 bodies from an old admin build are migrated by validateConfig), plus an
+    // optional `baseRevision`: the revision the admin loaded. A stale one gets 409 conflict; without it the last
+    // write wins, as with admin builds from before 0.5.
+    let body = req.body;
+    let baseRevision = null;
+    if (body && typeof body === 'object' && !Array.isArray(body) && Object.hasOwn(body, 'baseRevision')) {
+      ({ baseRevision = null, ...body } = body);
+      if (baseRevision !== null && !(Number.isSafeInteger(baseRevision) && baseRevision >= 0)) {
+        return res.status(400).json({ error: 'invalid config', details: [{ path: 'baseRevision', message: 'expected a revision number' }] });
+      }
+    }
+    const result = saveConfig(body, { reason: 'admin', req, baseRevision, checks: { weatherKeySet: Boolean(weatherKey()) } });
+    if (result.conflict) return res.status(409).json({ error: 'conflict', revision: result.config.revision });
     if (!result.ok) return res.status(400).json({ error: 'invalid config', details: result.errors });
     onConfigSaved?.(result.config);
     res.json(result.config);
@@ -52,6 +65,28 @@ export function adminRouter({ onConfigSaved } = {}) {
       res.json(await google.listCalendars(account));
     } catch (err) {
       res.status(502).json({ error: err.message });
+    }
+  }));
+
+  // --- Microsoft accounts / calendars (only with MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET) ---
+  const msOn = (req, res, next) => (microsoft.microsoftConfigured() ? next() : res.status(404).json({ error: 'feature_unavailable' }));
+  r.get('/microsoft/accounts', msOn, (req, res) => res.json(microsoft.listAccounts()));
+  r.delete('/microsoft/accounts/:email', msOn, (req, res) => {
+    const email = String(req.params.email).toLowerCase();
+    if (!microsoft.removeAccount(email)) return res.status(404).json({ error: 'not found' });
+    // Its calendars leave the config when the admin saves (it drops them from its draft), as for Google accounts.
+    logActivity('microsoft.removed', { req, data: { email } });
+    res.json({ ok: true, manageAccess: microsoft.MANAGE_ACCESS_URLS });
+  });
+  r.get('/microsoft/calendars', msOn, wrap(async (req, res) => {
+    const account = String(req.query.account || '').toLowerCase();
+    if (!account) return res.status(400).json({ error: 'account required' });
+    if (!microsoft.listAccounts().some((a) => a.email === account)) return res.status(404).json({ error: 'not found' });
+    try {
+      res.json(await microsoft.listCalendars(account));
+    } catch (err) {
+      if (err.code === 'auth_failed') return res.status(409).json({ error: 'microsoft_reconnect' });
+      res.status(502).json({ error: 'microsoft_unavailable' });
     }
   }));
 
@@ -85,6 +120,20 @@ export function adminRouter({ onConfigSaved } = {}) {
     updateSecrets((s) => { s.homeassistant.token = token.trim(); });
     res.json({ ok: true });
   });
+
+  // --- weather API key (Pirate Weather): kept in secrets.json, never sent back, only whether one is set ---
+  r.get('/weather/key', (req, res) => res.json(weatherKeyStatus(weatherKey())));
+  r.put('/weather/key', wrap(async (req, res) => {
+    const key = req.body?.key;
+    if (typeof key !== 'string' || key.length > 200) return res.status(400).json({ error: 'key must be a string' });
+    const k = key.trim();
+    if (k && !WEATHER_KEY_RE.test(k)) return res.status(400).json({ error: 'key_invalid' });
+    // A new key is tried once against the provider: a key it refuses is not stored.
+    const checked = k ? await checkWeatherKey(k) : null;
+    if (checked === false) return res.status(400).json({ error: 'key_invalid' });
+    updateSecrets((s) => { s.weather = { ...(s.weather || {}), apiKey: k }; });
+    res.json({ ...weatherKeyStatus(k), checked: checked === true });
+  }));
 
   // --- gallery ---
   r.get('/photos', (req, res) => res.json(listGallery()));
@@ -130,7 +179,7 @@ export function adminRouter({ onConfigSaved } = {}) {
     }
     for (const [seq, p] of thumbs) if (!photos.some((f) => f.seq === seq)) fs.rmSync(p, { force: true }); // unpaired
     writeMeta(meta);
-    if (files.length) broadcast('photos', {});
+    if (files.length) publish('photos', {});
     res.json({ ok: true, files, skipped });
   });
   // Body: { focusX, focusY } (focal point) and/or { hidden } (excluded from the rotation).
@@ -150,7 +199,7 @@ export function adminRouter({ onConfigSaved } = {}) {
       photo = getPhoto(req.params.file);
     }
     if (!photo) return res.status(404).json({ error: 'not found' });
-    broadcast('photos', hasHidden && hidden ? { hidden: [photo.file] } : {});
+    publish('photos', hasHidden && hidden ? { hidden: [photo.file] } : {});
     res.json(photo);
   });
   // Bulk show / hide: { files: string[], hidden: boolean }.
@@ -161,7 +210,7 @@ export function adminRouter({ onConfigSaved } = {}) {
     }
     if (typeof hidden !== 'boolean') return res.status(400).json({ error: 'hidden must be a boolean' });
     const { updated, missing } = setHidden(files, hidden);
-    if (updated.length) broadcast('photos', hidden ? { hidden: updated } : {});
+    if (updated.length) publish('photos', hidden ? { hidden: updated } : {});
     const all = listGallery();
     res.json({ ok: true, updated, missing, total: all.length, inRotation: all.filter((p) => !p.hidden).length });
   });
@@ -176,7 +225,7 @@ export function adminRouter({ onConfigSaved } = {}) {
   });
   r.delete('/photos/:file', (req, res) => {
     if (!deletePhoto(req.params.file)) return res.status(404).json({ error: 'not found' });
-    broadcast('photos', {});
+    publish('photos', {});
     res.json({ ok: true });
   });
 
@@ -184,9 +233,9 @@ export function adminRouter({ onConfigSaved } = {}) {
   r.post('/refresh-displays', (req, res) => {
     const scr = resolveScreenList(getConfig(), req.body?.screens);
     if (scr.error) return res.status(400).json({ error: scr.error, ...(scr.unknown ? { unknown: scr.unknown } : {}) });
-    const delivered = broadcast('reload', {}, scr.ids.length ? { screenIds: scr.ids } : null);
+    const delivered = publish('reload', {}, scr.ids.length ? { screenIds: scr.ids } : null);
     logActivity('display.command', { req, data: { action: 'reload', ...(scr.ids.length ? { screens: scr.ids } : {}), delivered } });
-    res.json({ ok: true, displays: clientCount(), delivered });
+    res.json({ ok: true, displays: connectedCount(), delivered });
   });
 
   r.get('/status', (req, res) => {
@@ -194,7 +243,7 @@ export function adminRouter({ onConfigSaved } = {}) {
       sources: sourceStatus(),
       weather: { ...weatherStatus },
       news: { ...newsStatus },
-      displays: clientCount(),
+      displays: connectedCount(),
       uptime: Math.round(process.uptime()),
     });
   });

@@ -26,6 +26,8 @@ const DEMO_LANG = (() => {
   return l === 'es' || l === 'pt' ? l : 'en';
 })();
 /** Pick the demo string for the current language: L('English', 'Español', 'Português?'). */
+/** ?empty=1: no events, no countdowns, no to-dos (empty states). */
+const EMPTY = new URLSearchParams(location.search).get('empty') === '1';
 const L = (en: string, es: string, pt?: string) => (DEMO_LANG === 'es' ? es : DEMO_LANG === 'pt' ? (pt ?? en) : en);
 
 export const MOCK_SOURCES: PublicCalendarSource[] = [
@@ -43,8 +45,10 @@ export function mockConfig(): DisplayConfig {
     revision: 1,
     screenId: 's_main',
     slug: 'living-room',
-    screen: { name: L('Living room', 'Salón', 'Sala'), language: DEMO_LANG },
+    screen: { name: L('Living room', 'Salón', 'Sala'), language: DEMO_LANG, style: 'modern' },
     weather: { locationName: 'Lisbon, Portugal' },
+    // ?photos=0 → no background photo
+    ...(q.get('photos') === '0' ? { background: { enabled: false } } : {}),
     datetime: { timezone: TZ },
     countdowns: { enabled: q.get('countdowns') !== '0', max: Number(q.get('cdmax')) || 4 },
     // ?sched=1 → a scheduled message whose window is open right now
@@ -58,7 +62,7 @@ export function mockConfig(): DisplayConfig {
     calendar: { sources: MOCK_SOURCES, iconRules: DEFAULT_ICON_RULES },
     todo: {
       enabled: q.get('todo') === '1',
-      items: [
+      items: EMPTY ? [] : [
         { id: 't1', text: L('Buy batteries for the remote', 'Comprar pilas para el mando'), done: false },
         { id: 't2', text: L('Call the plumber', 'Llamar al fontanero'), done: true },
         { id: 't3', text: L('Fresh sheets for the beach house', 'Sábanas limpias para la casa de la playa'), done: false },
@@ -179,7 +183,9 @@ export function mockEvents(now = new Date()): EventsResponse {
 
   // Sort: allDay first, then start
   out.sort((a, b) => (a.allDay === b.allDay ? sortKey(a).localeCompare(sortKey(b)) : a.allDay ? -1 : 1));
-  return { generatedAt: new Date().toISOString(), hash: `mock-${T}`, events: out, errors: [] };
+  // ?empty=1 → an empty week (to check the empty states)
+  if (EMPTY) out.length = 0;
+  return { generatedAt: new Date().toISOString(), hash: `mock-${T}${EMPTY ? '-empty' : ''}`, events: out, errors: [] };
 }
 
 function sortKey(e: CalEvent) {
@@ -235,6 +241,10 @@ function baseWeather(now: Date): WeatherResponse {
     },
     today: { sunrise: isoAt(T, 7, 39), sunset: isoAt(T, 19, 7), min: 14, max: 22, precipChance: 10 },
     daily, hourly, indoor: { temp: 22.3, humidity: 54 },
+    source: {
+      provider: 'open-meteo', name: 'Open-Meteo', model: null, modelName: null, url: 'https://open-meteo.com/',
+      licence: 'CC BY 4.0', licenceUrl: 'https://creativecommons.org/licenses/by/4.0/',
+    },
   };
 }
 
@@ -286,6 +296,7 @@ export function mockCountdowns(now = new Date()): CountdownsResponse {
     { id: 'k_xmas', title: L('Christmas', 'Navidad', 'Natal'), emoji: '🎄', color: '#2ec4b6', date: xmas, days: 0, origin: 'manual' },
   ];
   items.sort((a, b) => a.date.localeCompare(b.date));
+  if (EMPTY) items.length = 0;
   return { generatedAt: now.toISOString(), today: T, hash: `mock-cd-${T}`, items };
 }
 

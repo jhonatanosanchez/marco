@@ -5,6 +5,7 @@ import { EventEmitter } from 'node:events';
 import cookieSession from 'cookie-session';
 import { getConfig, getSecrets, updateSecrets, updateConfig } from './store.js';
 import * as google from './google.js';
+import * as microsoft from './microsoft.js';
 import { logActivity, logActivityThrottled } from './activity.js';
 import { passwordProblem, PASSWORD_MESSAGES } from './lib/password.js';
 import { isPrivateIp, isLanClient, ipBucket, hostAllowed, hostnameOf } from './lib/net.js';
@@ -242,6 +243,8 @@ export function meHandler(req, res) {
     // Initial password came from ADMIN_PASSWORD (headless/Docker install): the panel offers to change it.
     passwordFromEnv: Boolean(valid && sec.passwordFromEnv),
     googleConfigured: google.googleConfigured(),
+    // Microsoft calendars with the server's own Entra app (MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET).
+    microsoftConfigured: microsoft.microsoftConfigured(),
     passwordLoginEnabled: getConfig().auth.passwordLoginEnabled,
   });
 }
@@ -331,4 +334,46 @@ export async function googleCallbackHandler(req, res) {
   startSession(req, { email: profile.email, name: profile.name, picture: profile.picture, method: 'google' });
   logActivity('auth.login', { req, data: { method: 'google' } });
   res.redirect('/admin/');
+}
+
+// --- Microsoft calendars (server/microsoft.js) ---
+
+const MS_BACK = '#/calendars/cal-accounts';
+
+/** GET /auth/microsoft/connect: a signed in admin goes to Microsoft (PKCE, state in the session). */
+export function microsoftConnectHandler(req, res) {
+  if (!microsoft.microsoftConfigured()) return res.redirect(`/admin/?error=microsoft_not_configured${MS_BACK}`);
+  if (!sessionValid(req)) return res.redirect('/admin/?error=login_required');
+  const lang = ['es', 'en', 'pt'].includes(getConfig().screens?.[0]?.screen?.language) ? getConfig().screens[0].screen.language : '';
+  res.redirect(microsoft.startConnect(req, lang));
+}
+
+/** GET /auth/microsoft/callback: the redirect URI registered in the Entra app (PUBLIC_URL + this path). */
+export async function microsoftCallbackHandler(req, res) {
+  const back = (q) => res.redirect(`/admin/?${q}${MS_BACK}`);
+  const failEarly = (code) => {
+    logActivityThrottled('auth.login_failed', `microsoft|${req.ip}|${code}`, { everyMs: 60_000, perMinute: 10 },
+      { req, actor: 'anonymous', level: 'warn', data: { method: 'microsoft', reason: code } });
+    return back(`error=${encodeURIComponent(code)}`);
+  };
+  if (!microsoft.microsoftConfigured()) return back('error=microsoft_not_configured');
+  const pendingConnect = microsoft.takeConnect(req, req.query.state);
+  if (req.query.error) {
+    const e = String(req.query.error);
+    return failEarly(microsoft.MICROSOFT_OAUTH_ERRORS.has(e) ? `microsoft_${e}` : 'microsoft_error');
+  }
+  if (!pendingConnect) return failEarly('microsoft_invalid_state');
+  if (!sessionValid(req)) return back('error=login_required');
+  if (typeof req.query.code !== 'string' || !req.query.code || req.query.code.length > 4096) return failEarly('microsoft_missing_code');
+  let result;
+  try {
+    result = await microsoft.exchangeCode(req, req.query.code, pendingConnect.verifier);
+  } catch (err) {
+    const known = { scope_denied: 'microsoft_scope_denied', no_refresh_token: 'microsoft_no_refresh_token', no_email: 'microsoft_no_email' };
+    console.warn('[auth] microsoft connect failed:', err.code || err.status || 'error');
+    return back(`error=${known[err.code] || 'microsoft_exchange_failed'}`);
+  }
+  microsoft.storeAccount(result.email, result.tokens);
+  logActivity('microsoft.connected', { req, data: { email: result.email } });
+  return back(`microsoft=${encodeURIComponent(result.email)}`);
 }

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'preact/hooks';
-import type { CalendarSource, GoogleAccount, GoogleCalendarListItem, SourceKind, TestIcsResponse } from '../../shared/types';
-import { api, ApiError } from '../api';
-import { confirmDialog, toast } from '../components/feedback';
-import { GoogleG, Icon } from '../components/icons';
+import type { CalendarSource, GoogleCalendarListItem, MicrosoftCalendarListItem, SourceKind, TestIcsResponse } from '../../shared/types';
+import { api, ApiError, UNAUTHORIZED_EVENT } from '../api';
+import { fetchErrorText } from '../apiErrors';
+import { choiceDialog, confirmDialog, toast } from '../components/feedback';
+import { GoogleG, Icon, MicrosoftLogo } from '../components/icons';
 import {
   Button,
   Callout,
@@ -22,6 +23,8 @@ import {
   ToggleRow,
   useReorder,
 } from '../components/ui';
+import { atLimit, has, offers } from '../caps';
+import { LimitNote } from '../components/LimitNote';
 import { t } from '../i18n';
 import { allSourceOptions, guessKind, HOLIDAY_PRESETS, isHttpUrl, KIND_EMOJI, moveItem, SWATCHES, uid } from '../util';
 import type { SectionProps } from './common';
@@ -64,6 +67,8 @@ function SourceRow({
   const [test, setTest] = useState<{ loading: boolean; res?: TestIcsResponse }>({ loading: false });
   const p = `source.${src.id}`;
   const urlValid = src.type === 'ics' && !!src.url && isHttpUrl(src.url, true);
+  /** The server kept the stored URL back (no recent sign-in): the field stays empty unless a new URL is typed. */
+  const hidden = src.type === 'ics' && !!src.urlHidden && !src.url;
   const runTest = async () => {
     if (!src.url) return;
     setTest({ loading: true });
@@ -89,7 +94,9 @@ function SourceRow({
           placeholder={t('Nombre')}
           onValue={(v) => update((s) => void (s.name = v))}
         />
-        <span class={`badge ${src.type === 'google' ? 'badge--google' : ''}`}>{src.type === 'google' ? <GoogleG size={12} /> : 'ICS'}</span>
+        <span class={`badge ${src.type !== 'ics' ? 'badge--google' : ''}`}>
+          {src.type === 'google' ? <GoogleG size={12} /> : src.type === 'microsoft' ? <MicrosoftLogo size={12} /> : 'ICS'}
+        </span>
         <Toggle checked={src.enabled} onChange={(v) => update((s) => void (s.enabled = v))} label={t('Activo')} />
         <ReorderButtons index={index} count={count} onMove={move} />
         <button type="button" class="icon-btn icon-btn--danger" onClick={remove} aria-label={t('Eliminar')} title={t('Eliminar')}>
@@ -98,11 +105,24 @@ function SourceRow({
       </div>
       <div class="src__body">
         {src.type === 'ics' ? (
-          <Field error={errors[`${p}.url`]} class="src__url">
+          <Field
+            error={errors[`${p}.url`]}
+            class="src__url"
+            hint={
+              hidden ? (
+                <>
+                  {t('Por seguridad, la dirección solo se muestra si has iniciado sesión hace poco.')}{' '}
+                  <button type="button" class="link-btn" onClick={() => window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT))}>
+                    {t('Volver a iniciar sesión')}
+                  </button>
+                </>
+              ) : undefined
+            }
+          >
             <TextInput
               mono
               value={src.url ?? ''}
-              placeholder="https://…/calendar.ics"
+              placeholder={hidden ? t('Dirección guardada (oculta)') : 'https://…/calendar.ics'}
               error={!!errors[`${p}.url`]}
               onValue={(v) => {
                 update((s) => {
@@ -121,6 +141,11 @@ function SourceRow({
               }
             />
           </Field>
+        ) : src.type === 'microsoft' ? (
+          <div class="src__google">
+            <MicrosoftLogo size={14} />
+            <span class="muted">{src.microsoftAccount}</span>
+          </div>
         ) : (
           <div class="src__google">
             <GoogleG size={14} />
@@ -139,7 +164,7 @@ function SourceRow({
             <span>{t('Actualizar cada')}</span>
             <NumberInput value={src.refreshMin} min={1} max={1440} suffix="min" error={!!errors[`${p}.refreshMin`]} onValue={(v) => update((s) => void (s.refreshMin = v))} />
           </label>
-          {src.type === 'ics' && (
+          {src.type === 'ics' && (has('insecureTls') || !!src.insecureTls) && (
             <label class="mini-toggle" title={t('Acepta certificados HTTPS autofirmados (solo en tu red local)')}>
               <Toggle size="sm" checked={!!src.insecureTls} onChange={(v) => update((s) => void (s.insecureTls = v))} />
               <span>{t('Certificado autofirmado')}</span>
@@ -168,7 +193,7 @@ function SourceRow({
               </>
             ) : (
               <span>
-                <Icon name="alert" size={14} /> {test.res.error || t('No se pudo leer el calendario')}
+                <Icon name="alert" size={14} /> {fetchErrorText(test.res.error) || t('No se pudo leer el calendario')}
               </span>
             )}
           </div>
@@ -178,57 +203,155 @@ function SourceRow({
   );
 }
 
-function GoogleAccounts({ cfg, set, me, dirty, save }: SectionProps) {
-  const [accounts, setAccounts] = useState<GoogleAccount[] | null>(null);
-  const [cals, setCals] = useState<Record<string, GoogleCalendarListItem[] | 'error' | undefined>>({});
+/** A linked account and one of its calendars, the same for every provider. */
+interface LinkedAccount {
+  email: string;
+  name?: string;
+  picture?: string;
+}
+interface LinkedCalendar {
+  id: string;
+  name: string;
+  color?: string;
+  primary?: boolean;
+  /** owner address of a calendar someone else shared with the account */
+  owner?: string;
+}
+
+type ProviderId = 'google' | 'microsoft';
+
+/** What differs between Google and Microsoft in the linked accounts card. Strings are Spanish keys for t(). */
+interface Provider {
+  id: ProviderId;
+  label: string;
+  /** the server can link accounts of this provider for this user (me.googleConfigured / me.microsoftConfigured) */
+  configured: boolean;
+  leaveBody: string;
+  disconnectBody: string;
+  connectPath: string;
+  accounts: () => Promise<LinkedAccount[]>;
+  calendars: (email: string) => Promise<LinkedCalendar[]>;
+  remove: (email: string) => Promise<unknown>;
+  accountOf: (s: CalendarSource) => string | undefined;
+  calendarOf: (s: CalendarSource) => string | undefined;
+  newSource: (email: string, c: LinkedCalendar) => Partial<CalendarSource>;
+}
+
+function googleProvider(me: SectionProps['me']): Provider {
+  return {
+    id: 'google',
+    label: 'Google',
+    configured: offers('googleCalendar') && !!me.googleConfigured,
+    leaveBody: 'Vas a salir a Google para vincular la cuenta. ¿Guardamos primero los cambios pendientes?',
+    disconnectBody: 'Se dejarán de mostrar sus calendarios en la pantalla.',
+    connectPath: '/auth/google/connect',
+    accounts: () => api.googleAccounts(),
+    calendars: async (email) =>
+      (await api.googleCalendars(email)).map((c: GoogleCalendarListItem) => ({ id: c.id, name: c.summary, color: c.backgroundColor, primary: c.primary })),
+    remove: (email) => api.removeGoogleAccount(email),
+    accountOf: (s) => (s.type === 'google' ? s.googleAccount : undefined),
+    calendarOf: (s) => (s.type === 'google' ? s.googleCalendarId : undefined),
+    newSource: (email, c) => ({ type: 'google', googleAccount: email, googleCalendarId: c.id }),
+  };
+}
+
+function microsoftProvider(me: SectionProps['me']): Provider {
+  return {
+    id: 'microsoft',
+    label: 'Microsoft',
+    configured: has('microsoftCalendar') && !!me.microsoftConfigured,
+    leaveBody: 'Vas a salir a Microsoft para vincular la cuenta. ¿Guardamos primero los cambios pendientes?',
+    disconnectBody:
+      'Se dejarán de mostrar sus calendarios en la pantalla y Marco borrará su acceso. Para retirar también el permiso en Microsoft, entra en account.live.com/consent/Manage (cuenta personal) o en myapps.microsoft.com (cuenta del trabajo o del centro educativo).',
+    connectPath: '/auth/microsoft/connect',
+    accounts: () => api.microsoftAccounts(),
+    calendars: async (email) =>
+      (await api.microsoftCalendars(email)).map((c: MicrosoftCalendarListItem) => ({ id: c.id, name: c.name, color: c.color, primary: c.isDefault, owner: c.owner })),
+    remove: (email) => api.removeMicrosoftAccount(email),
+    accountOf: (s) => (s.type === 'microsoft' ? s.microsoftAccount : undefined),
+    calendarOf: (s) => (s.type === 'microsoft' ? s.microsoftCalendarId : undefined),
+    newSource: (email, c) => ({ type: 'microsoft', microsoftAccount: email, microsoftCalendarId: c.id }),
+  };
+}
+
+/** One linked account of any provider, as listed in the card. */
+interface Linked extends LinkedAccount {
+  provider: ProviderId;
+}
+const linkKey = (a: { provider: ProviderId; email: string }) => `${a.provider}:${a.email}`;
+
+/**
+ * Linked accounts (Google and Microsoft) in one card: "Link account" asks which provider when the server offers more
+ * than one, and every linked account is listed one below the other with its calendars to pick from.
+ */
+function LinkedAccounts({ cfg, set, dirty, save, me }: SectionProps) {
+  const all = [googleProvider(me), microsoftProvider(me)];
+  const providers = all.filter((p) => p.configured);
+  const byId = (id: ProviderId) => all.find((p) => p.id === id)!;
+  const configuredKey = providers.map((p) => p.id).join(',');
+  const [accounts, setAccounts] = useState<Linked[] | null>(null);
+  const [cals, setCals] = useState<Record<string, LinkedCalendar[] | 'error' | undefined>>({});
   const [err, setErr] = useState('');
 
   const load = async () => {
-    try {
-      const list = await api.googleAccounts();
-      setAccounts(list);
-      setErr('');
-      for (const a of list) {
-        api
-          .googleCalendars(a.email)
-          .then((c) => setCals((m) => ({ ...m, [a.email]: c })))
-          .catch(() => setCals((m) => ({ ...m, [a.email]: 'error' })));
-      }
-    } catch (e) {
-      setAccounts([]);
-      setErr((e as ApiError).message);
+    const lists = await Promise.allSettled(providers.map(async (p) => (await p.accounts()).map((a) => ({ ...a, provider: p.id }) as Linked)));
+    const list = lists.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
+    const failed = lists.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+    setAccounts(list);
+    setErr(failed ? (failed.reason as ApiError).message : '');
+    for (const a of list) {
+      byId(a.provider)
+        .calendars(a.email)
+        .then((c) => setCals((m) => ({ ...m, [linkKey(a)]: c })))
+        .catch(() => setCals((m) => ({ ...m, [linkKey(a)]: 'error' })));
     }
   };
   useEffect(() => {
-    if (me.googleConfigured) load();
+    if (providers.length) load();
     else setAccounts([]);
-  }, [me.googleConfigured]);
+  }, [configuredKey]);
 
-  const connect = async () => {
+  const go = async (p: Provider) => {
     if (dirty) {
       const ok = await confirmDialog({
         title: t('Guardar cambios antes de continuar'),
-        body: t('Vas a salir a Google para vincular la cuenta. ¿Guardamos primero los cambios pendientes?'),
+        body: t(p.leaveBody),
         confirm: t('Guardar y continuar'),
       });
       if (!ok) return;
       if (!(await save())) return;
     }
-    window.location.href = '/auth/google/connect';
+    window.location.href = p.connectPath;
   };
 
-  const disconnect = async (a: GoogleAccount) => {
+  /** One provider: straight there. Several: ask which one. */
+  const connect = async () => {
+    if (providers.length === 1) return go(providers[0]);
+    const choice = await choiceDialog<ProviderId>({
+      title: t('Vincular cuenta'),
+      body: t('¿Qué cuenta quieres vincular?'),
+      choices: providers.map((p) => ({ value: p.id, label: p.label, kind: 'default' as const, icon: p.id })),
+      closeX: true,
+    });
+    if (choice) await go(byId(choice));
+  };
+
+  const ofAccount = (s: CalendarSource, a: Linked) => byId(a.provider).accountOf(s) === a.email;
+  const isOn = (a: Linked, id: string) => cfg.calendar.sources.some((s) => ofAccount(s, a) && byId(a.provider).calendarOf(s) === id);
+
+  const disconnect = async (a: Linked) => {
+    const p = byId(a.provider);
     const ok = await confirmDialog({
       title: t('Desvincular {email}', { email: a.email }),
-      body: t('Se dejarán de mostrar sus calendarios en la pantalla.'),
+      body: t(p.disconnectBody),
       confirm: t('Desvincular'),
       danger: true,
     });
     if (!ok) return;
     try {
-      await api.removeGoogleAccount(a.email);
+      await p.remove(a.email);
       set((d) => {
-        d.calendar.sources = d.calendar.sources.filter((s) => !(s.type === 'google' && s.googleAccount === a.email));
+        d.calendar.sources = d.calendar.sources.filter((s) => !ofAccount(s, a));
       });
       toast(t('Cuenta desvinculada. Guarda para aplicar los cambios en los calendarios.'), 'info');
       load();
@@ -237,48 +360,53 @@ function GoogleAccounts({ cfg, set, me, dirty, save }: SectionProps) {
     }
   };
 
-  const isOn = (email: string, id: string) =>
-    cfg.calendar.sources.some((s) => s.type === 'google' && s.googleAccount === email && s.googleCalendarId === id);
-
-  const toggleCal = (email: string, c: GoogleCalendarListItem, on: boolean) =>
+  const toggleCal = (a: Linked, c: LinkedCalendar, on: boolean) =>
     set((d) => {
+      const p = byId(a.provider);
       if (on) {
-        if (isOn(email, c.id)) return;
+        if (isOn(a, c.id) || atLimit('sources', d.calendar.sources.length)) return;
         d.calendar.sources.push({
           id: uid('c'),
-          type: 'google',
-          name: c.summary,
-          googleAccount: email,
-          googleCalendarId: c.id,
-          color: c.backgroundColor && /^#[0-9a-f]{6}$/i.test(c.backgroundColor) ? c.backgroundColor : nextColor(d.calendar.sources),
+          type: p.id,
+          name: c.name,
+          color: c.color && /^#[0-9a-f]{6}$/i.test(c.color) ? c.color : nextColor(d.calendar.sources),
           emoji: '',
-          kind: guessKind(`${c.summary} ${c.id}`),
+          kind: guessKind(`${c.name} ${c.id}`),
           enabled: true,
           refreshMin: 5,
-        });
+          ...p.newSource(a.email, c),
+        } as CalendarSource);
       } else {
-        d.calendar.sources = d.calendar.sources.filter((s) => !(s.type === 'google' && s.googleAccount === email && s.googleCalendarId === c.id));
+        d.calendar.sources = d.calendar.sources.filter((s) => !(ofAccount(s, a) && p.calendarOf(s) === c.id));
       }
     });
 
+  const desc =
+    providers.length > 1
+      ? t('Vincula cuentas de Google o de Microsoft (Outlook.com, Hotmail, Microsoft 365) y elige qué calendarios mostrar.')
+      : providers[0]?.id === 'microsoft'
+        ? t('Vincula una cuenta de Outlook.com, Hotmail o Microsoft 365 y elige qué calendarios mostrar.')
+        : t('Vincula una cuenta de Google y elige qué calendarios mostrar.');
+  const hasMicrosoft = !!accounts?.some((a) => a.provider === 'microsoft');
+
   return (
     <Card
-      title={t('Cuentas de Google')}
-      id="cal-google"
+      title={t('Cuentas vinculadas')}
+      id="cal-accounts"
       scope="global"
-      icon="google"
-      desc={t('Vincula una cuenta de Google y elige qué calendarios mostrar.')}
+      icon="link"
+      desc={desc}
       actions={
-        me.googleConfigured && (
+        providers.length > 0 && (
           <Button icon="plus" variant="primary" size="sm" onClick={connect}>
             {t('Vincular cuenta')}
           </Button>
         )
       }
     >
-      {!me.googleConfigured ? (
+      {providers.length === 0 ? (
         <Callout kind="warn">
-          {t('Google no está configurado en el servidor. Añade GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET al archivo .env y reinicia. Mientras tanto puedes usar la URL iCal secreta de Google Calendar (Configuración → Integrar calendario).')}
+          {t('Para vincular cuentas, añade GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET (Google) o MICROSOFT_CLIENT_ID y MICROSOFT_CLIENT_SECRET (Microsoft) al archivo .env y reinicia. Mientras tanto puedes usar la URL iCal secreta de tu calendario.')}
         </Callout>
       ) : accounts === null ? (
         <div class="skeleton-list">
@@ -287,19 +415,27 @@ function GoogleAccounts({ cfg, set, me, dirty, save }: SectionProps) {
         </div>
       ) : accounts.length === 0 ? (
         <Empty icon="calendar" title={err ? t('No se pudieron cargar las cuentas') : t('Ninguna cuenta vinculada')}>
-          {err || t('Pulsa “Vincular cuenta” para dar acceso de solo lectura a tu Google Calendar.')}
+          {err ||
+            (providers.length > 1
+              ? t('Pulsa “Vincular cuenta” para dar acceso de solo lectura a tu calendario de Google o de Outlook.')
+              : providers[0].id === 'microsoft'
+                ? t('Pulsa “Vincular cuenta” para dar acceso de solo lectura a tu calendario de Outlook.')
+                : t('Pulsa “Vincular cuenta” para dar acceso de solo lectura a tu Google Calendar.'))}
         </Empty>
       ) : (
         <div class="gaccounts">
           {accounts.map((a) => {
-            const list = cals[a.email];
+            const list = cals[linkKey(a)];
             return (
               <div class="gaccount">
                 <div class="gaccount__head">
                   {a.picture ? <img class="avatar" src={a.picture} alt="" referrerpolicy="no-referrer" /> : <span class="avatar avatar--letter">{(a.name || a.email)[0].toUpperCase()}</span>}
                   <div class="gaccount__who">
                     <strong>{a.name || a.email}</strong>
-                    <span class="muted small">{a.email}</span>
+                    <span class="muted small">
+                      {a.provider === 'microsoft' ? <MicrosoftLogo size={12} /> : <GoogleG size={12} />} {byId(a.provider).label}
+                      {a.name && a.name !== a.email ? ` · ${a.email}` : ''}
+                    </span>
                   </div>
                   <Button size="sm" variant="ghost" icon="x" onClick={() => disconnect(a)}>
                     {t('Desvincular')}
@@ -312,16 +448,17 @@ function GoogleAccounts({ cfg, set, me, dirty, save }: SectionProps) {
                 ) : (
                   <ul class="gcal-list">
                     {list.map((c) => {
-                      const on = isOn(a.email, c.id);
+                      const on = isOn(a, c.id);
                       return (
                         <li>
                           <label class={`gcal ${on ? 'is-on' : ''}`}>
-                            <input type="checkbox" checked={on} onChange={(e) => toggleCal(a.email, c, e.currentTarget.checked)} />
+                            <input type="checkbox" checked={on} disabled={!on && atLimit('sources', cfg.calendar.sources.length)} onChange={(e) => toggleCal(a, c, e.currentTarget.checked)} />
                             <span class="check-box">
                               <Icon name="check" size={12} />
                             </span>
-                            <span class="dot-color" style={{ background: c.backgroundColor || '#888' }} />
-                            <span class="gcal__name">{c.summary}</span>
+                            <span class="dot-color" style={{ background: c.color || '#888' }} />
+                            <span class="gcal__name">{c.name}</span>
+                            {c.owner && <span class="muted small">{c.owner}</span>}
                             {c.primary && <span class="badge badge--soft">{t('Principal')}</span>}
                           </label>
                         </li>
@@ -333,6 +470,18 @@ function GoogleAccounts({ cfg, set, me, dirty, save }: SectionProps) {
             );
           })}
         </div>
+      )}
+      {hasMicrosoft && (
+        <p class="muted small">
+          {t('Marco solo lee tus calendarios. Para retirar el permiso también en Microsoft:')}{' '}
+          <a href="https://account.live.com/consent/Manage" target="_blank" rel="noopener noreferrer">
+            {t('cuenta personal')}
+          </a>
+          {' · '}
+          <a href="https://myapps.microsoft.com" target="_blank" rel="noopener noreferrer">
+            {t('cuenta del trabajo o del centro educativo')}
+          </a>
+        </p>
       )}
     </Card>
   );
@@ -406,8 +555,10 @@ export function CalendarsSection(props: SectionProps) {
   const move = (from: number, to: number) => set((d) => void (d.calendar.sources = moveItem(d.calendar.sources, from, to)));
   const reorder = useReorder(move);
 
+  const atMax = atLimit('sources', sources.length);
   const addIcs = (name = '', url = '', kind: SourceKind = 'generic') =>
     set((d) => {
+      if (atLimit('sources', d.calendar.sources.length)) return;
       d.calendar.sources.push({
         id: uid('c'),
         type: 'ics',
@@ -428,7 +579,18 @@ export function CalendarsSection(props: SectionProps) {
 
   return (
     <>
-      <PageHeader title={t('Calendarios')} desc={t('Conecta calendarios iCal y Google, y decide cómo se muestran.')} />
+      <PageHeader
+        title={t('Calendarios')}
+        desc={
+          offers('microsoftCalendar')
+            ? offers('googleCalendar')
+              ? t('Conecta calendarios iCal, Google y Microsoft, y decide cómo se muestran.')
+              : t('Conecta calendarios iCal y Microsoft, y decide cómo se muestran.')
+            : offers('googleCalendar')
+              ? t('Conecta calendarios iCal y Google, y decide cómo se muestran.')
+              : t('Conecta calendarios iCal y decide cómo se muestran.')
+        }
+      />
 
       <Card
         title={t('Calendarios conectados')}
@@ -437,14 +599,20 @@ export function CalendarsSection(props: SectionProps) {
         icon="link"
         desc={t('Cada calendario tiene su color y emoji. El orden define la prioridad en la leyenda.')}
         actions={
-          <Button icon="plus" variant="primary" size="sm" onClick={() => addIcs()}>
+          <Button icon="plus" variant="primary" size="sm" disabled={atMax} onClick={() => addIcs()}>
             {t('Añadir URL iCal')}
           </Button>
         }
       >
         {sources.length === 0 ? (
           <Empty icon="calendar" title={t('Aún no hay calendarios')}>
-            {t('Pega la URL .ics de tu calendario (Airbnb, Booking, Google, iCloud, Outlook…) o vincula una cuenta de Google.')}
+            {offers('googleCalendar') && offers('microsoftCalendar')
+              ? t('Pega la URL .ics de tu calendario (Airbnb, Booking, Google, iCloud, Outlook…) o vincula una cuenta de Google o de Microsoft.')
+              : offers('googleCalendar')
+                ? t('Pega la URL .ics de tu calendario (Airbnb, Booking, Google, iCloud, Outlook…) o vincula una cuenta de Google.')
+                : offers('microsoftCalendar')
+                  ? t('Pega la URL .ics de tu calendario (Airbnb, Booking, Google, iCloud, Outlook…) o vincula una cuenta de Microsoft.')
+                  : t('Pega la URL .ics de tu calendario (Airbnb, Booking, Google, iCloud, Outlook…).')}
           </Empty>
         ) : (
           <div class="src-list">
@@ -468,20 +636,21 @@ export function CalendarsSection(props: SectionProps) {
             ))}
           </div>
         )}
+        <LimitNote name="sources" count={sources.length} />
         <div class="quick-add">
           <span class="muted small">{t('Añadir rápido:')}</span>
           {HOLIDAY_PRESETS.filter((p) => !sources.some((s) => s.url === p.url)).map((p) => (
-            <button type="button" class="pill" onClick={() => addIcs(t(p.name), p.url, 'holidays')}>
+            <button type="button" class="pill" disabled={atMax} onClick={() => addIcs(t(p.name), p.url, 'holidays')}>
               🎉 {t(p.name)}
             </button>
           ))}
-          <button type="button" class="pill" onClick={() => addIcs('Airbnb', '', 'airbnb')}>
+          <button type="button" class="pill" disabled={atMax} onClick={() => addIcs('Airbnb', '', 'airbnb')}>
             🏠 {t('Reservas Airbnb')}
           </button>
         </div>
       </Card>
 
-      <GoogleAccounts {...props} />
+      {(offers('googleCalendar') || offers('microsoftCalendar')) && <LinkedAccounts {...props} />}
 
       <ScreenSourcesCard {...props} />
 

@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import type { AlertStyle, AnnounceResponse, ScreenProfile } from '../../shared/types';
 import { api, ApiError } from '../api';
 import { t } from '../i18n';
+import { withPollNote } from '../liveNote';
 import { toast } from './feedback';
 import { Icon } from './icons';
 import { Button, EmojiPicker, Field, Select, Textarea, TextInput, Toggle } from './ui';
@@ -109,7 +110,7 @@ export function AnnounceForm({ screens, compact, onSent }: { screens: ScreenProf
     setBusy(true);
     try {
       const r = await api.announce({ title: title.trim(), body: body.trim(), emoji, style, durationSec: duration, sound, screens: targets });
-      toast(r.delivered ? t('Aviso enviado a {n} pantallas', { n: r.delivered }) : t('Aviso guardado: se mostrará cuando se conecte una pantalla'), r.delivered ? 'ok' : 'info');
+      toast(r.delivered ? withPollNote(t('Aviso enviado a {n} pantallas', { n: r.delivered })) : t('Aviso guardado: se mostrará cuando se conecte una pantalla'), r.delivered ? 'ok' : 'info');
       setTitle('');
       setBody('');
       onSent?.(r);

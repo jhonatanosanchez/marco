@@ -10,10 +10,11 @@ import crypto from 'node:crypto';
 import { Router } from 'express';
 import { requireAuth } from '../auth.js';
 import { getConfig } from '../store.js';
-import { defaultScreenProfile } from '../defaults.js';
-import { slugify } from '../validate.js';
+import { defaultScreenProfile } from '../core/defaults.js';
+import { slugify } from '../core/validate.js';
 import { listDisplays, runCommand, forgetDisplay, recordHeartbeat, getServerVersion } from '../displays.js';
 import { logActivity } from '../activity.js';
+import { markFast } from '../pollHub.js';
 
 /** A fresh screen profile named `name` whose slug is not used by `cfg`. */
 export function screenTemplate(cfg, name) {
@@ -39,6 +40,8 @@ export function screensAdminRouter() {
 
   r.get('/displays', (req, res) => {
     res.set('cache-control', 'no-store');
+    // Polling displays check in every few seconds while someone has this page open (Identify, night mode).
+    markFast(60_000);
     res.json({ displays: listDisplays(), serverVersion: getServerVersion() });
   });
 

@@ -16,8 +16,9 @@ import crypto from 'node:crypto';
 import { getConfig, getSecrets, updateSecrets, flushSecrets } from './store.js';
 import { sessionValid, isLanClient, authEvents, SESSION_MAX_AGE } from './auth.js';
 import { listClients, dropClient } from './sse.js';
+import { listPollers, dropPollers } from './pollHub.js';
 import { logActivity } from './activity.js';
-import { resolveScreen } from './screens.js';
+import { resolveScreen } from './core/screens.js';
 
 export const KEY_HEADER = 'x-marco-key';
 /** Display key: a random UUIDv4 (122 random bits), lower-case. Upper-case input is accepted. */
@@ -198,11 +199,11 @@ export function regenerateKey(screenId, { req } = {}) {
 
 const deviceInfo = (d, cfg = getConfig()) => {
   const s = cfg.screens.find((x) => x.id === d.screenId);
-  const live = listClients().filter((c) => c.access?.deviceId === d.id && !c.preview);
+  const live = [...listClients(), ...listPollers()].filter((c) => c.access?.deviceId === d.id && !c.preview);
   return {
     id: d.id, name: d.name, prefix: d.prefix, screenId: d.screenId, screenSlug: s?.slug || '', screenName: s?.name || '',
     createdAt: d.createdAt, lastSeenAt: d.lastSeenAt ?? null, lastIp: d.lastIp ?? null, userAgent: d.userAgent ?? '',
-    connected: live.length > 0, clientIds: live.filter((c) => !c.anonymous).map((c) => c.clientId),
+    connected: live.length > 0, clientIds: [...new Set(live.filter((c) => !c.anonymous).map((c) => c.clientId))],
   };
 };
 
@@ -278,8 +279,12 @@ export function revokeDevice(id, { req } = {}) {
   return true;
 }
 
-/** Send `revoked` to matching SSE clients and close their streams. Returns how many were closed. */
+/**
+ * Send `revoked` to matching SSE clients and close their streams. Matching pollers stop counting as connected (their
+ * next poll gets 401 / 403). Returns how many streams were closed.
+ */
 export function kickClients(filter, code) {
+  dropPollers(filter);
   let n = 0;
   for (const c of listClients()) {
     if (!filter(c)) continue;
@@ -307,28 +312,38 @@ export function revalidateStreams(cfg = getConfig()) {
   const k = keys();
   const devs = new Map(devices().map((d) => [d.id, d]));
   const mode = displayAccessMode(cfg);
-  let n = 0;
-  for (const c of listClients()) {
-    const a = c.access;
-    if (!a) continue;
-    let code = null;
+  /** null (still valid), 'reload' (device moved to another screen) or the `revoked` code. */
+  const check = (a, since) => {
     if (a.via === 'key') {
       const cur = k[a.screenId]?.key;
-      if (!ids.has(a.screenId) || typeof cur !== 'string' || !sameHash(a.credHash, sha(cur))) code = 'invalid_key';
+      if (!ids.has(a.screenId) || typeof cur !== 'string' || !sameHash(a.credHash, sha(cur))) return 'invalid_key';
     } else if (a.via === 'device') {
       const d = devs.get(a.deviceId);
-      if (!d || !sameHash(a.credHash, Buffer.from(String(d.hash || ''), 'hex'))) code = 'invalid_key';
-      else if (d.screenId !== a.screenId) { dropClient(c, { event: 'reload', data: {} }); n++; continue; }
+      if (!d || !sameHash(a.credHash, Buffer.from(String(d.hash || ''), 'hex'))) return 'invalid_key';
+      if (d.screenId !== a.screenId) return 'reload';
     } else if (a.via === 'session') {
       let ok = false;
       // The cookie expires after SESSION_MAX_AGE: a stream opened with it does not outlive it either.
-      try { ok = Boolean(a.authReq) && sessionValid(a.authReq) && Date.now() - c.since < SESSION_MAX_AGE; } catch { ok = false; }
-      if (!ok) code = 'key_required';
+      try { ok = Boolean(a.authReq) && sessionValid(a.authReq) && Date.now() - since < SESSION_MAX_AGE; } catch { ok = false; }
+      if (!ok) return 'key_required';
     } else if (a.via === 'open') {
-      if (mode !== 'open') code = 'key_required';
+      if (mode !== 'open') return 'key_required';
     }
-    if (code) { dropClient(c, { event: 'revoked', data: { code } }); n++; }
+    return null;
+  };
+  let n = 0;
+  for (const c of listClients()) {
+    if (!c.access) continue;
+    const code = check(c.access, c.since);
+    if (code === 'reload') { dropClient(c, { event: 'reload', data: {} }); n++; }
+    else if (code) { dropClient(c, { event: 'revoked', data: { code } }); n++; }
   }
+  // Pollers re-check on every poll; a moved device finds its new screen there. The others stop counting as connected.
+  dropPollers((p) => {
+    if (!p.access) return false;
+    const code = check(p.access, p.at);
+    return code !== null && code !== 'reload';
+  });
   return n;
 }
 

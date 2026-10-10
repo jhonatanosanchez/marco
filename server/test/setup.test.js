@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import express from 'express';
 import * as store from '../store.js';
-import { defaultConfig } from '../defaults.js';
+import { defaultConfig } from '../core/defaults.js';
 import { sessionMiddleware, csrfGuard, ensurePassword, loginHandler, meHandler, hashPassword, verifyPassword } from '../auth.js';
 import { adminRouter } from '../routes/admin.js';
 import { setupRouter, setupToken, _resetSetup, parseSetupBody, applySetup } from '../setup.js';

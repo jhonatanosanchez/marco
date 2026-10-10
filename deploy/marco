@@ -5,6 +5,7 @@
 #   marco logs [-f]         server log (-f follows it); on a kiosk-only device, the kiosk log
 #   marco restart           restart the server
 #   marco update [--force]  install the latest release (rolled back if it does not start; --force reinstalls)
+#                           (`marco update --requested` is run by marco-update.service for an update started in the admin)
 #   marco url               admin address and the private link of every screen, with QR codes
 #   marco version           installed version and the latest release
 #   marco uninstall [--purge]  remove Marco; your data is kept unless you add --purge
@@ -21,6 +22,7 @@ have() { command -v "$1" >/dev/null 2>&1; }
 
 [ -r "$CONF" ] || die "Marco is not installed here ($CONF not found). Install it: curl -fsSL https://marcohome.app/install | bash"
 MARCO_MODE=server; MARCO_LAYOUT=release; MARCO_DIR=""; MARCO_USER=""; MARCO_NODE=""; MARCO_REPO="mr-reb00t/marco"
+MARCO_RELEASES_URL=""
 # shellcheck disable=SC1090
 . "$CONF"
 
@@ -44,7 +46,7 @@ lan_ip() {
 installed_version() { sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$APP/package.json" 2>/dev/null | head -n1; }
 latest_version() {
   local loc
-  loc="$(curl -fsSI --connect-timeout 10 "https://github.com/${MARCO_REPO}/releases/latest" 2>/dev/null | tr -d '\r' | sed -n 's/^[Ll]ocation: *//p' | tail -n1 || true)"
+  loc="$(curl -fsSI --connect-timeout 10 "${MARCO_RELEASES_URL:-https://github.com/${MARCO_REPO}/releases}/latest" 2>/dev/null | tr -d '\r' | sed -n 's/^[Ll]ocation: *//p' | tail -n1 || true)"
   case "$loc" in */releases/tag/v*) printf '%s' "${loc##*/tag/v}" ;; esac
 }
 qr() {
@@ -125,16 +127,71 @@ cmd_version() {
 
 installer() {
   [ -x "$INSTALLER" ] || die "$INSTALLER is missing. Run the installer again: curl -fsSL https://marcohome.app/install | bash"
+  # MARCO_RELEASES_URL (testing only) comes from /etc/marco.conf, which only root can change.
+  if [ -n "$MARCO_RELEASES_URL" ]; then export MARCO_RELEASES_URL; fi
   exec bash "$INSTALLER" "$@"
 }
 
-usage() { sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; }
+# marco update --requested: run by marco-update.service (root) when the admin asked for an update. The data folder
+# belongs to the service user, so everything written there is written as that user (a link planted in that folder
+# cannot make root overwrite another file), and nothing in the request is used except that it exists.
+cmd_update_requested() {
+  [ "$(id -u)" -eq 0 ] || die "marco update --requested is run by the marco-update service (as root)."
+  local udir="$MARCO_DIR/data/update" req from to rc by=admin state rolled=false target=""
+  req="$udir/request"
+  [ -e "$req" ] || [ -L "$req" ] || { echo "No update requested."; return 0; }
+  if [ -f "$req" ] && [ ! -L "$req" ]; then
+    case "$(head -c 300 "$req" 2>/dev/null || true)" in *'"by":"auto"'*) by=auto ;; esac
+    target="$(head -c 300 "$req" 2>/dev/null | sed -n 's/.*"target":"\([0-9A-Za-z.+-]*\)".*/\1/p' | head -n1 || true)"
+  fi
+  rm -rf "$req"
+  if [ "$MARCO_LAYOUT" != release ] || [ "$MARCO_MODE" = kiosk ]; then
+    write_status failed "$(installed_version)" "" "$by" false "$target"
+    die "Updates from the admin need a release install (this one is: $MARCO_LAYOUT, $MARCO_MODE)."
+  fi
+  from="$(installed_version)"
+  write_status running "$from" "" "$by" false "$target"
+  echo "Update requested from the admin ($by): Marco $from, latest release ${target:-unknown}"
+  [ -x "$INSTALLER" ] || { write_status failed "$from" "" "$by" false "$target"; die "$INSTALLER is missing."; }
+  if [ -n "$MARCO_RELEASES_URL" ]; then export MARCO_RELEASES_URL; fi
+  set +e
+  bash "$INSTALLER" --update --yes --dir "$MARCO_DIR" --mode "$MARCO_MODE" --user "$MARCO_USER" 2>&1 \
+    | as_owner tee "$udir/update.log"
+  rc="${PIPESTATUS[0]}"
+  set -e
+  to="$(installed_version)"
+  if [ "$rc" = 0 ] && [ "$to" != "$from" ]; then state="done"
+  elif [ "$rc" = 0 ]; then state="current"
+  else
+    state=failed
+    if [ "$to" = "$from" ]; then rolled=true; fi
+  fi
+  write_status "$state" "$from" "$to" "$by" "$rolled" "$target"
+  echo "Update finished: $state (from $from to ${to:-?})"
+  [ "$state" != failed ] || exit 1
+}
+
+# write_status <state> <from> <to> <by> <rolledBack> <target>: <data>/update/status.json, written as the service user
+write_status() {
+  local udir="$MARCO_DIR/data/update" clean=() v
+  for v in "$@"; do clean+=("$(printf '%s' "$v" | tr -cd '0-9A-Za-z.+-')"); done
+  as_owner mkdir -p "$udir" 2>/dev/null || true
+  printf '{"state":"%s","from":"%s","to":"%s","by":"%s","rolledBack":%s,"target":"%s","at":"%s"}\n' \
+    "${clean[0]}" "${clean[1]}" "${clean[2]}" "${clean[3]}" "${clean[4]}" "${clean[5]}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    | as_owner tee "$udir/.status.json.tmp" >/dev/null || return 0
+  as_owner mv -f "$udir/.status.json.tmp" "$udir/status.json" || true
+}
+
+usage() { sed -n '2,/^set -euo/p' "$0" | sed -e '/^set -euo/d' -e 's/^# \{0,1\}//'; }
 
 case "${1:-}" in
   status) cmd_status ;;
   logs) shift; cmd_logs "$@" ;;
   restart) need_server; root systemctl restart "$SERVICE" && echo "Restarted." ;;
-  update) shift; installer --update --yes --dir "$MARCO_DIR" --mode "$MARCO_MODE" --user "$MARCO_USER" "$@" ;;
+  update)
+    shift
+    if [ "${1:-}" = --requested ]; then cmd_update_requested
+    else installer --update --yes --dir "$MARCO_DIR" --mode "$MARCO_MODE" --user "$MARCO_USER" "$@"; fi ;;
   url|urls|links) cmd_url ;;
   version|--version|-v) cmd_version ;;
   uninstall) shift; installer --uninstall --dir "$MARCO_DIR" "$@" ;;

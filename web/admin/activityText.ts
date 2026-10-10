@@ -2,6 +2,7 @@
 import type { ActivityEntry } from '../shared/types';
 import type { IconName } from './components/icons';
 import { nScreens, t } from './i18n';
+import { fetchErrorText } from './apiErrors';
 
 const str = (v: unknown) => (v === undefined || v === null ? '' : String(v));
 const q = (v: unknown) => (str(v) ? `«${str(v)}»` : '');
@@ -52,6 +53,10 @@ export function describeActivity(e: ActivityEntry): { icon: IconName; text: stri
       return { icon: 'google', text: t('Cuenta de Google vinculada: {email}', { email: str(d.email ?? d.account) }) };
     case 'google.removed':
       return { icon: 'google', text: t('Cuenta de Google desvinculada: {email}', { email: str(d.email ?? d.account) }) };
+    case 'microsoft.connected':
+      return { icon: 'microsoft', text: t('Cuenta de Microsoft vinculada: {email}', { email: str(d.email ?? d.account) }) };
+    case 'microsoft.removed':
+      return { icon: 'microsoft', text: t('Cuenta de Microsoft desvinculada: {email}', { email: str(d.email ?? d.account) }) };
     case 'config.saved': {
       const secs: string[] = Array.isArray(d.sections) ? d.sections : [];
       const list = secs.slice(0, 4).map(sectionLabel).join(', ') + (secs.length > 4 ? ` +${secs.length - 4}` : '');
@@ -75,7 +80,7 @@ export function describeActivity(e: ActivityEntry): { icon: IconName; text: stri
     case 'backup.deleted':
       return { icon: 'trash', text: t('Copia de seguridad eliminada') };
     case 'source.error':
-      return { icon: 'alert', text: t('Error en el calendario {name}: {error}', { name: q(d.name ?? d.sourceId), error: str(d.error) }) };
+      return { icon: 'alert', text: t('Error en el calendario {name}: {error}', { name: q(d.name ?? d.sourceId), error: fetchErrorText(str(d.error)) }) };
     case 'source.recovered':
       return { icon: 'check', text: t('Calendario {name} recuperado', { name: q(d.name ?? d.sourceId) }) };
     case 'announce.sent':
@@ -107,6 +112,19 @@ export function describeActivity(e: ActivityEntry): { icon: IconName; text: stri
       return { icon: 'edit', text: t('Dispositivo editado: {name}', { name: q(d.name) }) };
     case 'display.device_revoked':
       return { icon: 'trash', text: t('Dispositivo revocado: {name}', { name: q(d.name) }) };
+    case 'update.requested':
+      return { icon: 'download', text: d.by === 'auto' ? t('Actualización automática a {v} iniciada', { v: str(d.to) }) : t('Actualización a {v} iniciada', { v: str(d.to) }) };
+    case 'update.finished':
+      return d.state === 'current'
+        ? { icon: 'check', text: t('Marco ya tenía la última versión ({v})', { v: str(d.to) }) }
+        : { icon: 'sparkles', text: t('Marco actualizado: {from} → {to}', { from: str(d.from), to: str(d.to) }) };
+    case 'update.failed':
+      return {
+        icon: 'alert',
+        text: (d.target ? t('Falló la actualización a {v}', { v: str(d.target) }) : t('Falló la actualización')) + (d.rolledBack ? ` · ${t('Marco ha vuelto a la versión {v}', { v: str(d.from) })}` : ''),
+      };
+    case 'update.settings':
+      return { icon: 'settings', text: d.auto ? t('Actualizaciones automáticas activadas ({from}–{to})', { from: str(d.from), to: str(d.to) }) : t('Ajustes de actualización guardados') };
     case 'activity.cleared':
       return { icon: 'trash', text: t('Registro de actividad vaciado') };
     default:

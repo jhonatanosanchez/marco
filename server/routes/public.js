@@ -7,10 +7,13 @@ import { getWeather } from '../weather.js';
 import { getNews } from '../news.js';
 import { getPhotos } from '../photos.js';
 import { sseHandler } from '../sse.js';
-import { streamInit, streamHello, onStreamOpen, onStreamClose } from '../displays.js';
-import { resolveScreen, displayConfig as projectDisplayConfig } from '../screens.js';
+import { streamInit, streamHello, onStreamOpen, onStreamClose, pollDisplay } from '../displays.js';
+import { resolveScreen, displayConfig as projectDisplayConfig } from '../core/screens.js';
 import { requestScreen } from '../displayAccess.js';
-import { addDays, localDate, isDateStr, daysBetween } from '../lib/tz.js';
+import { addDays, localDate, isDateStr, daysBetween } from '../core/lib/tz.js';
+import { healthBody } from '../capabilities.js';
+import { lanAddresses } from '../setup.js';
+import { hostAllowed, hostnameOf, untrustedProxy } from '../lib/net.js';
 
 /** GET /api/display/config payload for `screenKey` (slug or id; empty → default screen). */
 export function displayConfig(cfg, screenKey) {
@@ -24,12 +27,21 @@ function displayConfigFor(cfg, req) {
   return projectDisplayConfig(cfg, screen, { fallback });
 }
 
+/** The request comes from this machine (loopback, not relayed by an untrusted proxy) under an allowed host name. */
+export function onThisMachine(req) {
+  const ip = String(req.ip || '').replace(/^::ffff:/i, '');
+  if (ip !== '::1' && !ip.startsWith('127.')) return false;
+  return !untrustedProxy(req) && hostAllowed(hostnameOf(req.get('host')));
+}
+
 export function publicRouter({ version }) {
   const r = Router();
   const noStore = (req, res, next) => { if (!res.get('cache-control')) res.set('cache-control', 'private, no-store'); next(); };
   r.use(noStore);
 
-  r.get('/health', (req, res) => res.json({ ok: true, uptime: Math.round(process.uptime()), version, live: 'sse' }));
+  // A display opened on the server itself (a kiosk on http://localhost) gets this machine's LAN addresses, so its
+  // pairing screen can say where other devices reach the admin. Nobody else gets them.
+  r.get('/health', (req, res) => res.json(healthBody({ version, lanAddresses: onThisMachine(req) ? lanAddresses() : undefined })));
 
   r.get('/display/config', (req, res) => res.json(displayConfigFor(getConfig(), req)));
 
@@ -79,6 +91,9 @@ export function publicRouter({ version }) {
       next(err);
     }
   });
+
+  // Poll channel for displays without a stream: GET /api/display/poll?client=&cursor=&rev=&hidden= (docs/API.md).
+  r.get('/display/poll', (req, res) => res.json(pollDisplay(req)));
 
   // SSE: GET /api/stream?screen=<slug|id>&client=<clientId>[&k=<key|device token>] (docs/ARCHITECTURE.md).
   r.get('/stream', sseHandler({ init: streamInit, hello: streamHello, onOpen: onStreamOpen, onClose: onStreamClose }));

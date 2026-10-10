@@ -20,7 +20,7 @@ Un *marco* de fotos que también enmarca el día de tu familia.
 
 <a href="https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4"><img src="docs/media/hero.webp" width="100%" alt="Marco en la pantalla del salón: foto de fondo, reloj, tiempo y calendario mensual; llega un aviso de Home Assistant que dice que la lavadora ha terminado"></a>
 
-[Ver el vídeo de demostración de 48 segundos (MP4, en inglés)](https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4) · [marcohome.app](https://marcohome.app)
+[Web: marcohome.app](https://marcohome.app) · [Marco Cloud](https://app.marcohome.app/signup) · [Vídeo de demostración (MP4, en inglés)](https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4)
 
 ```bash
 curl -fsSL https://marcohome.app/install | bash
@@ -28,12 +28,24 @@ curl -fsSL https://marcohome.app/install | bash
 
 </div>
 
+### Dos formas de usarlo
+
+- **En tu propio equipo (autoalojado):** una Raspberry Pi, un servidor doméstico o un NAS en tu red, instalado con
+  el comando de arriba, con [Docker](#docker) o [a mano](#instalación-manual-nodejs). Gratis y de código abierto, y
+  tus datos se quedan en casa. Todo este README trata de esta opción.
+- **Marco Cloud, si no quieres tener un servidor:** la misma aplicación y el mismo panel de administración,
+  alojados por nosotros en [app.marcohome.app](https://app.marcohome.app). Es gratis para familias, funciona sobre
+  Cloudflare y guarda tus datos en la UE. [Crea una cuenta](https://app.marcohome.app/signup), añade tus calendarios
+  y abre el enlace de tu pantalla en una tele, una tablet o una Raspberry Pi.
+
+Más sobre las dos opciones en la web: [marcohome.app](https://marcohome.app).
+
 ## Por qué
 
 Marco está inspirado en [DAKboard](https://dakboard.com/): una pantalla de pared que muestra de un vistazo el
 calendario familiar, la hora, el tiempo, fotos y noticias. Es una **alternativa gratuita, de código abierto y
-autoalojada** que ejecutas en tu propia Raspberry Pi, servidor doméstico o NAS **dentro de tu red local**. Sin cuenta,
-sin suscripción y sin nube de por medio: tu configuración, tus fotos y los datos de tus calendarios se quedan en casa.
+autoalojada** que ejecutas en tu propia Raspberry Pi, servidor doméstico o NAS **dentro de tu red local**. Si lo alojas
+tú, no hay cuenta, ni suscripción, ni nube de por medio: tu configuración, tus fotos y los datos de tus calendarios se quedan en casa.
 El único tráfico saliente va a los calendarios, al tiempo y a las fuentes de noticias que *tú* conectes.
 
 > Marco es un proyecto independiente. No está afiliado, respaldado ni vinculado de ningún modo a DAKboard;
@@ -57,11 +69,40 @@ El único tráfico saliente va a los calendarios, al tiempo y a las fuentes de n
 | ![Vista semanal](docs/screenshots/display-week.webp) | ![Tema claro, calendario a la izquierda y foto a la derecha](docs/screenshots/display-light.webp) |
 | ![Aviso a pantalla completa enviado desde Home Assistant](docs/screenshots/display-announcement.webp) | ![Reloj analógico, efecto de lluvia y un mensaje programado](docs/screenshots/display-rain.webp) |
 
+**Un diseño para cada habitación.** *Hoy*, *Por persona*, *Marco de fotos*, *Dos semanas*, *Tablero* y *Mesilla*:
+
+| | |
+|---|---|
+| ![Diseño Hoy: el día hora a hora con una línea de ahora, el próximo evento en grande y el tiempo por horas](docs/screenshots/display-today.webp) | ![Diseño Por persona: una columna por calendario con lo de hoy y lo de mañana](docs/screenshots/display-people.webp) |
+| ![Diseño Marco de fotos: la foto con una tarjeta pequeña con la hora en una esquina](docs/screenshots/display-photoframe.webp) | ![Diseño Dos semanas: la cuadrícula del mes con dos filas amplias](docs/screenshots/display-twoweeks.webp) |
+| ![Diseño Tablero: agenda, mensaje del día, cuentas atrás, tareas y cumpleaños](docs/screenshots/display-board.webp) | ![Diseño Mesilla: un reloj grande y tenue con el próximo evento y la temperatura](docs/screenshots/display-bedside.webp) |
+
+**Moderno o Clásico, por pantalla.** Moderno es el de serie; Clásico mantiene el aspecto original:
+
+![La misma pantalla con el estilo Moderno (izquierda) y el Clásico (derecha)](docs/screenshots/display-modern-vs-classic.webp)
+
+**Opciones de cristal** (estilo Moderno): cristal automático, transparente o tintado, con tono oscuro, claro o del
+color de la foto, transparencia, desenfoque y borde de luz:
+
+![El panel lateral con cinco ajustes de cristal: automático (el de serie), transparente, tintado, tono claro y tono de la foto](docs/screenshots/display-glass.webp)
+
 <img src="docs/screenshots/display-portrait-1080x1920.webp" width="280" align="right" alt="Diseño vertical de 1080x1920">
 
-- **Calendario:** vistas de mes (con número de semanas configurable), agenda y semana; cinco diseños (*calendario
-  grande*, *izquierda/derecha*, *arriba/abajo*, *hora grande*, *agenda*), en horizontal o vertical, y cada calendario
-  con su propio color.
+- **Calendario:** vistas de mes (con número de semanas configurable), agenda y semana; once diseños (*calendario
+  grande*, *dos semanas*, *izquierda/derecha*, *arriba/abajo*, *agenda*, *hoy*, *por persona*, *tablero*, *hora
+  grande*, *marco de fotos*, *mesilla*), en horizontal o vertical, y cada calendario con su propio color.
+- **Un diseño para cada habitación:** *Hoy* muestra el día hora a hora con una línea de ahora, el próximo evento en
+  grande y el tiempo de las próximas horas (la cocina por la mañana). *Por persona* da a cada calendario su columna
+  con lo de hoy y lo de mañana (eliges hasta cinco en *Diseño*). *Tablero* es un tablón de organización familiar:
+  tareas, cuentas atrás, el mensaje del día, los próximos cumpleaños y una agenda corta. *Marco de fotos* deja la
+  foto sola, con una tarjeta pequeña con la hora en la esquina que elijas. *Mesilla* es un reloj enorme y muy tenue
+  con el próximo evento y la temperatura, que se atenúa más por la noche. *Dos semanas* es la cuadrícula del mes con
+  dos filas amplias.
+- **Dos estilos por pantalla:** *Moderno* (el de serie), un aspecto minimalista al estilo de Apple, con tarjetas de
+  cristal sobre la foto, reloj de pantalla de bloqueo y una cuadrícula de mes como la de iOS, o *Clásico*. El estilo
+  es independiente del diseño.
+- **Opciones de cristal** del estilo Moderno, por pantalla: automático (se adapta a cada foto), transparente o
+  tintado; transparencia, desenfoque, tono oscuro, claro o de la foto y borde de luz, con vista previa en *Diseño*.
 - **Emojis automáticos:** 🎂 cumpleaños, ✈️ vuelos, 🩺 médico, 🎒 colegio, ⚽ deporte, 🍽️ cenas, 💼 reuniones, 🏖️
   vacaciones, 🚗 coche, 🐾 veterinario y más, a partir de reglas de palabras clave editables (35 categorías con unas
   400 palabras clave en inglés, español y portugués de serie).
@@ -73,8 +114,11 @@ El único tráfico saliente va a los calendarios, al tiempo y a las fuentes de n
   fechas bloqueadas que puedes ocultar.
 - **Destacados y cuentas atrás:** "En 18 min · Llamada con cliente", "Salida · Mañana", "🎃 Fiesta de Halloween ·
   ¡Mañana!", "✈️ Viaje a Madeira · En 12 días".
-- **Tiempo:** condiciones actuales y previsión por horas y por días de [Open-Meteo](https://open-meteo.com/) (sin
-  clave de API), o tu propia entidad de tiempo y sensores interiores de [Home Assistant](https://www.home-assistant.io/);
+- **Tiempo:** condiciones actuales y previsión por horas y por días de la fuente gratuita que elijas:
+  [Open-Meteo](https://open-meteo.com/) (sin clave de API y con modelo a elegir: ECMWF, DWD ICON, NOAA GFS,
+  Météo-France, UK Met Office y más), [MET Norway](https://api.met.no/) (sin clave) o
+  [Pirate Weather](https://pirateweather.net/) (con tu propia clave gratuita). Las pantallas indican la fuente en letra
+  pequeña. También tu propia entidad de tiempo y sensores interiores de [Home Assistant](https://www.home-assistant.io/);
   lluvia/nieve animadas.
 - **Teletipo de noticias** desde cualquier fuente RSS/Atom, una lista de tareas y un mensaje del día.
 - **Fondo de fotos:** fotos de stock o tu propia galería, transiciones WebGL, zoom lento, un suave efecto ambiental de
@@ -126,7 +170,11 @@ El único tráfico saliente va a los calendarios, al tiempo y a las fuentes de n
 | ![Paleta de comandos buscando el modo noche](docs/screenshots/admin-home-palette.webp) | ![Editor de eventos locales](docs/screenshots/admin-local-edit.webp) | ![Diálogo de conflicto al subir una foto con el mismo nombre](docs/screenshots/admin-photos-conflict.webp) |
 | ![Pantallas: un perfil por habitación](docs/screenshots/admin-screens.webp) | ![Página de avisos: enviar un aviso al momento](docs/screenshots/admin-alerts.webp) | ![Registro de actividad con filtros](docs/screenshots/admin-activity.webp) |
 | ![Copias de seguridad: exportar, importar y restaurar](docs/screenshots/admin-backups.webp) | ![Cuentas atrás: fechas manuales y automáticas](docs/screenshots/admin-countdowns.webp) | ![Reglas de iconos con probador en vivo](docs/screenshots/admin-icons.webp) |
-| ![Página de diseño con vista previa de la pantalla](docs/screenshots/admin-layout.webp) | ![Lista de eventos locales](docs/screenshots/admin-local.webp) | ![Página de inicio de sesión](docs/screenshots/admin-login.webp) |
+| ![Página de diseño: estilo Moderno o Clásico, cristal y vista previa de la pantalla](docs/screenshots/admin-layout.webp) | ![Lista de eventos locales](docs/screenshots/admin-local.webp) | ![Página de inicio de sesión](docs/screenshots/admin-login.webp) |
+
+| | |
+|---|---|
+| ![Página de diseño: los once diseños con miniaturas](docs/screenshots/admin-layouts.webp) | ![Ajustes de cristal con vista previa sobre una foto oscura y otra clara](docs/screenshots/admin-layout-glass.webp) |
 
 <p align="center">
   <img src="docs/screenshots/mobile-home.webp" width="230" alt="Administración en un móvil: inicio">
@@ -249,12 +297,13 @@ inicio de sesión automático en el escritorio (modos con pantalla) o como un us
 
 ```
 ~/marco/                  (o /opt/marco)
-├── current -> releases/0.4.0   la versión en marcha, se cambia en un solo paso al actualizar
+├── current -> releases/0.5.0   la versión en marcha, se cambia en un solo paso al actualizar
 ├── releases/                   la versión actual y la anterior (para volver atrás)
 ├── data/                       configuración, secretos, fotos, copias (se conservan al actualizar y desinstalar)
 └── .env                        puerto y otros ajustes, consulta .env.example
 /etc/marco.conf                 qué se instaló y dónde (lo lee el comando marco)
 /usr/local/bin/marco            el comando marco
+/etc/systemd/system/marco-update.path, marco-update.service   el botón Actualizar del panel (ver Actualizaciones)
 ~/.config/marco/kiosk.env       ajustes del kiosco (modos pantalla y todo en uno)
 ```
 
@@ -269,6 +318,32 @@ inicio de sesión automático en el escritorio (modos con pantalla) o como un us
 | `marco url` | Dirección del panel y el enlace privado de cada pantalla, con códigos QR |
 | `marco version` | Versión instalada y la última publicada |
 | `marco uninstall [--purge]` | Desinstala Marco; tus datos se conservan salvo que añadas `--purge`. Pregunta antes (la respuesta por defecto es no); sin terminal necesita `--yes` |
+
+### Actualizaciones
+
+Una vez al día el servidor pregunta a GitHub cuál es la última versión. Si hay una más nueva, el panel muestra un
+aviso, *Marco 0.5.1 disponible*, con las novedades. Cómo se actualiza depende de cómo instalaste Marco:
+
+| Instalación | Cómo actualizar |
+|---|---|
+| Instalador de una línea | **Actualizar ahora** en el panel (o `marco update` en el servidor). Se descarga la nueva versión, se comprueba su suma, se cambia en un solo paso y se vuelve atrás si no arranca. El panel enseña el progreso y se recarga solo, y las pantallas se recargan por su cuenta |
+| Docker | `git pull && docker compose up -d --build` en la carpeta de `docker-compose.yml` (el panel lo indica) |
+| Copia de git | `marco update` si se preparó con `deploy/install.sh`; si no, `git pull && npm ci && npm run build` y reiniciar |
+
+Las **actualizaciones automáticas** vienen desactivadas. Actívalas en *Estado → Actualizaciones* (instalaciones hechas
+con el instalador de una línea) y elige el horario, por defecto entre las 03:00 y las 05:00 en la zona horaria de
+*Fecha y hora*. Una versión que no arranca se deshace y no se vuelve a intentar; la siguiente sí.
+
+Cómo funciona el botón: el servidor se ejecuta con un usuario normal y no puede actualizarse a sí mismo. Escribe
+`data/update/request`; una unidad *path* de systemd que instala el instalador (`marco-update.path`) lo detecta y arranca
+`marco-update.service`, que ejecuta `marco update --requested` como root, igual que `sudo marco update`. Del aviso solo
+importa que exista, así que lo único que el servidor puede pedir es «la última versión». El progreso y la salida del
+instalador quedan en `data/update/` para el panel. Las instalaciones que se actualizan desde la 0.4 tienen el botón
+después de ejecutar `marco update` una vez más en el servidor (dice que ya está al día y añade las unidades).
+
+Privacidad: la comprobación es un único `GET` diario a `api.github.com`, sin identificador ni versión (si la respuesta
+no ha cambiado, ni siquiera se vuelve a descargar). Desactívala en *Estado → Actualizaciones*, o del todo con
+`MARCO_UPDATE_CHECK=0` en `.env`.
 
 ### Docker
 
@@ -406,8 +481,8 @@ carpeta `data/` real nunca se toca.
 ![La pantalla de la cocina de la demo: tema claro, agenda, lista de tareas y tiempo en directo](docs/screenshots/display-kitchen-live.webp)
 
 ¿Solo quieres ver la pantalla? Cualquier instancia en marcha muestra un conjunto de datos de ejemplo integrado en
-`/?demo=1` (añade `&lang=es`, `&preset=agenda`, `&theme=light`, `&announce=success`, `&sched=1`,
-`&now=2026-10-09T10:42`).
+`/?demo=1` (añade `&lang=es`, `&preset=agenda`, `&theme=light`, `&style=modern`, `&announce=success`, `&sched=1`,
+`&now=2026-10-09T10:42`, `&wx=rain|snow|clear` con `&wxfx=rich` para ver el efecto del tiempo, `&pair=1` para la pantalla de vinculación).
 
 **Vídeo de demostración.** Un recorrido de 48 segundos por la demo: la pantalla del salón con transiciones de fotos,
 un aviso y un mensaje programado, las pantallas de la cocina y vertical, y la vinculación de una pantalla nueva.
@@ -434,7 +509,8 @@ detrás de HTTPS.
 - **Vinculación:** sin teclear enlaces largos en una tele. Abre la dirección normal (`http://homeserver.lan:3000/` o
   `/pair`) en el dispositivo nuevo y mostrará un **código de 6 caracteres** grande y un código QR. En el móvil abre
   *Pantallas conectadas → Vincular una pantalla* (o escanea el QR: abre el panel con el código ya escrito), escribe el
-  código, elige la pantalla y un nombre. El dispositivo arranca en un par de segundos y guarda su propia llave en el
+  código, elige la pantalla y un nombre. El panel te enseña entonces la dirección de la pantalla que espera con ese
+  código; confirma que es la que tienes delante. El dispositivo arranca en un par de segundos y guarda su propia llave en el
   almacenamiento del navegador. Va bien para tablets, teles y navegadores que sigues usando. El kiosco de la
   Raspberry Pi abre Chromium en modo incógnito (nada sobrevive a un reinicio), así que a él dale el enlace privado.
 - **Dispositivos vinculados:** *Pantallas conectadas* los lista con la pantalla que muestran y cuándo se vieron por
@@ -643,6 +719,36 @@ festivos → *Festivos*. Puedes vincular varias cuentas de Google.
 permitidos** (si la lista está vacía, el primer inicio de sesión con Google que hagas mientras ya tienes la sesión
 iniciada con la contraseña se añade solo). Después, si quieres, puedes desactivar el inicio de sesión con contraseña.
 
+## Conectar Outlook, Hotmail o Microsoft 365
+
+Opcional y de solo lectura. Con tu propia app de Microsoft Entra, *Calendarios → Cuentas vinculadas → Vincular
+cuenta* ofrece también **Microsoft**: cuentas personales (Outlook.com, Hotmail, Live) y cuentas del trabajo o del
+centro educativo (Microsoft 365). Sin ella la opción no aparece, y la dirección ICS del calendario (*Outlook →
+Configuración → Calendario → Calendarios compartidos → Publicar un calendario*) sigue funcionando.
+
+1. Entra en <https://entra.microsoft.com/> → **Registros de aplicaciones → Nuevo registro**:
+   - **Tipos de cuenta compatibles**: *Cuentas en cualquier directorio organizativo y cuentas personales de
+     Microsoft*.
+   - **URI de redirección**: plataforma **Web**, `<PUBLIC_URL>/auth/microsoft/callback`, por ejemplo
+     `http://localhost:3000/auth/microsoft/callback` (Microsoft, como Google, solo acepta `http://` para
+     `localhost`; mira las opciones de la URI de redirección más arriba).
+2. **Permisos de API → Agregar un permiso → Microsoft Graph → Permisos delegados**: `Calendars.Read`,
+   `Calendars.Read.Shared`, `offline_access`, `openid`, `email`, `profile`. Las cuentas personales no necesitan
+   consentimiento de administrador.
+3. **Certificados y secretos → Nuevo secreto de cliente**, copia su **Valor**, y el **Id. de aplicación (cliente)**
+   de *Información general*. Ponlos en `.env` y reinicia:
+
+   ```ini
+   MICROSOFT_CLIENT_ID=<id-de-aplicacion>
+   MICROSOFT_CLIENT_SECRET=<valor-del-secreto>
+   ```
+
+Marco guarda los tokens de cada cuenta en `data/secrets.json` (Microsoft entrega un token de actualización nuevo cada
+hora y se guarda el último). *Desvincular* los borra; desde aquí no se pueden revocar en Microsoft, así que para
+retirar el acceso entra en <https://account.live.com/consent/Manage> (cuenta personal) o en
+<https://myapps.microsoft.com> (cuenta del trabajo o del centro educativo). Los secretos de cliente caducan (de 6 a 24
+meses): crea uno nuevo antes y actualiza `.env`.
+
 ## Otras integraciones
 
 - **Fuentes iCal / ICS:** cualquier URL `http(s)://` o `webcal://`: colegio, club deportivo, trabajo, festivos
@@ -655,8 +761,19 @@ iniciada con la contraseña se añade solo). Después, si quieres, puedes desact
   fuentes que ya formatean los títulos como `🏠 Guest - 4p+1m` conservan su emoji y convierten el número de huéspedes en
   iconos; las líneas `Adults: 2 / Children: 1 / Infants: 1 / Pets: 1` de la descripción (también
   `Adultos/Niños/Bebés/Mascotas`) dan 🧑🏻🧑🏻 🧒🏻 👶🏻 🐶.
-- **Tiempo:** [Open-Meteo](https://open-meteo.com/), sin clave: basta con definir la ubicación (búsqueda por nombre o
-  coordenadas) y las unidades en *Tiempo*.
+- **Tiempo:** define la ubicación (búsqueda por nombre o coordenadas) y las unidades en *Tiempo* y elige la fuente
+  en *Tiempo → Fuente de los datos* (`weather.provider`). Todas son gratuitas:
+
+  | Fuente | Clave | Notas |
+  |---|---|---|
+  | [Open-Meteo](https://open-meteo.com/) (predeterminada) | no | Usa el mejor modelo para tu zona o el que elijas en *Modelo de previsión* (`weather.model`: `best_match`, `ecmwf_ifs`, `icon_seamless`, `gfs_seamless`, `meteofrance_seamless`, `ukmo_seamless`, `gem_seamless`, `jma_seamless`). Algunos modelos no dan probabilidad de lluvia ni índice UV, o dan menos días; esos datos no se muestran. Gratis para uso no comercial; datos con licencia CC BY 4.0. |
+  | [MET Norway](https://api.met.no/) | no | Locationforecast 2.0 del instituto meteorológico de Noruega, para todo el mundo. Solo da probabilidad de lluvia en los países nórdicos; la salida y la puesta del sol se calculan. Marco se identifica con su User-Agent y respeta la hora de `Expires` que indica el servicio (unos 30 minutos). Datos con licencia CC BY 4.0 y NLOD. |
+  | [Pirate Weather](https://pirateweather.net/) | tuya, gratuita | Crea una clave en [pirate-weather.apiable.io](https://pirate-weather.apiable.io/) y pégala en *Tiempo*. El plan gratuito permite 10.000 consultas al mes; Marco consulta como mucho cada 15 minutos (unas 3.000). La clave se comprueba una vez y se guarda en `data/secrets.json`. |
+
+  Cada fuente se guarda en caché por lugar durante al menos 10 minutos y la comparten todas las pantallas e idiomas;
+  si la fuente falla, las pantallas siguen mostrando la última previsión hasta 6 horas. Las pantallas muestran el
+  nombre de la fuente en letra pequeña junto al tiempo (*Open-Meteo*, *Open-Meteo · ECMWF IFS*, *MET Norway*), como
+  pide la licencia CC BY.
 - **Home Assistant:** en Home Assistant abre tu **perfil → Seguridad → Tokens de acceso de larga duración → Crear
   token**; en *Administración → Home Assistant* introduce la URL (p. ej. `http://homeassistant.local:8123`) y el token,
   pulsa *Probar conexión* y, después, elige en *Tiempo* una entidad `weather.*` y/o entidades `sensor.*` de temperatura
@@ -795,8 +912,10 @@ JSON), `429` (límite de peticiones). Referencia completa: [docs/API.md](docs/AP
 | `COOKIE_SECURE` | según la petición | `1` = cookie siempre `Secure`, `0` = nunca |
 | `TRUST_PROXY` | `loopback` | IP o rangos de los proxies inversos que pueden definir `X-Forwarded-*`. Necesario para un proxy en otro host y para cualquier proxy delante de Docker (`172.16.0.0/12`) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | ninguno | Cliente OAuth de Google ([guía](#conectar-google-calendar)) |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | ninguno | App de Microsoft Entra para calendarios de Outlook y Microsoft 365 ([guía](#conectar-outlook-hotmail-o-microsoft-365)) |
 | `NODE_EXTRA_CA_CERTS` | ninguno | Certificados de CA adicionales para fuentes iCal con una CA privada |
 | `TZ` | la zona de *Fecha y hora* (sigue los cambios al momento) | Zona horaria del proceso (usada para las horas iCal "flotantes"). Definirla aquí la fija |
+| `MARCO_UPDATE_CHECK` | activada | `0` = no preguntar nunca a GitHub si hay una versión nueva (sin aviso de actualización) |
 
 Con Docker Compose solo llegan al contenedor las variables que aparecen en `docker-compose.yml`; el `.env` de al lado
 les da valor.
@@ -807,13 +926,15 @@ les da valor.
 data/
 ├── config.json          # todos los ajustes (pantallas, calendarios, reglas, eventos, cumpleaños)
 ├── secrets.json         # hash de la contraseña, secreto de sesión, tokens de Google y Home Assistant, hashes de los tokens de API,
-│                        #   claves de los enlaces privados, hashes de las llaves de los dispositivos vinculados (modo 600)
+│                        #   claves de los enlaces privados, hashes de las llaves de los dispositivos vinculados,
+│                        #   clave de API del tiempo (modo 600)
 ├── photos/              # galería (+ .thumbs/ y .meta.json con los puntos focales y las fotos ocultas)
 ├── backups/             # copias de seguridad de la configuración automáticas y manuales
 ├── cache/               # cachés de las fuentes
 ├── activity.jsonl       # registro de actividad
 ├── announcements.json   # avisos activos + historial
-└── displays.json        # pantallas conocidas
+├── displays.json        # pantallas conocidas
+└── update/              # última comprobación, ajustes de actualización y registro de la última actualización
 ```
 
 Haz copia de seguridad de toda la carpeta (o usa *Exportar*) para conservarlo todo.
@@ -828,7 +949,13 @@ Haz copia de seguridad de toda la carpeta (o usa *Exportar*) para conservarlo to
 | `?lite=1` | Sin efectos WebGL (dispositivos lentos) |
 | `?demo=1` | Datos de ejemplo integrados (no necesita datos del servidor) |
 | `?lang=en\|es\|pt` | Fuerza el idioma |
-| `?preset=…` `?view=month\|agenda\|week` `?theme=dark\|light` `?side=left\|right` `?clock=analog` | Fuerza opciones de diseño (útil para hacer pruebas) |
+| `?preset=…` `?view=month\|agenda\|week` `?theme=dark\|light` `?style=classic\|modern` `?side=left\|right` `?clock=analog` | Fuerza opciones de diseño (útil para hacer pruebas) |
+| `?preset=today\|people\|photoFrame\|twoWeeks\|board\|bedside` `?people=<ids de calendario, separados por comas>` `?corner=tl\|tr\|bl\|br` | Prueba los diseños nuevos, las columnas de *Por persona* y la esquina de *Marco de fotos* |
+| `?glass=clear\|tinted\|auto` `?glassOpacity=0..1` `?glassBlur=0..40` `?glassTint=dark\|light\|photo` `?glassEdge=0\|1` | Fuerza las opciones de cristal del estilo Moderno |
+| `?wxfx=off\|simple\|rich` | Fuerza el efecto del tiempo; con `?demo=1`, `?wx=rain\|drizzle\|thunder\|snow\|clear` (o un código WMO, p. ej. `45` para niebla) fuerza el tiempo |
+| `?ambient=aurora\|particles\|none` | Fuerza el fondo ambiental detrás del calendario |
+| `?demo=1&pair=1` `?demo=1&pair=invalid` `&pairLen=6\|8` | Muestra la pantalla de vinculación o la de “enlace ya no válido” con un código de ejemplo (sin servidor) |
+| `?empty=1` `?photos=0` | Con `?demo=1`: sin eventos, cuentas atrás ni tareas, o sin foto de fondo (para ver los estados vacíos) |
 | `?client=<name>` | Nombre de este dispositivo en *Pantallas conectadas* (lo define el script del kiosco) |
 
 ## Seguridad
@@ -858,6 +985,9 @@ Marco se diseñó para una red doméstica; desde la 0.3 las pantallas son **priv
 - El instalador y `marco update` comprueban el SHA-256 de cada paquete (y de Node.js) antes de instalarlo.
   Las compilaciones desde git (solo antes de la primera versión, o en instalaciones que se compilaron desde git) no
   tienen suma que comprobar.
+- El botón *Actualizar ahora* del panel nunca da permisos de root al servidor: solo crea un archivo que vigila una
+  unidad de systemd de root, y esa unidad siempre instala la última versión, con la suma comprobada
+  ([Actualizaciones](#actualizaciones)).
 
 Consulta [SECURITY.md](SECURITY.md) para informar de una vulnerabilidad.
 
@@ -894,7 +1024,8 @@ Outfit (OFL-1.1); consulta [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 ## Agradecimientos
 
 - [DAKboard](https://dakboard.com/), por la idea de un panel de pared (este proyecto no está afiliado a él).
-- [Open-Meteo](https://open-meteo.com/): API meteorológica gratuita (datos bajo CC BY 4.0).
+- [Open-Meteo](https://open-meteo.com/) y [MET Norway](https://api.met.no/): API meteorológicas gratuitas (datos bajo
+  CC BY 4.0), y [Pirate Weather](https://pirateweather.net/).
 - [Lorem Picsum](https://picsum.photos/) y los fotógrafos de Unsplash, por las fotos de stock.
 - [three.js](https://threejs.org/), [Preact](https://preactjs.com/), [Vite](https://vite.dev/),
   [Express](https://expressjs.com/), [node-ical](https://github.com/jens-maus/node-ical), [rrule](https://github.com/jkbrzt/rrule),

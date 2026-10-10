@@ -5,6 +5,177 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Microsoft calendars**: link Outlook.com, Hotmail or Microsoft 365 accounts (read only) and pick their calendars,
+  including the ones other people shared with you. Optional on a self-hosted server: it needs your own Microsoft Entra
+  app (`MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, see *Connecting Outlook, Hotmail or Microsoft 365* in the
+  README); without it the option is not shown. Calendar sources get a new type `microsoft` (`microsoftAccount`,
+  `microsoftCalendarId`), `/api/health` a new `features.microsoftCalendar` and `/api/auth/me` a `microsoftConfigured`.
+  Tokens are kept in `data/secrets.json` and go into exports with secrets, like Google accounts.
+- **Linked accounts** (*Calendars*): one card for Google and Microsoft accounts. *Link account* asks which provider
+  when both are set up, and every linked account is listed one below the other with its calendars.
+
+## [0.5.0] - 2026-10-10
+
+A Modern display style with glass options, six new layouts, a choice of free weather sources, alerts and display commands in poll mode, a capability block in `/api/health` that the admin follows, a pairing
+confirm step, place search through the server, and the shared logic moved into `server/core`.
+
+### Added
+- **Update notices and updates from the admin**: once a day the server asks GitHub which release is the latest (one
+  `GET` to the public API, no identifier, `If-None-Match` so an unchanged answer is not downloaded again) and the
+  admin shows a banner, *Marco 0.5.1 is available*, with the release notes. On installs made with the one-line
+  installer, **Update now** installs it from the admin: the server writes `data/update/request`, a systemd path unit
+  (`marco-update.path`, installed by the installer) runs `marco update --requested` as root, and the admin follows
+  the progress, shows the log and the result (updated, or rolled back to the previous version) and reloads itself;
+  the screens reload on their own. Docker and git installs get the commands to copy instead. *Status → Updates* has
+  the daily check switch, *Check now* and **automatic updates** (off by default) inside a time window, 03:00 to
+  05:00 by default; a version that fails is not retried. `MARCO_UPDATE_CHECK=0` turns the check off. New feature
+  flag `updates` in `/api/health` (self-hosted only) and `GET /api/admin/update`, `PUT /api/admin/update/settings`,
+  `POST /api/admin/update/check`, `POST /api/admin/update/apply`. Marco Cloud shows a one-time *What's new* with the
+  CHANGELOG section of a new version instead. Installs updated from 0.4 get the button after one more
+  `marco update` on the server.
+- **More date formats** (*Date & time > Date format*): US style with the year ("Saturday, October 10, 2026"), numeric month/day/year and day/month/year ("Saturday, 10/10/2026", tagged in the admin so the order is clear) and ISO 8601 ("Saturday, 2026-10-10"). The admin preview now uses the display's own renderer. *Custom* takes your own pattern (`datetime.dateCustom`, up to 60 characters) with `{dddd}` `{ddd}` `{d}` `{dd}` `{mmmm}` `{mmm}` `{m}` `{mm}` `{yyyy}` `{yy}` and any text, with clickable variables and a live preview. Date formats are a compact grid.
+- **Weather sources** (*Weather → Data source*, `weather.provider`): besides Open-Meteo, the forecast can now come from
+  [MET Norway](https://api.met.no/) (Locationforecast 2.0, worldwide, no key) or [Pirate Weather](https://pirateweather.net/)
+  (your own free key, 10,000 calls a month; Marco uses about 3,000). With Open-Meteo you can also pick the forecast
+  model (`weather.model`): *Automatic* (as before), ECMWF IFS, DWD ICON, NOAA GFS, Météo-France, UK Met Office, GEM
+  or JMA. Each source shows a short description and its licence in the admin, and the screens credit it in small type
+  next to the weather (*Open-Meteo*, *Open-Meteo · ECMWF IFS*, *MET Norway*), in Classic and Modern, as the CC BY
+  licences ask. `GET /api/weather` has a new `source` field. The Pirate Weather key is pasted in *Weather*, tried once
+  (`PUT /api/admin/weather/key`), kept in `data/secrets.json`, included in exports with secrets and never sent back.
+  Values a source does not give (chance of rain from MET Norway outside the Nordics, UV from some models) are left
+  out instead of showing a dash. MET Norway's sleet now has its own description ("Sleet"). The provider code lives in
+  `server/core/weather.js`, so Marco Cloud offers the same sources.
+- **Display style** (*Layout → Display style*, `screen.style`): every screen can now be *Modern* or *Classic* (the look so far).
+  New installs and new screens start Modern; screens saved before this release keep Classic, so nothing changes
+  until you pick it. *Modern* is a more minimal, Apple-like look: glass widget
+  cards over the photo with a light edge, a Lock Screen clock with the date on top, the month grid in the iOS
+  Calendar idiom (no column lines, today as a filled circle, colour dots for timed events), agenda days as list
+  cards, a Weather-widget layout, notification-style alerts and scheduled messages. It works with every layout,
+  portrait and landscape, the light and dark themes, night mode, the weather effect and `?lite=1` (solid cards
+  instead of blur). Modern uses the system font (SF on Apple devices) and falls back to the bundled Inter
+  elsewhere. Preview it with `?style=modern` (or `?style=classic`).
+- **Glass options for the Modern style** (*Layout → Glass*, `screen.glass`, shown when a screen uses Modern), in the
+  spirit of the iPhone's glass settings: *Appearance* (*Clear*, *Tinted*, or *Automatic*, which follows each photo:
+  clearer over dark photos, more tinted over bright ones), *Transparency* (from see-through to solid), *Blur*, *Tint*
+  (*Dark*, *Light* with dark text, or *From the photo*, a deep version of the current photo's colour) and *Edge
+  highlight*. A live preview over a dark and a bright sample photo shows the result. The defaults are the Modern look
+  as it was. Everything is a few CSS variables, so it costs nothing extra on the Pi; with `?lite=1` there is still no
+  blur and the cards stay solid. Preview with `?glass=clear|tinted|auto`, `&glassOpacity=0..1`, `&glassBlur=0..40`,
+  `&glassTint=dark|light|photo`, `&glassEdge=0|1`.
+- **Six new layouts** (*Layout*, `layout.preset`), each in landscape and portrait, Classic and Modern, light and dark,
+  night mode and `?lite=1`:
+  - *Today* (`today`): the day hour by hour with a line for now and past events dimmed, the next event in large type
+    and the weather for the coming hours. Made for the kitchen in the morning.
+  - *Per person* (`people`): one column per calendar with today and tomorrow. Choose up to five calendars in
+    *Layout → Columns per person* (`layout.people`); holidays and birthdays go in a shared line above.
+  - *Photo frame* (`photoFrame`): the photo with a small clock, temperature and next event card in a corner of your
+    choice (`layout.corner`: `tl`, `tr`, `bl`, `br`). Made for a portrait frame.
+  - *Two weeks* (`twoWeeks`): this week and the next as a roomy grid, today highlighted.
+  - *Board* (`board`): a family organisation board with the to-do list, countdowns, the message of the day, upcoming
+    birthdays and a short agenda.
+  - *Bedside* (`bedside`): a huge, very dim clock with the next event and the temperature; deeper and dimmer during
+    the night window. No photo and no animation.
+  Preview with `?preset=today|people|photoFrame|twoWeeks|board|bedside`, `&people=<ids>` and `&corner=tl|tr|bl|br`.
+  The setup wizard still offers the five original layouts; the new ones are in *Layout*.
+- Demo URL parameters `?empty=1` (no events, countdowns or to-dos) and `?photos=0` (no background photo) to check
+  the empty states of every layout.
+- **Poll channel for displays** (`GET /api/display/poll`): with `MARCO_LIVE=poll` (or any server that answers
+  `live: 'poll'`), displays get announcements, identify, night mode, refresh, gallery and calendar changes from a
+  short poll instead of the stream. The server picks the delay: 30 s, 5 s while *Connected screens* is open or right
+  after a command, 3 min while the page is hidden. A server restart or a lost cursor replays the active
+  announcements, never old commands. A display that polled in the last 4 minutes is listed as connected and counts
+  in "sent to N screens". Version reloads and moved devices work in this mode too, and the heartbeat drops to every
+  10 min. A server without the endpoint still gets the 90 s config check. In poll mode the admin's "sent" messages
+  say that screens get the command within about 90 s.
+- **Capabilities in `GET /api/health`**: `edition`, `tenancy`, `runtime`, `pairCodeLength` and a `features` block
+  (plus optional `limits` and `displayOrigin`). The admin reads it at start: sections, palette actions and search
+  results for features a server turns off are hidden, and add buttons stop at the server's limits. A server that
+  sends no `features` keeps everything on, so older servers look the same as before.
+- **Pairing confirm step**: claiming a code first shows which display is waiting (its address) and pairs only after
+  the owner confirms. The code length comes from `/api/health`.
+- **Place search through the server** (`GET /api/admin/geocode`): the weather location search and the setup wizard
+  no longer call Open-Meteo from the browser. Rate limited and cached for a day.
+- **Account mode in the admin** for servers that sign users in with their own account pages (`user.method:
+  'account'`): sign-in and sign-out follow the server's links, the header menu shows the household and the account
+  links, and the Security page becomes *Account* on multi-tenant servers.
+- **Save conflicts**: the admin sends the revision it loaded with every save (`baseRevision`). If the settings were
+  saved since then, from another tab, another device or the server itself (the first Google sign-in adds the
+  allowed email), the server answers `409 conflict` and writes nothing. The admin then offers to load the saved
+  version or to save its own changes on top of it; parts it did not change keep the saved value. Saves without
+  `baseRevision` (admin pages loaded before the update) still overwrite, as before.
+- `GET /api/admin/countdowns?screen=` for the Countdowns page. `GET /api/countdowns` still accepts an admin
+  session in this release.
+- The admin translates the error codes a server can answer with (`rate_limited`, `screen_limit`,
+  `limit_exceeded`, `feature_unavailable`, `conflict`, `photo_quota`, `readonly`) in Spanish, English and
+  Portuguese.
+- `web/shared/adminContract.json`, generated by `npm run contract` from the admin API client and the shared types,
+  and checked in CI.
+- Emoji: a Noto Color Emoji subset with the picker's emoji and the default icon rules is served by Marco itself, so
+  the admin and the display show the same glyphs.
+
+### Changed
+- **Weather cache**: one forecast per place, shared by every language and screen (it was fetched once per language),
+  for at least 10 minutes and, with MET Norway, until the `Expires` time it gives (then asked again with
+  `If-Modified-Since`). Coordinates are rounded to 2 decimals (about 1 km) before they are sent. When the source
+  fails, the last forecast stays for up to 6 hours, and *Status* shows why (for example a refused key).
+- **Ambient backdrop**: the *Aurora* now looks like real northern lights: folding curtains with fine vertical rays
+  that shimmer slowly, green and teal at the lower edge fading to violet at the top, gentle brightness pulses and a
+  dither so the soft gradients never band. In the light theme it is a very faint pastel tint. *Particles* are now
+  soft bokeh dust in three depths (small specks far away, larger blurred discs close by, a few big out-of-focus orbs)
+  drifting with parallax and a slight twinkle, tinted by the accent colour; on the light theme they are soft pastel
+  discs. Same cost as before: the aurora still renders at ¼ resolution and refreshes at 15 fps, at most 150 particles,
+  nothing with `?lite=1`.
+- **Weather effect**: it now follows how strong the weather is (drizzle and light snow are sparse, heavy rain and
+  snow dense). *Rich*: drops on the glass act as small lenses (the photo seen through them flipped, a darker rim and
+  a highlight) with a mist of micro droplets, sliding drops stop and go and leave a trail of beads, rain streaks fall
+  at three depths, thunderstorms add a slanted downpour and lightning (a flash and a second flicker, never at night;
+  plain rain no longer flashes), snow falls at four depths with soft out-of-focus flakes close by, fog shows slow
+  banks of mist near the bottom, and clear days get softer sun shafts with a faint lens flare. *Simple*: rain and snow
+  particles have depth (size, speed and softness). The photo and the text are never blurred.
+- Every screen link in the admin (preview, *View screen*, screen cards, Home, Connected screens) comes from one
+  helper. With private links it opens `/d/<key>` (with `?preview=1` for the preview); in open mode it keeps
+  `/?screen=<slug>`.
+- The pure server logic (config validation, backups and import, announcements, feed parsing, image headers,
+  activity redaction, pairing codes, CSV, schedules) lives in `server/core`, with no Node built-ins or file access,
+  so Marco Cloud can run the same code. A test keeps it that way.
+- The display's SSE client and the poll channel share one event dispatcher, with the same checks for every event.
+- `MARCO_LIVE` is passed through in `docker-compose.yml`.
+
+### Fixed
+- Pairing and “link no longer valid” screens: the code no longer runs under the QR code. Everything is sized from
+  the width as well as the height (a tall browser window no longer makes the text, the code and the QR wider than
+  their columns), the code shrinks to fit its column for 6 or 8 characters, and on 1440p, 4K and large desktop
+  windows the card stops growing and stays centred. Preview with `?demo=1&pair=1` (or `pair=invalid`, `&pairLen=8`).
+- Modern style, *Big time* layout: the agenda card no longer runs under the news bar. It shows whole rows only and
+  drops the ones that do not fit (then the countdowns), instead of a faded, cut off last row. In portrait the weather
+  card spans the full width again.
+- Broken or non-image files in the gallery are read once instead of up to three times (up to 16 MB) each time the
+  photo list is rebuilt.
+- The admin preview no longer reads or writes the browser's stored device token, client id or cached data, so it
+  cannot replace a real display's identity in the same browser or show another display's cached data.
+- A pairing page opened at `/pair` stays there after pairing.
+- Weather or background settings saved with a feature the server turns off stay visible with a note, so they can be
+  changed back.
+- Sign-in redirects reject paths with whitespace or control characters.
+- Installer: run as a regular user with no terminal (`curl | bash` from a script, `marco update` from cron), it
+  stopped at `sudo -v` even when sudo needs no password, as on Raspberry Pi OS. On a 0.4.0 install made as a regular
+  user, `marco update` still asks for the sudo password once (it runs the 0.4.0 installer); with no terminal, use
+  `sudo marco update` or run the one-line installer again.
+- Installer: Raspberry Pi OS 32-bit on a Pi 4 or 5 (64-bit kernel, 32-bit programs) gets the armv7l Node.js build
+  instead of an arm64 one that cannot run.
+- Kiosk: the log `/tmp/marco-kiosk.log` (`marco logs` on a screen-only device) is written with Wayfire, LXDE-pi and
+  other desktops too, not only labwc. Chromium from a snap (Ubuntu) gets a profile folder it is allowed to write to.
+- Installer: the files that run as root (the `marco` command, the stored installer, the systemd unit) are taken from
+  the release package right after its checksum is checked, not from the install folder that belongs to the service
+  user, and a rollback puts the previous systemd unit back as it was. The `marco` command and the stored installer are
+  replaced by rename, so a running `marco update` keeps reading its own copy. Links in place of `releases/`,
+  `current` or `.env` are refused, and folders are handed to the service user without following links.
+- Installer: a kiosk link with no server address is refused; updating a screen-only install shows the saved link;
+  an all-in-one install warns when `kiosk.env` still points at another server. `marco help` no longer prints a
+  line of code.
+
+
 ## [0.4.0] - 2026-10-09
 
 A realistic weather effect over the photo, a polling mode for hosts without a live stream, and a language fix for

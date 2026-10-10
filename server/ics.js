@@ -2,7 +2,7 @@
 // { uid, title, description, location, allDay, start, end }
 //   allDay → start/end are 'YYYY-MM-DD' (end exclusive); timed → start/end are Date instants.
 import ical from 'node-ical';
-import { addDays, dateOnlyToString } from './lib/tz.js';
+import { addDays, dateOnlyToString } from './core/lib/tz.js';
 
 const DAY = 86_400_000;
 

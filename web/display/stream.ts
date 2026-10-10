@@ -1,22 +1,9 @@
 // SSE client for /api/stream?screen=&client= with manual exponential-backoff reconnect (docs/ARCHITECTURE.md).
-import type { Announcement, IdentifyPayload, NightCommand, StreamHello } from '../shared/types';
+// The per-event checks live in live.ts (dispatch), shared with the poll channel.
+import { dispatch, type StreamHandlers } from './live';
 import { clientId, credential, isPreview, screenKey } from './identity';
 
-export interface StreamHandlers {
-  hello?: (d: Partial<StreamHello>) => void;
-  config?: (d: { revision: number }) => void;
-  reload?: () => void;
-  events?: (d: { hash: string }) => void;
-  photos?: (d: { hidden?: string[] }) => void;
-  announce?: (d: Announcement) => void;
-  announceClear?: (d: { id: string | null }) => void;
-  identify?: (d: IdentifyPayload) => void;
-  night?: (d: { mode: NightCommand }) => void;
-  /** link regenerated / device revoked / display access switched to private */
-  revoked?: (d: { code: string }) => void;
-  open?: () => void;
-  down?: () => void;
-}
+export type { StreamHandlers } from './live';
 
 export function streamUrl(): string {
   const q = new URLSearchParams();
@@ -26,6 +13,20 @@ export function streamUrl(): string {
   // EventSource cannot send headers: the credential travels as ?k= (never logged by the server).
   if (credential) q.set('k', credential);
   return `/api/stream?${q.toString()}`;
+}
+
+/** Events the stream listens for (besides `revoked` and `ping`). */
+export const STREAM_EVENTS = ['hello', 'config', 'events', 'photos', 'reload', 'announce', 'announce-clear', 'identify', 'night'] as const;
+
+/** Query string for GET /api/display/poll (the screen is added by api.ts; the credential travels in X-Marco-Key). */
+export function pollUrl(cursor: string, revision: number | undefined, hidden: boolean): string {
+  const q = new URLSearchParams();
+  q.set('client', clientId);
+  if (isPreview) q.set('preview', '1');
+  if (cursor) q.set('cursor', cursor);
+  if (typeof revision === 'number') q.set('rev', String(revision));
+  if (hidden) q.set('hidden', '1');
+  return q.toString();
 }
 
 export function connectStream(h: StreamHandlers): { close(): void } {
@@ -84,19 +85,12 @@ export function connectStream(h: StreamHandlers): { close(): void } {
       h.down?.();
       restart();
     };
-    listen('hello', (d) => h.hello?.(d));
-    listen('config', (d) => h.config?.(d));
-    listen('events', (d) => h.events?.(d));
-    listen('photos', (d) => h.photos?.({ hidden: Array.isArray(d?.hidden) ? d.hidden.filter((f: unknown) => typeof f === 'string') : undefined }));
-    listen('reload', () => h.reload?.());
-    listen('announce', (d) => d && typeof d.id === 'string' && h.announce?.(d));
-    listen('announce-clear', (d) => h.announceClear?.({ id: typeof d?.id === 'string' ? d.id : null }));
-    listen('identify', (d) => h.identify?.(d));
-    listen('night', (d) => (d?.mode === 'on' || d?.mode === 'off' || d?.mode === 'auto') && h.night?.(d));
+    for (const name of STREAM_EVENTS) listen(name, (d) => dispatch(name, d, h));
+    // Transport specific: a revoked stream is closed for good before the handler runs.
     listen('revoked', (d) => {
       closed = true;
       es?.close();
-      h.revoked?.({ code: typeof d?.code === 'string' ? d.code : 'invalid_key' });
+      dispatch('revoked', d, h);
     });
     es.addEventListener('ping', () => kick());
     es.onmessage = () => kick();

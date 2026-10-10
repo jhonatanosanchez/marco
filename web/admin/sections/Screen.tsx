@@ -4,13 +4,17 @@ import { toast } from '../components/feedback';
 import { GoogleG, Icon } from '../components/icons';
 import { PrivateLinkCard } from '../components/DisplayAccess';
 import { Button, Callout, Card, Chips, ColorPicker, Field, PageHeader, Segmented, Slider, Textarea, TextInput, ToggleRow } from '../components/ui';
-import { t } from '../i18n';
-import { EMAIL_RE } from '../util';
+import { has, limit, offers } from '../caps';
+import { locale, t } from '../i18n';
+import { cssBytes, EMAIL_RE } from '../util';
 import { MIN_PASSWORD, passwordProblem } from '../../shared/password';
 import type { SectionProps } from './common';
 
+const kb = (n: number) => (Math.round((n / 1024) * 10) / 10).toLocaleString(locale());
+
 export function ScreenSection({ cfg, set, errors, screenId, saved, go }: SectionProps) {
   const s = cfg.screen;
+  const cssMax = limit('customCssBytes');
   const nm = s.nightMode;
   return (
     <>
@@ -82,9 +86,13 @@ export function ScreenSection({ cfg, set, errors, screenId, saved, go }: Section
           </Field>
         </div>
       </Card>
-      <Card id="scr-css" scope="screen" title={t('CSS personalizado')} icon="wand" desc={t('Para usuarios avanzados: se inyecta en la pantalla.')}>
-        <Textarea mono rows={6} value={s.customCss} placeholder={'.clock { letter-spacing: -0.02em; }'} onValue={(v) => set((d) => void (d.screen.customCss = v))} />
-      </Card>
+      {has('customCss') && (
+        <Card id="scr-css" scope="screen" title={t('CSS personalizado')} icon="wand" desc={t('Para usuarios avanzados: se inyecta en la pantalla.')}>
+          <Field error={errors['screen.customCss']} hint={cssMax != null ? t('{used} de {max} KB', { used: kb(cssBytes(s.customCss)), max: kb(cssMax) }) : undefined}>
+            <Textarea mono rows={6} value={s.customCss} placeholder={'.clock { letter-spacing: -0.02em; }'} onValue={(v) => set((d) => void (d.screen.customCss = v))} />
+          </Field>
+        </Card>
+      )}
     </>
   );
 }
@@ -118,6 +126,8 @@ export function SecuritySection({ cfg, set, errors, me, saved, go }: SectionProp
     }
   };
   const emailErr = Object.keys(errors).find((k) => k.startsWith('auth.allowedGoogleEmails'));
+  const pwOn = has('passwordLogin');
+  const googleOn = offers('googleLogin');
   return (
     <>
       <PageHeader title={t('Seguridad')} desc={t('Quién puede entrar en este panel.')} />
@@ -128,81 +138,89 @@ export function SecuritySection({ cfg, set, errors, me, saved, go }: SectionProp
             <div>
               <strong>{me.user.name || me.user.email}</strong>
               <div class="muted small">
-                {me.user.email} · {me.user.method === 'google' ? t('sesión con Google') : t('sesión con contraseña')}
+                {me.user.email} · {me.user.method === 'google' ? t('sesión con Google') : me.user.method === 'account' ? t('sesión con tu cuenta') : t('sesión con contraseña')}
               </div>
             </div>
           </div>
         </Card>
       )}
-      <DisplayAccessCard mode={cfg.security?.displayAccess ?? 'open'} savedMode={saved.security?.displayAccess ?? 'open'} onChange={(v) => set((d) => void (d.security = { ...(d.security ?? {}), displayAccess: v }))} go={go} />
-      <Card id="sec-google" title={t('Inicio de sesión con Google')} icon="google">
-        {!me.googleConfigured && <Callout kind="warn">{t('Google no está configurado en el servidor (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET).')}</Callout>}
-        <Field
-          label={t('Emails de Google permitidos')}
-          error={emailErr ? errors[emailErr] : undefined}
-          hint={t('Si la lista está vacía, el primer inicio con Google mientras tienes sesión con contraseña se añade automáticamente.')}
-        >
-          <Chips values={a.allowedGoogleEmails} placeholder="name@example.com" validate={(v) => EMAIL_RE.test(v)} onChange={(v) => set((d) => void (d.auth.allowedGoogleEmails = v))} />
-        </Field>
-        {me.googleConfigured && (
-          <a class="btn btn--default" href="/auth/google/login">
-            <GoogleG size={16} />
-            <span>{t('Vincular mi cuenta de Google para entrar')}</span>
-          </a>
-        )}
-      </Card>
-      <Card id="sec-password" title={t('Contraseña')} icon="key">
-        {me.mustChangePassword && (
-          <Callout kind="warn">{t('Estás usando la contraseña inicial. Cámbiala: hasta entonces solo se acepta desde tu red local.')}</Callout>
-        )}
-        {!me.mustChangePassword && me.passwordFromEnv && (
-          <Callout>{t('La contraseña viene de ADMIN_PASSWORD (instalación sin asistente). Te recomendamos cambiarla aquí: después ya no se usará la del .env.')}</Callout>
-        )}
-        <ToggleRow
-          label={t('Permitir entrar con contraseña')}
-          hint={errors['auth.passwordLoginEnabled'] ? <span class="err-text">{t(errors['auth.passwordLoginEnabled'])}</span> : undefined}
-          checked={a.passwordLoginEnabled}
-          onChange={(v) => set((d) => void (d.auth.passwordLoginEnabled = v))}
-        />
-        <form class="pw-form" onSubmit={change}>
-          <input type="text" name="username" autocomplete="username" value="admin" hidden readOnly />
-          <Field label={t('Contraseña actual')}>
-            <input class="input" type="password" autocomplete="current-password" value={cur} onInput={(e) => setCur(e.currentTarget.value)} />
+      {has('openDisplayAccess') && (
+        <DisplayAccessCard mode={cfg.security?.displayAccess ?? 'open'} savedMode={saved.security?.displayAccess ?? 'open'} onChange={(v) => set((d) => void (d.security = { ...(d.security ?? {}), displayAccess: v }))} go={go} />
+      )}
+      {googleOn && (
+        <Card id="sec-google" title={t('Inicio de sesión con Google')} icon="google">
+          {!me.googleConfigured && <Callout kind="warn">{t('Google no está configurado en el servidor (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET).')}</Callout>}
+          <Field
+            label={t('Emails de Google permitidos')}
+            error={emailErr ? errors[emailErr] : undefined}
+            hint={t('Si la lista está vacía, el primer inicio con Google mientras tienes sesión con contraseña se añade automáticamente.')}
+          >
+            <Chips values={a.allowedGoogleEmails} placeholder="name@example.com" validate={(v) => EMAIL_RE.test(v)} onChange={(v) => set((d) => void (d.auth.allowedGoogleEmails = v))} />
           </Field>
-          <div class="grid grid--2">
-            <Field label={t('Nueva contraseña')} error={problemText || undefined} hint={t('Mínimo {n} caracteres; nada obvio.', { n: MIN_PASSWORD })}>
-              <input class="input" type="password" autocomplete="new-password" value={next} onInput={(e) => setNext(e.currentTarget.value)} />
+          {me.googleConfigured && (
+            <a class="btn btn--default" href="/auth/google/login">
+              <GoogleG size={16} />
+              <span>{t('Vincular mi cuenta de Google para entrar')}</span>
+            </a>
+          )}
+        </Card>
+      )}
+      {pwOn && (
+        <Card id="sec-password" title={t('Contraseña')} icon="key">
+          {me.mustChangePassword && (
+            <Callout kind="warn">{t('Estás usando la contraseña inicial. Cámbiala: hasta entonces solo se acepta desde tu red local.')}</Callout>
+          )}
+          {!me.mustChangePassword && me.passwordFromEnv && (
+            <Callout>{t('La contraseña viene de ADMIN_PASSWORD (instalación sin asistente). Te recomendamos cambiarla aquí: después ya no se usará la del .env.')}</Callout>
+          )}
+          <ToggleRow
+            label={t('Permitir entrar con contraseña')}
+            hint={errors['auth.passwordLoginEnabled'] ? <span class="err-text">{t(errors['auth.passwordLoginEnabled'])}</span> : undefined}
+            checked={a.passwordLoginEnabled}
+            onChange={(v) => set((d) => void (d.auth.passwordLoginEnabled = v))}
+          />
+          <form class="pw-form" onSubmit={change}>
+            <input type="text" name="username" autocomplete="username" value="admin" hidden readOnly />
+            <Field label={t('Contraseña actual')}>
+              <input class="input" type="password" autocomplete="current-password" value={cur} onInput={(e) => setCur(e.currentTarget.value)} />
             </Field>
-            <Field label={t('Repetir contraseña')} error={rep && rep !== next ? t('Las contraseñas no coinciden') : undefined}>
-              <input class="input" type="password" autocomplete="new-password" value={rep} onInput={(e) => setRep(e.currentTarget.value)} />
-            </Field>
-          </div>
+            <div class="grid grid--2">
+              <Field label={t('Nueva contraseña')} error={problemText || undefined} hint={t('Mínimo {n} caracteres; nada obvio.', { n: MIN_PASSWORD })}>
+                <input class="input" type="password" autocomplete="new-password" value={next} onInput={(e) => setNext(e.currentTarget.value)} />
+              </Field>
+              <Field label={t('Repetir contraseña')} error={rep && rep !== next ? t('Las contraseñas no coinciden') : undefined}>
+                <input class="input" type="password" autocomplete="new-password" value={rep} onInput={(e) => setRep(e.currentTarget.value)} />
+              </Field>
+            </div>
+            <div>
+              <Button type="submit" variant="primary" icon="shield" loading={busy} disabled={!!pwErr || !cur || !next || rep !== next}>
+                {t('Cambiar contraseña')}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
+      {(pwOn || googleOn) && (
+        <Card id="sec-sessions" title={t('Sesiones')} icon="shield">
+          <p class="muted small">{t('Cierra la sesión en todos los navegadores y dispositivos (también en este). Cambiar la contraseña cierra las demás sesiones automáticamente.')}</p>
           <div>
-            <Button type="submit" variant="primary" icon="shield" loading={busy} disabled={!!pwErr || !cur || !next || rep !== next}>
-              {t('Cambiar contraseña')}
+            <Button
+              variant="default"
+              icon="logout"
+              onClick={async () => {
+                try {
+                  await api.logoutAll();
+                } catch {
+                  /* ignore */
+                }
+                location.reload();
+              }}
+            >
+              {t('Cerrar sesión en todos los dispositivos')}
             </Button>
           </div>
-        </form>
-      </Card>
-      <Card id="sec-sessions" title={t('Sesiones')} icon="shield">
-        <p class="muted small">{t('Cierra la sesión en todos los navegadores y dispositivos (también en este). Cambiar la contraseña cierra las demás sesiones automáticamente.')}</p>
-        <div>
-          <Button
-            variant="default"
-            icon="logout"
-            onClick={async () => {
-              try {
-                await api.logoutAll();
-              } catch {
-                /* ignore */
-              }
-              location.reload();
-            }}
-          >
-            {t('Cerrar sesión en todos los dispositivos')}
-          </Button>
-        </div>
-      </Card>
+        </Card>
+      )}
       <Callout>
         {t('Las URLs de los calendarios, los tokens y las claves de las pantallas nunca se envían a otras pantallas ni aparecen en el registro de actividad.')}
       </Callout>

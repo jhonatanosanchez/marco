@@ -1,11 +1,8 @@
-import fs from 'node:fs';
+import ICON_RULES from './iconRules.js';
 
 // Default configuration (created on first run, and used to back-fill missing keys on load).
-// Icon rules are shared with the admin and display (web/shared/iconRules.json): keywords in English, Spanish and
-// Portuguese, matched against event titles and descriptions. More specific categories come first.
-export const DEFAULT_ICON_RULES = JSON.parse(
-  fs.readFileSync(new URL('../web/shared/iconRules.json', import.meta.url), 'utf8'),
-).map((r) => ({ id: r.id, match: r.match, emoji: r.emoji, color: null }));
+// Icon rules are shared with the admin and display (server/core/iconRules.js).
+export const DEFAULT_ICON_RULES = ICON_RULES.map((r) => ({ id: r.id, match: [...r.match], emoji: r.emoji, color: null }));
 
 export const DEFAULT_SOURCES = [
   // A public example feed only. Add your own calendars (Google, iCal, vacation-rental feeds…) in the admin panel.
@@ -27,7 +24,7 @@ export const RESERVED_SOURCE_IDS = [LOCAL_SOURCE_ID, BIRTHDAYS_SOURCE_ID];
 /** Per-screen part of the keys that are split between global and per-screen ("merged sections"). */
 export const SCREEN_SPLIT_KEYS = {
   calendar: ['enabled', 'view', 'weeks', 'weekStart', 'showLocation', 'showEndTime', 'showDayXofY', 'showLegend', 'hidePast', 'maxEventsPerDay', 'sourceIds'],
-  datetime: ['enabled', 'clock', 'format24', 'showSeconds', 'showAmPm', 'dateFormat'],
+  datetime: ['enabled', 'clock', 'format24', 'showSeconds', 'showAmPm', 'dateFormat', 'dateCustom'],
   weather: ['enabled', 'forecastDays', 'showHourly', 'showPrecipChance'],
   news: ['enabled', 'rotateSec'],
   todo: ['enabled'],
@@ -41,10 +38,14 @@ export function defaultScreenProfile({ id = 's_main', slug = 'living-room', name
   return structuredClone({
     id, slug, name,
     screen: {
-      language: 'en', fontScale: 1.0, theme: 'dark', accent: '#ff5a4e', orientation: 'auto', customCss: '',
+      language: 'en', fontScale: 1.0, theme: 'dark', style: 'modern', accent: '#ff5a4e', orientation: 'auto', customCss: '',
       nightMode: { enabled: false, from: '23:00', to: '07:00', dim: 0.35 },
+      // Modern style glass material (ignored by Classic). The defaults reproduce the original Modern look.
+      glass: { appearance: 'auto', opacity: 0.5, blur: 18, tint: 'dark', edge: true },
     },
-    layout: { preset: 'bigCalendar', sidePanel: 'left', sideWidth: 0.36 },
+    // people: calendar ids shown as columns by the 'people' layout (null = automatic); corner: where the
+    // 'photoFrame' layout puts its small clock card (tl, tr, bl, br)
+    layout: { preset: 'bigCalendar', sidePanel: 'left', sideWidth: 0.36, people: null, corner: 'br' },
     background: {
       enabled: true, source: 'stock', stockTopic: 'nature', order: 'random', intervalSec: 120, brightness: 0.85, showMeta: false,
       cover: true, transition: 'webgl', ambient: 'aurora',
@@ -55,7 +56,7 @@ export function defaultScreenProfile({ id = 's_main', slug = 'living-room', name
       showDayXofY: true, showLegend: true, hidePast: false, maxEventsPerDay: 4,
       sourceIds: null, // null = every enabled source (incl. local + birthdays); array = only these ids
     },
-    datetime: { enabled: true, clock: 'digital', format24: true, showSeconds: true, showAmPm: false, dateFormat: 'weekday_d_month' },
+    datetime: { enabled: true, clock: 'digital', format24: true, showSeconds: true, showAmPm: false, dateFormat: 'weekday_d_month', dateCustom: '{dddd}, {d} {mmmm} {yyyy}' },
     weather: { enabled: true, forecastDays: 5, showHourly: true, showPrecipChance: true },
     news: { enabled: true, rotateSec: 15 },
     todo: { enabled: false },
@@ -75,7 +76,8 @@ export function defaultConfig() {
     calendar: { sources: DEFAULT_SOURCES, iconRules: DEFAULT_ICON_RULES },
     datetime: { timezone: 'Europe/Lisbon' },
     weather: {
-      provider: 'open-meteo', locationName: 'Lisbon, Portugal', lat: 38.7223, lon: -9.1393, units: 'metric',
+      // provider: a source of server/core/weather.js (or 'homeassistant'); model: an Open-Meteo forecast model
+      provider: 'open-meteo', model: 'best_match', locationName: 'Lisbon, Portugal', lat: 38.7223, lon: -9.1393, units: 'metric',
       haWeatherEntity: '', haIndoorTempEntity: '', haIndoorHumidityEntity: '',
     },
     news: {

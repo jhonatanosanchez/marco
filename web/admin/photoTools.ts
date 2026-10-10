@@ -179,12 +179,18 @@ export interface Optimized {
 }
 
 /**
- * Full pipeline for one file. `keepFocus` skips the saliency pass (photo already framed by hand).
+ * Full pipeline for one file. `keepFocus` skips the saliency pass (photo already framed by hand). `strip` always
+ * re-encodes (a canvas keeps no metadata), for servers that must never store the original bytes.
  * Throws PhotoError('heic' | 'decode' | 'too-big' | 'not-image').
  */
 export async function optimizePhoto(
   file: File,
-  opts: { onStage?: (s: 'heic' | 'optimizing') => void; keepFocus?: { focusX: number; focusY: number } } = {}
+  opts: {
+    onStage?: (s: 'heic' | 'optimizing') => void;
+    keepFocus?: { focusX: number; focusY: number };
+    /** always re-encode, never keep the original bytes: drops EXIF (GPS, camera) and every other metadata */
+    strip?: boolean;
+  } = {}
 ): Promise<Optimized> {
   if (file.size > MAX_UPLOAD_BYTES) throw new PhotoError('too-big');
   if (!looksLikeImage(file)) throw new PhotoError('not-image');
@@ -211,6 +217,7 @@ export async function optimizePhoto(
     ]);
     // An already web-sized, upright, light JPEG is kept byte-for-byte (no generation loss).
     const keep =
+      !opts.strip &&
       file.type === 'image/jpeg' && s === 1 && file.size <= Math.max(encoded.size, HEAVY_BYTES) && (await jpegOrientation(file)) === 1;
     const blob = keep ? file : encoded;
     return { blob, thumb, name: jpgName(file.name), w, h, ...focus, before: file.size, after: blob.size, kept: keep };

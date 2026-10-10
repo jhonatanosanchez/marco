@@ -25,7 +25,7 @@ it until you switch in *Security*).
 |---|---|---|
 | Display key | UUIDv4, e.g. `3f6c0a52-9d1e-4b7a-a2c4-0e5b8f1d2c37` (case-insensitive) | The screen's private link `/d/<key>` (*Screen → Settings → Private link*) |
 | Device token | `md_` + 43 base64url characters (256 bits) | Pairing (below); stored by the display in `localStorage` |
-| Admin session | `cs_session` cookie | Logged-in admin (preview iframe, *View screen*) |
+| Admin session | `cs_session` cookie | Logged-in admin (preview iframe and *View screen* in open mode, which use `/?screen=`; in private mode they use the private link) |
 
 Header `X-Marco-Key: <key or token>` for `fetch`; `?k=<key or token>` is accepted only by `/api/stream` (EventSource
 cannot send headers) and `/media/*` (images). Keys and tokens are compared in constant time and never logged.
@@ -46,9 +46,13 @@ the key from its path. `GET /pair` serves the display page in pairing mode.
 |---|---|
 | `POST /api/pair/start` | `{}` → `PairStartResponse` `{ sessionId, code, expiresAt, pollMs }`. `sessionId`: 32 random bytes (base64url), known only to this display; `code`: 6 characters from `23456789ABCDEFGHJKMNPQRSTUVWXYZ`, unique among pending codes, valid 10 min. `429` after 10 starts per IPv4 address / IPv6 /64 in 10 min; `503` with 100 pending codes |
 | `POST /api/pair/status` | `{ sessionId }` → `{ status: "waiting", code, expiresAt }` · `{ status: "paired", token, screen: { id, slug, name }, device: { id, name } }` (exactly once, then the session is gone) · `404 { status: "expired" }`. Poll every `pollMs` (2 s): a code can only be claimed while its display polled within the last 15 s |
-| `POST /api/admin/pair/claim` | Admin session. `{ code, screenId, name? }` (code case-insensitive, spaces/dashes ignored) → `{ device: PairedDevice }`. `404 { code: "invalid_code" }` unknown / expired / already used / display not waiting; `400 { code: "unknown_screen" }`; `429 { code: "rate_limited" }` after 10 wrong codes per admin session + address, or 50 wrong codes overall, in 10 minutes (then even a right code waits) |
+| `POST /api/admin/pair/claim` | Admin session. Two steps. `{ code, screenId, name? }` (code case-insensitive, spaces/dashes ignored) only finds the waiting display and answers `{ confirm: { where, screenId, screenName } }` (`where`: the display's address as this server saw it, `"localhost"` on the server itself, `""` when unknown); nothing is paired yet. The admin shows it and sends the same body with `confirm: true` → `{ device: PairedDevice }`. Marco Cloud answers the same shape, with `where` = city and country. `404 { code: "invalid_code" }` unknown / expired / already used / display not waiting; `400 { code: "unknown_screen" }`; `429 { code: "rate_limited" }` after 10 wrong codes per admin session + address, or 50 wrong codes overall, in 10 minutes (then even a right code waits). Read the error code as `code`, else `error` (Marco Cloud sends `{ error: "invalid_code" }`) |
 
 The admin's QR on the pairing screen opens `/admin/#pair=<code>`, which opens the *Pair a screen* dialog prefilled.
+The pairing screen reads `pairCodeLength` from `/api/health` and says where to open the admin: this page's
+`<host>/admin`, the first of `lanAddresses` when it was opened on `localhost` (a kiosk on the server itself), or
+`adminOrigin` when the server sets it. Once paired, a display opened at `/pair` stays on `/pair`; a dead private link
+continues at `/` (at `/pair` when `edition` is not `'self-hosted'`).
 
 **Links and devices** (admin session):
 
@@ -68,16 +72,75 @@ saved without `security` (old admin builds, backups or exports from before 0.3) 
 
 | Method & path | Response |
 |---|---|
-| `GET /api/health` | `{ ok, uptime, version, live }`; `live` is `'sse'` here. A server that answers `'poll'` gets no `/api/stream` connection: the display checks `/api/display/config` every 90 s and refetches events and countdowns when `revision` changes. A missing field means `'sse'` |
+| `GET /api/health` | `HealthResponse`: `{ ok, uptime, version, live, edition, tenancy, runtime, pairCodeLength, features, limits?, displayOrigin?, adminOrigin?, lanAddresses? }` (see below). `live` is `'sse'` unless `MARCO_LIVE=poll` is set. A server that answers `'poll'` gets no `/api/stream` connection: the display polls `GET /api/display/poll` instead (see below). A server that answers `404` there gets a config check every 90 s, which refetches events and countdowns when `revision` changes. A missing field means `'sse'` |
 | `GET /api/display/config?screen=` | `DisplayConfig`: flat view of one screen; `calendar.sources` only as `{ id, name, color, emoji, kind }`; enabled `schedules` for this screen |
 | `GET /api/events?screen=&from=YYYY-MM-DD&to=YYYY-MM-DD` | `{ generatedAt, hash, events: CalEvent[], errors: [{ sourceId, message }] }` |
-| `GET /api/weather?screen=` | `{ updatedAt, locationName, current, today, daily[], hourly[], indoor }` (localized descriptions, cache 10 min) |
+| `GET /api/weather?screen=` | `{ updatedAt, locationName, current, today, daily[], hourly[], indoor, source }` (localized descriptions). `source` = `{ provider, name, model, modelName, url, licence, licenceUrl, also? }`: where the data comes from, for the credit line. Values a source does not give are `null` (MET Norway: no chance of rain outside the Nordics; some Open-Meteo models: no UV). Cached per place for at least 10 minutes (15 for Pirate Weather, MET Norway's `Expires` when longer), the last answer is kept for 6 hours when the source fails |
 | `GET /api/news` | `{ updatedAt, items: [{ id, title, summary, source, date, image? }] }` (cache 15 min) |
 | `GET /api/photos?screen=&count=20&after=` | `{ photos: [{ url, author?, title?, source: "stock"\|"gallery", file?, focusX?, focusY? }] }`. Gallery photos follow the screen's `background.order` (`random` \| `newest` \| `name`); hidden photos are never returned. `after` = gallery `file` the display showed last: sequential orders continue right after it (wrapping around), `random` avoids starting with it. Without `after`, the server remembers where the previous batch for that screen ended. Falls back to stock when no gallery photo is in rotation |
-| `GET /api/countdowns?screen=` | `{ generatedAt, today, hash, items: [{ id, title, emoji, color, date, days, origin, age? }] }` |
+| `GET /api/countdowns?screen=` | `{ generatedAt, today, hash, items: [{ id, title, emoji, color, date, days, origin, age? }] }`. An admin session is still accepted here in 0.5 for admin pages loaded before the update; the admin itself uses `GET /api/admin/countdowns` |
 | `POST /api/display/heartbeat` | Body `DisplayHeartbeat` (≤ 4 kB: clientId, screen, version, resolution, dpr, webgl, night state, photo frame…) → `HeartbeatResponse` |
 | `GET /api/stream?screen=&client=&k=` | Server-Sent Events, see below |
+| `GET /api/display/poll?screen=&client=&cursor=&rev=&hidden=&preview=` | `PollResponse`: the same events as commands, for displays without a stream. See below |
 | `GET /media/photos/<file>`, `GET /media/thumbs/<file>` | Gallery images and thumbnails |
+
+### Capabilities in `/api/health`
+
+The admin and the display read these fields to decide which sections, actions and limits apply.
+
+- `edition`: `'self-hosted'` here. `tenancy`: `'single'`. `runtime`: `'node'`.
+- `pairCodeLength`: characters in the pairing code a TV shows (`6`).
+- `features`: one boolean per feature: `homeassistant`, `news`, `customCss`, `gallery`, `schedules`,
+  `announcements`, `displayCommands`, `openDisplayAccess`, `insecureTls`, `googleCalendar`, `googleLogin`,
+  `passwordLogin`, `apiTokens`, `webhooks`, `backups`, `importExport`, `includeSecrets`, `activity`, `setupWizard`,
+  `status`, `accountMenu`, `microsoftCalendar`, `updates`. A self-hosted server turns all of them on, except
+  `googleCalendar` and `googleLogin` (on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set),
+  `microsoftCalendar` (Outlook and Microsoft 365 calendars, on when `MICROSOFT_CLIENT_ID` and
+  `MICROSOFT_CLIENT_SECRET` are set) and `accountMenu` (always off). `updates` is the update banner,
+  *Status → Updates* and `/api/admin/update*`; Marco Cloud answers `false` and shows the CHANGELOG section of a new
+  version once instead.
+- `limits` (optional): plan limits such as `screens`, `sources` or `devices`. Absent means no limit beyond the
+  config validator's own caps (12 screens, 50 calendars, 20 news feeds, 1000 local events, 500 birthdays,
+  100 countdowns). The admin disables "add" at the limit and flags a config that goes over it.
+- `displayOrigin` (optional): absolute origin that serves `/d/<key>` and `/pair`. Absent means the same origin. The
+  admin opens screens (preview, *View screen*) at `<displayOrigin or its own origin>/d/<key>` when it has the private
+  links (a server in private mode, or one without open display access), else at `/?screen=<slug>`. The preview adds
+  `?preview=1`: that page is never counted as a connected display and does not read or write the browser's stored
+  device token, client id or cached data.
+- `adminOrigin` (optional): absolute origin of the admin, for displays served from another origin. Absent means the
+  same origin.
+- `lanAddresses` (optional): this server's LAN addresses (as in `/api/setup/status`). Only sent to a client on the
+  server itself (loopback, not relayed by an untrusted proxy, allowed host name), so the pairing screen of a kiosk on
+  `http://localhost` can say where other devices reach the admin.
+
+Clients treat a response with no `features` field (servers older than 0.5.0) as having every feature on, except
+`accountMenu`, `microsoftCalendar` and `updates`. A key missing from `features` counts as off only when `edition` is
+not `'self-hosted'`, and a missing `accountMenu`, `microsoftCalendar` or `updates` is always off.
+
+### Account mode
+
+A multi-tenant server (`tenancy: 'multi'`) signs people in on its own account pages instead of the admin's login
+screen. `GET /api/auth/me` then returns `user.method: 'account'` and an `account` block:
+`{ loginUrl, accountUrl, sessionsUrl, deleteUrl, household: { name, role } }`. The admin:
+
+- sends the browser to `loginUrl?next=<path and hash>` when it is signed out or a call answers 401. `next` is
+  always a path under `/admin/`;
+- after `POST /api/auth/logout`, goes to the `next` path in the response, or to `loginUrl`;
+- shows the household and the account links in the header menu, and also sends `POST /api/account/lang {lang}`
+  when the language changes;
+- replaces the Security page with an Account page (same `#/security` route) that renames the household with
+  `PATCH /api/admin/household {name}` (60 characters at most).
+
+Links in the `account` block must be paths on the same site or `http(s)` URLs; the admin ignores anything else.
+
+Every call the admin makes is listed in `web/shared/adminContract.json` (method, path, query keys, gating feature,
+request type and top-level response keys), generated from `web/admin/api.ts` and `web/shared/types.ts` by
+`npm run contract`. A server that turns a feature off answers that feature's routes with
+`404 {"error":"feature_unavailable"}`.
+
+Error codes the admin translates (`web/admin/apiErrors.ts`), read from `code` first and then `error`:
+`rate_limited`, `screen_limit`, `limit_exceeded`, `feature_unavailable`, `conflict`, `photo_quota`, `readonly`. A
+`details[].message` with one of these codes is translated too. Any other error shows the server's own text.
 
 `CalEvent`: `{ id, sourceId, title, start, end, allDay, location, color, emoji, kind, multiDay, age? }`. `start`/`end`
 are ISO strings with offset, or `YYYY-MM-DD` for all-day events (`end` exclusive).
@@ -100,16 +163,52 @@ are ISO strings with offset, or `YYYY-MM-DD` for all-day events (`end` exclusive
 
 Displays whose screen has alerts disabled do not receive `announce`.
 
+### Poll channel (`/api/display/poll`)
+
+Used when `/api/health` says `live: 'poll'`. The credential travels in `X-Marco-Key`, as for the other display
+endpoints, and the same `401` / `403` answers apply (the display then shows the pairing or "no longer valid" screen,
+so there is no `revoked` command).
+
+| Query | Meaning |
+|---|---|
+| `client` | the display's client id (as on `/api/stream`) |
+| `cursor` | the `cursor` of the previous answer; empty on the first poll |
+| `rev` | the config revision the display has |
+| `hidden` | `1` while the page is hidden |
+| `preview` | `1` for the admin preview: commands still arrive, but the poll is not listed as a display |
+
+Answer `{ revision, screenId, now, serverVersion, cursor, reset, commands, activeAnnouncementIds?, next }`:
+
+- `commands`: in order and already filtered to this display. Each one is `{ type, ...payload }` with the SSE event
+  names and payloads: `reload`, `night`, `identify` (filled in for this display), `announce`, `announce-clear`,
+  `photos` and `events`.
+- `reset: true` on the first poll, after a server restart, or for a cursor the server no longer knows. `commands` then
+  only holds the announcements still active on this screen, like the replay on `/api/stream`, and old commands are
+  never replayed.
+- `activeAnnouncementIds`: present on a reset and whenever `commands` holds `announce` or `announce-clear`.
+- `revision`: the display refetches its config, events and countdowns when it differs from its own. `screenId`: a
+  different one (the paired device was moved) reloads the page. `serverVersion`: a newer server reloads the page once.
+- `next`: milliseconds until the next poll. Self-hosted answers 30 s, 3 min while hidden, and 5 s while someone has
+  *Connected screens* open or just sent a command. The display adds ±10 % and keeps it between 3 s and 15 min; on
+  errors it waits 5 s, doubling up to 5 min.
+
+The self-hosted server keeps the last 500 events in memory. Commands expire: `identify` after 60 s, `announce` at
+its `expiresAt`, the others after 10 min. A display that polled in the last 4 minutes is listed as connected and
+counts in `delivered` (at most 24 client ids per address, as for streams). A new private link, a revoked device or
+a switch to private access takes its pollers off the list at once; their next poll gets `401` / `403`.
+
 ## Authentication
 
 | Method & path | Notes |
 |---|---|
-| `GET /api/auth/me` | `{ user: { email, name, picture, method } \| null, needsSetup, googleConfigured, passwordLoginEnabled, mustChangePassword, passwordFromEnv }` |
+| `GET /api/auth/me` | `{ user: { email, name, picture, method } \| null, needsSetup, googleConfigured, passwordLoginEnabled, mustChangePassword, passwordFromEnv }`. `method` is `'password'` or `'google'` here; Marco Cloud answers `'account'` and adds `account: { loginUrl, accountUrl, sessionsUrl, deleteUrl, household: { name, role } }` and `microsoftConfigured` (Microsoft calendars on for this account; a self-hosted server sends it too, true when `MICROSOFT_CLIENT_ID` and `MICROSOFT_CLIENT_SECRET` are set) |
 | `POST /api/auth/login` | `{ password }`; `409 { needsSetup: true }` while the install has no password yet |
 | `POST /api/auth/logout`, `POST /api/auth/logout-all` | log out this session / every session |
 | `GET /auth/google/login` | "Sign in with Google" (email must be in `auth.allowedGoogleEmails`; if the list is empty, the first Google login made while already logged in with the password adds itself) |
 | `GET /auth/google/connect` | Link a Google account for calendars (scope `calendar.readonly`, offline access); requires a session |
 | `GET /auth/google/callback` | OAuth redirect URI: `${PUBLIC_URL}/auth/google/callback` |
+| `GET /auth/microsoft/connect` | Link a Microsoft account for calendars (`openid email profile offline_access Calendars.Read Calendars.Read.Shared`, PKCE); requires a session and `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` |
+| `GET /auth/microsoft/callback` | OAuth redirect URI: `${PUBLIC_URL}/auth/microsoft/callback`. Back to `/admin/?microsoft=<email>` or `/admin/?error=microsoft_<code>` |
 
 ## Setup (first run)
 
@@ -160,13 +259,15 @@ Rules for the mutating setup endpoints:
 | Method & path | Notes |
 |---|---|
 | `GET /api/admin/config` | Full `StoredConfig` |
-| `PUT /api/admin/config` | Validate + save (revision + 1, backup first, SSE `config`). `400 { error, details: [{ path, message }] }` when invalid |
+| `PUT /api/admin/config` | Validate + save (revision + 1, backup first, SSE `config`). Body = `StoredConfig` plus an optional `baseRevision`: the revision the admin loaded. When the config was saved since then (another tab or device, or the server itself, for example the first Google sign-in adding the allowed email) the answer is `409 { error: "conflict", revision }` and nothing is written; the admin then offers to load the saved version or to save its changes on top of it (parts it did not change keep the saved value) with the new `baseRevision`. Without `baseRevision` (or `null`) the last write wins, as before 0.5. `400 { error, details: [{ path, message }] }` when invalid |
 | `PUT /api/admin/password` | `{ current, next }`: same password rules as the setup wizard (`400 { code: too_short \| too_common \| too_long }`); also logs out other sessions |
 | `GET /api/admin/screens/template?name=` | New `ScreenProfile` with defaults and a free slug |
+| `GET /api/admin/geocode?q=&lang=` | Place search for the weather location, through this server (Open-Meteo geocoding) so the browser only talks to Marco → `{ results: [{ name, admin1, country, countryCode, lat, lon, timezone }] }` (at most 8; `q` shorter than 2 characters gives `[]`). Also open to the setup wizard while no password exists, with the same token rules as `/api/setup/*` (`x-setup-token`). `429 { error: "rate_limited" }` after 60 searches per address in 10 minutes (600 overall); answers are cached for a day; `502 { error: "geocode_unavailable" }` when Open-Meteo cannot be reached |
 | `POST /api/admin/events/preview` | Body `{ from?, days? (1..60), screen?, eventRules?, iconRules?, localEvents?, birthdays? }` (draft values) → every event incl. hidden ones with `applied[]` rules and `ruleHits` |
+| `GET /api/admin/countdowns?screen=` | Same answer as `GET /api/countdowns` for the screen with that id or slug (unknown → default screen); used by the Countdowns page |
 | `POST /api/admin/birthdays/parse-csv` | `{ text }`: one `name;dd/mm[/yyyy]` per line (`;`, `,` or tab) → parsed rows, duplicates, errors with line numbers |
 | `GET /api/admin/dashboard` | Next events, weather now, active schedules, recent activity, warnings |
-| `GET /api/admin/status` | Per-source last fetch / errors, weather and news status, display count, uptime |
+| `GET /api/admin/status` | Per-source last fetch / errors, weather (`ok`, `updatedAt`, `error`, `errorCode`: `key_missing`, `key_invalid`, `rate_limited`, `http`, `bad_response`, `provider`) and news status, display count, uptime |
 
 **Sources and integrations**
 
@@ -174,11 +275,14 @@ Rules for the mutating setup endpoints:
 |---|---|
 | `GET /api/admin/google/accounts` · `DELETE /api/admin/google/accounts/:email` | Linked Google accounts |
 | `GET /api/admin/google/calendars?account=` | Calendars of a linked account |
+| `GET /api/admin/microsoft/accounts` · `DELETE /api/admin/microsoft/accounts/:email` · `GET /api/admin/microsoft/calendars?account=` | Linked Microsoft accounts and their own and shared calendars (`MicrosoftAccount[]`, `MicrosoftCalendarListItem[]`). `404 feature_unavailable` without `features.microsoftCalendar`; the calendar list answers `409 microsoft_reconnect` when the account must be linked again. `DELETE` answers `{ ok, manageAccess }` (Microsoft has no revoke endpoint: the pages where the access is removed) |
 | `POST /api/admin/test/ics` | `{ url, insecureTls? }` → `{ ok, count, sample, error? }` |
 | `POST /api/admin/test/rss` | `{ url }` → `{ ok, title, count, error? }` |
 | `POST /api/admin/test/homeassistant` | `{ url, token? }` → `{ ok, version?, error? }` |
 | `GET /api/admin/homeassistant/entities?domain=sensor\|weather` | `[{ entity_id, name, state, unit }]` |
 | `PUT /api/admin/homeassistant/token` | `{ token }` |
+| `GET /api/admin/weather/key` | `{ set, hint }`: whether an API key for a weather source that needs one (Pirate Weather) is stored, and its last 4 characters. The key itself is never sent back |
+| `PUT /api/admin/weather/key` | `{ key }` (letters, digits, `-` and `_`, 8 to 128; `""` removes it). A new key is tried once at the configured place: `400 { error: "key_invalid" }` when the source refuses it (nothing is stored); `{ set, hint, checked }` otherwise (`checked: false` when the source could not be reached). Saving the config with `weather.provider: "pirate-weather"` while no key is stored answers `400` with `weather.apiKey` |
 
 **Photos**
 
@@ -215,6 +319,15 @@ Rules for the mutating setup endpoints:
 | `POST /api/admin/import/apply` | `{ bundle, sections?, includeSecrets? }` → `{ ok, config, loggedOut? }`. `security.displayAccess` is never taken from the bundle (restores keep it too). Imported keys / devices close the streams of replaced keys and dropped devices |
 | `GET /api/admin/activity?type=&level=&q=&actor=&before=&limit=` | Newest first, paged with `before=<id>` |
 | `DELETE /api/admin/activity` | Clear the log |
+
+**Updates** (self-hosted, `features.updates`; see docs/ARCHITECTURE.md *Updates*)
+
+| Method & path | Notes |
+|---|---|
+| `GET /api/admin/update` | `UpdateInfo`: `{ current, latest: { version, name, notes, url, publishedAt } \| null, available, checkedAt, error, checks: 'on'\|'off'\|'env-off', install: { kind: 'release'\|'checkout'\|'docker'\|'manual', canApply, cli }, settings: { check, auto, from, to }, status, log }`. `status` is the last update: `{ state: 'requested'\|'running'\|'done'\|'current'\|'failed', from, to, target, by: 'admin'\|'auto', at, rolledBack, stalled }`; `log` the last lines of the installer's output |
+| `PUT /api/admin/update/settings` | `{ check?, auto?, from?, to? }` (`HH:MM`, time zone of *Date & time*) → `UpdateInfo` |
+| `POST /api/admin/update/check` | Ask GitHub now (a second call within 20 s answers the stored result) → `UpdateInfo`; `409 checks_disabled` with `MARCO_UPDATE_CHECK=0` |
+| `POST /api/admin/update/apply` | Ask the update service for the latest release → `UpdateInfo` with `status.state: 'requested'`. `409` with `error`: `not_supported` (not a release install with `marco-update.path`), `busy`, `up_to_date` |
 
 ## Webhooks (`/api/hooks/*`)
 

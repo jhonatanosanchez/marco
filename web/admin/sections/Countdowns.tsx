@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { Countdown, CountdownsResponse } from '../../shared/types';
+import { api } from '../api';
 import { confirmDialog } from '../components/feedback';
 import { Icon } from '../components/icons';
 import { Button, Card, ColorPicker, EmojiPicker, Empty, Field, NumberInput, PageHeader, Slider, TextInput, Toggle, ToggleRow } from '../components/ui';
 import { addDays, daysBetween, fmtDay, todayIn } from '../dates';
+import { atLimit } from '../caps';
+import { LimitNote } from '../components/LimitNote';
 import { t } from '../i18n';
 import { takeIntent } from '../intent';
 import { isValidDate, uid } from '../util';
@@ -40,6 +43,7 @@ const PRESETS = [
 
 export function CountdownsSection({ full, setFull, cfg, set, errors }: SectionProps) {
   const cd = full.countdowns;
+  const atMax = atLimit('countdowns', cd.items.length);
   const today = todayIn(cfg.datetime.timezone);
   const [title, setTitle] = useState('');
   const [emoji, setEmoji] = useState('⏳');
@@ -49,9 +53,9 @@ export function CountdownsSection({ full, setFull, cfg, set, errors }: SectionPr
   const [focusAdd] = useState(() => takeIntent('countdowns', 'add'));
 
   useEffect(() => {
-    fetch(`/api/countdowns?screen=${encodeURIComponent(cfg.slug)}`, { headers: { Accept: 'application/json' } })
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((j: CountdownsResponse) => setLive(j))
+    api
+      .countdowns(cfg.slug)
+      .then((j) => setLive(j))
       .catch(() => setLive('na'));
   }, [cfg.slug, full.revision]);
 
@@ -68,7 +72,7 @@ export function CountdownsSection({ full, setFull, cfg, set, errors }: SectionPr
 
   const add = (e?: Event) => {
     e?.preventDefault();
-    if (!title.trim() || !isValidDate(date)) return;
+    if (!title.trim() || !isValidDate(date) || atMax) return;
     setFull((d) => void d.countdowns.items.push({ id: uid('k'), title: title.trim().slice(0, 80), emoji, color: null, date, yearly }));
     setTitle('');
   };
@@ -117,7 +121,7 @@ export function CountdownsSection({ full, setFull, cfg, set, errors }: SectionPr
             <Toggle size="sm" checked={yearly} onChange={setYearly} />
             <span>{t('Anual')}</span>
           </label>
-          <Button type="submit" variant="primary" icon="plus" disabled={!title.trim() || !isValidDate(date)}>
+          <Button type="submit" variant="primary" icon="plus" disabled={!title.trim() || !isValidDate(date) || atMax}>
             {t('Añadir')}
           </Button>
         </form>
@@ -127,12 +131,14 @@ export function CountdownsSection({ full, setFull, cfg, set, errors }: SectionPr
             <button
               type="button"
               class="pill"
+              disabled={atMax}
               onClick={() => setFull((d) => void d.countdowns.items.push({ id: uid('k'), title: t(p.title), emoji: p.emoji, color: null, date: `${today.slice(0, 4)}-${p.md}`, yearly: true }))}
             >
               {p.emoji} {t(p.title)}
             </button>
           ))}
         </div>
+        <LimitNote name="countdowns" count={cd.items.length} />
         {rows.length === 0 ? (
           <Empty icon="hourglass" title={t('Sin fechas')}>
             {t('Añade una fecha o usa los atajos de arriba.')}

@@ -4,6 +4,14 @@ import { ROWS4 } from './i18n-dict4';
 import { ROWS5 } from './i18n-dict5';
 import { ROWS6 } from './i18n-dict6';
 import { ROWS7 } from './i18n-dict7';
+import { ROWS8 } from './i18n-dict8';
+import { ROWS9 } from './i18n-dict9';
+import { ROWS10 } from './i18n-dict10';
+import { ROWS11 } from './i18n-dict11';
+import { ROWS12 } from './i18n-dict12';
+import { ROWS13 } from './i18n-dict13';
+import { ROWS14 } from './i18n-dict14';
+import { ROWS15 } from './i18n-dict15';
 // Translations for the admin panel. Spanish is the source language (key); [es, en, pt].
 const ROWS: [string, string, string][] = [
   ['(ninguno)', '(none)', '(nenhum)'],
@@ -80,6 +88,7 @@ const ROWS: [string, string, string][] = [
   ['Color de acento', 'Accent colour', 'Cor de destaque'],
   ['Color no válido', 'Invalid colour', 'Cor inválida'],
   ['Conecta calendarios iCal y Google, y decide cómo se muestran.', 'Connect iCal and Google calendars and decide how they are shown.', 'Liga calendários iCal e Google e decide como são mostrados.'],
+  ['Conecta calendarios iCal y decide cómo se muestran.', 'Connect iCal calendars and decide how they are shown.', 'Liga calendários iCal e decide como são mostrados.'],
   ['Conectado', 'Connected', 'Ligado'],
   ['Conexión', 'Connection', 'Ligação'],
   ['Contenido', 'Content', 'Conteúdo'],
@@ -269,6 +278,7 @@ const ROWS: [string, string, string][] = [
   ['Para usuarios avanzados: se inyecta en la pantalla.', 'For advanced users: injected into the screen.', 'Para utilizadores avançados: é injetado no ecrã.'],
   ['Partículas', 'Particles', 'Partículas'],
   ['Pega la URL .ics de tu calendario (Airbnb, Booking, Google, iCloud, Outlook…) o vincula una cuenta de Google.', 'Paste your calendar’s .ics URL (Airbnb, Booking, Google, iCloud, Outlook…) or link a Google account.', 'Cola o URL .ics do teu calendário (Airbnb, Booking, Google, iCloud, Outlook…) ou liga uma conta Google.'],
+  ['Pega la URL .ics de tu calendario (Airbnb, Booking, Google, iCloud, Outlook…).', 'Paste your calendar’s .ics URL (Airbnb, Booking, Google, iCloud, Outlook…).', 'Cola o URL .ics do teu calendário (Airbnb, Booking, Google, iCloud, Outlook…).'],
   ['Pendiente', 'Pending', 'Pendente'],
   ['Permitir entrar con contraseña', 'Allow password sign-in', 'Permitir entrar com palavra-passe'],
   ['Polvo de luz flotando con profundidad.', 'Floating light dust with depth.', 'Pó de luz a flutuar com profundidade.'],
@@ -401,7 +411,7 @@ for (const [es, en, pt] of ROWS) {
   PT[es] = pt;
 }
 // v2 pages; existing rows win on duplicates.
-for (const [es, en, pt] of [...ROWS2, ...ROWS3, ...ROWS4, ...ROWS5, ...ROWS6, ...ROWS7]) {
+for (const [es, en, pt] of [...ROWS2, ...ROWS3, ...ROWS4, ...ROWS5, ...ROWS6, ...ROWS7, ...ROWS8, ...ROWS9, ...ROWS10, ...ROWS11, ...ROWS12, ...ROWS13, ...ROWS14, ...ROWS15]) {
   if (!(es in EN)) EN[es] = en;
   if (!(es in PT)) PT[es] = pt;
 }

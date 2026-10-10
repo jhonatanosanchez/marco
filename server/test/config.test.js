@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { validateConfig, mergeDefaults } from '../validate.js';
-import { defaultConfig } from '../defaults.js';
+import { validateConfig, mergeDefaults } from '../core/validate.js';
+import { defaultConfig } from '../core/defaults.js';
 
 test('defaults are valid, ship no personal sources, only a public example + rules', () => {
   const { ok, errors, value } = validateConfig(defaultConfig());
@@ -64,6 +64,27 @@ test('sanitisation: unknown keys dropped, ids generated & deduped, colors lowerc
   assert.equal(value.weather.lat, 38.5);
 });
 
+test('microsoft sources: account and calendar id required, nothing else kept', () => {
+  const c = defaultConfig();
+  c.calendar.sources = [
+    { type: 'microsoft', name: 'Outlook', microsoftAccount: ' Ana@Outlook.com ', microsoftCalendarId: 'AQMkADAwATM0MDAAMS1iZ', googleAccount: 'x@y.z', url: 'https://x', color: '#111111' },
+  ];
+  const { ok, errors, value } = validateConfig(c);
+  assert.equal(ok, true, JSON.stringify(errors));
+  const [m] = value.calendar.sources;
+  assert.equal(m.type, 'microsoft');
+  assert.equal(m.microsoftAccount, 'ana@outlook.com');
+  assert.equal(m.microsoftCalendarId, 'AQMkADAwATM0MDAAMS1iZ');
+  assert.equal(m.googleAccount, undefined);
+  assert.equal(m.url, undefined);
+  c.calendar.sources = [{ type: 'microsoft', name: 'Outlook', microsoftAccount: 'not-an-email', color: '#111111' }];
+  const bad = validateConfig(c);
+  assert.equal(bad.ok, false);
+  const paths = bad.errors.map((e) => e.path);
+  assert.ok(paths.includes('calendar.sources[0].microsoftAccount'), paths.join());
+  assert.ok(paths.includes('calendar.sources[0].microsoftCalendarId'), paths.join());
+});
+
 test('mergeDefaults back-fills new keys but keeps stored arrays', () => {
   const stored = { revision: 7, screen: { name: 'Cocina' }, calendar: { sources: [] } };
   const m = mergeDefaults(stored);
@@ -117,7 +138,7 @@ const V1 = {
 };
 
 test('migration v1 → v2 keeps every value (global vs screens[0])', async () => {
-  const { migrateConfig, isV1 } = await import('../validate.js');
+  const { migrateConfig, isV1 } = await import('../core/validate.js');
   assert.equal(isV1(V1), true);
   const { ok, errors, value: v } = validateConfig(mergeDefaults(migrateConfig(structuredClone(V1))));
   assert.equal(ok, true, JSON.stringify(errors));
@@ -129,15 +150,18 @@ test('migration v1 → v2 keeps every value (global vs screens[0])', async () =>
   assert.equal(s.name, 'Cocina');
   assert.equal(s.slug, 'cocina');
   const { name, ...scr } = V1.screen;
-  assert.deepEqual(s.screen, scr);
-  assert.deepEqual(s.layout, V1.layout);
+  // the display style is back-filled as classic, the Modern glass options with their defaults
+  assert.deepEqual(s.screen, { ...scr, style: 'classic', glass: { appearance: 'auto', opacity: 0.5, blur: 18, tint: 'dark', edge: true } });
+  // v1 had no options for the newer layouts: they are back-filled with their defaults
+  assert.deepEqual(s.layout, { ...V1.layout, people: null, corner: 'br' });
   assert.deepEqual(s.background, { ...V1.background, order: 'random', panelBlur: 18, panelShade: 0.5, weatherFx: 'simple' }); // new keys back-filled with defaults
   assert.deepEqual(s.message, V1.message);
   const { sources, iconRules, ...calView } = V1.calendar;
   assert.deepEqual(s.calendar, { ...calView, sourceIds: null });
   assert.deepEqual(v.calendar, { sources, iconRules });
   const { timezone, ...dtView } = V1.datetime;
-  assert.deepEqual(s.datetime, dtView);
+  // v1 had no custom date pattern: it is back-filled with the default
+  assert.deepEqual(s.datetime, { ...dtView, dateCustom: '{dddd}, {d} {mmmm} {yyyy}' });
   assert.deepEqual(v.datetime, { timezone });
   assert.deepEqual(s.weather, { enabled: false, forecastDays: 3, showHourly: false, showPrecipChance: false });
   assert.equal(v.weather.locationName, 'Madrid');
@@ -150,7 +174,7 @@ test('migration v1 → v2 keeps every value (global vs screens[0])', async () =>
   assert.deepEqual(v.homeassistant, V1.homeassistant);
   assert.deepEqual(v.auth, V1.auth);
   // validateConfig also accepts v1 directly (old clients / imports)
-  assert.deepEqual(validateConfig(structuredClone(V1)).value.screens[0].layout, V1.layout);
+  assert.deepEqual(validateConfig(structuredClone(V1)).value.screens[0].layout, { ...V1.layout, people: null, corner: 'br' });
   // already-v2 input is untouched
   assert.equal(migrateConfig(v), v);
 });
@@ -168,7 +192,7 @@ test('store migrates a v1 file on load and keeps a pre-migration copy', async ()
 });
 
 test('screens: ids/slugs unique, unknown sourceIds dropped, defaultScreen fixed, flat view', async () => {
-  const { flatView, resolveScreen, displayConfig } = await import('../screens.js');
+  const { flatView, resolveScreen, displayConfig } = await import('../core/screens.js');
   const c = defaultConfig();
   c.screens.push({ ...structuredClone(c.screens[0]), name: 'Living room 2' }); // same id + slug
   c.screens[1].calendar.sourceIds = ['c_holidays', 'nope', 'birthdays'];

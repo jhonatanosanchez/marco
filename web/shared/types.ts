@@ -1,12 +1,18 @@
 // Shared JSON contracts, see docs/API.md and docs/ARCHITECTURE.md. Imported by both the display and the admin panel.
-// Keep in sync with the server (server/validate.js, server/defaults.js).
+// Keep in sync with the server (server/core/validate.js, server/core/defaults.js).
 import type { PhotoFrame } from './focus';
 
 export type Lang = 'es' | 'en' | 'pt';
-export type LayoutPreset = 'bigCalendar' | 'leftRight' | 'topBottom' | 'bigTime' | 'agenda';
+export type LayoutPreset =
+  | 'bigCalendar' | 'leftRight' | 'topBottom' | 'bigTime' | 'agenda'
+  | 'today' | 'people' | 'photoFrame' | 'twoWeeks' | 'board' | 'bedside';
+/** Corner of the clock card in the 'photoFrame' layout: top-left, top-right, bottom-left, bottom-right. */
+export type FrameCorner = 'tl' | 'tr' | 'bl' | 'br';
 export type SourceKind = 'generic' | 'airbnb' | 'birthdays' | 'holidays';
-export type SourceType = 'ics' | 'google';
-export type DateFormat = 'weekday_month_d' | 'weekday_d_month' | 'weekday_d_dot_month';
+export type SourceType = 'ics' | 'google' | 'microsoft';
+export type DateFormat = 'weekday_month_d' | 'weekday_d_month' | 'weekday_d_dot_month' | 'weekday_month_d_y' | 'weekday_mdy' | 'weekday_dmy' | 'weekday_iso' | 'custom';
+/** Every date format, in the order the admin offers them. */
+export const DATE_FORMATS: DateFormat[] = ['weekday_d_month', 'weekday_month_d', 'weekday_d_dot_month', 'weekday_month_d_y', 'weekday_mdy', 'weekday_dmy', 'weekday_iso', 'custom'];
 
 export interface NightMode {
   enabled: boolean;
@@ -15,11 +21,31 @@ export interface NightMode {
   dim: number; // 0..1 (brightness multiplier applied at night)
 }
 
+export type DisplayStyle = 'classic' | 'modern';
+
+/** Glass material of the Modern style (like iOS Liquid Glass): ignored by Classic. */
+export interface GlassConfig {
+  /** 'auto' follows the photo (clearer over dark photos, more tinted over bright ones); 'clear' or 'tinted' fix it. */
+  appearance: 'auto' | 'clear' | 'tinted';
+  /** 0 = most see-through, 1 = most solid (0.5 = the default Modern look). */
+  opacity: number;
+  /** Background blur, 0..40 (0 = none). */
+  blur: number;
+  /** Tint colour: dark, light, or taken from the current photo. */
+  tint: 'dark' | 'light' | 'photo';
+  /** Thin light ring along the card edge. */
+  edge: boolean;
+}
+
 export interface ScreenConfig {
   name: string;
   language: Lang;
   fontScale: number;
   theme: 'dark' | 'light' | string;
+  /** Display style, independent of the layout: 'classic' (default) or 'modern' (glass cards, Apple-like). */
+  style?: DisplayStyle;
+  /** Glass options for the Modern style. Missing = defaults (GLASS_DEFAULTS). */
+  glass?: GlassConfig;
   accent: string;
   orientation: 'auto' | 'landscape' | 'portrait' | string;
   customCss: string;
@@ -30,6 +56,10 @@ export interface LayoutConfig {
   preset: LayoutPreset;
   sidePanel: 'left' | 'right';
   sideWidth: number; // 0..1 fraction of the screen width
+  /** 'people' layout: calendar ids shown as columns (max 5); null / missing = automatic. */
+  people?: string[] | null;
+  /** 'photoFrame' layout: corner of the clock card (default 'br'). */
+  corner?: FrameCorner;
 }
 
 export interface BackgroundConfig {
@@ -56,8 +86,14 @@ export interface CalendarSource {
   type: SourceType;
   name: string;
   url?: string; // ics only
+  /** Sent by multi-tenant servers instead of the URL when the session has not signed in recently. The URL comes back
+   *  empty, and saving a known calendar with an empty URL keeps the stored one. Never stored. */
+  urlHidden?: boolean;
   googleCalendarId?: string; // google only
   googleAccount?: string; // google only
+  /** Microsoft Graph calendar id (Outlook.com, Hotmail, Microsoft 365). Marco Cloud only for now. */
+  microsoftCalendarId?: string; // microsoft only
+  microsoftAccount?: string; // microsoft only
   color: string;
   emoji?: string;
   kind: SourceKind;
@@ -106,11 +142,20 @@ export interface DateTimeConfig {
   showSeconds: boolean;
   showAmPm: boolean;
   dateFormat: DateFormat;
+  /** pattern for dateFormat 'custom': {dddd} {ddd} {d} {dd} {mmmm} {mmm} {m} {mm} {yyyy} {yy} plus any text */
+  dateCustom?: string;
 }
+
+/** Weather data sources (server/core/weather.js). 'homeassistant' = Open-Meteo plus a Home Assistant entity (self-hosted). */
+export type WeatherProvider = 'open-meteo' | 'met-norway' | 'pirate-weather' | 'homeassistant';
+/** Open-Meteo forecast models offered in the admin ('best_match' = Open-Meteo picks). */
+export type OpenMeteoModel = 'best_match' | 'ecmwf_ifs' | 'icon_seamless' | 'gfs_seamless' | 'meteofrance_seamless' | 'ukmo_seamless' | 'gem_seamless' | 'jma_seamless';
 
 export interface WeatherConfig {
   enabled: boolean;
-  provider: 'open-meteo' | 'homeassistant';
+  provider: WeatherProvider;
+  /** forecast model when the data comes from Open-Meteo (open-meteo, homeassistant) */
+  model: OpenMeteoModel;
   locationName: string;
   lat: number;
   lon: number;
@@ -193,6 +238,8 @@ export interface DisplayLinksResponse {
   lanAddresses?: string[];
   /** PUBLIC_URL origin when set to something else than localhost */
   publicUrl?: string | null;
+  /** Absolute origin that serves /d/<key> when it is not the admin's own (Marco Cloud) */
+  displayOrigin?: string;
 }
 
 export interface PairedDevice {
@@ -236,6 +283,40 @@ export interface PairClaimRequest {
   code: string;
   screenId: string;
   name?: string;
+  /** Second step: pair now. Without it the server only answers `confirm` (which display is waiting). */
+  confirm?: boolean;
+}
+
+/** First step of POST /api/admin/pair/claim: the display that shows this code, for the owner to confirm. */
+export interface PairConfirm {
+  /** Where the waiting display is: its LAN address (self-hosted) or "City, Country" (Marco Cloud); '' = unknown. */
+  where: string;
+  screenId: string;
+  screenName: string;
+}
+
+/** POST /api/admin/pair/claim: `confirm` without `confirm: true` in the request, else `device`. */
+export interface PairClaimResponse {
+  confirm?: PairConfirm;
+  device?: PairedDevice;
+}
+
+/** GET /api/admin/geocode?q=&lang= (Open-Meteo geocoding through the server). */
+export interface GeocodeResult {
+  name: string;
+  /** region / state; '' when unknown */
+  admin1: string;
+  country: string;
+  /** ISO 3166-1 alpha-2, upper case; '' when unknown */
+  countryCode: string;
+  lat: number;
+  lon: number;
+  /** IANA time zone; '' when unknown */
+  timezone: string;
+}
+
+export interface GeocodeResponse {
+  results: GeocodeResult[];
 }
 
 /**
@@ -323,10 +404,10 @@ export interface EventsResponse {
 
 export interface WeatherCurrent {
   temp: number;
-  feelsLike: number;
-  humidity: number;
-  windKmh: number;
-  windDir: number; // degrees
+  feelsLike: number | null;
+  humidity: number | null;
+  windKmh: number | null;
+  windDir: number | null; // degrees
   windDirLabel: string;
   code: number; // WMO
   isDay: boolean;
@@ -336,11 +417,11 @@ export interface WeatherCurrent {
 }
 
 export interface WeatherToday {
-  sunrise: string;
-  sunset: string;
+  sunrise: string | null;
+  sunset: string | null;
   min: number;
   max: number;
-  precipChance: number;
+  precipChance: number | null;
 }
 
 export interface WeatherDaily {
@@ -348,18 +429,36 @@ export interface WeatherDaily {
   code: number;
   min: number;
   max: number;
-  precipChance: number;
-  windKmh: number;
+  precipChance: number | null;
+  windKmh: number | null;
 }
 
 export interface WeatherHourly {
   time: string;
   temp: number;
   code: number;
-  precipChance: number;
+  precipChance: number | null;
   isDay: boolean;
 }
 
+/** Where the weather comes from: the display shows `name` (and `modelName`) small, as the licences ask. */
+export interface WeatherSource {
+  provider: Exclude<WeatherProvider, 'homeassistant'>;
+  name: string;
+  model: OpenMeteoModel | null;
+  modelName: string | null;
+  url: string;
+  /** e.g. 'CC BY 4.0'; empty when the provider names none */
+  licence: string;
+  licenceUrl: string;
+  /** another source on top (current conditions from Home Assistant) */
+  also?: string;
+}
+
+/**
+ * Fields a source does not have are null (MET Norway has no precipitation probability outside the Nordics,
+ * some Open-Meteo models have no UV index): the display leaves them out.
+ */
 export interface WeatherResponse {
   updatedAt: string;
   locationName: string;
@@ -368,6 +467,17 @@ export interface WeatherResponse {
   daily: WeatherDaily[];
   hourly: WeatherHourly[];
   indoor: { temp: number | null; humidity: number | null } | null;
+  /** since 0.5; missing from older servers (then it is Open-Meteo) */
+  source?: WeatherSource;
+}
+
+/** GET /api/admin/weather/key: the key itself is never sent back. */
+export interface WeatherKeyStatus {
+  set: boolean;
+  /** last 4 characters of the stored key, to recognise it */
+  hint: string;
+  /** PUT only: the provider accepted the key on a test call (false when that could not be tried) */
+  checked?: boolean;
 }
 
 export interface NewsItem {
@@ -400,12 +510,144 @@ export interface PhotosResponse {
   photos: Photo[];
 }
 
+/** Feature flags in GET /api/health. A self-hosted server turns them all on except googleCalendar and googleLogin
+ *  (on when Google credentials are set), accountMenu and microsoftCalendar. No `features` field at all (older servers) means every
+ *  feature is on except accountMenu; a missing key counts as off only when `edition` is not 'self-hosted'. */
+export interface Features {
+  homeassistant: boolean;
+  news: boolean;
+  customCss: boolean;
+  gallery: boolean;
+  schedules: boolean;
+  announcements: boolean;
+  displayCommands: boolean;
+  openDisplayAccess: boolean;
+  insecureTls: boolean;
+  googleCalendar: boolean;
+  googleLogin: boolean;
+  passwordLogin: boolean;
+  apiTokens: boolean;
+  webhooks: boolean;
+  backups: boolean;
+  importExport: boolean;
+  includeSecrets: boolean;
+  activity: boolean;
+  setupWizard: boolean;
+  status: boolean;
+  accountMenu: boolean;
+  /** Outlook.com, Hotmail and Microsoft 365 calendars (read only, Microsoft Graph). Off unless the server says so. */
+  microsoftCalendar: boolean;
+  /** Update banner, settings and the update button (self-hosted only; absent on older servers = off). */
+  updates: boolean;
+}
+
+export type FeatureName = keyof Features;
+
+/** Plan limits in GET /api/health. Absent (self-hosted) = no limit. */
+export interface Limits {
+  screens?: number;
+  sources?: number;
+  devices?: number;
+  photos?: number;
+  /** bytes per photo */
+  photoBytes?: number;
+  /** bytes for all photos together */
+  totalPhotoBytes?: number;
+  newsFeeds?: number;
+  apiTokens?: number;
+  backups?: number;
+  /** webhook commands per day */
+  hookCommandsPerDay?: number;
+  /** bytes of custom CSS per screen */
+  customCssBytes?: number;
+  /** list caps; absent = the config validator's own caps (web/admin/caps.ts BUILTIN_LIMITS) */
+  localEvents?: number;
+  birthdays?: number;
+  countdowns?: number;
+}
+
 export interface HealthResponse {
   ok: boolean;
-  uptime: number;
+  /** seconds since the server started; null where there is no long-running process */
+  uptime: number | null;
   version: string;
-  /** How displays get live updates: 'sse' = /api/stream, 'poll' = config revision poll. Absent (old servers) = 'sse'. */
+  /**
+   * How displays get live updates: 'sse' = /api/stream, 'poll' = GET /api/display/poll (the display falls back to a
+   * config revision poll when that answers 404). Absent (old servers) = 'sse'.
+   */
   live?: 'sse' | 'poll';
+  /** Absent on servers older than 0.5.0. */
+  edition?: 'self-hosted' | 'cloud';
+  tenancy?: 'single' | 'multi';
+  runtime?: 'node' | 'workers';
+  /** Characters in a pairing code shown on a TV (6 when absent). */
+  pairCodeLength?: number;
+  features?: Partial<Features>;
+  limits?: Limits;
+  /** Absolute origin that serves the display pages (/d/<key>, /pair). Absent = same origin as the admin. */
+  displayOrigin?: string;
+  /** Absolute origin of the admin, for a display served from another origin. Absent = same origin as the display. */
+  adminOrigin?: string;
+  /** This server's LAN addresses; only sent to a client on the server itself (a kiosk on http://localhost). */
+  lanAddresses?: string[];
+}
+
+// ---- Updates (self-hosted, features.updates) ----
+
+/** How the server was installed: what the admin offers to update it (server/updates.js detectInstall). */
+export interface UpdateInstall {
+  kind: 'release' | 'checkout' | 'docker' | 'manual';
+  /** The update button works (install.sh release install with the marco-update units). */
+  canApply: boolean;
+  /** The `marco` command manages this install. */
+  cli: boolean;
+}
+
+export interface UpdateRelease {
+  version: string;
+  name: string;
+  /** Markdown from the CHANGELOG section of that version */
+  notes: string;
+  url: string | null;
+  publishedAt: string | null;
+}
+
+export interface UpdateSettings {
+  /** Check for a new version once a day */
+  check: boolean;
+  /** Install it on its own inside the window (release installs) */
+  auto: boolean;
+  /** HH:MM, server time zone (Date & time) */
+  from: string;
+  to: string;
+}
+
+export interface UpdateStatus {
+  state: 'requested' | 'running' | 'done' | 'current' | 'failed';
+  from: string;
+  to: string;
+  target: string;
+  by: 'admin' | 'auto';
+  at: string | null;
+  rolledBack: boolean;
+  /** Requested, but no update service picked it up */
+  stalled: boolean;
+}
+
+/** GET /api/admin/update */
+export interface UpdateInfo {
+  current: string;
+  latest: UpdateRelease | null;
+  available: boolean;
+  checkedAt: string | null;
+  error: 'network' | 'http' | 'rate_limited' | 'bad_response' | null;
+  /** 'env-off' = MARCO_UPDATE_CHECK=0 on the server */
+  checks: 'on' | 'off' | 'env-off';
+  install: UpdateInstall;
+  settings: UpdateSettings;
+  status: UpdateStatus | null;
+  /** Last lines of the installer's output for the last update */
+  log: string[];
 }
 
 /** SSE /api/stream?screen=&client= event payloads (docs/ARCHITECTURE.md) */
@@ -426,7 +668,21 @@ export interface AuthUser {
   email: string;
   name: string;
   picture?: string;
-  method: 'password' | 'google';
+  method: 'password' | 'google' | 'account';
+}
+
+/** Marco Cloud: where the account pages live and which household the admin edits. */
+export interface AccountInfo {
+  loginUrl: string;
+  accountUrl: string;
+  sessionsUrl: string;
+  deleteUrl: string;
+  household: HouseholdInfo;
+}
+
+export interface HouseholdInfo {
+  name: string;
+  role: 'owner' | 'member';
 }
 
 export interface AuthMeResponse {
@@ -439,6 +695,10 @@ export interface AuthMeResponse {
   needsSetup?: boolean;
   /** The initial password came from ADMIN_PASSWORD (headless install): the panel offers to change it. */
   passwordFromEnv?: boolean;
+  /** Only when user.method is 'account' (Marco Cloud). */
+  account?: AccountInfo;
+  /** Marco Cloud: the admin shows the Microsoft accounts card when it is true (Microsoft calendars on for this account). */
+  microsoftConfigured?: boolean;
 }
 
 /** GET /api/setup/status */
@@ -496,6 +756,21 @@ export interface GoogleCalendarListItem {
   summary: string;
   backgroundColor?: string;
   primary?: boolean;
+}
+
+export interface MicrosoftAccount {
+  email: string;
+}
+
+export interface MicrosoftCalendarListItem {
+  id: string;
+  name: string;
+  /** #rrggbb, when the calendar has a colour */
+  color?: string;
+  /** the account's default calendar */
+  isDefault?: boolean;
+  /** owner address when the calendar is shared with the account by someone else */
+  owner?: string;
 }
 
 export interface TestIcsResponse {
@@ -572,12 +847,15 @@ export interface SourceStatus {
   error?: string | null;
 }
 
+export type WeatherErrorCode = 'key_missing' | 'key_invalid' | 'rate_limited' | 'http' | 'bad_response';
+
 export interface AdminStatus {
   sources: SourceStatus[];
-  weather: { ok: boolean; updatedAt: string | null };
+  weather: { ok: boolean; updatedAt: string | null; error?: string | null; errorCode?: WeatherErrorCode | null; provider?: WeatherProvider | null };
   news: { ok: boolean; updatedAt: string | null; count?: number; error?: string | null };
   displays: number;
-  uptime: number;
+  /** seconds; null where there is no long-running process (Marco Cloud) */
+  uptime: number | null;
 }
 
 // =================================================================================================
@@ -768,6 +1046,10 @@ export interface StoredConfig {
   security: SecurityConfig;
 }
 
+/** PUT /api/admin/config body: the whole config plus the revision the admin loaded it at. A stale `baseRevision`
+ *  gets 409 {error:'conflict', revision}; without it the last write wins. */
+export type SaveConfigRequest = StoredConfig & { baseRevision?: number };
+
 export interface ValidationError {
   path: string;
   message: string;
@@ -920,6 +1202,41 @@ export interface StreamHello {
   activeAnnouncementIds: string[];
 }
 
+/**
+ * A live command for one display, as GET /api/display/poll returns it. Names and payloads are the SSE event names
+ * and payloads (StreamEvent), so one dispatcher (web/display/live.ts) serves both transports.
+ */
+export type DisplayCommand =
+  | { type: 'reload' }
+  | { type: 'night'; mode: NightCommand }
+  | ({ type: 'identify' } & IdentifyPayload)
+  | ({ type: 'announce' } & Announcement)
+  | { type: 'announce-clear'; id: string | null }
+  | { type: 'photos'; hidden?: string[] }
+  /** self-hosted only: calendar data changed */
+  | { type: 'events'; hash: string };
+
+/** GET /api/display/poll?client=&cursor=&rev=&hidden=&preview= (docs/API.md) */
+export interface PollResponse {
+  /** config revision; a different one makes the display refetch its config, events and countdowns */
+  revision: number;
+  /** screen bound to this display now; a different one (device moved) reloads the page */
+  screenId: string;
+  /** server ISO time (clock offset for announcement expiry) */
+  now: string;
+  serverVersion: string;
+  /** opaque; send it back on the next poll */
+  cursor: string;
+  /** true on the first poll or after an unknown cursor: `commands` only replays the active announcements */
+  reset: boolean;
+  /** in order, already filtered to this display */
+  commands: DisplayCommand[];
+  /** present on a reset and whenever `commands` holds announce or announce-clear */
+  activeAnnouncementIds?: string[];
+  /** ms until the next poll, chosen by the server */
+  next: number;
+}
+
 export interface IdentifyPayload {
   name: string;
   slug: string;
@@ -1001,6 +1318,8 @@ export interface BackupInfo {
 export interface ExportSecrets {
   passwordHash?: string;
   homeassistant?: { token?: string };
+  /** API key of a weather source that needs one (Pirate Weather) */
+  weather?: { apiKey?: string };
   google?: { accounts: Record<string, unknown> };
   apiTokens?: unknown[];
 }
@@ -1031,6 +1350,29 @@ export interface ImportPreview {
   /** enabled scheduled messages that a partial import would leave without target screens (they get disabled) */
   orphanSchedules: { screensOnly: string[]; schedulesOnly: string[] };
   counts: { localEvents: number; birthdays: number; eventRules: number; countdowns: number; schedules: number };
+  /** Marco Cloud: settings this server does not offer, left out of the import (absent on self-hosted servers). */
+  notes?: ImportNote[];
+  /** Marco Cloud: sections that go over a plan limit; importing one of them is refused (400 limit_exceeded). */
+  overLimit?: { section: string; path: string; max: number }[];
+}
+
+/**
+ * Something an import leaves out on this server, and why:
+ *   secrets            the file has secrets (they are not imported here)
+ *   homeassistant      Home Assistant (and its weather) cannot be reached
+ *   signIn             admin password and Google sign-in (the account signs in instead)
+ *   openDisplayAccess  open display access (screens use private links and pairing)
+ *   insecureTls        calendars imported with certificate checks on (items)
+ *   google             Google calendars of accounts not connected here (items)
+ *   microsoft          Microsoft calendars of accounts not connected here, or on a server without them (items)
+ *   blockedUrl         calendars and feeds on an address this server cannot fetch (items)
+ *   refreshMin         calendars refreshed every 30 minutes at most (items)
+ *   news               news feeds, while this server offers no news
+ *   photos             screens show the gallery: photos are not in the file
+ */
+export interface ImportNote {
+  code: 'secrets' | 'homeassistant' | 'signIn' | 'openDisplayAccess' | 'insecureTls' | 'google' | 'microsoft' | 'blockedUrl' | 'refreshMin' | 'news' | 'photos';
+  items?: string[];
 }
 
 export interface ImportApplyRequest {
@@ -1050,6 +1392,8 @@ export type ActivityType =
   | 'auth.setup_rejected'
   | 'google.connected'
   | 'google.removed'
+  | 'microsoft.connected'
+  | 'microsoft.removed'
   | 'config.saved'
   | 'config.restored'
   | 'config.imported'
@@ -1072,7 +1416,11 @@ export type ActivityType =
   | 'display.pair_failed'
   | 'display.device_updated'
   | 'display.device_revoked'
-  | 'activity.cleared';
+  | 'activity.cleared'
+  | 'update.requested'
+  | 'update.finished'
+  | 'update.failed'
+  | 'update.settings';
 
 export interface ActivityEntry {
   id: string; // sortable (time-based)
@@ -1093,16 +1441,18 @@ export interface ActivityResponse {
 
 export interface DashboardResponse {
   version: string;
-  uptime: number;
+  /** seconds; null where there is no long-running process (Marco Cloud) */
+  uptime: number | null;
   revision: number;
   screens: { id: string; slug: string; name: string; isDefault: boolean; displaysOnline: number }[];
   displays: DisplayInfo[];
   nextEvents: CalEvent[];
   sources: SourceStatus[];
-  weather: (WeatherCurrent & { locationName: string; updatedAt: string; min: number; max: number }) | null;
+  /** `source` since 0.5 (Marco Cloud copies the dashboard shape, so it may be missing) */
+  weather: (WeatherCurrent & { locationName: string; updatedAt: string; min: number; max: number; source?: WeatherSource }) | null;
   announcements: Announcement[];
   schedulesNow: { id: string; title: string; emoji: string; screenIds: string[]; until: string }[];
   activity: ActivityEntry[];
-  /** codes: default_password | source_errors | no_displays | outdated_displays | google_auth_failed */
+  /** codes: default_password | source_errors | no_displays | outdated_displays | google_auth_failed | microsoft_auth_failed */
   warnings: string[];
 }

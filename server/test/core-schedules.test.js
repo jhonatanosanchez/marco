@@ -1,8 +1,8 @@
 // scheduled messages algorithm (docs/ARCHITECTURE.md), Europe/Lisbon.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { scheduleState, schedulesNow, dayOk, localInstant } from '../schedules.js';
-import { defaultConfig } from '../defaults.js';
+import { scheduleState, schedulesNow, dayOk, localInstant } from '../core/schedules.js';
+import { defaultConfig } from '../core/defaults.js';
 
 const TZ = 'Europe/Lisbon';
 const msg = (o) => ({ id: 'm_1', enabled: true, title: '🗑️ Sacar la basura', body: '', emoji: '🗑️', style: 'info', days: [], from: '20:00', to: '22:00', startDate: null, endDate: null, screenIds: [], sound: false, ...o });

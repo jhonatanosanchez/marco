@@ -3,7 +3,8 @@
 //
 //   display:  POST /api/pair/start   → { sessionId, code, expiresAt, pollMs }      (unauthenticated, rate-limited)
 //             POST /api/pair/status  { sessionId } → waiting | paired (+ token, once) | expired
-//   admin:    POST /api/admin/pair/claim { code, screenId, name? } → { device }
+//   admin:    POST /api/admin/pair/claim { code, screenId, name? }                → { confirm: { where, … } }
+//             POST /api/admin/pair/claim { code, screenId, name?, confirm: true } → { device }
 //
 // The code is only a rendezvous label shown on the screen: it never returns the token. The token is handed out
 // only to whoever polls with the session id (256 random bits) that /start returned to that display, so somebody
@@ -16,9 +17,10 @@ import { ipBucket } from './lib/net.js';
 import { createDevice } from './displayAccess.js';
 import { getConfig } from './store.js';
 import { logActivityThrottled } from './activity.js';
+import { CODE_LENGTH, randomCode, normalizeCode } from './core/pairCore.js';
 
-export const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
-export const CODE_LENGTH = 6;
+export { CODE_ALPHABET, CODE_LENGTH, normalizeCode } from './core/pairCore.js';
+
 export const PAIR_TTL_MS = 10 * 60_000;
 export const POLL_MS = 2000;
 /** A claim only succeeds while the display polled within this window (it is really there, waiting). */
@@ -38,25 +40,6 @@ const sessions = new Map(); // sha256(sessionId) hex → PairingSession
 const startHits = new Map(); // ip bucket → number[] (ms)
 const claimFails = new Map(); // `${session}|${ip bucket}` → number[] (ms)
 let globalFails = []; // ms
-
-function randomCode() {
-  // Rejection sampling: unbiased over the 31-symbol alphabet.
-  let out = '';
-  while (out.length < CODE_LENGTH) {
-    for (const b of crypto.randomBytes(16)) {
-      if (b < 248 && out.length < CODE_LENGTH) out += CODE_ALPHABET[b % 31];
-    }
-  }
-  return out;
-}
-
-/** "abc-234" / "ABC 234" → "ABC234"; null when it cannot be a code. */
-export function normalizeCode(v) {
-  const s = typeof v === 'string' ? v.toUpperCase().replace(/[\s-]+/g, '') : '';
-  if (s.length !== CODE_LENGTH) return null;
-  for (const ch of s) if (!CODE_ALPHABET.includes(ch)) return null;
-  return s;
-}
 
 function prune(now = Date.now()) {
   for (const [k, s] of sessions) {
@@ -79,7 +62,7 @@ export function startPairing(req, now = Date.now()) {
   startHits.set(bucket, hits);
   const live = new Set([...sessions.values()].map((s) => s.code));
   let code;
-  do code = randomCode(); while (live.has(code));
+  do code = randomCode(CODE_LENGTH); while (live.has(code));
   const sessionId = crypto.randomBytes(32).toString('base64url');
   sessions.set(shaHex(sessionId), {
     code, codeHash: sha(code), createdAt: now, expiresAt: now + PAIR_TTL_MS, lastPollAt: now, state: 'waiting',
@@ -109,8 +92,19 @@ function rateKey(req) {
   return `${sid}|${ipBucket(req.ip)}`;
 }
 
+/** The waiting display's address as the owner would recognise it ("192.168.1.50"; "" when unknown). */
+export function displayAddress(ip) {
+  const a = String(ip || '').replace(/^::ffff:/i, '').trim();
+  if (!a) return '';
+  if (a === '::1' || a.startsWith('127.')) return 'localhost';
+  return a.slice(0, 64);
+}
+
 /**
- * Admin claims a code for a screen. Returns { device } or { error, status, code }.
+ * Admin claims a code for a screen, in two steps (the same contract as Marco Cloud):
+ *   { code, screenId, name? }                → { confirm: { where, screenId, screenName } }
+ *   { code, screenId, name?, confirm: true } → { device }
+ * Errors: { error, status, code }.
  * Wrong codes count against the per-admin (session + address) and the global limits; once either is reached every
  * claim answers 429 until the window passes (also for a right code: no oracle while locked).
  */
@@ -140,6 +134,12 @@ export function claimPairing(req, body, now = Date.now()) {
     logActivityThrottled('display.pair_failed', rk, { everyMs: 60_000, perMinute: 10 },
       { req, level: 'warn', data: { reason: code ? 'unknown_code' : 'malformed_code', attempt: mine.length } });
     return { error: 'unknown or expired code: check the code shown on the screen', status: 404, code: 'invalid_code' };
+  }
+  // First step: only say which display is waiting (its address), so the owner confirms a code that came from a
+  // link or a message really belongs to the screen in front of them. Nothing is paired until `confirm: true`.
+  if (body?.confirm !== true) {
+    const screen = getConfig().screens.find((s) => s.id === screenId);
+    return { confirm: { where: displayAddress(hit.ip), screenId, screenName: screen?.name ?? '' } };
   }
   const r = createDevice({ name: body?.name, screenId, ip: hit.ip, userAgent: hit.userAgent }, { req });
   if (r.error) return { error: r.error, status: r.status, code: 'device_error' };

@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'preact/hooks';
 import { slugify, SLUG_RE } from '../../shared/screens';
-import type { DisplayInfo, DisplayLinksResponse, ScreenProfile } from '../../shared/types';
+import type { DisplayInfo, ScreenProfile } from '../../shared/types';
 import { api, ApiError } from '../api';
 import { openPairDialog, shareOrigin } from '../components/DisplayAccess';
 import { confirmDialog, toast } from '../components/feedback';
 import { Icon } from '../components/icons';
 import { Button, Callout, Card, Field, Modal, PageHeader, ReorderButtons, Select, TextInput } from '../components/ui';
+import { atLimit, limit } from '../caps';
+import { screenHref, useDisplayLinks } from '../displayLinks';
+import { LimitNote } from '../components/LimitNote';
 import { t } from '../i18n';
 import { takeIntent } from '../intent';
 import { clone, moveItem, uid } from '../util';
+import { withPollNote } from '../liveNote';
 import type { SectionProps } from './common';
 
-const PRESET_LABEL: Record<string, string> = { bigCalendar: 'Calendario grande', leftRight: 'Izquierda / derecha', topBottom: 'Arriba / abajo', bigTime: 'Reloj grande', agenda: 'Agenda' };
+const PRESET_LABEL: Record<string, string> = { bigCalendar: 'Calendario grande', leftRight: 'Izquierda / derecha', topBottom: 'Arriba / abajo', bigTime: 'Reloj grande', agenda: 'Agenda', today: 'Hoy', people: 'Por persona', photoFrame: 'Marco de fotos', twoWeeks: 'Dos semanas', board: 'Tablero', bedside: 'Mesilla' };
 
 function uniqueSlug(base: string, taken: Set<string>) {
   let s = slugify(base) || 'pantalla';
@@ -99,14 +103,8 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
   // Private mode (default): a device opens its screen's private link or is paired; ?screen= only works in open mode
   // (and in this admin's own previews).
   const openMode = saved.security?.displayAccess === 'open';
-  const [links, setLinks] = useState<DisplayLinksResponse | null>(null);
-  useEffect(() => {
-    if (openMode) return;
-    api
-      .displayLinks()
-      .then(setLinks)
-      .catch(() => {});
-  }, [openMode, saved.revision]);
+  const linkState = useDisplayLinks(saved);
+  const links = linkState.data;
   const screens = full.screens;
   const taken = (exceptId: string) => new Set(screens.filter((s) => s.id !== exceptId).map((s) => s.slug));
   const upd = (id: string, fn: (s: ScreenProfile) => void) =>
@@ -119,7 +117,7 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
   const linkOf = (id: string) => links?.links.find((l) => l.screenId === id);
 
   const duplicate = (s: ScreenProfile) => {
-    if (screens.length >= 12) return toast(t('Máximo 12 pantallas'), 'error');
+    if (atLimit('screens', screens.length)) return toast(t('Máximo {n} pantallas', { n: limit('screens') ?? screens.length }), 'error');
     const p = clone(s);
     p.id = uid('s');
     p.name = t('{name} (copia)', { name: s.name }).slice(0, 60);
@@ -181,7 +179,7 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
   const reload = async (s: ScreenProfile) => {
     try {
       await api.refreshDisplays([s.id]);
-      toast(t('Recargando {name}…', { name: s.name }), 'info');
+      toast(withPollNote(t('Recargando {name}…', { name: s.name })), 'info');
     } catch (e) {
       toast((e as ApiError).message, 'error');
     }
@@ -194,10 +192,11 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
             ? t('Cada pantalla (salón, cocina, entrada…) tiene su propio diseño y widgets. Abre /?screen=<dirección> en cada dispositivo.')
             : t('Cada pantalla (salón, cocina, entrada…) tiene su propio diseño y widgets. Cada dispositivo abre el enlace privado de su pantalla o se vincula con un código.')
         }>
-        <Button variant="primary" icon="plus" disabled={screens.length >= 12} onClick={() => setCreating(true)}>
+        <Button variant="primary" icon="plus" disabled={atLimit('screens', screens.length)} onClick={() => setCreating(true)}>
           {t('Nueva pantalla')}
         </Button>
       </PageHeader>
+      <LimitNote name="screens" count={screens.length} />
       <div class="screen-cards" id="scr-list">
         {screens.map((s, i) => {
           const isDefault = s.id === full.defaultScreen;
@@ -233,29 +232,41 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
                   )}
                   {isNew && <span class="badge badge--soft">{t('Nueva')}</span>}
                 </div>
-                <div class="screen-card__slug">
-                  <TextInput
-                    mono
-                    class="input--sm"
-                    value={s.slug}
-                    error={!slugOk}
-                    prefix={<span class="mono small">?screen=</span>}
-                    onValue={(v) => upd(s.id, (x) => void (x.slug = v.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 32)))}
-                  />
-                  <button type="button" class="icon-btn" title={t('Generar desde el nombre')} onClick={() => upd(s.id, (x) => void (x.slug = uniqueSlug(x.name, taken(s.id))))}>
-                    <Icon name="wand" size={15} />
-                  </button>
-                  <button
-                    type="button"
-                    class="icon-btn"
-                    title={openMode ? t('Copiar URL') : url ? t('Copiar enlace privado') : t('Guarda la pantalla para obtener su enlace privado.')}
-                    disabled={!url}
-                    onClick={() => copy(url)}
-                  >
-                    <Icon name="copy" size={15} />
-                  </button>
-                </div>
-                {!slugOk && <div class="field__error">{t('Solo minúsculas, números y guiones; no puede repetirse')}</div>}
+                {openMode ? (
+                  <div class="screen-card__slug">
+                    <TextInput
+                      mono
+                      class="input--sm"
+                      value={s.slug}
+                      error={!slugOk}
+                      prefix={<span class="mono small">?screen=</span>}
+                      onValue={(v) => upd(s.id, (x) => void (x.slug = v.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 32)))}
+                    />
+                    <button type="button" class="icon-btn" title={t('Generar desde el nombre')} onClick={() => upd(s.id, (x) => void (x.slug = uniqueSlug(x.name, taken(s.id))))}>
+                      <Icon name="wand" size={15} />
+                    </button>
+                    <button type="button" class="icon-btn" title={t('Copiar URL')} onClick={() => copy(url)}>
+                      <Icon name="copy" size={15} />
+                    </button>
+                  </div>
+                ) : (
+                  // Private links: the screen's own link, read only, ready to copy (the slug does not open anything here)
+                  <div class="screen-card__slug screen-card__link">
+                    <input
+                      class="input input--mono input--sm"
+                      value={url}
+                      readOnly
+                      spellcheck={false}
+                      aria-label={t('Enlace privado')}
+                      placeholder={isNew ? t('Guarda la pantalla para obtener su enlace privado.') : t('Cargando el enlace…')}
+                      onFocus={(e) => e.currentTarget.select()}
+                    />
+                    <button type="button" class="btn btn--sm btn--ghost" title={url ? t('Copiar enlace privado') : t('Guarda la pantalla para obtener su enlace privado.')} disabled={!url} onClick={() => copy(url)}>
+                      <Icon name="copy" size={15} /> {t('Copiar')}
+                    </button>
+                  </div>
+                )}
+                {openMode && !slugOk && <div class="field__error">{t('Solo minúsculas, números y guiones; no puede repetirse')}</div>}
                 {openMode && slugChanged && slugOk && <div class="field__hint warn-text">{t('Las pantallas que usan ?screen={old} mostrarán la predeterminada hasta que cambies su URL.', { old: savedSlug! })}</div>}
                 <div class="screen-card__meta">
                   <span>
@@ -280,13 +291,15 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
                   >
                     {s.id === screenId ? t('Editando') : t('Editar')}
                   </Button>
-                  <Button size="sm" variant="ghost" icon="copy" onClick={() => duplicate(s)}>
+                  <Button size="sm" variant="ghost" icon="copy" disabled={atLimit('screens', screens.length)} onClick={() => duplicate(s)}>
                     {t('Duplicar')}
                   </Button>
-                  <a class="btn btn--ghost btn--sm" href={`/?screen=${encodeURIComponent(savedSlug ?? '')}`} target="_blank" rel="noopener">
-                    <Icon name="external" size={15} />
-                    <span>{t('Abrir')}</span>
-                  </a>
+                  {screenHref(saved, s.id, linkState) && (
+                    <a class="btn btn--ghost btn--sm" href={screenHref(saved, s.id, linkState)!} target="_blank" rel="noopener">
+                      <Icon name="external" size={15} />
+                      <span>{t('Abrir')}</span>
+                    </a>
+                  )}
                   {on > 0 && (
                     <Button size="sm" variant="ghost" icon="refresh" onClick={() => reload(s)}>
                       {t('Recargar')}
@@ -357,7 +370,7 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
           screens={screens}
           onClose={() => setCreating(false)}
           onCreate={(p) => {
-            if (screens.length >= 12) return toast(t('Máximo 12 pantallas'), 'error');
+            if (atLimit('screens', screens.length)) return toast(t('Máximo {n} pantallas', { n: limit('screens') ?? screens.length }), 'error');
             setFull((d) => void d.screens.push(p));
             setScreenId(p.id);
             setCreating(false);

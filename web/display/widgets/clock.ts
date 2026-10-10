@@ -16,7 +16,8 @@ export class Clock {
   /** epoch second of the previous update: digit animations only run on a normal 1 s step */
   private lastSec = 0;
 
-  constructor(private root: HTMLElement) {
+  /** @param opts.seconds force the seconds on / off (layouts with a small or a bedside clock); default: the config */
+  constructor(private root: HTMLElement, private opts: { seconds?: boolean } = {}) {
     root.classList.add('clock-wrap');
     root.innerHTML = `<div class="clock"></div><div class="date"></div>`;
     this.face = root.querySelector('.clock')!;
@@ -24,7 +25,7 @@ export class Clock {
   }
 
   private build(): void {
-    const dt = ctx.cfg.datetime;
+    const dt = { ...ctx.cfg.datetime, showSeconds: this.opts.seconds ?? ctx.cfg.datetime.showSeconds };
     const mode = `${dt.clock}|${dt.showSeconds}|${dt.format24}|${dt.showAmPm}`;
     if (mode === this.mode) return;
     this.mode = mode;
@@ -93,7 +94,7 @@ export class Clock {
       }
       setText(this.ampm, !dt.format24 && dt.showAmPm ? (hour < 12 ? 'AM' : 'PM') : '');
     }
-    setHTML(this.dateEl, esc(formatDateLine(ctx.lang, tick.dayKey, dt.dateFormat)));
+    setHTML(this.dateEl, esc(formatDateLine(ctx.lang, tick.dayKey, dt.dateFormat, dt.dateCustom)));
   }
 
   private setDigit(e: HTMLElement | undefined, ch: string, animate: boolean): void {

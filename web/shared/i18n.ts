@@ -7,6 +7,17 @@ export const LOCALES: Record<Lang, string> = { es: 'es-ES', en: 'en-GB', pt: 'pt
 type Dict = Record<string, string>;
 
 const es: Dict = {
+  // layouts with their own view (web/display/widgets/views.ts)
+  upNext: 'A continuación',
+  nothingMoreToday: 'Nada más por hoy',
+  firstTomorrow: 'Mañana',
+  everyone: 'Todos',
+  birthdays: 'Cumpleaños',
+  agenda: 'Agenda',
+  allDone: 'Todo hecho',
+  noPeople: 'Elige los calendarios de cada persona en Diseño',
+  nothingPlanned: 'Nada previsto',
+  daysWord: 'días',
   today: 'Hoy',
   tomorrow: 'Mañana',
   yesterday: 'Ayer',
@@ -26,6 +37,8 @@ const es: Dict = {
   noEvents: 'Sin eventos',
   noUpcoming: 'Nada en la agenda',
   feelsLike: 'Sensación',
+  hiShort: 'Máx.',
+  loShort: 'Mín.',
   humidity: 'Humedad',
   wind: 'Viento',
   sunrise: 'Amanecer',
@@ -54,6 +67,17 @@ const es: Dict = {
 };
 
 const en: Dict = {
+  // layouts with their own view (web/display/widgets/views.ts)
+  upNext: 'Up next',
+  nothingMoreToday: 'Nothing else today',
+  firstTomorrow: 'Tomorrow',
+  everyone: 'Everyone',
+  birthdays: 'Birthdays',
+  agenda: 'Agenda',
+  allDone: 'All done',
+  noPeople: 'Choose each person’s calendars in Layout',
+  nothingPlanned: 'Nothing planned',
+  daysWord: 'days',
   today: 'Today',
   tomorrow: 'Tomorrow',
   yesterday: 'Yesterday',
@@ -73,6 +97,8 @@ const en: Dict = {
   noEvents: 'No events',
   noUpcoming: 'Nothing scheduled',
   feelsLike: 'Feels like',
+  hiShort: 'H',
+  loShort: 'L',
   humidity: 'Humidity',
   wind: 'Wind',
   sunrise: 'Sunrise',
@@ -101,6 +127,17 @@ const en: Dict = {
 };
 
 const pt: Dict = {
+  // layouts with their own view (web/display/widgets/views.ts)
+  upNext: 'A seguir',
+  nothingMoreToday: 'Mais nada hoje',
+  firstTomorrow: 'Amanhã',
+  everyone: 'Todos',
+  birthdays: 'Aniversários',
+  agenda: 'Agenda',
+  allDone: 'Tudo feito',
+  noPeople: 'Escolha os calendários de cada pessoa em Disposição',
+  nothingPlanned: 'Nada previsto',
+  daysWord: 'dias',
   today: 'Hoje',
   tomorrow: 'Amanhã',
   yesterday: 'Ontem',
@@ -120,6 +157,8 @@ const pt: Dict = {
   noEvents: 'Sem eventos',
   noUpcoming: 'Nada agendado',
   feelsLike: 'Sensação',
+  hiShort: 'Máx.',
+  loShort: 'Mín.',
   humidity: 'Humidade',
   wind: 'Vento',
   sunrise: 'Nascer do sol',
@@ -291,7 +330,29 @@ export function monthName(lang: Lang, month1: number, style: 'long' | 'short' = 
 }
 
 /** Localized long date line, e.g. es weekday_d_month → "viernes, 9 de octubre". */
-export function formatDateLine(lang: Lang, key: string, format: DateFormat = 'weekday_d_month'): string {
+/** Tokens of the custom date pattern, longest first so {dddd} wins over {ddd} and {d}. */
+export const DATE_TOKENS = ['dddd', 'ddd', 'dd', 'd', 'mmmm', 'mmm', 'mm', 'm', 'yyyy', 'yy'] as const;
+
+/** Custom date line: {dddd} Saturday, {ddd} Sat, {d} 7, {dd} 07, {mmmm} March, {mmm} Mar, {m} 3, {mm} 03, {yyyy} 2026, {yy} 26. */
+export function formatDatePattern(lang: Lang, key: string, pattern: string): string {
+  const d = keyToUTC(key);
+  const val: Record<string, () => string> = {
+    dddd: () => capitalize(fmt(lang, { weekday: 'long', timeZone: 'UTC' }).format(d)),
+    ddd: () => capitalize(fmt(lang, { weekday: 'short', timeZone: 'UTC' }).format(d).replace(/\.$/, '')),
+    d: () => String(d.getUTCDate()),
+    dd: () => key.slice(8, 10),
+    mmmm: () => { const m = fmt(lang, { month: 'long', timeZone: 'UTC' }).format(d); return lang === 'en' ? capitalize(m) : m; },
+    mmm: () => { const m = fmt(lang, { month: 'short', timeZone: 'UTC' }).format(d).replace(/\.$/, ''); return lang === 'en' ? capitalize(m) : m; },
+    m: () => String(d.getUTCMonth() + 1),
+    mm: () => key.slice(5, 7),
+    yyyy: () => key.slice(0, 4),
+    yy: () => key.slice(2, 4),
+  };
+  return pattern.replace(/\{(dddd|ddd|dd|d|mmmm|mmm|mm|m|yyyy|yy)\}/gi, (_, t: string) => val[t.toLowerCase()]());
+}
+
+export function formatDateLine(lang: Lang, key: string, format: DateFormat = 'weekday_d_month', custom = ''): string {
+  if (format === 'custom' && custom.trim()) return formatDatePattern(lang, key, custom.trim());
   const d = keyToUTC(key);
   const wd = fmt(lang, { weekday: 'long', timeZone: 'UTC' }).format(d);
   const mo = fmt(lang, { month: 'long', timeZone: 'UTC' }).format(d);
@@ -302,6 +363,14 @@ export function formatDateLine(lang: Lang, key: string, format: DateFormat = 'we
       return lang === 'en' ? `${W}, ${capitalize(mo)} ${day}` : `${W}, ${mo} ${day}`;
     case 'weekday_d_dot_month':
       return `${W} ${day}. ${lang === 'en' ? capitalize(mo) : mo}`;
+    case 'weekday_month_d_y':
+      return `${W}, ${lang === 'en' ? capitalize(mo) : mo} ${day}, ${d.getUTCFullYear()}`;
+    case 'weekday_mdy':
+      return `${W}, ${key.slice(5, 7)}/${key.slice(8, 10)}/${key.slice(0, 4)}`;
+    case 'weekday_dmy':
+      return `${W}, ${key.slice(8, 10)}/${key.slice(5, 7)}/${key.slice(0, 4)}`;
+    case 'weekday_iso':
+      return `${W}, ${key.slice(0, 10)}`;
     case 'weekday_d_month':
     default:
       if (lang === 'en') return `${W}, ${day} ${capitalize(mo)}`;

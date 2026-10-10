@@ -1,15 +1,55 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import type { BackupInfo, ImportPreview } from '../../shared/types';
+import type { AdminPhoto, BackupInfo, ImportNote, ImportPreview } from '../../shared/types';
 import { api, ApiError, downloadJson } from '../api';
 import { confirmDialog, toast } from '../components/feedback';
 import { Icon } from '../components/icons';
 import { Button, Callout, Card, Empty, PageHeader, Toggle } from '../components/ui';
 import { fmtDateTime } from '../dates';
 import { relTime, nScreens, t } from '../i18n';
+import { has, isSelfHosted } from '../caps';
 import { takeIntent } from '../intent';
 import { sectionLabel } from '../activityText';
 import { formatBytes } from '../util';
+import { uniqueNames, zipParts, ZIP_MAX_BYTES } from '../zip';
 import type { SectionProps } from './common';
+
+/** What an import leaves out on this server (ImportPreview.notes, Marco Cloud), in words. */
+export function importNoteText(n: ImportNote): string {
+  const list = (n.items ?? []).join(', ');
+  switch (n.code) {
+    case 'secrets':
+      return t('La copia trae secretos (contraseña, tokens, enlaces privados, dispositivos vinculados). Aquí no se importan: los enlaces y dispositivos de tus pantallas siguen como están.');
+    case 'homeassistant':
+      return t('Home Assistant no se importa: Marco Cloud no puede conectarse a tu red de casa. El tiempo se toma de Open-Meteo.');
+    case 'signIn':
+      return t('La contraseña del panel y el inicio de sesión con Google no se importan: aquí entras con tu cuenta de Marco.');
+    case 'openDisplayAccess':
+      return t('El acceso abierto a las pantallas no se importa: aquí cada pantalla usa su enlace privado o un dispositivo vinculado.');
+    case 'insecureTls':
+      return t('Se importan con la comprobación de certificados activada: {list}.', { list });
+    case 'google':
+      return t('Calendarios de Google de cuentas que no están conectadas aquí, no se importan: {list}. Conecta la cuenta en Calendarios y vuelve a añadirlos.', { list });
+    case 'microsoft':
+      return t('Calendarios de Microsoft de cuentas que no están conectadas aquí, no se importan: {list}. Conecta la cuenta en Calendarios y vuelve a añadirlos.', { list });
+    case 'blockedUrl':
+      return t('No se importan porque su dirección no es accesible desde Internet (red local o nombre interno): {list}.', { list });
+    case 'refreshMin':
+      return t('Se actualizarán cada 30 minutos, el mínimo aquí: {list}.', { list });
+    case 'news':
+      return t('Las fuentes de noticias no se importan: este servidor no ofrece noticias.');
+    case 'photos':
+      return t('Las fotos de la galería no van en la copia: súbelas en Fotos.');
+    default:
+      return list;
+  }
+}
+
+/** File name for a downloaded backup (self-hosted ids are file names already). */
+function backupFileName(b: BackupInfo): string {
+  if (b.id.endsWith('.json')) return b.id;
+  const stamp = b.createdAt.replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  return `config-${stamp}-r${b.revision}-${b.reason}.json`;
+}
 
 const REASON: Record<string, string> = { save: 'Al guardar', manual: 'Manual', restore: 'Antes de restaurar', import: 'Antes de importar', migration: 'Migración v1' };
 
@@ -27,6 +67,10 @@ export function BackupsSection({ dirty, replaceConfig }: SectionProps) {
   const [busy, setBusy] = useState('');
   const [drag, setDrag] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [zipping, setZipping] = useState<{ done: number; total: number } | null>(null);
+  const secretsOn = has('includeSecrets');
+  const backupsOn = has('backups');
+  const transferOn = has('importExport');
 
   const load = async () => {
     try {
@@ -38,17 +82,18 @@ export function BackupsSection({ dirty, replaceConfig }: SectionProps) {
     }
   };
   useEffect(() => {
-    load();
-    if (takeIntent('backups', 'export')) setTimeout(() => doExport(), 200);
-    if (takeIntent('backups', 'backup')) setTimeout(() => createNow(), 200);
+    if (backupsOn) load();
+    if (takeIntent('backups', 'export') && transferOn) setTimeout(() => doExport(), 200);
+    if (takeIntent('backups', 'backup') && backupsOn) setTimeout(() => createNow(), 200);
   }, []);
 
   const doExport = async () => {
     setExporting(true);
     try {
-      const b = await api.exportConfig(secrets);
+      const withSecrets = secretsOn && secrets;
+      const b = await api.exportConfig(withSecrets);
       const day = new Date().toISOString().slice(0, 10);
-      downloadJson(b, `marco-${day}${secrets ? '-secrets' : ''}.json`);
+      downloadJson(b, `marco-${day}${withSecrets ? '-secrets' : ''}.json`);
       toast(t('Copia descargada'));
     } catch (e) {
       toast(`${t('No se pudo exportar')}: ${(e as ApiError).message}`, 'error');
@@ -86,7 +131,8 @@ export function BackupsSection({ dirty, replaceConfig }: SectionProps) {
     try {
       const p = await api.importPreview(data);
       setPreview(p);
-      setSections(p.sections.filter((s) => s.changed).map((s) => s.key));
+      const over = new Set((p.overLimit ?? []).map((o) => o.section));
+      setSections(p.sections.filter((s) => s.changed && !over.has(s.key)).map((s) => s.key));
       setImpSecrets(false);
     } catch (e) {
       toast(`${t('No se pudo analizar')}: ${(e as ApiError).message}`, 'error');
@@ -105,7 +151,7 @@ export function BackupsSection({ dirty, replaceConfig }: SectionProps) {
           <p>{all ? t('Se reemplazará toda la configuración actual.') : t('Se reemplazarán: {list}.', { list: sections.map(sectionLabel).join(', ') })}</p>
           <p class="muted small">{t('Antes se guarda una copia automática de la configuración actual.')}</p>
           {dirty && <p class="err-text">{t('Perderás los cambios sin guardar.')}</p>}
-          {impSecrets && <p class="err-text">{t('Si la copia trae otra contraseña, se cerrarán todas las sesiones.')}</p>}
+          {secretsOn && impSecrets && <p class="err-text">{t('Si la copia trae otra contraseña, se cerrarán todas las sesiones.')}</p>}
         </>
       ),
       confirm: t('Importar'),
@@ -114,7 +160,7 @@ export function BackupsSection({ dirty, replaceConfig }: SectionProps) {
     if (!ok) return;
     setBusy('apply');
     try {
-      const r = await api.importApply({ bundle, includeSecrets: impSecrets, sections: all ? undefined : sections });
+      const r = await api.importApply({ bundle, includeSecrets: secretsOn && impSecrets, sections: all ? undefined : sections });
       if (r.loggedOut) {
         toast(t('Importado. La contraseña ha cambiado: vuelve a entrar.'), 'info');
         setTimeout(() => location.reload(), 1500);
@@ -169,6 +215,60 @@ export function BackupsSection({ dirty, replaceConfig }: SectionProps) {
     }
   };
 
+  const download = async (b: BackupInfo) => {
+    setBusy(`d-${b.id}`);
+    try {
+      downloadJson(await api.backupFile(b.id), backupFileName(b));
+    } catch (e) {
+      toast((e as ApiError).message, 'error');
+    } finally {
+      setBusy('');
+    }
+  };
+
+  // Every gallery photo in one .zip, built here in the browser (the photos are fetched one by one).
+  const downloadPhotos = async () => {
+    let list: AdminPhoto[];
+    try {
+      list = await api.photos();
+    } catch (e) {
+      return toast((e as ApiError).message, 'error');
+    }
+    if (!list.length) return toast(t('La galería está vacía'), 'info');
+    const total = list.reduce((n, p) => n + (p.size || 0), 0);
+    if (total > ZIP_MAX_BYTES) return toast(t('La galería es demasiado grande para un solo .zip'), 'error');
+    setZipping({ done: 0, total: list.length });
+    const names = uniqueNames(list.map((p) => p.file));
+    const entries = [];
+    let failed = 0;
+    try {
+      for (const [i, p] of list.entries()) {
+        try {
+          const r = await fetch(p.url, { credentials: 'same-origin' });
+          if (!r.ok) throw new Error(String(r.status));
+          entries.push({ name: names[i], data: new Uint8Array(await r.arrayBuffer()), date: p.uploadedAt ? new Date(p.uploadedAt) : undefined });
+        } catch {
+          failed++;
+        }
+        setZipping({ done: i + 1, total: list.length });
+      }
+      const blob = new Blob(zipParts(entries) as BlobPart[], { type: 'application/zip' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `marco-photos-${new Date().toISOString().slice(0, 10)}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
+      if (failed) toast(t('Fotos descargadas · {n} no se pudieron leer', { n: failed }), 'info', 6000);
+      else toast(t('Fotos descargadas'));
+    } catch (e) {
+      toast(`${t('No se pudieron descargar las fotos')}: ${(e as Error).message}`, 'error');
+    } finally {
+      setZipping(null);
+    }
+  };
+
   const diffList = (label: string, d: { added: string[]; removed: string[]; changed: string[] }) =>
     d.added.length + d.removed.length + d.changed.length > 0 && (
       <div class="diff-block">
@@ -191,203 +291,245 @@ export function BackupsSection({ dirty, replaceConfig }: SectionProps) {
     <>
       <PageHeader title={t('Copias de seguridad')} desc={t('Exporta toda la configuración a un archivo, impórtala en otra instalación o vuelve a una versión anterior.')} />
 
-      <Card title={t('Exportar')} icon="download" id="bk-export" desc={t('Pantallas, calendarios, cumpleaños, filtros, avisos programados… en un archivo JSON.')}>
-        <label class="mini-toggle">
-          <Toggle checked={secrets} onChange={setSecrets} />
-          <span>{t('Incluir secretos (contraseña cifrada, token de Home Assistant, cuentas de Google, tokens de API)')}</span>
-        </label>
-        {secrets && <Callout kind="warn">{t('Con secretos, quien tenga el archivo podría acceder a tus calendarios de Google y a Home Assistant. Guárdalo en un lugar seguro.')}</Callout>}
-        <div>
-          <Button variant="primary" icon="download" loading={exporting} onClick={doExport}>
-            {t('Descargar copia')}
-          </Button>
-        </div>
-      </Card>
-
-      <Card title={t('Importar')} icon="upload" id="bk-import">
-        <div
-          class={`dropzone dropzone--sm ${drag ? 'is-drag' : ''}`}
-          onClick={() => fileRef.current?.click()}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDrag(true);
-          }}
-          onDragLeave={() => setDrag(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDrag(false);
-            const f = e.dataTransfer?.files?.[0];
-            if (f) readFile(f);
-          }}
-        >
-          <span class="dropzone__icon">{busy === 'preview' ? <span class="spinner" /> : <Icon name="upload" size={20} />}</span>
+      {transferOn && (
+        <Card title={t('Exportar')} icon="download" id="bk-export" desc={t('Pantallas, calendarios, cumpleaños, filtros, avisos programados… en un archivo JSON.')}>
+          {secretsOn && (
+            <label class="mini-toggle">
+              <Toggle checked={secrets} onChange={setSecrets} />
+              <span>{t('Incluir secretos (contraseña cifrada, token de Home Assistant, cuentas de Google, tokens de API)')}</span>
+            </label>
+          )}
+          {secretsOn && secrets && <Callout kind="warn">{t('Con secretos, quien tenga el archivo podría acceder a tus calendarios de Google y a Home Assistant. Guárdalo en un lugar seguro.')}</Callout>}
+          {!secretsOn && !isSelfHosted() && (
+            <p class="muted small">
+              {t('Sirve también para pasar a un Marco instalado en casa: impórtalo en su panel. No lleva enlaces privados, dispositivos vinculados, tokens de API ni cuentas de Google, así que después vincula de nuevo las pantallas y vuelve a conectar Google Calendar.')}{' '}
+              {t('Contiene las direcciones de tus calendarios: guárdalo en un lugar seguro.')}
+            </p>
+          )}
           <div>
-            <strong>{fileName || t('Elige o arrastra un archivo .json')}</strong>
-            <div class="muted small">{t('Copias exportadas desde aquí o un config.json (también del formato antiguo).')}</div>
+            <Button variant="primary" icon="download" loading={exporting} onClick={doExport}>
+              {t('Descargar copia')}
+            </Button>
           </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="application/json,.json"
-            hidden
-            onChange={(e) => {
-              const f = e.currentTarget.files?.[0];
-              if (f) readFile(f);
-              e.currentTarget.value = '';
-            }}
-          />
-        </div>
-        {preview && (
-          <div class="import-prev">
-            <div class="import-prev__head">
-              {preview.ok ? (
-                <span class="ok-text">
-                  <Icon name="check" size={15} /> {t('Archivo válido')}
-                </span>
-              ) : (
-                <span class="err-text">
-                  <Icon name="alert" size={15} /> {t('{n} errores de validación', { n: preview.errors.length })}
-                </span>
-              )}
-              <span class="muted small">
-                {preview.fromVersion === 1 ? t('formato antiguo (v1), se migrará') : 'v2'}
-                {preview.appVersion && ` · app ${preview.appVersion}`}
-                {preview.exportedAt && ` · ${t('exportada {when}', { when: fmtDateTime(preview.exportedAt) })}`}
-              </span>
-            </div>
-            {!preview.ok && (
-              <ul class="import-prev__errs">
-                {preview.errors.slice(0, 8).map((e) => (
-                  <li>
-                    <code>{e.path}</code> {e.message}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {preview.ok && (
-              <>
-                <div class="import-sections">
-                  {preview.sections.map((s) => {
-                    const on = sections.includes(s.key);
-                    return (
-                      <label class={`import-sec ${s.changed ? '' : 'is-same'} ${on ? 'is-on' : ''}`}>
-                        <input type="checkbox" checked={on} onChange={() => setSections(on ? sections.filter((x) => x !== s.key) : [...sections, s.key])} />
-                        <span class="check-box">
-                          <Icon name="check" size={12} />
-                        </span>
-                        <span class="import-sec__name">{sectionLabel(s.key)}</span>
-                        <span class="import-sec__sum muted small">{s.summary}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-                {diffList(t('Pantallas'), preview.screens)}
-                {diffList(t('Calendarios'), preview.sources)}
-                <div class="muted small">
-                  {t('Contiene')}: {t('{n} eventos locales', { n: preview.counts.localEvents })} · {t('{n} cumpleaños', { n: preview.counts.birthdays })} · {t('{n} reglas', { n: preview.counts.eventRules })} · {t('{n} cuentas atrás', { n: preview.counts.countdowns })} · {t('{n} mensajes programados', { n: preview.counts.schedules })}
-                </div>
-                {(() => {
-                  const o = preview.orphanSchedules;
-                  const list = sections.includes('screens') && !sections.includes('schedules') ? o?.screensOnly
-                    : sections.includes('schedules') && !sections.includes('screens') ? o?.schedulesOnly : null;
-                  return list?.length ? (
-                    <p class="err-text small">
-                      {t('Estos mensajes programados se quedarán sin pantallas y se desactivarán: {list}. Importa también «Pantallas» y «Mensajes programados» juntos para conservarlos.', { list: list.join(', ') })}
-                    </p>
-                  ) : null;
-                })()}
-                {preview.hasSecrets && (
-                  <label class="mini-toggle">
-                    <Toggle checked={impSecrets} onChange={setImpSecrets} />
-                    <span>{t('Importar también los secretos que trae la copia')}</span>
-                  </label>
-                )}
-                {preview.hasSecrets && impSecrets && preview.secretsImpact && (preview.secretsImpact.linksChanged.length > 0 || preview.secretsImpact.devicesRemoved.length > 0) && (
-                  <Callout kind="warn">
-                    {preview.secretsImpact.linksChanged.length > 0 && (
-                      <p>{t('Cambiará el enlace privado de: {list}. Las pantallas abiertas con el enlace actual se desconectan; vuelve a funcionar el de la copia.', { list: preview.secretsImpact.linksChanged.join(', ') })}</p>
-                    )}
-                    {preview.secretsImpact.devicesRemoved.length > 0 && (
-                      <p>{t('Se quitarán estos dispositivos vinculados (se desconectan al instante): {list}.', { list: preview.secretsImpact.devicesRemoved.join(', ') })}</p>
-                    )}
-                  </Callout>
-                )}
-                {preview.displayAccess && (
-                  <p class="muted small">
-                    {t('El acceso a las pantallas ({mode}) no cambia al importar ni al restaurar: se cambia en Seguridad.', {
-                      mode: preview.displayAccess === 'open' ? t('Abierto (red local)') : t('Privado'),
-                    })}
-                  </p>
-                )}
-                <div class="btn-row">
-                  <Button variant="ghost" onClick={() => (setPreview(null), setBundle(null), setFileName(''))}>
-                    {t('Cancelar')}
-                  </Button>
-                  <Button variant="primary" icon="upload" loading={busy === 'apply'} disabled={!sections.length} onClick={apply}>
-                    {t('Importar {n} secciones', { n: sections.length })}
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </Card>
+        </Card>
+      )}
 
-      <Card
-        title={t('Copias automáticas')}
-        icon="archive"
-        id="bk-auto"
-        desc={t('Se crea una copia cada vez que guardas (se conservan las 20 últimas).')}
-        actions={
-          <Button size="sm" icon="plus" loading={creating} onClick={createNow}>
-            {t('Crear copia ahora')}
-          </Button>
-        }
-      >
-        {listErr && <Callout kind="error">{listErr}</Callout>}
-        {list === null ? (
-          <div class="skeleton-list">
-            <div class="skeleton" />
-            <div class="skeleton" />
+      {transferOn && (
+        <Card title={t('Importar')} icon="upload" id="bk-import">
+          <div
+            class={`dropzone dropzone--sm ${drag ? 'is-drag' : ''}`}
+            onClick={() => fileRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDrag(true);
+            }}
+            onDragLeave={() => setDrag(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDrag(false);
+              const f = e.dataTransfer?.files?.[0];
+              if (f) readFile(f);
+            }}
+          >
+            <span class="dropzone__icon">{busy === 'preview' ? <span class="spinner" /> : <Icon name="upload" size={20} />}</span>
+            <div>
+              <strong>{fileName || t('Elige o arrastra un archivo .json')}</strong>
+              <div class="muted small">{t('Copias exportadas desde aquí o un config.json (también del formato antiguo).')}</div>
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/json,.json"
+              hidden
+              onChange={(e) => {
+                const f = e.currentTarget.files?.[0];
+                if (f) readFile(f);
+                e.currentTarget.value = '';
+              }}
+            />
           </div>
-        ) : list.length === 0 ? (
-          <Empty icon="archive" title={t('Todavía no hay copias')}>
-            {t('Aparecerán aquí cuando guardes cambios.')}
-          </Empty>
-        ) : (
-          <ul class="bk-list">
-            {list.map((b, i) => (
-              <li class="bk">
-                <span class={`bk__icon bk__icon--${b.reason}`}>
-                  <Icon name={b.reason === 'manual' ? 'star' : b.reason === 'save' ? 'check' : b.reason === 'migration' ? 'wand' : 'history'} size={14} />
-                </span>
-                <div class="bk__main">
-                  <strong>
-                    {fmtDateTime(b.createdAt)} <span class="muted small">· {relTime(b.createdAt)}</span>
-                    {i === 0 && <span class="badge badge--soft">{t('la más reciente')}</span>}
-                  </strong>
-                  <span class="muted small">
-                    {t(REASON[b.reason] ?? b.reason)} · {t('revisión {n}', { n: b.revision })} · {nScreens(b.screens)} · {t('{n} calendarios', { n: b.sources })} · {formatBytes(b.size)}
+          {preview && (
+            <div class="import-prev">
+              <div class="import-prev__head">
+                {preview.ok ? (
+                  <span class="ok-text">
+                    <Icon name="check" size={15} /> {t('Archivo válido')}
                   </span>
-                </div>
-                <div class="bk__actions">
-                  <a class="icon-btn" href={api.backupUrl(b.id)} download title={t('Descargar')}>
-                    <Icon name="download" size={15} />
-                  </a>
-                  <Button size="sm" variant="ghost" icon="history" loading={busy === `r-${b.id}`} onClick={() => restore(b)}>
-                    {t('Restaurar')}
-                  </Button>
-                  {b.reason !== 'migration' && (
-                    <button type="button" class="icon-btn icon-btn--danger" title={t('Eliminar')} onClick={() => remove(b)}>
-                      <Icon name="trash" size={15} />
-                    </button>
+                ) : (
+                  <span class="err-text">
+                    <Icon name="alert" size={15} /> {t('{n} errores de validación', { n: preview.errors.length })}
+                  </span>
+                )}
+                <span class="muted small">
+                  {preview.fromVersion === 1 ? t('formato antiguo (v1), se migrará') : 'v2'}
+                  {preview.appVersion && ` · app ${preview.appVersion}`}
+                  {preview.exportedAt && ` · ${t('exportada {when}', { when: fmtDateTime(preview.exportedAt) })}`}
+                </span>
+              </div>
+              {!preview.ok && (
+                <ul class="import-prev__errs">
+                  {preview.errors.slice(0, 8).map((e) => (
+                    <li>
+                      <code>{e.path}</code> {e.message}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {preview.ok && (
+                <>
+                  <div class="import-sections">
+                    {preview.sections.map((s) => {
+                      const on = sections.includes(s.key);
+                      const over = (preview.overLimit ?? []).find((o) => o.section === s.key);
+                      return (
+                        <label class={`import-sec ${s.changed ? '' : 'is-same'} ${on ? 'is-on' : ''} ${over ? 'is-same' : ''}`}>
+                          <input
+                            type="checkbox"
+                            checked={on}
+                            disabled={!!over}
+                            onChange={() => setSections(on ? sections.filter((x) => x !== s.key) : [...sections, s.key])}
+                          />
+                          <span class="check-box">
+                            <Icon name="check" size={12} />
+                          </span>
+                          <span class="import-sec__name">{sectionLabel(s.key)}</span>
+                          <span class={`import-sec__sum small ${over ? 'err-text' : 'muted'}`}>
+                            {over ? t('Supera el límite de tu plan ({max}): no se puede importar', { max: over.max }) : s.summary}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {diffList(t('Pantallas'), preview.screens)}
+                  {diffList(t('Calendarios'), preview.sources)}
+                  <div class="muted small">
+                    {t('Contiene')}: {t('{n} eventos locales', { n: preview.counts.localEvents })} · {t('{n} cumpleaños', { n: preview.counts.birthdays })} · {t('{n} reglas', { n: preview.counts.eventRules })} · {t('{n} cuentas atrás', { n: preview.counts.countdowns })} · {t('{n} mensajes programados', { n: preview.counts.schedules })}
+                  </div>
+                  {preview.notes && preview.notes.length > 0 && (
+                    <Callout kind="info">
+                      <strong>{t('Lo que no se importa aquí')}</strong>
+                      <ul class="import-prev__notes">
+                        {preview.notes.map((n) => (
+                          <li>{importNoteText(n)}</li>
+                        ))}
+                      </ul>
+                    </Callout>
                   )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+                  {(() => {
+                    const o = preview.orphanSchedules;
+                    const list = sections.includes('screens') && !sections.includes('schedules') ? o?.screensOnly
+                      : sections.includes('schedules') && !sections.includes('screens') ? o?.schedulesOnly : null;
+                    return list?.length ? (
+                      <p class="err-text small">
+                        {t('Estos mensajes programados se quedarán sin pantallas y se desactivarán: {list}. Importa también «Pantallas» y «Mensajes programados» juntos para conservarlos.', { list: list.join(', ') })}
+                      </p>
+                    ) : null;
+                  })()}
+                  {secretsOn && preview.hasSecrets && (
+                    <label class="mini-toggle">
+                      <Toggle checked={impSecrets} onChange={setImpSecrets} />
+                      <span>{t('Importar también los secretos que trae la copia')}</span>
+                    </label>
+                  )}
+                  {secretsOn && preview.hasSecrets && impSecrets && preview.secretsImpact && (preview.secretsImpact.linksChanged.length > 0 || preview.secretsImpact.devicesRemoved.length > 0) && (
+                    <Callout kind="warn">
+                      {preview.secretsImpact.linksChanged.length > 0 && (
+                        <p>{t('Cambiará el enlace privado de: {list}. Las pantallas abiertas con el enlace actual se desconectan; vuelve a funcionar el de la copia.', { list: preview.secretsImpact.linksChanged.join(', ') })}</p>
+                      )}
+                      {preview.secretsImpact.devicesRemoved.length > 0 && (
+                        <p>{t('Se quitarán estos dispositivos vinculados (se desconectan al instante): {list}.', { list: preview.secretsImpact.devicesRemoved.join(', ') })}</p>
+                      )}
+                    </Callout>
+                  )}
+                  {preview.displayAccess && (
+                    <p class="muted small">
+                      {t('El acceso a las pantallas ({mode}) no cambia al importar ni al restaurar: se cambia en Seguridad.', {
+                        mode: preview.displayAccess === 'open' ? t('Abierto (red local)') : t('Privado'),
+                      })}
+                    </p>
+                  )}
+                  <div class="btn-row">
+                    <Button variant="ghost" onClick={() => (setPreview(null), setBundle(null), setFileName(''))}>
+                      {t('Cancelar')}
+                    </Button>
+                    <Button variant="primary" icon="upload" loading={busy === 'apply'} disabled={!sections.length} onClick={apply}>
+                      {t('Importar {n} secciones', { n: sections.length })}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {transferOn && has('gallery') && (
+        <Card title={t('Fotos')} icon="photos" id="bk-photos" desc={t('Las fotos de la galería no van en la copia de la configuración. Descárgalas todas en un .zip para guardarlas o subirlas en otra instalación.')}>
+          <div>
+            <Button icon="download" loading={!!zipping} onClick={downloadPhotos}>
+              {zipping ? t('Descargando {done} de {total}…', zipping) : t('Descargar fotos (.zip)')}
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {backupsOn && (
+        <Card
+          title={t('Copias automáticas')}
+          icon="archive"
+          id="bk-auto"
+          desc={t('Se crea una copia cada vez que guardas (se conservan las 20 últimas).')}
+          actions={
+            <Button size="sm" icon="plus" loading={creating} onClick={createNow}>
+              {t('Crear copia ahora')}
+            </Button>
+          }
+        >
+          {listErr && <Callout kind="error">{listErr}</Callout>}
+          {list === null ? (
+            <div class="skeleton-list">
+              <div class="skeleton" />
+              <div class="skeleton" />
+            </div>
+          ) : list.length === 0 ? (
+            <Empty icon="archive" title={t('Todavía no hay copias')}>
+              {t('Aparecerán aquí cuando guardes cambios.')}
+            </Empty>
+          ) : (
+            <ul class="bk-list">
+              {list.map((b, i) => (
+                <li class="bk">
+                  <span class={`bk__icon bk__icon--${b.reason}`}>
+                    <Icon name={b.reason === 'manual' ? 'star' : b.reason === 'save' ? 'check' : b.reason === 'migration' ? 'wand' : 'history'} size={14} />
+                  </span>
+                  <div class="bk__main">
+                    <strong>
+                      {fmtDateTime(b.createdAt)} <span class="muted small">· {relTime(b.createdAt)}</span>
+                      {i === 0 && <span class="badge badge--soft">{t('la más reciente')}</span>}
+                    </strong>
+                    <span class="muted small">
+                      {t(REASON[b.reason] ?? b.reason)} · {t('revisión {n}', { n: b.revision })} · {nScreens(b.screens)} · {t('{n} calendarios', { n: b.sources })} · {formatBytes(b.size)}
+                    </span>
+                  </div>
+                  <div class="bk__actions">
+                    <button type="button" class="icon-btn" title={t('Descargar')} disabled={busy === `d-${b.id}`} onClick={() => download(b)}>
+                      <Icon name="download" size={15} />
+                    </button>
+                    <Button size="sm" variant="ghost" icon="history" loading={busy === `r-${b.id}`} onClick={() => restore(b)}>
+                      {t('Restaurar')}
+                    </Button>
+                    {b.reason !== 'migration' && (
+                      <button type="button" class="icon-btn icon-btn--danger" title={t('Eliminar')} onClick={() => remove(b)}>
+                        <Icon name="trash" size={15} />
+                      </button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
     </>
   );
 }

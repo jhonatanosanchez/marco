@@ -1,13 +1,13 @@
 // countdowns ("🎄 Navidad · Faltan 12 días"). See docs/API.md and docs/ARCHITECTURE.md.
 // computeCountdowns() is pure (unit-tested in events-countdowns.test.js); getCountdowns() wires config + events.
-import { addDays, daysBetween, localDate } from './lib/tz.js';
+import { addDays, daysBetween, localDate } from './core/lib/tz.js';
 import { hash } from './lib/text.js';
 import { getConfig } from './store.js';
-import { defaultScreen, screenSourceIds } from './screens.js';
+import { defaultScreen, screenSourceIds } from './core/screens.js';
 import { getDetailedEvents } from './calendars.js';
 import { yearlyDate } from './localEvents.js';
 import { normKey } from './eventRules.js';
-import { LOCAL_SOURCE_ID, BIRTHDAYS_SOURCE_ID } from './defaults.js';
+import { LOCAL_SOURCE_ID, BIRTHDAYS_SOURCE_ID } from './core/defaults.js';
 
 export const MAX_COUNTDOWNS = 30;
 /** Flagged events are looked up at most this far ahead (bounds recurrence expansion / Google windows). */

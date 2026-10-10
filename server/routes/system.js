@@ -6,21 +6,21 @@
 //   GET /dashboard
 import fs from 'node:fs';
 import { Router } from 'express';
-import { requestLang } from '../lib/i18n.js';
+import { requestLang } from '../core/lib/i18n.js';
 import { requireAuth, rotateSessionEpoch } from '../auth.js';
 import { getConfig, getSecrets, saveConfig, updateSecrets } from '../store.js';
 import {
   listBackups, writeBackup, backupPath, readBackup, deleteBackup, makeBundle, importPreview, parseImport,
-  mergeImport, sanitizeImportedSecrets, repairConfig,
+  mergeImport, absentSections, sanitizeImportedSecrets, repairConfig,
 } from '../backups.js';
 import { logActivity, listActivity, clearActivity, recentActivity } from '../activity.js';
 import { syncDisplayKeys, revalidateStreams } from '../displayAccess.js';
 import { listDisplays, getServerVersion } from '../displays.js';
 import { listAnnouncements } from '../announce.js';
-import { schedulesNow } from '../schedules.js';
+import { schedulesNow } from '../core/schedules.js';
 import { getEvents, sourceStatus } from '../calendars.js';
 import { cachedWeather } from '../weather.js';
-import { localDate, addDays } from '../lib/tz.js';
+import { localDate, addDays } from '../core/lib/tz.js';
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const LEVELS = ['info', 'warn', 'error'];
@@ -46,6 +46,12 @@ export function dashboardWarnings({ secrets, sources, displays, cfg }) {
   const authFail = /Google account|Google token|refresh token|invalid_grant|HTTP 401|HTTP 403|reconnect/i;
   if (googleSources.some((s) => !accounts[s.googleAccount] || authFail.test(sources.find((x) => x.id === s.id)?.error || ''))) {
     w.push('google_auth_failed');
+  }
+  const msSources = cfg.calendar.sources.filter((s) => s.enabled && s.type === 'microsoft');
+  const msAccounts = secrets.microsoft?.accounts || {};
+  const msFail = /Microsoft account|refresh token|invalid_grant|interaction_required|HTTP 401|reconnect/i;
+  if (msSources.some((s) => !msAccounts[s.microsoftAccount] || msFail.test(sources.find((x) => x.id === s.id)?.error || ''))) {
+    w.push('microsoft_auth_failed');
   }
   return w;
 }
@@ -125,7 +131,7 @@ export function systemRouter({ version = getServerVersion() } = {}) {
     if (b.sections !== undefined && !Array.isArray(b.sections)) return res.status(400).json({ error: 'sections must be an array' });
     const cur = getConfig();
     // Same as restore: an import never changes the display access mode (see keepSecurity).
-    const merged = { ...mergeImport(cur, parsed.value, b.sections), security: keepSecurity(cur, parsed.value) };
+    const merged = { ...mergeImport(cur, parsed.value, b.sections, absentSections(b.bundle)), security: keepSecurity(cur, parsed.value) };
     writeBackup(cur, 'import');
     const result = saveConfig(merged, { reason: 'import', req, backup: false });
     if (!result.ok) return res.status(400).json({ error: 'invalid', details: result.errors });
@@ -135,7 +141,9 @@ export function systemRouter({ version = getServerVersion() } = {}) {
       const s = sanitizeImportedSecrets(parsed.secrets);
       updateSecrets((x) => {
         if (s.haToken !== undefined) { x.homeassistant.token = s.haToken; applied.push('homeassistant'); }
+        if (s.weatherKey !== undefined) { x.weather = { ...(x.weather || {}), apiKey: s.weatherKey }; applied.push('weather'); }
         if (s.googleAccounts) { x.google.accounts = s.googleAccounts; applied.push('google'); }
+        if (s.microsoftAccounts) { x.microsoft = { accounts: s.microsoftAccounts }; applied.push('microsoft'); }
         if (s.apiTokens) { x.apiTokens = s.apiTokens; applied.push('apiTokens'); }
         if (s.displayKeys) { x.displayKeys = { ...(x.displayKeys || {}), ...s.displayKeys }; applied.push('displayKeys'); }
         if (s.devices) { x.devices = s.devices; applied.push('devices'); }
@@ -196,7 +204,7 @@ export function systemRouter({ version = getServerVersion() } = {}) {
       console.warn('[dashboard] events:', err.message);
     }
     const w = cachedWeather();
-    const weather = w ? { ...w.current, locationName: w.locationName, updatedAt: w.updatedAt, min: w.today?.min ?? null, max: w.today?.max ?? null } : null;
+    const weather = w ? { ...w.current, locationName: w.locationName, updatedAt: w.updatedAt, min: w.today?.min ?? null, max: w.today?.max ?? null, source: w.source } : null;
     res.json({
       version,
       uptime: Math.round(process.uptime()),

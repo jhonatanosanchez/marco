@@ -20,7 +20,7 @@
 
 <a href="https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4"><img src="docs/media/hero.webp" width="100%" alt="Marco on a living room screen: photo background, clock, weather and a month calendar; an alert from Home Assistant slides in saying the washing machine is done"></a>
 
-[Watch the 48-second demo video (MP4)](https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4) · [marcohome.app](https://marcohome.app)
+[Website: marcohome.app](https://marcohome.app) · [Marco Cloud](https://app.marcohome.app/signup) · [Demo video (MP4)](https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4)
 
 ```bash
 curl -fsSL https://marcohome.app/install | bash
@@ -28,12 +28,24 @@ curl -fsSL https://marcohome.app/install | bash
 
 </div>
 
+### Two ways to run it
+
+- **On your own hardware (self-hosted):** a Raspberry Pi, home server or NAS on your network, installed with the
+  one-line command above, [Docker](#docker) or [by hand](#manual-install-nodejs). Free and open source, and your data
+  stays at home. Everything in this README is about this option.
+- **Marco Cloud, if you don't want to run a server:** the same app and the same admin panel, hosted by us at
+  [app.marcohome.app](https://app.marcohome.app). It is free for families, runs on Cloudflare and keeps your data in
+  the EU. [Create an account](https://app.marcohome.app/signup), add your calendars and open your screen's link on a
+  TV, tablet or Raspberry Pi.
+
+More about both on the website: [marcohome.app](https://marcohome.app).
+
 ## Why
 
 Marco is inspired by [DAKboard](https://dakboard.com/): a wall display that shows your family calendar,
 the time, the weather, photos and news at a glance. It is a **free, open-source, self-hosted alternative** that you run
-on your own Raspberry Pi, home server or NAS **inside your local network**. There is no account, no subscription and
-no cloud in the middle: your configuration, photos and calendar data stay at home. The only outbound traffic goes to the
+on your own Raspberry Pi, home server or NAS **inside your local network**. When you host it yourself, there is no
+account, no subscription and no cloud in the middle: your configuration, photos and calendar data stay at home. The only outbound traffic goes to the
 calendars, weather and news feeds *you* connect.
 
 > Marco is an independent project. It is not affiliated with, endorsed by or connected to DAKboard;
@@ -49,7 +61,7 @@ calendars, weather and news feeds *you* connect.
 
 ### The display
 
-![Marco on a 1920x1080 display: clock, highlights, countdowns, weather and a month calendar with events, birthdays and vacation-rental stays](docs/screenshots/display-1920x1080.webp)
+![Marco on a 1920x1080 display in the Modern style: clock, highlights, countdowns, weather and a month calendar with events, birthdays and vacation-rental stays](docs/screenshots/display-1920x1080.webp)
 
 | | |
 |---|---|
@@ -57,10 +69,38 @@ calendars, weather and news feeds *you* connect.
 | ![Week view](docs/screenshots/display-week.webp) | ![Light theme with the calendar on the left and the photo on the right](docs/screenshots/display-light.webp) |
 | ![Announcement overlay sent from Home Assistant](docs/screenshots/display-announcement.webp) | ![Analog clock, rain effect over the photo and a scheduled message](docs/screenshots/display-rain.webp) |
 
+**Layouts for every room.** *Today*, *Per person*, *Photo frame*, *Two weeks*, *Board* and *Bedside*:
+
+| | |
+|---|---|
+| ![Today layout: the day hour by hour with a line for now, the next event in large type and the hourly weather](docs/screenshots/display-today.webp) | ![Per person layout: one column per calendar with today and tomorrow](docs/screenshots/display-people.webp) |
+| ![Photo frame layout: the photo with a small clock card in a corner](docs/screenshots/display-photoframe.webp) | ![Two weeks layout: the month grid with two roomy rows](docs/screenshots/display-twoweeks.webp) |
+| ![Board layout: agenda, message of the day, countdowns, to-dos and birthdays](docs/screenshots/display-board.webp) | ![Bedside layout: a large, dim clock with the next event and the temperature](docs/screenshots/display-bedside.webp) |
+
+**Modern or Classic, per screen.** Modern is the default; Classic keeps the original look:
+
+![The same screen in the Modern style (left) and the Classic style (right)](docs/screenshots/display-modern-vs-classic.webp)
+
+**Glass options** (Modern style): automatic, clear or tinted glass, with a dark, light or photo-coloured tint,
+transparency, blur and a light edge:
+
+![The side panel with five glass settings: automatic (the default), clear, tinted, light tint and photo tint](docs/screenshots/display-glass.webp)
+
 <img src="docs/screenshots/display-portrait-1080x1920.webp" width="280" align="right" alt="Portrait layout at 1080x1920">
 
-- **Calendar:** month (configurable number of weeks), agenda and week views; five layouts (*big calendar*,
-  *left/right*, *top/bottom*, *big time*, *agenda*), landscape or portrait, each calendar with its own colour.
+- **Calendar:** month (configurable number of weeks), agenda and week views; eleven layouts (*big calendar*,
+  *two weeks*, *left/right*, *top/bottom*, *agenda*, *today*, *per person*, *board*, *big time*, *photo frame*,
+  *bedside*), landscape or portrait, each calendar with its own colour.
+- **Layouts for every room:** *Today* shows the day hour by hour with a line for now, the next event in large type and
+  the weather for the coming hours (the kitchen in the morning). *Per person* gives each calendar its own column with
+  today and tomorrow (pick up to five in *Layout*). *Board* is a family organisation board: to-dos, countdowns, the
+  message of the day, upcoming birthdays and a short agenda. *Photo frame* leaves the photo alone with a small clock
+  card in the corner you choose. *Bedside* is a huge, very dim clock with the next event and the temperature that
+  dims further at night. *Two weeks* is the month grid with two roomy rows.
+- **Two styles per screen:** *Modern* (the default), a minimal Apple-like look with glass cards over the photo,
+  a Lock Screen clock and an iOS-style month grid, or *Classic*. The style is independent of the layout.
+- **Glass options** for the Modern style, per screen: automatic (adapts to each photo), clear or tinted; transparency,
+  blur, a dark, light or photo-coloured tint and a light edge, with a live preview in *Layout*.
 - **Automatic emoji:** 🎂 birthdays, ✈️ flights, 🩺 doctor, 🎒 school, ⚽ sports, 🍽️ dinners, 💼 meetings, 🏖️
   holidays, 🚗 car, 🐾 vet and more, from editable keyword rules (35 categories with about 400 keywords in English,
   Spanish and Portuguese out of the box).
@@ -70,8 +110,11 @@ calendars, weather and news feeds *you* connect.
   guests as 🧑🏻🧒🏻👶🏻🐶 icons, 🚪 check-outs, "Check-in today" highlights and blocked dates you can hide.
 - **Highlights and countdowns:** "In 18 min · Client call", "Check-out · Tomorrow", "🎃 Halloween party · Tomorrow!",
   "✈️ Trip to Madeira · In 12 days".
-- **Weather:** current conditions, hourly and daily forecast from [Open-Meteo](https://open-meteo.com/) (no API key),
-  or your own [Home Assistant](https://www.home-assistant.io/) weather entity and indoor sensors; animated rain/snow, or an optional
+- **Weather:** current conditions, hourly and daily forecast from a free source of your choice:
+  [Open-Meteo](https://open-meteo.com/) (no API key, with a choice of forecast model: ECMWF, DWD ICON, NOAA GFS,
+  Météo-France, UK Met Office and more), [MET Norway](https://api.met.no/) (no API key) or
+  [Pirate Weather](https://pirateweather.net/) (your own free key). The screens credit the source in small type.
+  Add your own [Home Assistant](https://www.home-assistant.io/) weather entity and indoor sensors; animated rain/snow, or an optional
   realistic effect with drops on the glass, layered snow and sun rays on clear days (the photo is never blurred).
 - **News ticker** from any RSS/Atom feed, a to-do list and a message of the day.
 - **Photo background:** stock photos or your own gallery, WebGL transitions, slow zoom, a soft "aurora" ambient
@@ -118,7 +161,11 @@ calendars, weather and news feeds *you* connect.
 | ![Command palette searching for night mode actions and settings](docs/screenshots/admin-home-palette.webp) | ![Local event editor: date, time, repeat, location and countdown](docs/screenshots/admin-local-edit.webp) | ![Upload conflict dialog: replace, keep both or skip](docs/screenshots/admin-photos-conflict.webp) |
 | ![Screens: one profile per room with its own layout and private link](docs/screenshots/admin-screens.webp) | ![Alerts page: send an alert now](docs/screenshots/admin-alerts.webp) | ![Activity log with filters](docs/screenshots/admin-activity.webp) |
 | ![Backups: export, import and automatic backups with restore](docs/screenshots/admin-backups.webp) | ![Countdowns: manual dates and automatic countdowns](docs/screenshots/admin-countdowns.webp) | ![Icon rules with a live tester for event titles](docs/screenshots/admin-icons.webp) |
-| ![Layout page with the live preview of the screen](docs/screenshots/admin-layout.webp) | ![Local events list with upcoming appointments](docs/screenshots/admin-local.webp) | ![Sign-in page of the admin panel](docs/screenshots/admin-login.webp) |
+| ![Layout page: Modern or Classic style, glass settings and the live preview of the screen](docs/screenshots/admin-layout.webp) | ![Local events list with upcoming appointments](docs/screenshots/admin-local.webp) | ![Sign-in page of the admin panel](docs/screenshots/admin-login.webp) |
+
+| | |
+|---|---|
+| ![Layout page: the eleven layouts with thumbnails](docs/screenshots/admin-layouts.webp) | ![Glass settings with a preview over a dark and a bright photo](docs/screenshots/admin-layout-glass.webp) |
 
 <p align="center">
   <img src="docs/screenshots/mobile-home.webp" width="230" alt="Admin on a phone: home">
@@ -234,12 +281,13 @@ with a screen) or as a new `marco` system user (server only).
 
 ```
 ~/marco/                  (or /opt/marco)
-├── current -> releases/0.4.0   the running version, switched in one step on update
+├── current -> releases/0.5.0   the running version, switched in one step on update
 ├── releases/                   the current version and the previous one (for rollback)
 ├── data/                       config, secrets, photos, backups (kept on update and uninstall)
 └── .env                        port and other settings, see .env.example
 /etc/marco.conf                 what was installed and where (read by the marco command)
 /usr/local/bin/marco            the marco command
+/etc/systemd/system/marco-update.path, marco-update.service   the admin's Update button (see Updates below)
 ~/.config/marco/kiosk.env       kiosk settings (screen and all-in-one modes)
 ```
 
@@ -254,6 +302,31 @@ with a screen) or as a new `marco` system user (server only).
 | `marco url` | Admin address and the private link of every screen, with QR codes |
 | `marco version` | Installed version and the latest release |
 | `marco uninstall [--purge]` | Remove Marco; your data is kept unless you add `--purge`. It asks first (the default answer is no); without a terminal it needs `--yes` |
+
+### Updates
+
+Once a day the server asks GitHub which release is the latest. When there is a newer one, the admin shows a banner,
+*Marco 0.5.1 is available*, with the release notes. How you update depends on how Marco was installed:
+
+| Install | How to update |
+|---|---|
+| One-line installer | **Update now** in the admin (or `marco update` on the server). The new version is downloaded, its checksum checked, switched in one step and rolled back if it does not start. The admin follows the progress and reloads itself, and the screens reload on their own |
+| Docker | `git pull && docker compose up -d --build` in the folder with `docker-compose.yml` (the admin shows it) |
+| Git checkout | `marco update` when it was set up with `deploy/install.sh`, otherwise `git pull && npm ci && npm run build` and a restart |
+
+**Automatic updates** are off by default. Turn them on in *Status → Updates* (installs made with the one-line
+installer) and choose the hours, by default between 03:00 and 05:00 in the time zone of *Date & time*. A version that
+fails to start is rolled back and not tried again; the next release is.
+
+How the button works: the server runs as a normal user and cannot update itself. It writes
+`data/update/request`; a systemd path unit installed by the installer (`marco-update.path`) sees it and starts
+`marco-update.service`, which runs `marco update --requested` as root, the same as `sudo marco update`. Nothing in the
+request is read except that it exists, so all the server can ask for is "the latest release". Progress and the
+installer's output go to `data/update/` for the admin. Installs updated from 0.4 get the button after running
+`marco update` once more on the server (it says the version is up to date and adds the units).
+
+Privacy: the check is one `GET` to `api.github.com` a day, with no identifier or version in it (an unchanged answer is
+not even downloaded again). Turn it off in *Status → Updates*, or for good with `MARCO_UPDATE_CHECK=0` in `.env`.
 
 ### Docker
 
@@ -384,8 +457,8 @@ token and some activity history. Your real `data/` folder is never touched.
 ![The kitchen screen of the demo: light theme, agenda, to-do list and live weather](docs/screenshots/display-kitchen-live.webp)
 
 Just want to see the display? Any running instance shows a built-in sample dataset at `/?demo=1`
-(add `&lang=es`, `&preset=agenda`, `&theme=light`, `&announce=success`, `&sched=1`, `&now=2026-10-09T10:42`,
-`&wx=rain|snow|clear` with `&wxfx=rich` to see the weather effect).
+(add `&lang=es`, `&preset=agenda`, `&theme=light`, `&style=modern`, `&announce=success`, `&sched=1`, `&now=2026-10-09T10:42`,
+`&wx=rain|snow|clear` with `&wxfx=rich` to see the weather effect, `&pair=1` for the pairing screen).
 
 **Demo video.** A 48-second tour of the demo: the living room screen with photo transitions, an alert and a scheduled
 message, the kitchen and portrait screens, and pairing a new screen.
@@ -410,8 +483,9 @@ makes Marco safe on shared networks (flat-share Wi-Fi, office) and lets you reac
   `?screen=` is ignored), so keep it to your own devices.
 - **Pairing:** no long links to type on a TV. Open the plain address (`http://homeserver.lan:3000/` or `/pair`) on the
   new device and it shows a big **6-character code** and a QR code. On your phone open *Connected screens → Pair a
-  screen* (or scan the QR: it opens the admin with the code filled in), type the code, pick the screen and a name. The
-  device starts within two seconds and keeps its own device token in the browser's storage. This suits tablets, TVs
+  screen* (or scan the QR: it opens the admin with the code filled in), type the code, pick the screen and a name.
+  The admin then shows the address of the screen that is waiting with that code; confirm it is the one in front of
+  you. The device starts within two seconds and keeps its own device token in the browser's storage. This suits tablets, TVs
   and browsers you keep using. The Raspberry Pi kiosk runs Chromium in incognito mode (nothing survives a restart),
   so give it the private link instead.
 - **Paired devices:** *Connected screens* lists them with the screen they show and when they were last seen; **Edit**
@@ -606,6 +680,33 @@ birthdays → type *Birthdays* (🎂 and ages), a holiday calendar → *Holidays
 is empty, the first Google sign-in made while you are already logged in with the password adds itself). You can then
 disable password login if you want.
 
+## Connecting Outlook, Hotmail or Microsoft 365
+
+Optional, read only. With your own Microsoft Entra app, *Calendars → Linked accounts → Link account* also offers
+**Microsoft**: personal accounts (Outlook.com, Hotmail, Live) and work or school accounts (Microsoft 365). Without it
+the option is not shown, and the calendar's ICS address (*Outlook → Settings → Calendar → Shared calendars → Publish a
+calendar*) still works.
+
+1. Go to <https://entra.microsoft.com/> → **App registrations → New registration**:
+   - **Supported account types**: *Accounts in any organizational directory and personal Microsoft accounts*.
+   - **Redirect URI**: platform **Web**, `<PUBLIC_URL>/auth/microsoft/callback`, e.g.
+     `http://localhost:3000/auth/microsoft/callback` (Microsoft, like Google, accepts `http://` only for
+     `localhost`; see the redirect URI options above).
+2. **API permissions → Add a permission → Microsoft Graph → Delegated**: `Calendars.Read`, `Calendars.Read.Shared`,
+   `offline_access`, `openid`, `email`, `profile`. No admin consent is needed for personal accounts.
+3. **Certificates & secrets → New client secret**, copy its **Value**, and the **Application (client) ID** from
+   *Overview*. Put them in `.env` and restart:
+
+   ```ini
+   MICROSOFT_CLIENT_ID=<application-id>
+   MICROSOFT_CLIENT_SECRET=<secret-value>
+   ```
+
+Marco keeps each account's tokens in `data/secrets.json` (Microsoft hands out a new refresh token every hour and the
+newest one is kept). *Unlink* deletes them; Microsoft has no way to revoke them from here, so to remove the access
+itself go to <https://account.live.com/consent/Manage> (personal) or <https://myapps.microsoft.com> (work or school).
+Client secrets expire (6 to 24 months): create a new one before that and update `.env`.
+
 ## Other integrations
 
 - **iCal / ICS feeds:** any `http(s)://` or `webcal://` URL: school, sports club, work, public holidays (presets for
@@ -616,8 +717,18 @@ disable password login if you want.
   "Reservation · Guest" bars (blocked dates can be hidden with a filter); feeds that already format titles like
   `🏠 Guest - 4p+1m` keep their emoji and turn guest counts into icons; `Adults: 2 / Children: 1 / Infants: 1 / Pets: 1`
   lines in the description (also `Adultos/Niños/Bebés/Mascotas`) give 🧑🏻🧑🏻 🧒🏻 👶🏻 🐶.
-- **Weather:** [Open-Meteo](https://open-meteo.com/), no key needed: just set the location (search by name or
-  coordinates) and units in *Weather*.
+- **Weather:** set the location (search by name or coordinates) and units in *Weather*, then pick the source in
+  *Weather → Data source* (`weather.provider`). All of them are free:
+
+  | Source | Key | Notes |
+  |---|---|---|
+  | [Open-Meteo](https://open-meteo.com/) (default) | none | Picks the best model for your area, or the one you choose in *Forecast model* (`weather.model`: `best_match`, `ecmwf_ifs`, `icon_seamless`, `gfs_seamless`, `meteofrance_seamless`, `ukmo_seamless`, `gem_seamless`, `jma_seamless`). Some models have no chance of rain or UV index, or fewer days; those values are left out. Free for non-commercial use; data under CC BY 4.0. |
+  | [MET Norway](https://api.met.no/) | none | Locationforecast 2.0 of the Norwegian Meteorological Institute, worldwide. Chance of rain only in the Nordic countries; sunrise and sunset are computed. Marco identifies itself with its User-Agent and waits for the `Expires` time the service gives (about 30 minutes). Data under CC BY 4.0 and NLOD. |
+  | [Pirate Weather](https://pirateweather.net/) | your own, free | Create a key at [pirate-weather.apiable.io](https://pirate-weather.apiable.io/) and paste it in *Weather*. The free plan allows 10,000 calls a month; Marco asks at most every 15 minutes (about 3,000). The key is checked once and kept in `data/secrets.json`. |
+
+  Every source is cached per place for at least 10 minutes and shared by all the screens and languages; if the
+  source fails, the screens keep the last forecast for up to 6 hours. The screens show the source's name in small
+  type next to the weather (*Open-Meteo*, *Open-Meteo · ECMWF IFS*, *MET Norway*), as the CC BY licence asks.
 - **Home Assistant:** in Home Assistant open your **profile → Security → Long-lived access tokens → Create token**;
   in *Admin → Home Assistant* enter the URL (e.g. `http://homeassistant.local:8123`) and the token, *Test connection*,
   then choose a `weather.*` entity and/or indoor temperature/humidity `sensor.*` entities in *Weather*. The token stays
@@ -720,12 +831,22 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 Limits: 30 requests/minute per token; errors `401` (bad token), `400` (invalid data), `415` (not JSON), `429`
 (rate limit). Full reference: [docs/API.md](docs/API.md).
 
+On Marco Cloud the same calls work against `https://app.marcohome.app/api/hooks/...` with a token made in its admin
+(*API & webhooks*), so the same scripts, automations and iPhone Shortcuts keep working after a move. There a household
+can also send at most 500 alerts and commands a day through its tokens.
+
 ### Backups and activity
 
 - Every save keeps the previous configuration in `data/backups/` (the 20 newest; quick successive saves count as one).
   *System → Backups* downloads, restores or deletes them and makes manual backups.
 - **Export** downloads everything as one JSON file, optionally with secrets (password hash, Home Assistant token,
   Google accounts, API tokens; keep it safe). **Import** shows what changes per section before applying.
+- **Download photos (.zip)** puts every gallery photo in one archive, made in your browser. Photos are not part of
+  the JSON export, so upload them again in *Photos* when you move to another installation.
+- Moving between Marco Cloud and a self-hosted Marco works both ways with the same file. Marco Cloud never exports
+  or imports secrets, and it leaves out what it does not offer (Home Assistant, the admin password, open display
+  access); the import preview lists what it left out. After a move, pair the screens again and reconnect Google
+  Calendar.
 - *System → Activity* records sign-ins (and failed attempts), saves, restores, alerts, API usage, displays connecting
   and calendar errors. Passwords, tokens and calendar URLs are never logged.
 
@@ -748,8 +869,11 @@ Limits: 30 requests/minute per token; errors `401` (bad token), `400` (invalid d
 | `COOKIE_SECURE` | per request | `1` = always `Secure` cookie, `0` = never |
 | `TRUST_PROXY` | `loopback` | IP(s)/ranges of reverse proxies allowed to set `X-Forwarded-*`. Needed for a proxy on another host and for any proxy in front of Docker (`172.16.0.0/12`) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | none | Google OAuth client ([guide](#connecting-google-calendar)) |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | none | Microsoft Entra app for Outlook and Microsoft 365 calendars ([guide](#connecting-outlook-hotmail-or-microsoft-365)) |
 | `NODE_EXTRA_CA_CERTS` | none | Extra CA certificates for iCal feeds with a private CA |
+| `MARCO_LIVE` | `sse` | `poll` = displays get no `/api/stream` connection and poll `/api/display/poll` instead (every 30 s, every 5 s while *Connected screens* is open). Alerts and display commands (refresh, night mode, identify) still arrive, a little later than over the stream. Useful behind a proxy that buffers server-sent events |
 | `TZ` | the zone set in *Date & time* (follows changes live) | Process time zone (used for "floating" iCal times). Setting it here pins it |
+| `MARCO_UPDATE_CHECK` | on | `0` = never ask GitHub for a newer release (no update banner) |
 
 With Docker Compose only the variables listed in `docker-compose.yml` reach the container; `.env` next to it fills
 them in.
@@ -760,13 +884,14 @@ them in.
 data/
 ├── config.json          # all settings (screens, calendars, rules, events, birthdays)
 ├── secrets.json         # password hash, session secret, Google & Home Assistant tokens, API token hashes,
-│                        #   private-link keys per screen, paired-device token hashes (mode 600)
+│                        #   private-link keys per screen, paired-device token hashes, weather API key (mode 600)
 ├── photos/              # gallery (+ .thumbs/ and .meta.json with focal points, hidden flags)
 ├── backups/             # automatic and manual configuration backups
 ├── cache/               # feed caches
 ├── activity.jsonl       # activity log
 ├── announcements.json   # active alerts + history
-└── displays.json        # known displays
+├── displays.json        # known displays
+└── update/              # last update check, update settings and the log of the last update
 ```
 
 Back up the whole folder (or use *Export*) to keep everything.
@@ -781,8 +906,13 @@ Back up the whole folder (or use *Export*) to keep everything.
 | `?lite=1` | No WebGL effects (slow devices) |
 | `?demo=1` | Built-in sample data (no server data needed) |
 | `?lang=en\|es\|pt` | Override the language |
-| `?preset=…` `?view=month\|agenda\|week` `?theme=dark\|light` `?side=left\|right` `?clock=analog` | Override layout options (handy for testing) |
-| `?wxfx=off\|simple\|rich` | Override the weather effect; with `?demo=1`, `?wx=rain\|snow\|clear\|thunder` forces the weather |
+| `?preset=…` `?view=month\|agenda\|week` `?theme=dark\|light` `?style=classic\|modern` `?side=left\|right` `?clock=analog` | Override layout options (handy for testing) |
+| `?preset=today\|people\|photoFrame\|twoWeeks\|board\|bedside` `?people=<calendar ids, comma separated>` `?corner=tl\|tr\|bl\|br` | Preview the newer layouts, the *Per person* columns and the *Photo frame* corner |
+| `?glass=clear\|tinted\|auto` `?glassOpacity=0..1` `?glassBlur=0..40` `?glassTint=dark\|light\|photo` `?glassEdge=0\|1` | Override the glass options of the Modern style |
+| `?wxfx=off\|simple\|rich` | Override the weather effect; with `?demo=1`, `?wx=rain\|drizzle\|thunder\|snow\|clear` (or a WMO code, e.g. `45` for fog) forces the weather |
+| `?ambient=aurora\|particles\|none` | Override the ambient backdrop behind the calendar |
+| `?demo=1&pair=1` `?demo=1&pair=invalid` `&pairLen=6\|8` | Preview the pairing screen or the “link no longer valid” screen with a sample code (no server needed) |
+| `?empty=1` `?photos=0` | With `?demo=1`: no events, countdowns or to-dos, or no background photo (to check the empty states) |
 | `?client=<name>` | Name of this device in *Connected displays* (the kiosk script sets it) |
 
 ## Security
@@ -807,6 +937,8 @@ Marco was designed for a home network; since 0.3 the displays are **private by d
 - Keep `.env`, `data/secrets.json`, exports with secrets and `data/backups/` private.
 - The installer and `marco update` check the SHA-256 of every release package (and of Node.js) before installing it.
   Builds from git (only before the first release, or on installs that were built from git) have no checksum to check.
+- The admin's *Update now* button never gives the server root rights: it only creates a file that a root-owned systemd
+  unit watches, and that unit always installs the latest release, checksum checked ([Updates](#updates)).
 
 See [SECURITY.md](SECURITY.md) to report a vulnerability.
 
@@ -843,7 +975,8 @@ HEIC decoder (LGPL-3.0, loaded as a separate unmodified chunk) and the Inter / O
 ## Acknowledgements
 
 - [DAKboard](https://dakboard.com/) for the idea of a wall dashboard (this project is unaffiliated).
-- [Open-Meteo](https://open-meteo.com/): free weather API (data under CC BY 4.0).
+- [Open-Meteo](https://open-meteo.com/) and [MET Norway](https://api.met.no/): free weather APIs (data under CC BY 4.0),
+  and [Pirate Weather](https://pirateweather.net/).
 - [Lorem Picsum](https://picsum.photos/) and the Unsplash photographers for the stock photos.
 - [three.js](https://threejs.org/), [Preact](https://preactjs.com/), [Vite](https://vite.dev/),
   [Express](https://expressjs.com/), [node-ical](https://github.com/jens-maus/node-ical), [rrule](https://github.com/jkbrzt/rrule),

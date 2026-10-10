@@ -4,8 +4,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { fileURLToPath } from 'node:url';
-import { defaultConfig, DEFAULT_ICON_RULES } from './defaults.js';
-import { validateConfig, mergeDefaults, migrateConfig, isV1 } from './validate.js';
+import { defaultConfig, DEFAULT_ICON_RULES } from './core/defaults.js';
+import { validateConfig, mergeDefaults, migrateConfig, isV1 } from './core/validate.js';
 import { backupBeforeSave } from './backups.js';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -155,7 +155,10 @@ function loadSecrets() {
   const s = readJson(paths.secrets, { strict: true }) || {};
   s.google ??= {};
   s.google.accounts ??= {};
+  s.microsoft ??= {};
+  s.microsoft.accounts ??= {}; // Microsoft calendar accounts (server/microsoft.js)
   s.homeassistant ??= {};
+  s.weather ??= {}; // { apiKey } of a weather source that needs one (server/weather.js)
   if (!Array.isArray(s.apiTokens)) s.apiTokens = []; // webhook tokens (hashed), see docs/ARCHITECTURE.md
   if (!s.sessionSecret) s.sessionSecret = crypto.randomBytes(32).toString('hex');
   writeFileAtomic(paths.secrets, JSON.stringify(s, null, 2), 0o600);
@@ -166,18 +169,24 @@ export const getConfig = () => config;
 export const getSecrets = () => secrets;
 
 /**
- * Validate + save a full config. Returns { ok, errors, config }. Bumps revision.
+ * Validate + save a full config. Returns { ok, errors, config, conflict? }. Bumps revision.
  * Before overwriting, the current file is copied to data/backups/ (rotating, docs/ARCHITECTURE.md).
+ * `baseRevision` (the revision the caller's copy was loaded at) turns on the revision guard: when the config was
+ * saved since then, nothing is written and the result has `conflict: true`. Without it the last write wins.
  * @param {unknown} input
- * @param {{ reason?: string, req?: any, backup?: boolean }} [opts] reason/req are passed to 'config' listeners
+ * `checks` is passed to validateConfig (the admin save asks for the weather API key check).
+ * @param {{ reason?: string, req?: any, backup?: boolean, baseRevision?: number | null, checks?: { weatherKeySet?: boolean } }} [opts] reason/req are passed to 'config' listeners
  */
-export function saveConfig(input, { reason = 'server', req = null, backup = true } = {}) {
+export function saveConfig(input, { reason = 'server', req = null, backup = true, baseRevision = null, checks = {} } = {}) {
+  if (baseRevision !== null && baseRevision !== undefined && baseRevision !== (config?.revision || 0)) {
+    return { ok: false, conflict: true, errors: [], config };
+  }
   // A config without `security` (old admin build, backup or export from before 0.3) keeps the current display
   // access mode: restoring an old backup must neither open private displays nor lock out open-mode kiosks.
   if (input && typeof input === 'object' && !Array.isArray(input) && input.security === undefined && config?.security) {
     input = { ...input, security: structuredClone(config.security) };
   }
-  const { ok, errors, value } = validateConfig(input);
+  const { ok, errors, value } = validateConfig(input, checks);
   if (!ok) return { ok, errors, config };
   value.revision = (config?.revision || 0) + 1;
   if (backup) {

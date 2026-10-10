@@ -11,7 +11,7 @@ display and the server guarantee. The HTTP endpoints and event formats are in [A
  │                                                                                             │
  │   sources ──► server/calendars.js ──► events pipeline ──► /api/events (per screen)          │
  │   ICS · Google · local events · birthdays    (rules, icons, rental feeds, countdowns)       │
- │   Open-Meteo / Home Assistant ──► /api/weather      RSS ──► /api/news                       │
+ │   weather sources · HA        ──► /api/weather      RSS ──► /api/news                       │
  │   data/ (JSON files, atomic writes)          SSE hub ──► /api/stream (live updates)         │
  │   serves dist/ (Vite build): /  = display, /admin/ = admin panel                            │
  └───────────────▲──────────────────────────────────────────────▲──────────────────────────────┘
@@ -22,10 +22,12 @@ display and the server guarantee. The HTTP endpoints and event formats are in [A
 
 | Folder | Content |
 |---|---|
-| `server/` | API and logic: ICS + recurrences (`node-ical`, `rrule`), Google Calendar, weather, RSS, photos, auth, SSE, backups, activity |
+| `server/` | API and logic: ICS + recurrences (`node-ical`, `rrule`), Google Calendar, weather, RSS, photos, auth, SSE and the poll channel (`pollHub.js`), backups, activity |
 | `server/app.js` | `createApp()`: the whole Express stack (host guard, sessions, CSRF, display access, routers, static files); `server/index.js` adds the store, listen and shutdown |
+| `server/core/` | Pure logic shared with Marco Cloud, which copies the folder as it is: config schema and validation (`validate.js`, `defaults.js`, `screens.js`, `iconRules.js`), backups and import (`backupsCore.js`), announcements (`announceCore.js`), feed parsing (`newsParse.js`), image headers and photo names (`imageInfo.js`), activity helpers (`activityCore.js`), pairing codes (`pairCore.js`), CSV, schedules and `lib/` (text, time zones, server strings). No Node built-ins, no store, SSE or HTTP modules (checked by `server/test/core-lint.test.js`); the files next to it (`backups.js`, `announce.js`, `photos.js`, `news.js`, `activity.js`, `pairing.js`) add the files, network and SSE |
 | `server/displayAccess.js`, `server/pairing.js` | Private display links, paired devices and pairing codes (see *Display access* below) |
-| `server/routes/` | Express routers: `public.js` (display API), `admin.js`, `screens.js`, `announce.js`, `hooks.js`, `system.js`, `localEvents.js`, `access.js` (links, devices, pairing) |
+| `server/routes/` | Express routers: `public.js` (display API), `admin.js`, `screens.js`, `announce.js`, `hooks.js`, `system.js`, `localEvents.js`, `access.js` (links, devices, pairing), `updates.js` |
+| `server/updates.js` | Daily check for a newer release, update settings, the request read by `marco-update.path` (see *Updates* below) |
 | `server/test/` | `node --test` suites and fixtures |
 | `web/index.html`, `web/display/` | The display (vanilla TypeScript + three.js) |
 | `web/admin/` | The admin panel (Preact + TypeScript) |
@@ -44,7 +46,7 @@ failing source never breaks the others.
 
 | Path | Content |
 |---|---|
-| `config.json` | The whole configuration (schema v2 below). Bumped `revision` on every save. |
+| `config.json` | The whole configuration (schema v2 below). Bumped `revision` on every save. The admin sends the revision it loaded (`baseRevision`) and a stale one gets `409 conflict`, so only real saves may bump it: background work (calendar refresh, pairing, display links, commands) never writes `config.json`. |
 | `secrets.json` | Password hash (scrypt; absent on a fresh install → setup wizard, `server/setup.js`), `setupCompletedAt`, session secret/epoch, Google refresh tokens per account, Home Assistant token, API tokens (SHA-256 hashes), `displayKeys` (one private-link key per screen id), `devices` (paired devices: name, screen, SHA-256 of the token, last seen). Mode 600. Never sent to displays. |
 | `photos/` | Gallery images; `photos/.thumbs/` thumbnails (480 px); `photos/.meta.json` size + focal point per file |
 | `cache/` | Source and feed caches |
@@ -52,11 +54,12 @@ failing source never breaks the others.
 | `activity.jsonl` | Activity log (≈ 5000 newest entries) |
 | `announcements.json` | Active announcements + history (50) |
 | `displays.json` | Known displays registry (≤ 100, offline > 30 days pruned) |
+| `update/` | `check.json` (last answer from GitHub, ETag), `settings.json`, `request` (while an update is asked for), `status.json` and `update.log` (last update) |
 
 ## Configuration schema (v2)
 
 The stored config has **global** sections shared by every screen and a list of **screen profiles**
-(`server/defaults.js` → `defaultConfig()`, TS `StoredConfig` in `web/shared/types.ts`; limits in `server/validate.js`).
+(`server/core/defaults.js` → `defaultConfig()`, TS `StoredConfig` in `web/shared/types.ts`; limits in `server/core/validate.js`).
 
 ```jsonc
 {
@@ -66,7 +69,7 @@ The stored config has **global** sections shared by every screen and a list of *
   // ---------- global ----------
   "calendar":   { "sources": [CalendarSource], "iconRules": [IconRule] },
   "datetime":   { "timezone": "Europe/Lisbon" },
-  "weather":    { "provider": "open-meteo", "locationName": "Lisbon, Portugal", "lat": 38.7223, "lon": -9.1393,
+  "weather":    { "provider": "open-meteo", "model": "best_match", "locationName": "Lisbon, Portugal", "lat": 38.7223, "lon": -9.1393,
                   "units": "metric", "haWeatherEntity": "", "haIndoorTempEntity": "", "haIndoorHumidityEntity": "" },
   "news":       { "feeds": [{ "id", "name", "url", "enabled" }], "maxItems": 30 },
   "todo":       { "items": [{ "id", "text", "done" }] },
@@ -85,9 +88,20 @@ The stored config has **global** sections shared by every screen and a list of *
 
 ```jsonc
 { "id": "s_main", "slug": "living-room", "name": "Living room",
-  "screen":     { "language": "en", "fontScale": 1, "theme": "dark", "accent": "#ff5a4e", "orientation": "auto",
+  "screen":     { "language": "en", "fontScale": 1, "theme": "dark", "style": "classic", "accent": "#ff5a4e", "orientation": "auto",
                   "customCss": "", "nightMode": { "enabled": false, "from": "23:00", "to": "07:00", "dim": 0.35 } },
-  "layout":     { "preset": "bigCalendar", "sidePanel": "left", "sideWidth": 0.36 },   // bigCalendar | leftRight | topBottom | bigTime | agenda
+                  // style: classic | modern, independent of the layout. Missing (older configs) = classic.
+                  // glass (Modern only): { "appearance": "auto", "opacity": 0.5, "blur": 18, "tint": "dark", "edge": true }
+                  //   appearance auto | clear | tinted, opacity 0..1 (see-through to solid), blur 0..40, tint dark | light | photo.
+                  //   web/shared/glass.ts turns it (plus the current photo) into --g-* CSS variables on <html>.
+  "layout":     { "preset": "bigCalendar", "sidePanel": "left", "sideWidth": 0.36, "people": null, "corner": "br" },
+                  // preset: bigCalendar | leftRight | topBottom | bigTime | agenda | today | people | photoFrame | twoWeeks | board | bedside
+                  // people: calendar ids shown as columns by 'people' (max 5; null = the first five without holidays / birthdays)
+                  // corner: where 'photoFrame' puts its clock card (tl | tr | bl | br)
+                  // today / people / photoFrame / board / bedside render into #view (web/display/widgets/views.ts, styles in
+                  //   styles-views.css + styles-modern.css). today and twoWeeks reuse the big calendar frame (#app also gets
+                  //   .preset-bigCalendar), people and board the top / bottom one (.preset-topBottom). twoWeeks is the month
+                  //   grid with weeks = 2. Each view drops whole rows that do not fit (never a row cut in half).
   "background": { "enabled": true, "source": "stock", "stockTopic": "nature", "order": "random", "intervalSec": 120, "brightness": 0.85,
                   "showMeta": false, "cover": true, "transition": "webgl", "ambient": "aurora", "panelBlur": 18, "panelShade": 0.5, "weatherFx": "simple" },
                   // source: stock | gallery | mixed · order: random | newest | name · transition: webgl | fade | none · ambient: aurora | particles | none · weatherFx: off | simple | rich
@@ -110,20 +124,21 @@ Global vs per-screen for the "split" sections:
 | screen, layout, background, message, alerts | none | all |
 | calendar | sources, iconRules | view settings + `sourceIds` |
 | datetime | timezone | clock and date format, enabled |
-| weather | provider, location, units, HA entities | enabled, forecastDays, showHourly, showPrecipChance |
+| weather | provider, model, location, units, HA entities | enabled, forecastDays, showHourly, showPrecipChance |
 | news | feeds, maxItems | enabled, rotateSec |
 | todo | items | enabled |
 | countdowns | items + inclusion settings | enabled, max |
 | localEvents, birthdays, eventRules, schedules, homeassistant, auth | all | none |
 
 The display and most admin pages work on a **flat view of one screen** (`AppConfig`): global sections merged with
-one profile (`flatView()` in `server/screens.js`, `projectScreen()` / `applyScreen()` in `web/shared/screens.ts`,
+one profile (`flatView()` in `server/core/screens.js`, `projectScreen()` / `applyScreen()` in `web/shared/screens.ts`,
 lossless round-trip).
 
 Item schemas (ids generated by the server when missing; prefixes in brackets):
 
-- **CalendarSource** `[c_]`: `type` `ics|google`, `name`, `url` (ics; `webcal://` accepted), `googleCalendarId` +
-  `googleAccount` (google), `color`, `emoji`, `kind` `generic|airbnb|birthdays|holidays`, `enabled`, `refreshMin`,
+- **CalendarSource** `[c_]`: `type` `ics|google|microsoft`, `name`, `url` (ics; `webcal://` accepted), `googleCalendarId` +
+  `googleAccount` (google), `microsoftCalendarId` + `microsoftAccount` (microsoft: Outlook.com, Hotmail and Microsoft
+  365 calendars through Microsoft Graph, with the server's own Entra app on a self-hosted server), `color`, `emoji`, `kind` `generic|airbnb|birthdays|holidays`, `enabled`, `refreshMin`,
   `insecureTls` (accept self-signed certificates for this feed only). Ids `local` and `birthdays` are reserved for the
   built-in pseudo-sources.
 - **IconRule**: `match` (keywords, case/accent-insensitive substring of title + description), `emoji`, `color|null`.
@@ -174,8 +189,12 @@ flagged by a local event or a style rule (nearest occurrence per title), sorted 
   15 min, photos per interval; the DOM is patched in place. Day rollover at midnight re-renders the grid.
 - Offline tolerant: last data is cached in `localStorage` per screen; a small status dot appears when the server is
   unreachable; SSE reconnects automatically.
-- Live mode comes from `GET /api/health`: `live: 'poll'` replaces the SSE stream with a config revision check every
-  90 s (no announcements, identify, night or remote reload in that mode). No field or `'sse'` keeps the stream.
+- Live mode comes from `GET /api/health`: `live: 'poll'` replaces the SSE stream with `GET /api/display/poll`. The
+  answer carries the same events as commands (announcements, identify, night, reload, photos, events), the config
+  revision, the screen id and the server version, so version reloads and moved devices work too. The server picks
+  the delay (`next`); the heartbeat drops to every 10 min. A server without the poll endpoint (404) gets a config
+  revision check every 90 s instead. No field or `'sse'` keeps the stream. `web/display/live.ts` holds one
+  `dispatch` that both transports use, so every event is checked the same way.
 - Raspberry Pi friendly: WebGL capped at 30 fps and `devicePixelRatio ≤ 1`, paused when hidden; `?lite=1` or
   `ambient: none` + `transition: fade` disables three.js entirely; CSS transforms/opacity only.
 - Photos are cropped around their focal point; displays report the bands covered by the clock and weather cards in the
@@ -211,7 +230,8 @@ flagged by a local event or a style rule (nearest occurrence per title), sorted 
   replaced by *Regenerate link* (SSE clients that used the old key get `revoked` and are closed).
 - Pairing (`server/pairing.js`, memory only): `POST /api/pair/start` → `{ sessionId, code }`; the display polls
   `POST /api/pair/status` with the secret `sessionId`; an admin claims the 6-character code
-  (`POST /api/admin/pair/claim`) for a screen → a device with a random 256-bit token is created (only its hash is
+  (`POST /api/admin/pair/claim`) for a screen in two steps (the first only answers which display is waiting, the
+  owner confirms, the second pairs) → a device with a random 256-bit token is created (only its hash is
   stored) and handed to the polling display once. Codes live 10 minutes, are single use and claimable only while the
   display polled in the last 15 s. Devices of a deleted screen move to the default screen.
 - New installs start `private`; a stored config without `security` (saved by 0.2 or older) is migrated to `open` on
@@ -270,12 +290,18 @@ photo routes, and the outbound address filter used by the unauthenticated setup 
   it says so and stops (`--force` rebuilds).
 - **Checkout installs** (made with `git clone` + `deploy/install.sh`): updated in place with `git pull --ff-only`,
   `npm ci` and `npm run build`; data stays in `<checkout>/data`.
+- **Updates from the admin** (release installs): see *Updates* below. The units are written by the installer from its
+  own text (never from files in the install folder, which belongs to the service user), on install and on every
+  update, also when the version is already up to date; `--uninstall` and a switch to a checkout remove them. The
+  files that run as root (`marco`, the stored installer, `marco.service`) are copied out of the release package
+  right after its checksum is checked, before the release folder is handed to the service user, and they replace
+  the old ones by rename (a running `marco update` keeps reading its own copy).
 - `/etc/marco.conf` records mode, layout, folder and user for the `marco` command (`deploy/marco`, installed to
   `/usr/local/bin/marco`); the installer keeps a copy of itself in `/usr/local/lib/marco/install.sh` for
   `marco update` and `marco uninstall`.
 - **Release tarball** (`scripts/package-release.sh`, run by `.github/workflows/release.yml` on `v*` tags after tests and
   the build): `server/` (without tests), `dist/`, `deploy/`, `install.sh`, `package.json`, `package-lock.json`,
-  `web/shared/iconRules.json`, `.env.example` and the license files. The release notes are the version's CHANGELOG
+  `.env.example` and the license files. The release notes are the version's CHANGELOG
   section (`scripts/release-notes.js`). The release also carries `install.sh` and `install.sh.sha256`, so the
   installer can be checked before it runs (`releases/latest/download/install.sh`).
 - **Demo video**: `marco-demo.mp4` (about 15 MB) is too big for the repository. It lives in a fixed pre-release
@@ -287,3 +313,34 @@ photo routes, and the outbound address filter used by the unauthenticated setup 
   `docs/screenshots/` (WebP).
 - Testing hooks (not for normal use): `--tarball-url <url>` or `MARCO_TARBALL_URL` installs a given tarball (its
   `.sha256` must sit next to it), `MARCO_REPO_URL` changes the git source.
+
+## Updates
+
+- **Check** (`server/updates.js`): once a day (first 1 to 3 minutes after start, then a 15 minute timer that only uses
+  the network when a day has passed, 6 hours after a failure) one `GET` to
+  `https://api.github.com/repos/mr-reb00t/marco/releases/latest` with `User-Agent: Marco` and the stored ETag
+  (`If-None-Match`). Drafts and pre-releases are ignored, the notes are the release body without its install
+  instructions. Off with `MARCO_UPDATE_CHECK=0` or the admin switch (`data/update/settings.json`). Testing only:
+  `MARCO_UPDATE_URL` points the check at another URL that answers like that API.
+- **Install type** (`detectInstall`): `/etc/marco.conf` with `MARCO_LAYOUT=release` and the running code under
+  `<dir>/releases/` is a release install, and the button works when `/etc/systemd/system/marco-update.path` exists
+  and `DATA_DIR` is `<dir>/data`; the Docker image sets `MARCO_INSTALL=docker`; a `.git` folder is a checkout. The
+  admin shows the button for the first and the commands for the others.
+- **Request**: `POST /api/admin/update/apply` (or the automatic update inside its window) writes `data/update/request`
+  and `status.json` (`requested`). `marco-update.path` (`PathExists=`) starts `marco-update.service` (oneshot, root),
+  which runs `marco update --requested`: it removes the request, writes `running`, runs the installer
+  (`--update --yes`) with its output going to `data/update/update.log`, and writes `done`, `current` or `failed`
+  (`rolledBack` when the previous version is running again). Everything in `data/update/` is written as the service
+  user. A request no service picks up within 2 minutes is reported as `stalled`.
+- **After the update** the installer restarts the server. Displays reload when the `serverVersion` of the stream's
+  `hello` (or of a poll answer) differs from their build; the admin polls `GET /api/admin/update` every 2.5 s while
+  an update runs and reloads itself once the server reports a newer version. The new server records the outcome in
+  the activity log (`update.finished` / `update.failed`) the first time it reads it.
+- **Automatic updates** (off by default): when on, the timer requests an update inside the `from`/`to` window (time
+  zone of *Date & time*, may cross midnight) once a newer version is known. A version that failed is not retried.
+- **Marco Cloud** (`runtime: 'workers'`, `features.updates: false`) has no banner; the admin build carries the
+  CHANGELOG section of its version (`__APP_NOTES__`, a separate chunk) and shows it once per browser after a newer
+  version (`components/Updates.tsx` `WhatsNewHost`).
+- **Testing the whole flow**: `MARCO_RELEASES_URL` (installer and `marco`, from `/etc/marco.conf` only) points at a
+  server that answers like GitHub releases (`<url>/latest` redirects to `<url>/tag/v<x.y.z>`, packages at
+  `<url>/download/v<x.y.z>/marco-<x.y.z>.tar.gz`).

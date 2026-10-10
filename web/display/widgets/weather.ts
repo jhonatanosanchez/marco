@@ -6,6 +6,19 @@ import { esc, setHTML } from '../dom';
 import { ICON, weatherIcon, windArrow } from '../icons';
 
 const r = (n: number | null | undefined) => (n === null || n === undefined || Number.isNaN(n) ? '–' : String(Math.round(n)));
+const has = (n: number | null | undefined): n is number => n !== null && n !== undefined && !Number.isNaN(n);
+
+/**
+ * Credit line for the data source ("Open-Meteo", "Open-Meteo · ECMWF IFS", "MET Norway"): the free sources ask
+ * for it (CC BY 4.0). A server from before 0.5 sends no source: its data is Open-Meteo.
+ */
+export function sourceCredit(w: WeatherResponse | null): string {
+  if (!w) return '';
+  const s = w.source;
+  if (!s) return 'Open-Meteo';
+  return [s.name, s.modelName, s.also].filter(Boolean).join(' · ');
+}
+
 const r1 = (n: number | null | undefined, lang: string) =>
   n === null || n === undefined || Number.isNaN(n) ? '–' : (Math.round(n * 10) / 10).toLocaleString(lang === 'en' ? 'en-GB' : 'es-ES');
 
@@ -23,7 +36,7 @@ export class Weather {
     const c = w.current;
     const f24 = cfg.datetime.format24;
     const speedUnit = wc.units === 'imperial' ? 'mph' : 'km/h';
-    const windVal = wc.units === 'imperial' ? c.windKmh / 1.609 : c.windKmh;
+    const windVal = has(c.windKmh) ? (wc.units === 'imperial' ? c.windKmh / 1.609 : c.windKmh) : null;
 
     const nowMs = Date.now();
     const sunsetMs = w.today?.sunset ? Date.parse(w.today.sunset) : NaN;
@@ -33,13 +46,14 @@ export class Weather {
       ? `<span class="m">${showSunset ? ICON.sunset : ICON.sunrise}<b>${esc(formatTime(new Date(showSunset ? sunsetMs : sunriseMs), tz, f24, cfg.datetime.showAmPm))}</b></span>`
       : '';
 
+    // A value the source does not give is left out rather than shown as a dash.
     const meta = [
-      `<span class="m">${ICON.thermo}<em>${esc(t('feelsLike'))}</em><b>${r(c.feelsLike)}°</b></span>`,
-      `<span class="m">${ICON.drop}<b>${r(c.humidity)}%</b></span>`,
-      `<span class="m">${windArrow(c.windDir)}<b>${r(windVal)}</b><em>${speedUnit}${c.windDirLabel ? ' ' + esc(c.windDirLabel) : ''}</em></span>`,
+      has(c.feelsLike) ? `<span class="m">${ICON.thermo}<em>${esc(t('feelsLike'))}</em><b>${r(c.feelsLike)}°</b></span>` : '',
+      has(c.humidity) ? `<span class="m">${ICON.drop}<b>${r(c.humidity)}%</b></span>` : '',
+      has(windVal) ? `<span class="m">${windArrow(c.windDir ?? 0)}<b>${r(windVal)}</b><em>${speedUnit}${c.windDirLabel ? ' ' + esc(c.windDirLabel) : ''}</em></span>` : '',
       sunHtml,
     ];
-    if (wc.showPrecipChance && w.today && w.today.precipChance >= 10) {
+    if (wc.showPrecipChance && w.today && has(w.today.precipChance) && w.today.precipChance >= 10) {
       meta.push(`<span class="m">${ICON.umbrella}<b>${r(w.today.precipChance)}%</b></span>`);
     }
     if (w.indoor && (w.indoor.temp !== null || w.indoor.humidity !== null)) {
@@ -48,11 +62,16 @@ export class Weather {
       );
     }
 
+    if (cfg.screen.style === 'modern') {
+      setHTML(this.root, this.modern(w, todayKey, meta.filter(Boolean)));
+      return;
+    }
+
     const hi = w.today ? `<span class="hilo"><b>${r(w.today.max)}°</b><i>/</i>${r(w.today.min)}°</span>` : '';
     let html = `<div class="wx-now">
         <div class="wx-icon">${weatherIcon(c.code, c.isDay, { animated: !ctx.lite })}</div>
         <div class="wx-temp">${r(c.temp)}<span class="deg">°</span></div>
-        <div class="wx-desc"><b>${esc(c.description || '')}</b>${hi}<span class="loc">${esc(w.locationName || wc.locationName || '')}</span></div>
+        <div class="wx-desc"><b>${esc(c.description || '')}</b>${hi}<span class="loc">${esc(w.locationName || wc.locationName || '')}</span><span class="wx-src">${esc(sourceCredit(w))}</span></div>
       </div>
       <div class="wx-meta">${meta.filter(Boolean).join('')}</div>`;
 
@@ -61,7 +80,7 @@ export class Weather {
         const d = new Date(h.time);
         const p = zonedParts(d, tz);
         const lbl = f24 ? `${p.hour}h` : `${p.hour % 12 === 0 ? 12 : p.hour % 12}${p.hour < 12 ? 'a' : 'p'}`;
-        const pc = wc.showPrecipChance && h.precipChance >= 20 ? `<span class="p">${r(h.precipChance)}%</span>` : '<span class="p"></span>';
+        const pc = wc.showPrecipChance && has(h.precipChance) && h.precipChance >= 20 ? `<span class="p">${r(h.precipChance)}%</span>` : '<span class="p"></span>';
         return `<div class="h"><span class="hl">${lbl}</span>${weatherIcon(h.code, h.isDay)}<span class="hv">${r(h.temp)}°</span>${pc}</div>`;
       });
       html += `<div class="wx-hourly">${hrs.join('')}</div>`;
@@ -76,12 +95,51 @@ export class Weather {
         const isToday = diffDays(todayKey, d.date) === 0;
         const name = isToday ? t('today') : weekdayName(lang, d.date, 'short');
         const a = ((d.min - lo) / span) * 100, b = ((d.max - lo) / span) * 100;
-        const pc = wc.showPrecipChance && d.precipChance >= 20 ? `<span class="p">${ICON.drop}${r(d.precipChance)}%</span>` : '';
+        const pc = wc.showPrecipChance && has(d.precipChance) && d.precipChance >= 20 ? `<span class="p">${ICON.drop}${r(d.precipChance)}%</span>` : '';
         return `<div class="dp${isToday ? ' today' : ''}"><span class="dn">${esc(name)}</span>${weatherIcon(d.code, true)}
           <span class="dmx">${r(d.max)}°</span><span class="rng"><i style="left:${a.toFixed(0)}%;right:${(100 - b).toFixed(0)}%"></i></span><span class="dmn">${r(d.min)}°</span>${pc}</div>`;
       });
       html += `<div class="wx-days">${pills.join('')}</div>`;
     }
     setHTML(this.root, html);
+  }
+
+  /**
+   * Modern style: an iOS Weather-like widget. Place and big temperature on the left, symbol, condition and
+   * high / low on the right, then a quiet details line, an hourly row (.wx-hourly, so the side-panel fitting
+   * still drops it first) and the next days as columns.
+   */
+  private modern(w: WeatherResponse, todayKey: string, meta: string[]): string {
+    const { cfg, lang, tz, t } = ctx;
+    const wc = cfg.weather;
+    const c = w.current!;
+    const f24 = cfg.datetime.format24;
+    const place = (w.locationName || wc.locationName || '').split(',')[0].trim();
+    const hilo = w.today
+      ? `<span class="wxm-hl"><span>${esc(t('hiShort'))} <b>${r(w.today.max)}°</b></span><span>${esc(t('loShort'))} <b>${r(w.today.min)}°</b></span></span>`
+      : '';
+    let html = `<div class="wxm-head">
+        <div class="wxm-main"><span class="wxm-loc">${esc(place)}</span><span class="wxm-temp">${r(c.temp)}°</span></div>
+        <div class="wxm-side"><span class="wxm-icon">${weatherIcon(c.code, c.isDay, { animated: !ctx.lite })}</span><span class="wxm-cond">${esc(c.description || '')}</span>${hilo}<span class="wx-src">${esc(sourceCredit(w))}</span></div>
+      </div>
+      <div class="wx-meta">${meta.join('')}</div>`;
+    if (wc.showHourly && this.opts.hourly !== false && w.hourly?.length) {
+      const hrs = w.hourly.slice(0, 6).map((h, i) => {
+        const p = zonedParts(new Date(h.time), tz);
+        const lbl = i === 0 ? t('now') : f24 ? `${p.hour}` : `${p.hour % 12 === 0 ? 12 : p.hour % 12}${p.hour < 12 ? 'a' : 'p'}`;
+        const pc = wc.showPrecipChance && has(h.precipChance) && h.precipChance >= 20 ? `<span class="p">${r(h.precipChance)}%</span>` : '';
+        return `<div class="h"><span class="hl">${esc(lbl)}</span>${weatherIcon(h.code, h.isDay)}${pc}<span class="hv">${r(h.temp)}°</span></div>`;
+      });
+      html += `<div class="wx-hourly">${hrs.join('')}</div>`;
+    }
+    if (this.opts.days !== false && w.daily?.length) {
+      const days = w.daily.filter((d) => d.date > todayKey).slice(0, Math.max(1, wc.forecastDays - 1));
+      const cols = days.map((d) => {
+        const pc = wc.showPrecipChance && has(d.precipChance) && d.precipChance >= 30 ? `<span class="p">${r(d.precipChance)}%</span>` : '';
+        return `<div class="wxm-day"><span class="dn">${esc(weekdayName(lang, d.date, 'short'))}</span>${weatherIcon(d.code, true)}${pc}<span class="dmx">${r(d.max)}°</span><span class="dmn">${r(d.min)}°</span></div>`;
+      });
+      if (cols.length) html += `<div class="wx-days wxm-days">${cols.join('')}</div>`;
+    }
+    return html;
   }
 }

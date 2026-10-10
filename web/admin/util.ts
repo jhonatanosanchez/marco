@@ -2,6 +2,7 @@ import { projectScreen, SLUG_RE } from '../shared/screens';
 import { locale } from './i18n';
 import type { AppConfig, CalendarSource, IconRule, SourceKind, StoredConfig } from '../shared/types';
 import { findKeyword } from '../../server/lib/keywords.js';
+import { caps as currentCaps, hasFeature, limitOf, type Caps, type LimitName } from './caps';
 
 export const uid = (prefix: string) =>
   `${prefix}_${Date.now().toString(36).slice(-4)}${Math.random().toString(36).slice(2, 7)}`;
@@ -84,7 +85,7 @@ export const EMOJI_GRID = [
   '🎬', '🎵', '🎮', '📺', '🎨', '📸', '⭐', '📌', '⏰', '🔔', '💬', '✅',
 ];
 
-/** Mirror of server/defaults.js DEFAULT_ICON_RULES (used by "restore defaults"). */
+/** Mirror of server/core/defaults.js DEFAULT_ICON_RULES (used by "restore defaults"). */
 export const DEFAULT_ICON_RULES: IconRule[] = [
   { id: 'r_birthday', match: ['cumple', 'birthday', 'aniversário', 'aniversario', 'faz anos'], emoji: '🎂', color: null },
   { id: 'r_checkout', match: ['check-out', 'checkout', 'check out', 'salida huésped'], emoji: '🧳', color: null },
@@ -109,7 +110,8 @@ export const DEFAULT_ICON_RULES: IconRule[] = [
 
 export function guessKind(nameOrId: string): SourceKind {
   const s = normalize(nameOrId);
-  if (/airbnb|booking|reserv|al\b|alojamento/.test(s)) return 'airbnb';
+  // vacation rentals only on clear words: a bare "al" also matched "Portugal", "Personal" or "Festival"
+  if (/airbnb|booking|vrbo|reserv|alojamento/.test(s)) return 'airbnb';
   if (/birthday|cumple|aniversar|contacts/.test(s)) return 'birthdays';
   if (/holiday|festivo|feriado/.test(s)) return 'holidays';
   return 'generic';
@@ -125,9 +127,17 @@ export function formatBytes(n: number): string {
 
 export type Errors = Record<string, string>;
 
-/** Client-side validation. Keys are dotted paths used by fields to show inline errors. Messages are Spanish keys for t(). */
-export function validateConfig(c: AppConfig): Errors {
+/** Message of every "over the limit" error (the server answers limit_exceeded for the same cases). */
+export const LIMIT_EXCEEDED = 'Supera el máximo permitido';
+
+/** UTF-8 size of a string (custom CSS limit). */
+export const cssBytes = (v: string) => new TextEncoder().encode(v).length;
+
+/** Client-side validation. Keys are dotted paths used by fields to show inline errors. Messages are Spanish keys for t().
+ *  Rules for features the server turns off (Home Assistant, password login) are skipped. */
+export function validateConfig(c: AppConfig, caps: Caps = currentCaps()): Errors {
   const e: Errors = {};
+  const ha = hasFeature(caps, 'homeassistant');
   const s = c.screen;
   if (!s.name.trim()) e['screen.name'] = 'Obligatorio';
   if (!HEX_RE.test(s.accent)) e['screen.accent'] = 'Color no válido';
@@ -146,7 +156,11 @@ export function validateConfig(c: AppConfig): Errors {
     if (!src.name.trim()) e[`${p}.name`] = 'Obligatorio';
     if (!HEX_RE.test(src.color)) e[`${p}.color`] = 'Color no válido';
     if (src.type === 'ics') {
-      if (!src.url || !isHttpUrl(src.url, true)) e[`${p}.url`] = 'URL no válida (http, https o webcal)';
+      // A hidden URL (see CalendarSource.urlHidden) is still stored on the server: an empty field keeps it.
+      const kept = src.urlHidden && !src.url;
+      if (!kept && (!src.url || !isHttpUrl(src.url, true))) e[`${p}.url`] = 'URL no válida (http, https o webcal)';
+    } else if (src.type === 'microsoft') {
+      if (!src.microsoftAccount || !src.microsoftCalendarId) e[`${p}.url`] = 'Falta la cuenta o el calendario de Microsoft';
     } else {
       if (!src.googleAccount || !src.googleCalendarId) e[`${p}.url`] = 'Falta la cuenta o el calendario de Google';
     }
@@ -170,7 +184,7 @@ export function validateConfig(c: AppConfig): Errors {
   if (w.enabled) {
     if (!(w.lat >= -90 && w.lat <= 90)) e['weather.lat'] = 'Latitud entre -90 y 90';
     if (!(w.lon >= -180 && w.lon <= 180)) e['weather.lon'] = 'Longitud entre -180 y 180';
-    if (w.provider === 'homeassistant' && !w.haWeatherEntity) e['weather.haWeatherEntity'] = 'Elige una entidad weather.*';
+    if (ha && w.provider === 'homeassistant' && !w.haWeatherEntity) e['weather.haWeatherEntity'] = 'Elige una entidad weather.*';
   }
   c.news.feeds.forEach((f) => {
     if (!f.name.trim()) e[`feed.${f.id}.name`] = 'Obligatorio';
@@ -178,12 +192,14 @@ export function validateConfig(c: AppConfig): Errors {
   });
   if (!(c.news.rotateSec >= 3)) e['news.rotateSec'] = 'Mínimo 3 s';
   if (!(c.news.maxItems >= 1 && c.news.maxItems <= 200)) e['news.maxItems'] = 'Entre 1 y 200';
-  if (c.homeassistant.enabled && !isHttpUrl(c.homeassistant.url)) e['homeassistant.url'] = 'URL no válida';
+  if (ha && c.homeassistant.enabled && !isHttpUrl(c.homeassistant.url)) e['homeassistant.url'] = 'URL no válida';
   c.auth.allowedGoogleEmails.forEach((m, i) => {
     if (!EMAIL_RE.test(m)) e[`auth.allowedGoogleEmails.${i}`] = 'Email no válido';
   });
-  if (!c.auth.passwordLoginEnabled && c.auth.allowedGoogleEmails.length === 0)
+  if (hasFeature(caps, 'passwordLogin') && !c.auth.passwordLoginEnabled && c.auth.allowedGoogleEmails.length === 0)
     e['auth.passwordLoginEnabled'] = 'Añade un email de Google permitido antes de desactivar la contraseña';
+  const cssMax = caps.limits.customCssBytes;
+  if (typeof cssMax === 'number' && hasFeature(caps, 'customCss') && cssBytes(s.customCss) > cssMax) e['screen.customCss'] = LIMIT_EXCEEDED;
   return e;
 }
 
@@ -265,12 +281,32 @@ export interface AllErrors {
   total: number;
 }
 
-/** Validate the whole stored config: every screen's flat view + the global lists. */
-export function validateAll(full: StoredConfig): AllErrors {
-  const global: Errors = { ...validateGlobal(full) };
+/** List sizes checked against the limits (key `limit.<name>`, see sectionForError). */
+const LIMITED_LISTS: [LimitName, (c: StoredConfig) => number][] = [
+  ['screens', (c) => c.screens.length],
+  ['sources', (c) => c.calendar.sources.length],
+  ['newsFeeds', (c) => c.news?.feeds?.length ?? 0],
+  ['localEvents', (c) => c.localEvents?.items?.length ?? 0],
+  ['birthdays', (c) => c.birthdays?.items?.length ?? 0],
+  ['countdowns', (c) => c.countdowns?.items?.length ?? 0],
+];
+
+/** `limit.<name>` errors for lists longer than the limit. */
+export function validateLimits(full: StoredConfig, caps: Caps = currentCaps()): Errors {
+  const e: Errors = {};
+  for (const [name, count] of LIMITED_LISTS) {
+    const max = limitOf(caps, name);
+    if (max != null && count(full) > max) e[`limit.${name}`] = LIMIT_EXCEEDED;
+  }
+  return e;
+}
+
+/** Validate the whole stored config: every screen's flat view + the global lists + the limits. */
+export function validateAll(full: StoredConfig, caps: Caps = currentCaps()): AllErrors {
+  const global: Errors = { ...validateGlobal(full), ...validateLimits(full, caps) };
   const screens: Record<string, Errors> = {};
   for (const s of full.screens) {
-    const errs = validateConfig(projectScreen(full, s.id));
+    const errs = validateConfig(projectScreen(full, s.id), caps);
     const mine: Errors = {};
     for (const [k, v] of Object.entries(errs)) {
       if (isPerScreenKey(k)) mine[k] = v;
@@ -304,7 +340,10 @@ export function sectionForServerPath(path: string): { screenIndex: number | null
 }
 
 /** Map an error key to the nav section that owns it (for "jump to error"). */
+const LIMIT_SECTION: Record<string, string> = { screens: 'screens', sources: 'calendars', newsFeeds: 'news', localEvents: 'local', birthdays: 'birthdays', countdowns: 'countdowns' };
+
 export function sectionForError(key: string): string {
+  if (key.startsWith('limit.')) return LIMIT_SECTION[key.slice(6)] ?? 'home';
   if (key.startsWith('screen.')) return 'screen';
   if (key.startsWith('layout.')) return 'layout';
   if (key.startsWith('message.')) return 'message';
@@ -333,4 +372,10 @@ export function allSourceOptions(c: Pick<StoredConfig, 'calendar' | 'localEvents
   out.push({ id: 'local', name: c.localEvents.name || 'Local', color: c.localEvents.color, emoji: c.localEvents.emoji || '📅' });
   out.push({ id: 'birthdays', name: c.birthdays.name || 'Cumpleaños', color: c.birthdays.color, emoji: c.birthdays.emoji || '🎂' });
   return out;
+}
+
+/** First name for the dashboard greeting; none when the account name is an email address (Marco Cloud accounts). */
+export function greetingName(name?: string | null): string {
+  const n = (name || '').trim();
+  return n && !n.includes('@') ? n.split(/\s+/)[0] : '';
 }

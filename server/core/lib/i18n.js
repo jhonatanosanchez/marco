@@ -2,7 +2,7 @@
 export const LANGS = ['es', 'en', 'pt'];
 export const lang = (l) => (LANGS.includes(l) ? l : 'en');
 
-// WMO weather interpretation codes (Open-Meteo).
+// WMO weather interpretation codes (Open-Meteo; 68 and 69 for the other providers' sleet).
 const WMO = {
   0: ['Despejado', 'Clear sky', 'Céu limpo'],
   1: ['Mayormente despejado', 'Mainly clear', 'Céu pouco nublado'],
@@ -20,6 +20,9 @@ const WMO = {
   65: ['Lluvia intensa', 'Heavy rain', 'Chuva forte'],
   66: ['Lluvia helada', 'Freezing rain', 'Chuva gelada'],
   67: ['Lluvia helada intensa', 'Heavy freezing rain', 'Chuva gelada forte'],
+  // 68, 69: rain and snow mixed (WMO 4677); MET Norway and Pirate Weather "sleet"
+  68: ['Aguanieve', 'Sleet', 'Água-neve'],
+  69: ['Aguanieve intensa', 'Heavy sleet', 'Água-neve forte'],
   71: ['Nevada ligera', 'Light snow', 'Neve fraca'],
   73: ['Nevada', 'Snow', 'Neve'],
   75: ['Nevada intensa', 'Heavy snow', 'Neve forte'],
@@ -77,7 +80,7 @@ export const requestLang = (req) => {
   return LANGS.includes(explicit) ? explicit : langFromHeader(req?.get?.('accept-language'));
 };
 
-// Import-preview summaries (server/backups.js). Nouns: [one, many, grammatical gender ('f'|'m')].
+// Import-preview summaries (server/core/backupsCore.js). Nouns: [one, many, grammatical gender ('f'|'m')].
 const NOUNS = {
   screen: { es: ['pantalla', 'pantallas', 'f'], en: ['screen', 'screens'], pt: ['ecrã', 'ecrãs', 'm'] },
   source: { es: ['fuente', 'fuentes', 'f'], en: ['source', 'sources'], pt: ['fonte', 'fontes', 'f'] },

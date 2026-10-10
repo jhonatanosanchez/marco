@@ -20,6 +20,14 @@ You should get an answer within a week.
 - The installer writes `.env` and the kiosk's `kiosk.env` with mode 600 and never prints a private link in full.
 - The service runs as a normal user (yours, or a `marco` system user for a server-only install made as root), unless
   you pass `--user root` yourself.
+- Updates started from the admin (release installs): the server only creates `<data>/update/request`. A systemd path
+  unit written by the installer (`marco-update.path`) starts `marco-update.service`, which runs
+  `marco update --requested` as root. It reads nothing from the request except that it exists, writes its progress
+  into the data folder as the service user (so a link planted there cannot make root overwrite another file) and
+  always installs the latest release, checksum checked. The files that run as root (the `marco` command, the stored
+  installer, the systemd units) come from the verified package or the installer itself, never from the install
+  folder, which belongs to the service user.
+- The daily update check is a single `GET` to the GitHub API with no identifier; `MARCO_UPDATE_CHECK=0` turns it off.
 
 ## Deployment model (what is and is not protected)
 
@@ -133,8 +141,10 @@ how much of it.
   writes access logs, leave out the query string (Caddy logs nothing by default; for nginx use a `log_format` without
   `$request_uri`/`$args`, or `access_log off` for `/api/stream` and `/media/`).
 - *Social engineering of the pairing dialog* ("type this code to fix your screen"): pairing gives the code's display a
-  token for the screen the admin picks. Only type codes shown on your own screens; the new device appears in
-  *Connected screens → Paired devices*, where it can be revoked.
+  token for the screen the admin picks. The claim has two steps: the admin first shows the address of the display
+  that is waiting with that code and asks the owner to confirm it is the screen in front of them; only the second
+  request pairs. Only type codes shown on your own screens; the new device appears in *Connected screens → Paired
+  devices*, where it can be revoked.
 - *Malicious websites in a family member's browser* (CSRF, DNS rebinding): admin actions (claim, regenerate, revoke)
   need the session cookie (`SameSite=Lax`), JSON bodies and a matching `Origin`; unknown host names get `421`. The
   pairing status endpoint needs the secret session id.

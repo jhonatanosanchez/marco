@@ -18,8 +18,8 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { defaultConfig, defaultScreenProfile } from '../server/defaults.js';
-import { validateConfig } from '../server/validate.js';
+import { defaultConfig, defaultScreenProfile } from '../server/core/defaults.js';
+import { validateConfig } from '../server/core/validate.js';
 import { hashPassword } from '../server/auth.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

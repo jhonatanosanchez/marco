@@ -4,10 +4,12 @@ import type { AppConfig, AuthMeResponse, DisplayInfo, Lang, SetupStatus, StoredC
 import { api, ApiError } from './api';
 import { BrandMark } from './components/BrandMark';
 import { CommandPalette, type PaletteItem } from './components/CommandPalette';
-import { confirmDialog, DialogHost, toast, ToastHost } from './components/feedback';
+import { choiceDialog, confirmDialog, DialogHost, toast, ToastHost } from './components/feedback';
+import { saveWithRevision, type ConflictChoice } from './configMerge';
 import { Icon, type IconName } from './components/icons';
 import { ScreenSwitcher } from './components/ScreenSwitcher';
 import { openPairDialog, PairDialogHost } from './components/DisplayAccess';
+import { UpdateBanner, UpdateDialogHost, WhatsNewHost } from './components/Updates';
 import { Button, setScopeScreenName } from './components/ui';
 import { getLang, initialLang, setLang, nScreens, t } from './i18n';
 import { setIntent } from './intent';
@@ -15,6 +17,9 @@ import { Login } from './Login';
 import { SetupWizard, takeSetupToken } from './Setup';
 import { Preview } from './Preview';
 import { SETTINGS_INDEX } from './searchIndex';
+import { caps as currentCaps, has, hasFeature, loadCaps, type Caps } from './caps';
+import { accountNav, filterActions, filterNav, filterSettings, NAV_ITEMS, type NavMeta } from './navFilter';
+import { accountLinks, accountMode, authRedirect, logoutRedirect } from './authRedirect';
 import { ActivitySection } from './sections/Activity';
 import { AlertsSection } from './sections/Alerts';
 import { ApiSection } from './sections/Api';
@@ -39,47 +44,80 @@ import { ScreensSection } from './sections/Screens';
 import { StatusSection } from './sections/Status';
 import { WeatherSection } from './sections/Weather';
 import { UNAUTHORIZED_EVENT } from './api';
+import { usesPrivateLinks, useScreenUrl } from './displayLinks';
+import { withPollNote } from './liveNote';
 import { clone, produce, sectionForError, sectionForServerPath, validateAll, type Errors } from './util';
 
-interface NavItem {
-  id: string;
-  label: string;
-  icon: IconName;
-  group: string;
+interface NavItem extends NavMeta {
   comp: (p: SectionProps) => any;
-  enabled?: (c: AppConfig) => boolean;
-  /** page edits the selected screen (shows the switcher emphasised) */
-  perScreen?: boolean;
-  keywords?: string;
 }
 
-const NAV: NavItem[] = [
-  { id: 'home', label: 'Inicio', icon: 'home2', group: '', comp: HomeSection, keywords: 'dashboard resumen panel' },
-  { id: 'layout', label: 'Diseño', icon: 'layout', group: 'Pantalla', comp: LayoutSection, perScreen: true },
-  { id: 'background', label: 'Fondo', icon: 'image', group: 'Pantalla', comp: BackgroundSection, enabled: (c) => c.background.enabled, perScreen: true },
-  { id: 'screen', label: 'Ajustes', icon: 'settings', group: 'Pantalla', comp: ScreenSection, perScreen: true },
-  { id: 'datetime', label: 'Fecha y hora', icon: 'clock', group: 'Pantalla', comp: DateTimeSection, enabled: (c) => c.datetime.enabled, perScreen: true },
-  { id: 'calendars', label: 'Calendarios', icon: 'calendar', group: 'Contenido', comp: CalendarsSection, enabled: (c) => c.calendar.enabled },
-  { id: 'local', label: 'Eventos locales', icon: 'edit', group: 'Contenido', comp: LocalEventsSection, enabled: (c) => c.localEvents.enabled },
-  { id: 'birthdays', label: 'Cumpleaños', icon: 'cake', group: 'Contenido', comp: BirthdaysSection, enabled: (c) => c.birthdays.enabled },
-  { id: 'filters', label: 'Filtros y cambios', icon: 'filter', group: 'Contenido', comp: FiltersSection },
-  { id: 'icons', label: 'Iconos', icon: 'tag', group: 'Contenido', comp: IconRulesSection },
-  { id: 'countdowns', label: 'Cuentas atrás', icon: 'hourglass', group: 'Contenido', comp: CountdownsSection, enabled: (c) => c.countdowns.enabled },
-  { id: 'weather', label: 'Tiempo', icon: 'cloud', group: 'Contenido', comp: WeatherSection, enabled: (c) => c.weather.enabled },
-  { id: 'news', label: 'Noticias', icon: 'news', group: 'Contenido', comp: NewsSection, enabled: (c) => c.news.enabled },
-  { id: 'todo', label: 'Tareas', icon: 'checklist', group: 'Contenido', comp: TodoSection, enabled: (c) => c.todo.enabled },
-  { id: 'message', label: 'Mensaje', icon: 'message', group: 'Contenido', comp: MessageSection, enabled: (c) => c.message.enabled, perScreen: true },
-  { id: 'alerts', label: 'Avisos', icon: 'megaphone', group: 'Avisos', comp: AlertsSection, keywords: 'announce anuncios mensajes programados' },
-  { id: 'photos', label: 'Galería', icon: 'photos', group: 'Integraciones', comp: PhotosSection },
-  { id: 'homeassistant', label: 'Home Assistant', icon: 'home', group: 'Integraciones', comp: HomeAssistantSection, enabled: (c) => c.homeassistant.enabled },
-  { id: 'api', label: 'API y webhooks', icon: 'code', group: 'Integraciones', comp: ApiSection, keywords: 'tokens webhook' },
-  { id: 'screens', label: 'Pantallas', icon: 'monitor', group: 'Sistema', comp: ScreensSection, keywords: 'perfiles profiles' },
-  { id: 'displays', label: 'Pantallas conectadas', icon: 'wifi', group: 'Sistema', comp: DisplaysSection, keywords: 'kiosk dispositivos' },
-  { id: 'backups', label: 'Copias de seguridad', icon: 'archive', group: 'Sistema', comp: BackupsSection, keywords: 'backup export import' },
-  { id: 'activity', label: 'Actividad', icon: 'history', group: 'Sistema', comp: ActivitySection, keywords: 'log registro' },
-  { id: 'security', label: 'Seguridad', icon: 'shield', group: 'Sistema', comp: SecuritySection },
-  { id: 'status', label: 'Estado', icon: 'activity', group: 'Sistema', comp: StatusSection },
-];
+const SECTIONS: Record<string, (p: SectionProps) => any> = {
+  home: HomeSection,
+  layout: LayoutSection,
+  background: BackgroundSection,
+  screen: ScreenSection,
+  datetime: DateTimeSection,
+  calendars: CalendarsSection,
+  local: LocalEventsSection,
+  birthdays: BirthdaysSection,
+  filters: FiltersSection,
+  icons: IconRulesSection,
+  countdowns: CountdownsSection,
+  weather: WeatherSection,
+  news: NewsSection,
+  todo: TodoSection,
+  message: MessageSection,
+  alerts: AlertsSection,
+  photos: PhotosSection,
+  homeassistant: HomeAssistantSection,
+  api: ApiSection,
+  screens: ScreensSection,
+  displays: DisplaysSection,
+  backups: BackupsSection,
+  activity: ActivitySection,
+  security: SecuritySection,
+  status: StatusSection,
+};
+
+const NAV: NavItem[] = NAV_ITEMS.map((n) => ({ ...n, comp: SECTIONS[n.id] }));
+
+/** The Account page (multi-tenant servers only) is its own chunk, so self-hosted installs never load it. */
+type SectionComp = (p: SectionProps) => any;
+let accountChunk: Promise<SectionComp> | null = null;
+function AccountPage(p: SectionProps) {
+  const [Comp, setComp] = useState<SectionComp | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    accountChunk ??= import('./sections/Account').then((m) => m.AccountSection);
+    accountChunk.then(
+      (c) => alive && setComp(() => c),
+      () => {
+        accountChunk = null;
+        if (alive) setFailed(true);
+      }
+    );
+    return () => {
+      alive = false;
+    };
+  }, []);
+  if (Comp) return <Comp {...p} />;
+  if (failed)
+    return (
+      <div class="boot__err">
+        <Icon name="alert" size={28} />
+        <h2>{t('No se puede conectar con el servidor')}</h2>
+        <Button variant="primary" icon="refresh" onClick={() => location.reload()}>
+          {t('Reintentar')}
+        </Button>
+      </div>
+    );
+  return <span class="spinner spinner--lg" />;
+}
+
+/** Path and hash of this page, the `next` the account login comes back to. */
+const herePath = () => location.pathname + location.hash;
 
 const parseHash = () => {
   const raw = location.hash.replace(/^#\/?/, '');
@@ -140,7 +178,26 @@ function oauthErrorMessage(code: string): string {
     google_exchange_failed: 'Error al comunicar con Google. Inténtalo de nuevo.',
     google_access_denied: 'Has cancelado el acceso con Google.',
   };
+  if (code.startsWith('microsoft_')) return microsoftErrorMessage(code);
   return map[code] ? t(map[code]) : `${t('Error de Google')}: ${code}`;
+}
+
+/** Codes the Microsoft calendar connect (Marco Cloud, /auth/microsoft/callback) sends back, all prefixed microsoft_. */
+function microsoftErrorMessage(code: string): string {
+  const map: Record<string, string> = {
+    microsoft_not_configured: 'Los calendarios de Microsoft no están disponibles para esta cuenta.',
+    microsoft_invalid_state: 'La sesión con Microsoft caducó. Inténtalo de nuevo.',
+    microsoft_missing_code: 'Microsoft no devolvió autorización. Inténtalo de nuevo.',
+    microsoft_no_refresh_token: 'Microsoft no concedió acceso permanente. Vuelve a vincular la cuenta.',
+    microsoft_scope_denied: 'No se concedió permiso para leer el calendario.',
+    microsoft_no_email: 'No se pudo saber el email de la cuenta de Microsoft.',
+    microsoft_too_many_accounts: 'Has llegado al máximo de cuentas de Microsoft vinculadas.',
+    microsoft_exchange_failed: 'Error al comunicar con Microsoft. Inténtalo de nuevo.',
+    microsoft_temporarily_unavailable: 'Microsoft no responde ahora mismo. Inténtalo de nuevo en unos minutos.',
+    microsoft_access_denied: 'Has cancelado el acceso con Microsoft.',
+    microsoft_consent_required: 'Tu organización tiene que aprobar Marco antes de que puedas vincular esta cuenta.',
+  };
+  return map[code] ? t(map[code]) : `${t('Error de Microsoft')}: ${code.slice('microsoft_'.length)}`;
 }
 
 /** Scroll to an element id and flash it (palette / deep links). */
@@ -164,6 +221,7 @@ export function App() {
     return l;
   });
   const [me, setMe] = useState<AuthMeResponse | null>(null);
+  const [caps, setCapsState] = useState<Caps>(() => currentCaps());
   const [setup, setSetup] = useState<SetupStatus | null>(null);
   const [bootErr, setBootErr] = useState('');
   const [loginErr, setLoginErr] = useState<string | undefined>();
@@ -187,6 +245,8 @@ export function App() {
   const changeLang = (l: Lang) => {
     setLang(l);
     setLangState(l);
+    // Account logins keep the language on the account too (emails and account pages follow it).
+    if (me?.user?.method === 'account' && has('accountMenu')) api.accountLang(l).catch(() => {});
   };
 
   useEffect(() => {
@@ -198,8 +258,10 @@ export function App() {
   /* ---------- boot & auth */
   const loadMe = useCallback(async () => {
     try {
-      const m = await api.me();
-      if (m.needsSetup) {
+      // Capabilities and the session in parallel; a server without /api/health keeps every feature on.
+      const [c, m] = await Promise.all([loadCaps(api.health), api.me()]);
+      setCapsState(c);
+      if (m.needsSetup && hasFeature(c, 'setupWizard')) {
         // Fresh install: the wizard replaces the login. First visit follows the browser language (server hint).
         const st = await api.setupStatus();
         if (st.needsSetup) {
@@ -232,9 +294,11 @@ export function App() {
     const qs = new URLSearchParams(location.search);
     const err = qs.get('error');
     const g = qs.get('connected') || qs.get('google');
+    const ms = qs.get('microsoft');
     const errMsg = err ? oauthErrorMessage(err) : '';
     if (g) setTimeout(() => toast(`${t('Cuenta de Google vinculada')}: ${g}`, 'ok'), 400);
-    if (err || g) history.replaceState(null, '', location.pathname + location.hash);
+    if (ms) setTimeout(() => toast(`${t('Cuenta de Microsoft vinculada')}: ${ms}`, 'ok'), 400);
+    if (err || g || ms) history.replaceState(null, '', location.pathname + location.hash);
     loadMe().then((m) => {
       if (m?.user) {
         loadConfig();
@@ -243,8 +307,28 @@ export function App() {
     });
   }, []);
 
+  const meRef = useRef(me);
+  meRef.current = me;
+  /** Set right before the page leaves on purpose (logout, account login), so "unsaved changes" does not ask again. */
+  const leavingRef = useRef(false);
+
+  /* ---------- account mode (Marco Cloud): signing in happens on the account pages */
+  useEffect(() => {
+    if (!me || me.user || setup) return;
+    const url = authRedirect(me, caps, herePath());
+    if (url) {
+      leavingRef.current = true;
+      location.assign(url);
+    }
+  }, [me, caps, setup]);
+
   useEffect(() => {
     const on = () => {
+      const url = authRedirect(meRef.current, currentCaps(), herePath());
+      if (url) {
+        location.assign(url);
+        return;
+      }
       setMe((m) => (m ? { ...m, user: null } : m));
       setLoginErr(t('La sesión ha caducado. Vuelve a entrar.'));
       loadMe();
@@ -332,10 +416,13 @@ export function App() {
   // Preview and "view" links use the SAVED slug: the draft one changes on every keystroke and the server
   // doesn't know it until saved (null = screen not saved yet).
   const savedSlug = (curScreen && saved?.screens.find((s) => s.id === curScreen.id)?.slug) || null;
+  // Private link on the display origin (Marco Cloud, self-hosted private mode) or /?screen=<slug> (open mode).
+  const previewUrl = useScreenUrl(saved, savedSlug ? curScreen?.id : null, { preview: true });
+  const viewUrl = useScreenUrl(saved, savedSlug ? curScreen?.id : null);
 
   /* ---------- draft state */
   const dirty = useMemo(() => !!draft && !!saved && JSON.stringify(draft) !== JSON.stringify(saved), [draft, saved]);
-  const allErrors = useMemo(() => (draft ? validateAll(draft) : { global: {}, screens: {}, total: 0 }), [draft]);
+  const allErrors = useMemo(() => (draft ? validateAll(draft, caps) : { global: {}, screens: {}, total: 0 }), [draft, caps]);
   const errors: Errors = useMemo(() => ({ ...allErrors.global, ...(allErrors.screens[screenId] ?? {}) }), [allErrors, screenId]);
   const errorKeys = Object.keys(errors);
   const visibleErrors = showErrors || dirty ? errors : {};
@@ -352,6 +439,8 @@ export function App() {
 
   const draftRef = useRef(draft);
   draftRef.current = draft;
+  const savedRef = useRef(saved);
+  savedRef.current = saved;
 
   /** Jump to the first error: switch screen if needed, then route + anchor. */
   const revealError = useCallback((all: ReturnType<typeof validateAll>) => {
@@ -373,6 +462,23 @@ export function App() {
     }
   }, []);
 
+  /** After a 409: the config was saved elsewhere (another tab or device, or the server itself after a Google sign-in). */
+  const askConflict = (): Promise<ConflictChoice> =>
+    choiceDialog<'reload' | 'overwrite'>({
+      title: t('La configuración ha cambiado mientras editabas'),
+      body: (
+        <>
+          <p>{t('Se ha guardado desde otra pestaña u otro dispositivo.')}</p>
+          <p>{t('Puedes cargar la versión guardada (pierdes lo que has cambiado aquí) o guardar tus cambios encima. Lo que no hayas tocado se queda como está en la versión guardada.')}</p>
+        </>
+      ),
+      cancel: t('Seguir editando'),
+      choices: [
+        { value: 'reload', label: t('Cargar la versión guardada'), kind: 'ghost' },
+        { value: 'overwrite', label: t('Guardar mis cambios'), kind: 'primary' },
+      ],
+    });
+
   const save = useCallback(async (): Promise<boolean> => {
     const d = draftRef.current;
     if (!d) return false;
@@ -384,21 +490,35 @@ export function App() {
       return false;
     }
     setSaving(true);
+    let cur = d;
     try {
-      const c = await api.saveConfig(d);
-      setSaved(c);
-      setDraft(c);
+      const out = await saveWithRevision({
+        draft: d,
+        base: savedRef.current ?? d,
+        put: (body) => api.saveConfig(body),
+        get: () => api.getConfig(),
+        choose: askConflict,
+        isConflict: (e) => e instanceof ApiError && e.status === 409 && e.code === 'conflict',
+        merged: (m, theirs) => {
+          cur = m;
+          setSaved(theirs);
+          setDraft(m);
+        },
+      });
+      if (out.status === 'cancelled') return false;
+      setSaved(out.config);
+      setDraft(out.config);
       setShowErrors(false);
       setPreviewKey((k) => k + 1);
-      toast(t('Cambios guardados · la pantalla se actualizará sola'));
-      return true;
+      toast(out.status === 'saved' ? t('Cambios guardados · la pantalla se actualizará sola') : t('Se ha cargado la versión guardada'), out.status === 'saved' ? 'ok' : 'info');
+      return out.status === 'saved';
     } catch (e) {
       const ae = e as ApiError;
       const details = (ae.body as any)?.details as { path: string; message: string }[] | undefined;
       if (ae.status === 400 && details?.length) {
         const first = sectionForServerPath(details[0].path);
         if (first.screenIndex != null) {
-          const scr = d.screens[first.screenIndex];
+          const scr = cur.screens[first.screenIndex];
           if (scr && scr.id !== screenIdRef.current) {
             setScreenId(scr.id);
             toast(t('Error en la pantalla {name}', { name: scr.name }), 'error');
@@ -441,7 +561,7 @@ export function App() {
       }
     };
     const onUnload = (e: BeforeUnloadEvent) => {
-      if (dirty) {
+      if (dirty && !leavingRef.current) {
         e.preventDefault();
         e.returnValue = '';
       }
@@ -457,7 +577,7 @@ export function App() {
   const refreshDisplays = async (screens?: string[]) => {
     try {
       await api.refreshDisplays(screens);
-      toast(t('Pantallas recargándose…'), 'info');
+      toast(withPollNote(t('Pantallas recargándose…')), 'info');
       setPreviewKey((k) => k + 1);
     } catch (e) {
       toast((e as ApiError).message, 'error');
@@ -468,7 +588,7 @@ export function App() {
     try {
       const r = await api.displayCommand({ action, mode });
       const label = action === 'identify' ? t('Identificando pantallas') : mode === 'on' ? t('Modo noche activado') : mode === 'off' ? t('Modo noche desactivado') : t('Modo noche automático');
-      toast(`${label} · ${nScreens(r.delivered)}`, r.delivered ? 'ok' : 'info');
+      toast(r.delivered ? withPollNote(`${label} · ${nScreens(r.delivered)}`) : `${label} · ${nScreens(r.delivered)}`, r.delivered ? 'ok' : 'info');
     } catch (e) {
       toast((e as ApiError).message, 'error');
     }
@@ -479,10 +599,18 @@ export function App() {
       const ok = await confirmDialog({ title: t('¿Salir sin guardar?'), body: t('Tienes cambios sin guardar.'), confirm: t('Salir'), danger: true });
       if (!ok) return;
     }
+    let res: unknown = null;
     try {
-      await api.logout();
+      res = await api.logout();
     } catch {
       /* ignore */
+    }
+    const dest = logoutRedirect(me, caps, res);
+    if (dest) {
+      setMenuOpen(false);
+      leavingRef.current = true;
+      location.assign(dest);
+      return;
     }
     setSaved(null);
     setDraft(null);
@@ -490,6 +618,12 @@ export function App() {
     setMenuOpen(false);
     loadMe();
   };
+
+  /* ---------- pages the server offers (features in /api/health) */
+  const nav = useMemo(
+    () => accountNav(filterNav(NAV, caps), caps).map((n) => (n.id === 'security' && caps.tenancy === 'multi' ? { ...n, comp: AccountPage } : n)),
+    [caps]
+  );
 
   /* ---------- command palette items */
   const paletteItems = useMemo<PaletteItem[]>(() => {
@@ -499,12 +633,12 @@ export function App() {
     const gActions = t('Acciones');
     const gScreens = t('Pantallas');
     const gSettings = t('Ajustes');
-    const pageLabel = (id: string) => t(NAV.find((n) => n.id === id)?.label ?? id);
+    const pageLabel = (id: string) => t(nav.find((n) => n.id === id)?.label ?? id);
     const run = (r: string, intent?: string) => () => {
       if (intent) setIntent(r.split('/')[0], intent);
       go(r);
     };
-    items.push(
+    const actions: PaletteItem[] = [
       { id: 'a-announce', group: gActions, icon: 'megaphone', label: t('Enviar aviso'), keywords: 'announce alert notificación', run: run('alerts/al-send', 'focus') },
       { id: 'a-refresh', group: gActions, icon: 'refresh', label: t('Refrescar pantallas'), keywords: 'reload recargar', run: () => refreshDisplays() },
       { id: 'a-night-on', group: gActions, icon: 'moon', label: t('Modo noche ahora'), keywords: 'night dim noche', run: () => displayCommand('night', 'on') },
@@ -520,9 +654,10 @@ export function App() {
       { id: 'a-export', group: gActions, icon: 'download', label: t('Exportar copia'), keywords: 'export backup descargar', run: run('backups/bk-export', 'export') },
       { id: 'a-backup', group: gActions, icon: 'archive', label: t('Crear copia de seguridad ahora'), keywords: 'backup snapshot', run: run('backups/bk-auto', 'backup') },
       { id: 'a-token', group: gActions, icon: 'key', label: t('Crear token de API'), keywords: 'token webhook home assistant', run: run('api/api-tokens', 'new') },
-      { id: 'a-view', group: gActions, icon: 'external', label: t('Ver pantalla'), hint: curScreen?.name, run: () => window.open(`/?screen=${encodeURIComponent(savedSlug ?? '')}`, '_blank') },
+      { id: 'a-view', group: gActions, icon: 'external', label: t('Ver pantalla'), hint: curScreen?.name, run: () => viewUrl && window.open(viewUrl, '_blank', 'noopener') },
       { id: 'a-theme', group: gActions, icon: 'moon', label: t('Cambiar tema del panel'), keywords: 'dark light theme', run: () => setAdminTheme((x) => (x === 'dark' ? 'light' : x === 'light' ? '' : 'dark')) },
-    );
+    ];
+    items.push(...filterActions(actions, caps));
     if (dirty) items.unshift({ id: 'a-save', group: gActions, icon: 'check', label: t('Guardar cambios'), keywords: 'save', run: () => save() });
     for (const s of draft.screens) {
       items.push({
@@ -530,7 +665,7 @@ export function App() {
         group: gScreens,
         icon: 'monitor',
         label: t('Cambiar a pantalla {name}', { name: s.name }),
-        hint: s.id === screenId ? t('editando') : `?screen=${s.slug}`,
+        hint: s.id === screenId ? t('editando') : usesPrivateLinks(saved) ? undefined : `?screen=${s.slug}`,
         keywords: `${s.name} ${s.slug} screen switch`,
         run: () => {
           setScreenId(s.id);
@@ -538,15 +673,15 @@ export function App() {
         },
       });
     }
-    for (const n of NAV) items.push({ id: `p-${n.id}`, group: gPages, icon: n.icon, label: t(n.label), hint: n.group ? t(n.group) : undefined, keywords: n.keywords, run: run(n.id) });
-    SETTINGS_INDEX.forEach((s, i) =>
-      items.push({ id: `k-${i}`, group: gSettings, icon: NAV.find((n) => n.id === s.route)?.icon ?? 'settings', label: t(s.label), hint: pageLabel(s.route), keywords: s.keywords, run: run(s.anchor ? `${s.route}/${s.anchor}` : s.route) })
+    for (const n of nav) items.push({ id: `p-${n.id}`, group: gPages, icon: n.icon, label: t(n.label), hint: n.group ? t(n.group) : undefined, keywords: n.keywords, run: run(n.id) });
+    filterSettings(SETTINGS_INDEX, caps, nav.map((n) => n.id)).forEach((s) =>
+      items.push({ id: `k-${SETTINGS_INDEX.indexOf(s)}`, group: gSettings, icon: nav.find((n) => n.id === s.route)?.icon ?? 'settings', label: t(s.label), hint: pageLabel(s.route), keywords: s.keywords, run: run(s.anchor ? `${s.route}/${s.anchor}` : s.route) })
     );
     // individual items: birthdays, local events, rules
     for (const b of draft.birthdays.items) items.push({ id: `b-${b.id}`, group: t('Cumpleaños'), emoji: b.emoji || draft.birthdays.emoji || '🎂', label: b.name, hint: `${String(b.day).padStart(2, '0')}/${String(b.month).padStart(2, '0')}`, keywords: 'birthday cumpleaños', run: run('birthdays') });
     for (const e of draft.localEvents.items) items.push({ id: `l-${e.id}`, group: t('Eventos locales'), emoji: e.emoji || '📅', label: e.title, hint: e.date, keywords: 'evento local', run: run('local') });
     return items;
-  }, [draft, screenId, dirty, lang, savedSlug]);
+  }, [draft, saved, screenId, dirty, lang, savedSlug, viewUrl, nav, caps]);
 
   /* ---------- render */
   const accent = view?.screen.accent && /^#[0-9a-f]{6}$/i.test(view.screen.accent) ? view.screen.accent : '#ff5a4e';
@@ -588,6 +723,16 @@ export function App() {
     );
   }
 
+  if (!me.user && accountMode(me, caps)) {
+    // the effect above is sending the browser to the account login
+    return (
+      <div class="boot" style={rootStyle}>
+        <span class="spinner spinner--lg" />
+        <ToastHost />
+      </div>
+    );
+  }
+
   if (!me.user) {
     return (
       <div style={rootStyle}>
@@ -623,18 +768,21 @@ export function App() {
     );
   }
 
-  const current = NAV.find((n) => n.id === route) ?? NAV[0];
+  const current = nav.find((n) => n.id === route) ?? nav[0];
   const Section = current.comp;
-  const groups = [...new Set(NAV.map((n) => n.group))];
+  const groups = [...new Set(nav.map((n) => n.group))];
+  const liveCommands = has('displayCommands');
   const errCountBySection: Record<string, number> = {};
   if (showErrors || dirty) for (const k of errorKeys) errCountBySection[sectionForError(k)] = (errCountBySection[sectionForError(k)] ?? 0) + 1;
   const user = me.user;
+  const household = me.account?.household ?? null;
+  const links = has('accountMenu') ? accountLinks(me) : null;
+  const accountPage = caps.tenancy === 'multi';
   const portrait = view.screen.orientation === 'portrait';
   const previewSide = wide && showPreview;
   const online: Record<string, number> = {};
   for (const d of displays ?? []) if (d.connected) online[d.screenId] = (online[d.screenId] ?? 0) + 1;
   const onlineTotal = Object.values(online).reduce((a, b) => a + b, 0);
-  const viewUrl = `/?screen=${encodeURIComponent(savedSlug ?? '')}`;
   const multi = draft.screens.length > 1;
 
   const sectionProps: SectionProps = {
@@ -652,6 +800,7 @@ export function App() {
     setScreenId,
     go,
     reloadPreview: () => setPreviewKey((k) => k + 1),
+    updateMe: setMe,
   };
 
   return (
@@ -678,7 +827,7 @@ export function App() {
                   {g === 'Pantalla' && multi && <span class="nav__title-scr">· {curScreen.name}</span>}
                 </div>
               )}
-              {NAV.filter((n) => n.group === g).map((n) => {
+              {nav.filter((n) => n.group === g).map((n) => {
                 const en = n.enabled?.(view);
                 const ec = errCountBySection[n.id];
                 const badge = n.id === 'displays' && displays ? onlineTotal : null;
@@ -754,13 +903,15 @@ export function App() {
             <button type="button" class="icon-btn topbar__search" title={`${t('Buscar')} (Ctrl K)`} aria-label={t('Buscar')} onClick={() => setPalette(true)}>
               <Icon name="search" size={18} />
             </button>
-            <a class="btn btn--ghost hide-sm hide-lg" href={viewUrl} target="_blank" rel="noopener" title={t('Ver pantalla')}>
+            <a class="btn btn--ghost hide-sm hide-lg" href={viewUrl ?? undefined} target="_blank" rel="noopener" title={t('Ver pantalla')}>
               <Icon name="external" size={16} />
               <span>{t('Ver pantalla')}</span>
             </a>
-            <Button variant="ghost" icon="refresh" class="hide-sm hide-lg" onClick={() => refreshDisplays()}>
-              {t('Refrescar pantallas')}
-            </Button>
+            {liveCommands && (
+              <Button variant="ghost" icon="refresh" class="hide-sm hide-lg" onClick={() => refreshDisplays()}>
+                {t('Refrescar pantallas')}
+              </Button>
+            )}
             <button
               type="button"
               class={`icon-btn ${previewSide || sheet ? 'is-active' : ''}`}
@@ -784,27 +935,57 @@ export function App() {
                   <div class="menu">
                     <div class="menu__who">
                       <strong>{user.name || t('Administrador')}</strong>
-                      <span class="muted small">{user.email}</span>
+                      {user.email && user.email !== user.name && <span class="muted small">{user.email}</span>}
+                      {household && (
+                        <span class="menu__household muted small">
+                          <Icon name="home" size={13} />
+                          <span>
+                            {household.name} · {household.role === 'owner' ? t('Propietario') : t('Miembro')}
+                          </span>
+                        </span>
+                      )}
                     </div>
-                    <a class="menu__item show-lg" href={viewUrl} target="_blank" rel="noopener" onClick={() => setMenuOpen(false)}>
+                    <a class="menu__item show-lg" href={viewUrl ?? undefined} target="_blank" rel="noopener" onClick={() => setMenuOpen(false)}>
                       <Icon name="external" size={16} /> {t('Ver pantalla')} · {curScreen.name}
                     </a>
-                    <button
-                      type="button"
-                      class="menu__item show-lg"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        refreshDisplays();
-                      }}
-                    >
-                      <Icon name="refresh" size={16} /> {t('Refrescar pantallas')}
-                    </button>
+                    {liveCommands && (
+                      <button
+                        type="button"
+                        class="menu__item show-lg"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          refreshDisplays();
+                        }}
+                      >
+                        <Icon name="refresh" size={16} /> {t('Refrescar pantallas')}
+                      </button>
+                    )}
                     <a class="menu__item" href="#/displays" onClick={() => setMenuOpen(false)}>
                       <Icon name="wifi" size={16} /> {t('Pantallas conectadas')}
                     </a>
-                    <a class="menu__item" href="#/security" onClick={() => setMenuOpen(false)}>
-                      <Icon name="shield" size={16} /> {t('Seguridad')}
-                    </a>
+                    {links ? (
+                      <>
+                        {(accountPage || links.account) && (
+                          <a class="menu__item" href={accountPage ? '#/security' : links.account!} onClick={() => setMenuOpen(false)}>
+                            <Icon name="user" size={16} /> {t('Cuenta')}
+                          </a>
+                        )}
+                        {links.sessions && (
+                          <a class="menu__item" href={links.sessions} onClick={() => setMenuOpen(false)}>
+                            <Icon name="shield" size={16} /> {t('Sesiones abiertas')}
+                          </a>
+                        )}
+                        {links.remove && (
+                          <a class="menu__item menu__item--danger" href={links.remove} onClick={() => setMenuOpen(false)}>
+                            <Icon name="trash" size={16} /> {t('Eliminar cuenta')}
+                          </a>
+                        )}
+                      </>
+                    ) : (
+                      <a class="menu__item" href="#/security" onClick={() => setMenuOpen(false)}>
+                        <Icon name={accountPage ? 'user' : 'shield'} size={16} /> {t(accountPage ? 'Cuenta' : 'Seguridad')}
+                      </a>
+                    )}
                     <button type="button" class="menu__item menu__item--danger" onClick={logout}>
                       <Icon name="logout" size={16} /> {t('Cerrar sesión')}
                     </button>
@@ -815,13 +996,14 @@ export function App() {
           </div>
         </header>
 
+        <UpdateBanner />
         <div class="content-row">
           <main class={`content content--${route}`} ref={mainRef} key={`${route}`}>
             <Section {...sectionProps} />
           </main>
           {previewSide && (
             <aside class="preview-col">
-              <Preview variant="side" slug={savedSlug} screenName={multi ? curScreen.name : ''} reloadKey={previewKey} portrait={portrait} onClose={() => (setShowPreview(false), lsSet(LS_PREVIEW, '0'))} />
+              <Preview variant="side" saved={savedSlug != null} url={previewUrl} openUrl={viewUrl} screenName={multi ? curScreen.name : ''} reloadKey={previewKey} portrait={portrait} onClose={() => (setShowPreview(false), lsSet(LS_PREVIEW, '0'))} />
             </aside>
           )}
         </div>
@@ -851,12 +1033,14 @@ export function App() {
       {sheet && !previewSide && (
         <div class="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && setSheet(false)}>
           <div class="sheet">
-            <Preview variant="sheet" slug={savedSlug} screenName={multi ? curScreen.name : ''} reloadKey={previewKey} portrait={portrait} onClose={() => setSheet(false)} />
+            <Preview variant="sheet" saved={savedSlug != null} url={previewUrl} openUrl={viewUrl} screenName={multi ? curScreen.name : ''} reloadKey={previewKey} portrait={portrait} onClose={() => setSheet(false)} />
           </div>
         </div>
       )}
       {palette && <CommandPalette items={paletteItems} onClose={() => setPalette(false)} />}
       <PairDialogHost saved={saved} defaultScreenId={screenId} onPaired={() => window.dispatchEvent(new Event('marco:paired'))} />
+      <UpdateDialogHost />
+      <WhatsNewHost />
       <ToastHost />
       <DialogHost />
     </div>

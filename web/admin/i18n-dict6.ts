@@ -80,11 +80,6 @@ export const ROWS6: [string, string, string][] = [
     'The screen starts by itself in a few seconds. You can rename or revoke it in Connected screens.',
     'O ecrã arranca sozinho dentro de segundos. Podes mudar-lhe o nome ou revogá-lo em Ecrãs ligados.',
   ],
-  [
-    'Abre Marco en la pantalla nueva (o la dirección /pair): mostrará un código de 6 caracteres. Escríbelo aquí.',
-    'Open Marco on the new screen (or the /pair address): it shows a 6-character code. Type it here.',
-    'Abre o Marco no ecrã novo (ou o endereço /pair): mostra um código de 6 caracteres. Escreve-o aqui.',
-  ],
   ['Código de la pantalla', 'Screen code', 'Código do ecrã'],
   ['Qué pantalla mostrará', 'Screen to show', 'Ecrã a mostrar'],
   ['Nombre del dispositivo (opcional)', 'Device name (optional)', 'Nome do dispositivo (opcional)'],

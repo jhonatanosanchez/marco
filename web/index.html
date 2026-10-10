@@ -10,14 +10,8 @@
     <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Marco</title>
-    <!-- Inter/Outfit are bundled locally. The colour-emoji web font is only an optional, non-blocking fallback
-         for systems without fonts-noto-color-emoji (installed by deploy/install.sh): offline it is simply skipped. -->
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap"
-      media="print"
-      onload="this.media='all'"
-    />
+    <!-- Inter, Outfit and the "Marco Emoji" subset are bundled. Self-hosted servers also load Noto Color Emoji from
+         Google Fonts from the page script (web/display/health.ts), so this page has no inline script. -->
   </head>
   <body>
     <canvas id="gl" aria-hidden="true"></canvas>
@@ -41,6 +35,7 @@
       <section class="main">
         <div id="calendar"></div>
         <div id="agenda"></div>
+        <div id="view"></div>
         <div class="main-strip">
           <div id="sched-strip" style="display: none"></div>
           <div id="cd-strip" style="display: none"></div>
