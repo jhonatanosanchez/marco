@@ -19,4 +19,12 @@ export const ROWS11: [string, string, string][] = [
   ['Se ha cargado la versión guardada', 'Loaded the saved version', 'Versão guardada carregada'],
   // Sent messages on a server whose screens poll (liveNote.ts)
   ['llegará a las pantallas en unos 90 s', 'reaches the screens within about 90 s', 'chega aos ecrãs em cerca de 90 s'],
+  // Calendar addresses kept back by a multi-tenant server until a recent sign-in (CalendarSource.urlHidden)
+  [
+    'Por seguridad, la dirección solo se muestra si has iniciado sesión hace poco.',
+    'For security, the address is only shown if you signed in recently.',
+    'Por segurança, o endereço só aparece se tiveres iniciado sessão há pouco.',
+  ],
+  ['Volver a iniciar sesión', 'Sign in again', 'Iniciar sessão de novo'],
+  ['Dirección guardada (oculta)', 'Saved address (hidden)', 'Endereço guardado (oculto)'],
 ];

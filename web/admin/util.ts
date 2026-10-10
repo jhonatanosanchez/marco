@@ -155,7 +155,9 @@ export function validateConfig(c: AppConfig, caps: Caps = currentCaps()): Errors
     if (!src.name.trim()) e[`${p}.name`] = 'Obligatorio';
     if (!HEX_RE.test(src.color)) e[`${p}.color`] = 'Color no válido';
     if (src.type === 'ics') {
-      if (!src.url || !isHttpUrl(src.url, true)) e[`${p}.url`] = 'URL no válida (http, https o webcal)';
+      // A hidden URL (see CalendarSource.urlHidden) is still stored on the server: an empty field keeps it.
+      const kept = src.urlHidden && !src.url;
+      if (!kept && (!src.url || !isHttpUrl(src.url, true))) e[`${p}.url`] = 'URL no válida (http, https o webcal)';
     } else {
       if (!src.googleAccount || !src.googleCalendarId) e[`${p}.url`] = 'Falta la cuenta o el calendario de Google';
     }

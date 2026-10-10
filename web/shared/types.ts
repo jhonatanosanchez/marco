@@ -56,6 +56,9 @@ export interface CalendarSource {
   type: SourceType;
   name: string;
   url?: string; // ics only
+  /** Sent by multi-tenant servers instead of the URL when the session has not signed in recently. The URL comes back
+   *  empty, and saving a known calendar with an empty URL keeps the stored one. Never stored. */
+  urlHidden?: boolean;
   googleCalendarId?: string; // google only
   googleAccount?: string; // google only
   color: string;

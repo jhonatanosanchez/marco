@@ -153,6 +153,21 @@ test('validateAll: the password rule applies only with password login', () => {
   assert.equal(r.total, 0, JSON.stringify(r));
 });
 
+test('validateAll: a calendar URL the server kept back (urlHidden) may stay empty, a typed one is checked', () => {
+  const cfg = baseConfig();
+  const src = { id: 'c_hidden', type: 'ics', name: 'Family', url: '', urlHidden: true, color: '#336699', emoji: '', kind: 'generic', enabled: true, refreshMin: 30 };
+  cfg.calendar.sources = [src];
+  assert.equal(util.validateAll(cfg, cloud()).total, 0);
+  cfg.calendar.sources = [{ ...src, url: 'not a url' }];
+  assert.ok(util.validateAll(cfg, cloud()).total > 0);
+  cfg.calendar.sources = [{ ...src, urlHidden: false }];
+  assert.ok(util.validateAll(cfg, cloud()).total > 0);
+  // The server never keeps the flag.
+  const saved = serverValidate({ ...cfg, calendar: { ...cfg.calendar, sources: [{ ...src, url: 'https://example.com/a.ics' }] } });
+  assert.ok(saved.ok);
+  assert.ok(!('urlHidden' in saved.value.calendar.sources[0]));
+});
+
 test('validateAll: Home Assistant rules apply only with the feature', () => {
   const cfg = baseConfig();
   cfg.homeassistant = { ...cfg.homeassistant, enabled: true, url: 'not a url' };

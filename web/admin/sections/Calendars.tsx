@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { CalendarSource, GoogleAccount, GoogleCalendarListItem, SourceKind, TestIcsResponse } from '../../shared/types';
-import { api, ApiError } from '../api';
+import { api, ApiError, UNAUTHORIZED_EVENT } from '../api';
 import { confirmDialog, toast } from '../components/feedback';
 import { GoogleG, Icon } from '../components/icons';
 import {
@@ -66,6 +66,8 @@ function SourceRow({
   const [test, setTest] = useState<{ loading: boolean; res?: TestIcsResponse }>({ loading: false });
   const p = `source.${src.id}`;
   const urlValid = src.type === 'ics' && !!src.url && isHttpUrl(src.url, true);
+  /** The server kept the stored URL back (no recent sign-in): the field stays empty unless a new URL is typed. */
+  const hidden = src.type === 'ics' && !!src.urlHidden && !src.url;
   const runTest = async () => {
     if (!src.url) return;
     setTest({ loading: true });
@@ -100,11 +102,24 @@ function SourceRow({
       </div>
       <div class="src__body">
         {src.type === 'ics' ? (
-          <Field error={errors[`${p}.url`]} class="src__url">
+          <Field
+            error={errors[`${p}.url`]}
+            class="src__url"
+            hint={
+              hidden ? (
+                <>
+                  {t('Por seguridad, la dirección solo se muestra si has iniciado sesión hace poco.')}{' '}
+                  <button type="button" class="link-btn" onClick={() => window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT))}>
+                    {t('Volver a iniciar sesión')}
+                  </button>
+                </>
+              ) : undefined
+            }
+          >
             <TextInput
               mono
               value={src.url ?? ''}
-              placeholder="https://…/calendar.ics"
+              placeholder={hidden ? t('Dirección guardada (oculta)') : 'https://…/calendar.ics'}
               error={!!errors[`${p}.url`]}
               onValue={(v) => {
                 update((s) => {
