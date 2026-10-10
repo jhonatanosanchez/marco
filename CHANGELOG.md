@@ -30,6 +30,9 @@ All notable changes to this project are documented here. The format is based on
 - Every response now sends `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN` and
   `frame-ancestors 'self'`, so no other site can frame the admin. The display and admin pages (also as `/index.html`
   and `/admin/index.html`) are never cached, and admin changes refuse a `Sec-Fetch-Site` other than `same-origin`.
+- With Google sign-in off, sessions made with Google before end too, and the Google callback refuses a sign-in.
+  The OAuth purpose (sign in or link calendars) is kept in the session instead of being read back from the state
+  the browser returns.
 
 ### Fixed
 - Turning *Rotate busy days* off now brings back the "+N more" label at once; before, a busy day kept its page

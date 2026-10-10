@@ -104,6 +104,8 @@ export function sessionValid(req) {
     if (!cfg.auth.passwordLoginEnabled) return false;
     if (sec.passwordIsDefault && !isLanClient(req, { strict: true })) return false;
   } else if (u.method === 'google') {
+    // Sign in with Google turned off (the default on self-hosted): sessions made with it end too.
+    if (!google.googleLoginEnabled(cfg)) return false;
     if (!cfg.auth.allowedGoogleEmails.includes(u.email)) return false;
   } else {
     return false;
@@ -276,6 +278,8 @@ function oauthRedirect(req, res, purpose) {
   if (purpose === 'connect' && !sessionValid(req)) return res.redirect('/admin/?error=login_required');
   const nonce = google.newNonce();
   req.session.oauthNonce = nonce;
+  // The purpose is kept in the session: the one in `state` comes back from the browser and is only compared.
+  req.session.oauthPurpose = purpose;
   res.redirect(google.authUrl(req, purpose, nonce));
 }
 
@@ -301,12 +305,14 @@ export async function googleCallbackHandler(req, res) {
   if (!google.googleConfigured()) return res.redirect('/admin/?error=google_not_configured');
   const state = google.parseState(req.query.state);
   const nonce = req.session?.oauthNonce;
-  if (req.session) delete req.session.oauthNonce;
+  const purpose = req.session?.oauthPurpose;
+  if (req.session) { delete req.session.oauthNonce; delete req.session.oauthPurpose; }
   if (req.query.error) {
     const e = String(req.query.error);
     return failEarly(GOOGLE_ERRORS.has(e) ? `google_${e}` : 'google_error');
   }
-  if (!state || !nonce || state.n.length !== nonce.length || !crypto.timingSafeEqual(Buffer.from(state.n), Buffer.from(nonce))) {
+  if (!state || !nonce || state.n.length !== nonce.length || !crypto.timingSafeEqual(Buffer.from(state.n), Buffer.from(nonce))
+    || !purpose || state.p !== purpose) {
     return failEarly('invalid_state');
   }
   if (typeof req.query.code !== 'string') return failEarly('missing_code');
@@ -319,7 +325,7 @@ export async function googleCallbackHandler(req, res) {
   }
   const { profile, tokens } = result;
 
-  if (state.p === 'connect') {
+  if (purpose === 'connect') {
     if (!sessionValid(req)) return fail('login_required');
     if (!tokens.refresh_token && !getSecrets().google.accounts[profile.email]?.refresh_token) return fail('no_refresh_token');
     if (!String(tokens.scope || '').includes(google.CAL_SCOPE)) return fail('calendar_scope_denied');
@@ -329,6 +335,7 @@ export async function googleCallbackHandler(req, res) {
   }
 
   // login
+  if (!google.googleLoginEnabled(getConfig())) return fail('google_login_off', profile.email);
   const allowed = getConfig().auth.allowedGoogleEmails;
   if (!allowed.includes(profile.email)) {
     if (allowed.length === 0 && sessionValid(req) && req.session.user.method === 'password') {
