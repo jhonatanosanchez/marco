@@ -41,7 +41,7 @@ export function defaultScreenProfile({ id = 's_main', slug = 'living-room', name
   return structuredClone({
     id, slug, name,
     screen: {
-      language: 'en', fontScale: 1.0, theme: 'dark', style: 'classic', accent: '#ff5a4e', orientation: 'auto', customCss: '',
+      language: 'en', fontScale: 1.0, theme: 'dark', style: 'modern', accent: '#ff5a4e', orientation: 'auto', customCss: '',
       nightMode: { enabled: false, from: '23:00', to: '07:00', dim: 0.35 },
       // Modern style glass material (ignored by Classic). The defaults reproduce the original Modern look.
       glass: { appearance: 'auto', opacity: 0.5, blur: 18, tint: 'dark', edge: true },

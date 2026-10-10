@@ -6,8 +6,9 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
-- **Display style** (*Layout → Display style*, `screen.style`): every screen can now be *Classic* (the look so far,
-  still the default, so existing screens do not change) or *Modern*, a more minimal, Apple-like look: glass widget
+- **Display style** (*Layout → Display style*, `screen.style`): every screen can now be *Modern* or *Classic* (the look so far).
+  New installs and new screens start Modern; screens saved before this release keep Classic, so nothing changes
+  until you pick it. *Modern* is a more minimal, Apple-like look: glass widget
   cards over the photo with a light edge, a Lock Screen clock with the date on top, the month grid in the iOS
   Calendar idiom (no column lines, today as a filled circle, colour dots for timed events), agenda days as list
   cards, a Weather-widget layout, notification-style alerts and scheduled messages. It works with every layout,

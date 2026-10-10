@@ -68,8 +68,8 @@ calendars, weather and news feeds *you* connect.
   message of the day, upcoming birthdays and a short agenda. *Photo frame* leaves the photo alone with a small clock
   card in the corner you choose. *Bedside* is a huge, very dim clock with the next event and the temperature that
   dims further at night. *Two weeks* is the month grid with two roomy rows.
-- **Two styles per screen:** *Classic* or *Modern*, a more minimal Apple-like look with glass cards over the photo,
-  a Lock Screen clock and an iOS-style month grid. The style is independent of the layout.
+- **Two styles per screen:** *Modern* (the default), a minimal Apple-like look with glass cards over the photo,
+  a Lock Screen clock and an iOS-style month grid, or *Classic*. The style is independent of the layout.
 - **Automatic emoji:** 🎂 birthdays, ✈️ flights, 🩺 doctor, 🎒 school, ⚽ sports, 🍽️ dinners, 💼 meetings, 🏖️
   holidays, 🚗 car, 🐾 vet and more, from editable keyword rules (35 categories with about 400 keywords in English,
   Spanish and Portuguese out of the box).

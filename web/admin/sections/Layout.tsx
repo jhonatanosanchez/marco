@@ -181,8 +181,8 @@ export function Schematic({ id, side }: { id: LayoutPreset; side: 'left' | 'righ
 }
 
 export const STYLES: { id: DisplayStyle; name: string; desc: string }[] = [
-  { id: 'classic', name: 'Clásico', desc: 'El aspecto de siempre: reloj fino, tarjetas con borde y la cuadrícula completa.' },
   { id: 'modern', name: 'Moderno', desc: 'Más minimalista, al estilo de Apple: tarjetas de cristal sobre la foto, reloj de pantalla de bloqueo y menos líneas.' },
+  { id: 'classic', name: 'Clásico', desc: 'El aspecto de siempre: reloj fino, tarjetas con borde y la cuadrícula completa.' },
 ];
 
 /** Tiny drawing of each display style (same scene: photo with clock + widgets, calendar on the right). */

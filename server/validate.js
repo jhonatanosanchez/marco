@@ -198,8 +198,9 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
     language: oneOf(ctx, `${p}.screen.language`, sc.language, D.screen.language, LANGS),
     fontScale: num(ctx, `${p}.screen.fontScale`, sc.fontScale, D.screen.fontScale, 0.5, 3),
     theme: oneOf(ctx, `${p}.screen.theme`, sc.theme, D.screen.theme, ['dark', 'light', 'auto']),
-    // display style: 'classic' (the original look) or 'modern' (glass cards, Apple-like); independent of the layout
-    style: oneOf(ctx, `${p}.screen.style`, sc.style, D.screen.style, ['classic', 'modern']),
+    // display style: 'classic' (the original look) or 'modern' (glass cards, Apple-like); independent of the layout.
+    // New configs start Modern (defaults.js); a config saved before styles existed keeps the look it always had.
+    style: oneOf(ctx, `${p}.screen.style`, sc.style, 'classic', ['classic', 'modern']),
     accent: color(ctx, `${p}.screen.accent`, sc.accent, D.screen.accent),
     orientation: oneOf(ctx, `${p}.screen.orientation`, sc.orientation, D.screen.orientation, ['auto', 'landscape', 'portrait']),
     customCss: str(ctx, `${p}.screen.customCss`, sc.customCss, '', 20000).replace(/<\/style/gi, ''),
@@ -626,7 +627,9 @@ export function mergeDefaults(stored) {
   const src = migrateConfig(isObj(stored) ? stored : {});
   const out = merge(D, src);
   if (Array.isArray(src.screens) && src.screens.length) {
-    out.screens = src.screens.map((s) => (isObj(s) ? merge(defaultScreenProfile({ id: s.id, slug: s.slug, name: s.name }), s) : s));
+    // a screen saved before display styles existed keeps the Classic look; only new screens start Modern
+    const keepStyle = (s) => (isObj(s.screen) && 'style' in s.screen ? s : { ...s, screen: { ...(isObj(s.screen) ? s.screen : {}), style: 'classic' } });
+    out.screens = src.screens.map((s) => (isObj(s) ? merge(defaultScreenProfile({ id: s.id, slug: s.slug, name: s.name }), keepStyle(s)) : s));
   }
   return out;
 }

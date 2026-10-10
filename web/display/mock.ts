@@ -45,7 +45,7 @@ export function mockConfig(): DisplayConfig {
     revision: 1,
     screenId: 's_main',
     slug: 'living-room',
-    screen: { name: L('Living room', 'Salón', 'Sala'), language: DEMO_LANG },
+    screen: { name: L('Living room', 'Salón', 'Sala'), language: DEMO_LANG, style: 'modern' },
     weather: { locationName: 'Lisbon, Portugal' },
     // ?photos=0 → no background photo
     ...(q.get('photos') === '0' ? { background: { enabled: false } } : {}),

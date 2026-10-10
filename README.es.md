@@ -69,9 +69,9 @@ El único tráfico saliente va a los calendarios, al tiempo y a las fuentes de n
   foto sola, con una tarjeta pequeña con la hora en la esquina que elijas. *Mesilla* es un reloj enorme y muy tenue
   con el próximo evento y la temperatura, que se atenúa más por la noche. *Dos semanas* es la cuadrícula del mes con
   dos filas amplias.
-- **Dos estilos por pantalla:** *Clásico* o *Moderno*, un aspecto más minimalista al estilo de Apple, con tarjetas de
-  cristal sobre la foto, reloj de pantalla de bloqueo y una cuadrícula de mes como la de iOS. El estilo es
-  independiente del diseño.
+- **Dos estilos por pantalla:** *Moderno* (el de serie), un aspecto minimalista al estilo de Apple, con tarjetas de
+  cristal sobre la foto, reloj de pantalla de bloqueo y una cuadrícula de mes como la de iOS, o *Clásico*. El estilo
+  es independiente del diseño.
 - **Emojis automáticos:** 🎂 cumpleaños, ✈️ vuelos, 🩺 médico, 🎒 colegio, ⚽ deporte, 🍽️ cenas, 💼 reuniones, 🏖️
   vacaciones, 🚗 coche, 🐾 veterinario y más, a partir de reglas de palabras clave editables (35 categorías con unas
   400 palabras clave en inglés, español y portugués de serie).

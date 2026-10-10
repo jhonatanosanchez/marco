@@ -2,15 +2,25 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { validateConfig } from '../validate.js';
+import { validateConfig, mergeDefaults } from '../validate.js';
 import { defaultConfig, defaultScreenProfile } from '../defaults.js';
 import { displayConfig } from '../screens.js';
 
-test('new screens default to the classic style', () => {
-  assert.equal(defaultScreenProfile().screen.style, 'classic');
+test('new screens default to the modern style', () => {
+  assert.equal(defaultScreenProfile().screen.style, 'modern');
   const { ok, value } = validateConfig(defaultConfig());
   assert.equal(ok, true);
+  assert.equal(value.screens[0].screen.style, 'modern');
+});
+
+test('a stored screen without a style keeps the classic look when defaults are merged in', () => {
+  const c = defaultConfig();
+  delete c.screens[0].screen.style;
+  c.screens.push({ id: 's_kitchen', slug: 'kitchen', name: 'Kitchen', screen: { style: 'modern' } });
+  const { ok, value } = validateConfig(mergeDefaults(c));
+  assert.equal(ok, true);
   assert.equal(value.screens[0].screen.style, 'classic');
+  assert.equal(value.screens[1].screen.style, 'modern');
 });
 
 test('a config saved before the style setting existed loads as classic', () => {
@@ -25,6 +35,7 @@ test('each screen keeps its own style, independent of the layout', () => {
   const c = defaultConfig();
   c.screens.push({ ...defaultScreenProfile({ id: 's_kitchen', slug: 'kitchen', name: 'Kitchen' }) });
   c.screens[0].screen.style = 'modern';
+  c.screens[1].screen.style = 'classic';
   c.screens[1].layout.preset = 'bigTime';
   const { ok, errors, value } = validateConfig(c);
   assert.equal(ok, true, JSON.stringify(errors));
