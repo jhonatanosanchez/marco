@@ -4,7 +4,7 @@
 // Everything is plain HTML strings + setHTML (patched only when it changes) and one fitting pass that drops whole
 // rows that do not fit, so nothing is ever cut in half.
 import type { CountdownsResponse, PublicCalendarSource, WeatherResponse } from '../../shared/types';
-import { addDays, diffDays, formatCountdown, formatTime, keyToUTC, monthName, relativeDayLabel, weekdayName } from '../../shared/i18n';
+import { addDays, diffDays, formatCountdown, formatDateLine, formatTime, keyToUTC, monthName, relativeDayLabel } from '../../shared/i18n';
 import { chipColors } from '../color';
 import { ctx } from '../ctx';
 import { esc, setHTML } from '../dom';
@@ -74,7 +74,9 @@ function dayLabel(key: string, today: string): string {
   const dd = diffDays(today, key);
   if (dd < 7) return relativeDayLabel(lang, key, today);
   const d = keyToUTC(key);
-  return `${d.getUTCDate()} ${monthName(lang, d.getUTCMonth() + 1, 'short')}`;
+  const m = monthName(lang, d.getUTCMonth() + 1, 'short');
+  // Spanish and Portuguese write months in lower case ("23 oct", "8 nov")
+  return `${d.getUTCDate()} ${lang === 'en' ? m : m.toLowerCase()}`;
 }
 
 /**
@@ -155,8 +157,8 @@ export class Views {
     const key = tick.dayKey;
     const nowMs = tick.now.getTime();
     const p = tick.parts;
-    const d0 = keyToUTC(key);
-    setHTML(root.querySelector('.td-title')!, `<b>${esc(t('today'))}</b><span>${esc(weekdayName(lang, key, 'long'))} ${d0.getUTCDate()} ${esc(monthName(lang, d0.getUTCMonth() + 1, 'long'))}</span>`);
+    // the date as the screen writes it everywhere else ("Miércoles, 14 de octubre", "Wednesday, 14 October")
+    setHTML(root.querySelector('.td-title')!, `<b>${esc(t('today'))}</b><span>${esc(formatDateLine(lang, key, ctx.cfg.datetime.dateFormat))}</span>`);
 
     // all-day + multi-day things of today, as chips next to the title
     const chips = allDayOn(d.events, key).map((e) => {
@@ -255,7 +257,8 @@ export class Views {
   private columns(): PublicCalendarSource[] {
     const srcs = ctx.cfg.calendar.sources || [];
     const want = ctx.params.get('people')?.split(',').filter(Boolean) ?? ctx.cfg.layout.people;
-    if (Array.isArray(want) && want.length) return want.map((id) => srcs.find((s) => s.id === id)).filter((s): s is PublicCalendarSource => !!s).slice(0, 5);
+    // a list (even an empty one, "nothing ticked" in the admin) is used as is; null means automatic
+    if (Array.isArray(want)) return want.map((id) => srcs.find((s) => s.id === id)).filter((s): s is PublicCalendarSource => !!s).slice(0, 5);
     return srcs.filter((s) => s.kind !== 'holidays' && s.kind !== 'birthdays').slice(0, 5);
   }
 
@@ -443,9 +446,10 @@ export class Views {
       colsOut[best].push(c.html);
       weight[best] += c.w + 1.5;
     }
+    // the grid keeps its columns even when some are empty, so a lone agenda card does not stretch across the screen
     const html = colsOut.filter((c, i) => i === 0 || c.length).map((c) => `<div class="bd-col">${c.join('')}</div>`).join('');
     const box = this.root.querySelector<HTMLElement>('.bd-cols')!;
-    box.style.setProperty('--bd-n', String(colsOut.filter((c, i) => i === 0 || c.length).length));
+    box.style.setProperty('--bd-n', String(n));
     setHTML(box, html);
     this.fit();
   }

@@ -794,6 +794,7 @@ Back up the whole folder (or use *Export*) to keep everything.
 | `?preset=today\|people\|photoFrame\|twoWeeks\|board\|bedside` `?people=<calendar ids, comma separated>` `?corner=tl\|tr\|bl\|br` | Preview the newer layouts, the *Per person* columns and the *Photo frame* corner |
 | `?glass=clear\|tinted\|auto` `?glassOpacity=0..1` `?glassBlur=0..40` `?glassTint=dark\|light\|photo` `?glassEdge=0\|1` | Override the glass options of the Modern style |
 | `?wxfx=off\|simple\|rich` | Override the weather effect; with `?demo=1`, `?wx=rain\|snow\|clear\|thunder` forces the weather |
+| `?empty=1` `?photos=0` | With `?demo=1`: no events, countdowns or to-dos, or no background photo (to check the empty states) |
 | `?client=<name>` | Name of this device in *Connected displays* (the kiosk script sets it) |
 
 ## Security

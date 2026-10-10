@@ -37,6 +37,8 @@ All notable changes to this project are documented here. The format is based on
     the night window. No photo and no animation.
   Preview with `?preset=today|people|photoFrame|twoWeeks|board|bedside`, `&people=<ids>` and `&corner=tl|tr|bl|br`.
   The setup wizard still offers the five original layouts; the new ones are in *Layout*.
+- Demo URL parameters `?empty=1` (no events, countdowns or to-dos) and `?photos=0` (no background photo) to check
+  the empty states of every layout.
 
 ### Fixed
 - Modern style, *Big time* layout: the agenda card no longer runs under the news bar. It shows whole rows only and

@@ -841,6 +841,7 @@ Haz copia de seguridad de toda la carpeta (o usa *Exportar*) para conservarlo to
 | `?preset=…` `?view=month\|agenda\|week` `?theme=dark\|light` `?style=classic\|modern` `?side=left\|right` `?clock=analog` | Fuerza opciones de diseño (útil para hacer pruebas) |
 | `?preset=today\|people\|photoFrame\|twoWeeks\|board\|bedside` `?people=<ids de calendario, separados por comas>` `?corner=tl\|tr\|bl\|br` | Prueba los diseños nuevos, las columnas de *Por persona* y la esquina de *Marco de fotos* |
 | `?glass=clear\|tinted\|auto` `?glassOpacity=0..1` `?glassBlur=0..40` `?glassTint=dark\|light\|photo` `?glassEdge=0\|1` | Fuerza las opciones de cristal del estilo Moderno |
+| `?empty=1` `?photos=0` | Con `?demo=1`: sin eventos, cuentas atrás ni tareas, o sin foto de fondo (para ver los estados vacíos) |
 | `?client=<name>` | Nombre de este dispositivo en *Pantallas conectadas* (lo define el script del kiosco) |
 
 ## Seguridad

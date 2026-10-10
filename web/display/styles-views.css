@@ -297,6 +297,11 @@
 .corner-tl .view-photoFrame { justify-content: flex-start; align-items: flex-start; text-align: left; }
 .corner-tr .view-photoFrame { justify-content: flex-start; }
 .corner-bl .view-photoFrame { align-items: flex-start; text-align: left; }
+/* no photo to frame: the card moves to the middle and grows, like a desk clock */
+#app.no-photo .view-photoFrame { justify-content: center; align-items: center; text-align: center; }
+#app.no-photo .pf-card .clock.digital { font-size: 18rem; }
+#app.no-photo .pf-card .date { font-size: 3.4rem; }
+#app.no-photo .pf-wx { justify-content: center; }
 .pf-card { display: flex; flex-direction: column; align-items: inherit; gap: 1.6rem; max-width: min(64rem, 100%); text-shadow: 0 0.2rem 2.4rem rgb(0 0 0 / 0.45); }
 .pf-card .clock-wrap { align-items: inherit; }
 .pf-card .clock.digital { font-size: 11.5rem; }
@@ -330,6 +335,8 @@
 #app.preset-bedside { grid-template-columns: 100%; grid-template-rows: 100%; --bs-bg: #000; --bs-ink: rgb(255 196 150 / 0.5); --bs-ink-2: rgb(255 196 150 / 0.3); }
 /* night window (screen night mode, or 22:00–07:00): deeper, redder and dimmer, like a bedside clock */
 #app.preset-bedside.bedside-late { --bs-ink: rgb(255 96 64 / 0.34); --bs-ink-2: rgb(255 96 64 / 0.2); }
+/* the screen's night mode already dims everything with its overlay (its own "dim" setting): do not dim twice */
+.night #app.preset-bedside.bedside-late { --bs-ink: rgb(255 96 64 / 0.9); --bs-ink-2: rgb(255 96 64 / 0.56); }
 /* light theme: a soft paper look during the day, dark again at night */
 .theme-light #app.preset-bedside:not(.bedside-late) { --bs-bg: #ddd6cb; --bs-ink: rgb(64 52 42 / 0.82); --bs-ink-2: rgb(64 52 42 / 0.55); }
 .preset-bedside .photo-area, .preset-bedside .side { display: none; }
@@ -356,7 +363,8 @@
 .bs-tt { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bs-em { font-style: normal; font-family: var(--font-emoji); filter: grayscale(1) sepia(0.7) brightness(0.55); }
 .bedside-late .bs-em { filter: grayscale(1) sepia(1) hue-rotate(-30deg) brightness(0.4); }
-.bedside-late .bs-wx .v-wx-ic { opacity: 0.6; }
+.bs-wx .v-wx-ic { opacity: 0.55; }
+.bedside-late .bs-wx .v-wx-ic { opacity: 0.35; }
 #app.portrait .bs-info { flex-direction: column; gap: 2rem; }
 
 /* ---- small landscape screens (≈720p): a little more text */

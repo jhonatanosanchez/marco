@@ -64,6 +64,25 @@ test('people columns: at most five ids, no duplicates, only valid ids', () => {
   c.screens[0].layout.people = ['local'];
   r = validateConfig(c);
   assert.deepEqual(displayConfig(r.value, r.value.screens[0]).layout.people, ['local']);
+  // nothing ticked stays an empty list (not automatic): the display then asks to choose calendars, as the admin says
+  c.screens[0].layout.people = [];
+  r = validateConfig(c);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.value.screens[0].layout.people, []);
+  const views = read('web/display/widgets/views.ts');
+  assert.match(views, /if \(Array\.isArray\(want\)\) return want\.map/);
+});
+
+test('Two weeks, Board and Bedside polish: spare chip lines, fixed board columns, night mode not dimmed twice', () => {
+  const cal = read('web/display/widgets/calendar.ts');
+  assert.match(cal, /const maxSpan = this\.roomy \?/);
+  assert.match(read('web/display/widgets/views.ts'), /box\.style\.setProperty\('--bd-n', String\(n\)\)/);
+  const css = read('web/display/styles-views.css');
+  assert.match(css, /\.night #app\.preset-bedside\.bedside-late \{/);
+  assert.match(css, /#app\.no-photo \.view-photoFrame \{/);
+  // Modern: the board and photo frame cards follow the glass settings, also with the light theme
+  const modern = read('web/display/styles-modern.css');
+  assert.doesNotMatch(modern, /theme-light \.(bd|pf)-card \{/);
 });
 
 test('photo frame corner: tl, tr, bl or br', () => {

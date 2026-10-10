@@ -754,12 +754,10 @@
 .style-modern .bd-check { margin: 0 0.6rem 0 0.2rem; border-width: 0.2rem; border-color: var(--m-ink-2); }
 .style-modern .bd-task.done .bd-check { background: var(--accent); border-color: var(--accent); color: #fff; }
 .style-modern .bd-none, .style-modern .bd-more { color: var(--m-ink-2); }
+.style-modern .bd-col:first-child > .bd-card:first-child { flex: none; }
 .style-modern .bd-msg { padding: 2.2rem 2.4rem; }
 .style-modern .bd-msg-em { display: grid; place-items: center; width: 6.4rem; height: 6.4rem; border-radius: 1.6rem; background: rgb(255 255 255 / 0.14); font-size: 3.6rem; }
 .style-modern .bd-msg p { font-size: 2.8rem; font-weight: 600; letter-spacing: -0.01em; }
-.style-modern.theme-light .bd-card { background: rgb(255 255 255 / 0.74); --m-ink: rgb(0 0 0 / 0.86); --m-ink-2: rgb(60 60 67 / 0.7); --m-sep: rgb(60 60 67 / 0.16); color: #000; text-shadow: none; }
-.lite.style-modern.theme-light .bd-card { background: rgb(255 255 255 / 0.94); }
-.style-modern.theme-light .bd-row.soon .bd-meta, .style-modern.theme-light .bd-row.ongoing .bd-meta { color: var(--shade); }
 .style-modern .preset-board .scrim { background: linear-gradient(to bottom, rgb(0 0 0 / 0.42), rgb(0 0 0 / 0.08) 28%, rgb(0 0 0 / 0.08) 70%, rgb(0 0 0 / 0.3)); }
 
 /* photo frame: one small glass widget in the corner */
@@ -776,9 +774,6 @@
 .style-modern .pf-em { display: grid; place-items: center; width: 3.6rem; height: 3.6rem; border-radius: 1rem; background: rgb(var(--c) / 0.3); font-size: 2rem; }
 .style-modern .pf-tt { font-weight: 600; }
 .style-modern .pf-when { color: var(--m-ink-2); font-weight: 500; }
-.style-modern.theme-light .pf-card { background: rgb(255 255 255 / 0.72); --m-ink: rgb(0 0 0 / 0.86); --m-ink-2: rgb(60 60 67 / 0.7); --m-sep: rgb(60 60 67 / 0.16); color: #000; }
-.lite.style-modern.theme-light .pf-card { background: rgb(255 255 255 / 0.94); }
-.style-modern.theme-light .pf-card .clock .sec { color: rgb(0 0 0 / 0.5); }
 .style-modern.glass-ink-dark .pf-card .clock .sec { color: rgb(0 0 0 / 0.5); }
 .style-modern.glass-ink-dark .pf-card svg { filter: drop-shadow(0 0 0.08rem rgb(0 0 0 / 0.45)); }
 .style-modern .preset-photoFrame .scrim { background: radial-gradient(60% 55% at var(--sx) var(--sy), rgb(0 0 0 / 0.26), transparent 75%); }

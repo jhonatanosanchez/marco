@@ -339,14 +339,14 @@ export function GlassCard({ cfg, set }: Pick<SectionProps, 'cfg' | 'set'>) {
           <Field label={t('Desenfoque')} hint={t('En la Raspberry Pi (modo ligero) no hay desenfoque y las tarjetas son sólidas.')}>
             <Slider value={g.blur} min={0} max={40} step={1} format={(v) => (v ? `${v}` : t('Sin desenfoque'))} onChange={(v) => put('blur', v)} />
           </Field>
-          <Field label={t('Tono')} hint={t('Del fondo toma el color de la foto que se está mostrando, como en el iPhone.')}>
+          <Field label={t('Tono')} hint={t('Con «De la foto», el cristal toma el color de la foto que se está mostrando, como en el iPhone.')}>
             <Segmented
               value={g.tint}
               full
               options={[
                 { value: 'light', label: t('Claro') },
                 { value: 'dark', label: t('Oscuro') },
-                { value: 'photo', label: t('Del fondo') },
+                { value: 'photo', label: t('De la foto') },
               ]}
               onChange={(v) => put('tint', v)}
             />

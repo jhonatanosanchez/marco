@@ -42,8 +42,8 @@ export const ROWS7: [string, string, string][] = [
   ['Desenfoque', 'Blur', 'Desfoque'],
   ['En la Raspberry Pi (modo ligero) no hay desenfoque y las tarjetas son sólidas.', 'On the Raspberry Pi (lite mode) there is no blur and the cards are solid.', 'No Raspberry Pi (modo leve) não há desfoque e os cartões são sólidos.'],
   ['Tono', 'Tint', 'Tom'],
-  ['Del fondo', 'From the photo', 'Da foto'],
-  ['Del fondo toma el color de la foto que se está mostrando, como en el iPhone.', 'From the photo takes the colour of the photo on screen, as the iPhone does.', 'Da foto usa a cor da foto que está no ecrã, como no iPhone.'],
+  ['De la foto', 'From the photo', 'Da foto'],
+  ['Con «De la foto», el cristal toma el color de la foto que se está mostrando, como en el iPhone.', 'With “From the photo”, the glass takes the colour of the photo on screen, as the iPhone does.', 'Com «Da foto», o vidro usa a cor da foto que está no ecrã, como no iPhone.'],
   ['Borde de luz', 'Edge highlight', 'Contorno de luz'],
   ['Una línea fina y brillante en el borde de cada tarjeta.', 'A thin bright line along the edge of each card.', 'Uma linha fina e brilhante na borda de cada cartão.'],
   ['Foto oscura', 'Dark photo', 'Foto escura'],
@@ -74,5 +74,5 @@ export const ROWS7: [string, string, string][] = [
   ['Se usan los primeros cinco calendarios, sin festivos ni cumpleaños.', 'The first five calendars are used, without holidays or birthdays.', 'São usados os primeiros cinco calendários, sem feriados nem aniversários.'],
   ['Hasta cinco columnas. Se ven en el orden de esta lista.', 'Up to five columns, shown in the order of this list.', 'Até cinco colunas, pela ordem desta lista.'],
   ['No has marcado ningún calendario: la pantalla pedirá que elijas alguno.', 'No calendar is ticked: the screen will ask you to choose one.', 'Nenhum calendário marcado: o ecrã vai pedir que escolha algum.'],
-  ['Plantillas: hoy, por persona, tablero, marco de fotos, mesilla', 'Layouts: today, per person, board, photo frame, bedside', 'Modelos: hoje, por pessoa, quadro, moldura de fotos, cabeceira'],
+  ['Plantillas: hoy, por persona, dos semanas, tablero, marco de fotos, mesilla', 'Layouts: today, per person, two weeks, board, photo frame, bedside', 'Modelos: hoje, por pessoa, duas semanas, quadro, moldura de fotos, mesa de cabeceira'],
 ];
