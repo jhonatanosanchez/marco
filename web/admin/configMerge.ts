@@ -1,14 +1,60 @@
 // "Save my changes" after a 409 conflict: put what this tab changed on top of the version saved elsewhere.
-// Compares by value, two levels deep (top-level sections, then their keys). A part this tab did not touch takes
-// the saved value, so an unrelated change made elsewhere (a Google login adding the allowed email, a screen
-// renamed in another tab) survives. A part changed on both sides keeps this tab's value.
+// Compares by value, two levels deep (top-level sections, then their keys). Lists of items with an `id` (screens,
+// sources, countdowns, local events...) are merged item by item: items added or removed on either side are kept
+// added or removed, and an item this tab did not touch takes the saved value. So an unrelated change made
+// elsewhere (a Google login adding the allowed email, another screen edited in another tab) survives. A part
+// changed on both sides keeps this tab's value.
 import type { SaveConfigRequest, StoredConfig } from '../shared/types';
 
 const isPlain = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
+type Item = Record<string, unknown> & { id: string };
+/** An array of objects with distinct string ids, or null. */
+function idList(v: unknown): Item[] | null {
+  if (!Array.isArray(v)) return null;
+  const seen = new Set<string>();
+  for (const x of v) {
+    if (!isPlain(x) || typeof x.id !== 'string' || seen.has(x.id)) return null;
+    seen.add(x.id);
+  }
+  return v as Item[];
+}
+
+function mergeList(base: Item[], mine: Item[], theirs: Item[], depth: number): Item[] {
+  const byId = (l: Item[]) => new Map(l.map((x) => [x.id, x]));
+  const b = byId(base);
+  const m = byId(mine);
+  const th = byId(theirs);
+  const pick = (id: string): Item | undefined => {
+    const [bi, mi, ti] = [b.get(id), m.get(id), th.get(id)];
+    if (!bi) return mi ?? ti; // added here (or, with the same id, there)
+    if (!mi) return undefined; // removed here: gone (this tab wins, as for any other part)
+    if (!ti) return same(mi, bi) ? undefined : mi; // removed there: gone, unless it was changed here
+    return mergeLevel(bi, mi, ti, depth) as Item;
+  };
+  // order: this tab's when it moved items around, otherwise the saved one; items added here go last
+  const common = (l: Item[], other: Map<string, Item>) => l.filter((x) => other.has(x.id)).map((x) => x.id);
+  const reordered = !same(common(mine, b), common(base, m));
+  const ids = reordered ? [...mine.map((x) => x.id), ...theirs.map((x) => x.id)] : [...theirs.map((x) => x.id), ...mine.map((x) => x.id)];
+  const out: Item[] = [];
+  const done = new Set<string>();
+  for (const id of ids) {
+    if (done.has(id)) continue;
+    done.add(id);
+    const v = pick(id);
+    if (v !== undefined) out.push(v);
+  }
+  return out;
+}
+
 function mergeLevel(base: unknown, mine: unknown, theirs: unknown, depth: number): unknown {
   if (same(mine, base)) return theirs;
+  if (same(theirs, base)) return mine;
+  const lb = idList(base);
+  const lm = idList(mine);
+  const lt = idList(theirs);
+  if (lb && lm && lt) return mergeList(lb, lm, lt, depth);
   if (depth > 0 && isPlain(base) && isPlain(mine) && isPlain(theirs)) {
     const out: Record<string, unknown> = {};
     for (const k of new Set([...Object.keys(theirs), ...Object.keys(mine)])) {

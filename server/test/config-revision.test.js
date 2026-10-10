@@ -264,6 +264,38 @@ test('mergeOverwrite: untouched parts take the saved value, parts changed here w
   assert.deepEqual(merge.mergeOverwrite(base, structuredClone(base), theirs), theirs);
 });
 
+test('mergeOverwrite: lists with ids merge item by item (screens, countdowns)', () => {
+  const base = { ...defaultConfig(), revision: 1 };
+  const s0 = base.screens[0];
+  base.screens = [s0, { ...structuredClone(s0), id: 'scr-b', slug: 'hall', name: 'Hall' }];
+  base.countdowns.items = [
+    { id: 'k1', title: 'One', emoji: '⏳', color: null, date: '2099-01-01', yearly: false },
+    { id: 'k2', title: 'Two', emoji: '⏳', color: null, date: '2099-02-01', yearly: false },
+  ];
+  const mine = structuredClone(base);
+  mine.screens[0].name = 'Kitchen'; // edited here
+  mine.countdowns.items.push({ id: 'k3', title: 'Mine', emoji: '⏳', color: null, date: '2099-03-01', yearly: false });
+  mine.countdowns.items = mine.countdowns.items.filter((x) => x.id !== 'k2'); // removed here
+  const theirs = structuredClone(base);
+  theirs.revision = 2;
+  theirs.screens[1].name = 'Hallway'; // another screen edited elsewhere
+  theirs.screens[0].orientation = theirs.screens[0].orientation === 'portrait' ? 'landscape' : 'portrait'; // same screen, other key
+  theirs.countdowns.items[0].title = 'One (edited)';
+  theirs.countdowns.items.push({ id: 'k4', title: 'Theirs', emoji: '⏳', color: null, date: '2099-04-01', yearly: false });
+  const out = merge.mergeOverwrite(base, mine, theirs);
+  assert.deepEqual(out.screens.map((x) => x.name), ['Kitchen', 'Hallway']);
+  assert.equal(out.screens[0].orientation, theirs.screens[0].orientation);
+  assert.deepEqual(out.countdowns.items.map((x) => x.id), ['k1', 'k4', 'k3']);
+  assert.equal(out.countdowns.items[0].title, 'One (edited)');
+  // reordered here: this tab's order wins, items added elsewhere go last
+  const moved = structuredClone(base);
+  moved.screens.reverse();
+  const theirs2 = structuredClone(base);
+  theirs2.revision = 2;
+  theirs2.screens.push({ ...structuredClone(s0), id: 'scr-c', slug: 'office', name: 'Office' });
+  assert.deepEqual(merge.mergeOverwrite(base, moved, theirs2).screens.map((x) => x.id), ['scr-b', s0.id, 'scr-c']);
+});
+
 test('admin error map: every code has a message in es, en and pt', () => {
   const codes = ['rate_limited', 'screen_limit', 'limit_exceeded', 'feature_unavailable', 'conflict', 'photo_quota', 'readonly'];
   assert.deepEqual(Object.keys(errs.API_ERROR_MESSAGES).sort(), [...codes].sort());
