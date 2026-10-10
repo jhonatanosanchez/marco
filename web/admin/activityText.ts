@@ -2,6 +2,7 @@
 import type { ActivityEntry } from '../shared/types';
 import type { IconName } from './components/icons';
 import { nScreens, t } from './i18n';
+import { fetchErrorText } from './apiErrors';
 
 const str = (v: unknown) => (v === undefined || v === null ? '' : String(v));
 const q = (v: unknown) => (str(v) ? `«${str(v)}»` : '');
@@ -75,7 +76,7 @@ export function describeActivity(e: ActivityEntry): { icon: IconName; text: stri
     case 'backup.deleted':
       return { icon: 'trash', text: t('Copia de seguridad eliminada') };
     case 'source.error':
-      return { icon: 'alert', text: t('Error en el calendario {name}: {error}', { name: q(d.name ?? d.sourceId), error: str(d.error) }) };
+      return { icon: 'alert', text: t('Error en el calendario {name}: {error}', { name: q(d.name ?? d.sourceId), error: fetchErrorText(str(d.error)) }) };
     case 'source.recovered':
       return { icon: 'check', text: t('Calendario {name} recuperado', { name: q(d.name ?? d.sourceId) }) };
     case 'announce.sent':

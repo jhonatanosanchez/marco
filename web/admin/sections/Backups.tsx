@@ -300,10 +300,10 @@ export function BackupsSection({ dirty, replaceConfig }: SectionProps) {
           {secretsOn && secrets && <Callout kind="warn">{t('Con secretos, quien tenga el archivo podría acceder a tus calendarios de Google y a Home Assistant. Guárdalo en un lugar seguro.')}</Callout>}
           {!secretsOn && !isSelfHosted() && (
             <p class="muted small">
-              {t('Sirve también para pasar a un Marco instalado en casa: impórtalo en su panel. No lleva enlaces privados, dispositivos vinculados, tokens de API ni cuentas de Google, así que después vincula de nuevo las pantallas y vuelve a conectar Google Calendar.')}
+              {t('Sirve también para pasar a un Marco instalado en casa: impórtalo en su panel. No lleva enlaces privados, dispositivos vinculados, tokens de API ni cuentas de Google, así que después vincula de nuevo las pantallas y vuelve a conectar Google Calendar.')}{' '}
+              {t('Contiene las direcciones de tus calendarios: guárdalo en un lugar seguro.')}
             </p>
           )}
-          {!secretsOn && !isSelfHosted() && <p class="muted small">{t('Contiene las direcciones de tus calendarios: guárdalo en un lugar seguro.')}</p>}
           <div>
             <Button variant="primary" icon="download" loading={exporting} onClick={doExport}>
               {t('Descargar copia')}
