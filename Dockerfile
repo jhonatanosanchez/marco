@@ -20,7 +20,10 @@ LABEL org.opencontainers.image.title="Marco" \
       org.opencontainers.image.description="Your family's day, framed. Self-hosted family wall calendar and dashboard." \
       org.opencontainers.image.source="https://github.com/mr-reb00t/marco" \
       org.opencontainers.image.licenses="MIT"
+# MARCO_INSTALL=docker: the admin shows how to update a container (git pull, docker compose up -d --build) and never
+# offers the update button.
 ENV NODE_ENV=production \
+    MARCO_INSTALL=docker \
     PORT=3000 \
     DATA_DIR=/data \
     SETUP_REQUIRE_TOKEN=1
