@@ -125,6 +125,35 @@ test('imageInfo: JPEG size from SOF, EXIF orientation 6 swaps w/h, PNG and WebP 
   }
 });
 
+test('imageInfo on files: sizes after large ICC segments are found; non-images are read once', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cs-imginfo-big-'));
+  const realRead = fs.readSync;
+  let reads = 0;
+  fs.readSync = (...a) => { reads++; return realRead(...a); };
+  try {
+    const w = (name, buf) => { const p = path.join(dir, name); fs.writeFileSync(p, buf); return p; };
+    // 40 APP2 segments of 64 KB (about 2.6 MB of ICC data) before the SOF, then a large scan.
+    const app2 = Buffer.alloc(4 + 0xfffd, 0x41);
+    app2[0] = 0xff; app2[1] = 0xe2; app2.writeUInt16BE(0xffff, 2);
+    const sof = Buffer.from([0xff, 0xc0, 0, 17, 8, 0x0b, 0xb8, 0x0f, 0xa0, 3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]);
+    const jpg = Buffer.concat([Buffer.from([0xff, 0xd8]), ...Array(40).fill(app2), sof, Buffer.from([0xff, 0xda]), Buffer.alloc(4 << 20)]);
+    reads = 0;
+    assert.deepEqual(imageInfo(w('icc.jpg', jpg)), { w: 4000, h: 3000, orientation: 1 });
+    assert.equal(reads, 3);
+    // A 5 MB file that is not an image: one read, then stop.
+    reads = 0;
+    assert.equal(imageInfo(w('junk.jpg', Buffer.alloc(5 << 20, 0x20))), null);
+    assert.equal(reads, 1);
+    // A broken JPEG (scan before any size) is not read again either.
+    reads = 0;
+    assert.equal(imageInfo(w('broken.jpg', Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xda, 0, 4]), Buffer.alloc(3 << 20)]))), null);
+    assert.equal(reads, 1);
+  } finally {
+    fs.readSync = realRead;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('sanitization: upload names, .jpeg → .jpg, missing extension, free names', () => {
   assert.equal(sanitizeFilename('Vacaciones Playa.JPEG'), 'vacaciones-playa.jpg');
   assert.equal(uploadName('Fotó del Perro.jpg'), 'foto-del-perro.jpg');

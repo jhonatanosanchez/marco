@@ -36,28 +36,47 @@ export function sniffImage(bytes) {
 /**
  * Pixel size of a JPEG / PNG / WebP from its header. For JPEGs the EXIF orientation is read and w/h are swapped for
  * rotated (5–8) images, so they describe the photo as displayed. Returns { w, h, orientation } or null when the
- * format is unknown or the data ends before the size (pass more bytes and try again).
+ * format is unknown or the data ends before the size (see imageHeaderNeed to tell the two apart).
  */
 export function imageInfo(bytes) {
-  if (!isBytes(bytes) || bytes.length < 4) return null;
+  const r = parseHeader(bytes);
+  return typeof r === 'number' ? null : r;
+}
+
+/**
+ * How many bytes from the start imageInfo needs at least to find the size when `bytes` is a cut-off header of a
+ * known format (more data may help), or 0 when it already found the size or more data cannot help (unknown or
+ * broken file). Callers that read a file in steps use it to stop early on files that are not images.
+ */
+export function imageHeaderNeed(bytes) {
+  const r = parseHeader(bytes);
+  return typeof r === 'number' ? r : 0;
+}
+
+/** { w, h, orientation } when found, null when the data is not a usable header, or a byte count when it is cut off. */
+function parseHeader(bytes) {
+  if (!isBytes(bytes)) return null;
   const b = bytes;
+  if (b.length < 4) return b.length === 0 || b[0] === 0x89 || b[0] === 0xff || b[0] === 0x52 ? 4 : null;
   if (u32be(b, 0) === 0x89504e47) {
     const w = u32be(b, 16), h = u32be(b, 20);
-    return w < 0 || h < 0 ? null : { w, h, orientation: 1 };
+    return w < 0 || h < 0 ? 24 : { w, h, orientation: 1 };
   }
-  if (ascii(b, 0, 4) === 'RIFF' && ascii(b, 8, 12) === 'WEBP') {
+  if (ascii(b, 0, 4) === 'RIFF') {
+    if (b.length < 16) return 16;
+    if (ascii(b, 8, 12) !== 'WEBP') return null;
     const chunk = ascii(b, 12, 16);
     if (chunk === 'VP8X') {
       const w = u24le(b, 24), h = u24le(b, 27);
-      return w < 0 || h < 0 ? null : { w: w + 1, h: h + 1, orientation: 1 };
+      return w < 0 || h < 0 ? 30 : { w: w + 1, h: h + 1, orientation: 1 };
     }
     if (chunk === 'VP8 ') {
       const w = u16le(b, 26), h = u16le(b, 28);
-      return w < 0 || h < 0 ? null : { w: w & 0x3fff, h: h & 0x3fff, orientation: 1 };
+      return w < 0 || h < 0 ? 30 : { w: w & 0x3fff, h: h & 0x3fff, orientation: 1 };
     }
     if (chunk === 'VP8L') {
       const v = u32le(b, 21);
-      return v < 0 ? null : { w: (v & 0x3fff) + 1, h: ((v >>> 14) & 0x3fff) + 1, orientation: 1 };
+      return v < 0 ? 25 : { w: (v & 0x3fff) + 1, h: ((v >>> 14) & 0x3fff) + 1, orientation: 1 };
     }
     return null;
   }
@@ -65,7 +84,8 @@ export function imageInfo(bytes) {
   let pos = 2;
   let orientation = 1;
   for (let guard = 0; guard < 500; guard++) {
-    if (pos + 4 > b.length || b[pos] !== 0xff) return null;
+    if (pos + 4 > b.length) return pos + 4;
+    if (b[pos] !== 0xff) return null;
     const marker = b[pos + 1];
     if (marker === 0xff) { pos++; continue; } // fill byte
     if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) { pos += 2; continue; }
@@ -73,10 +93,11 @@ export function imageInfo(bytes) {
     const len = u16be(b, pos + 2);
     if (len < 2) return null;
     if (marker === 0xe1 && len > 16) {
-      orientation = exifOrientation(b.subarray(pos + 4, Math.min(b.length, pos + 2 + len))) || orientation;
+      if (pos + 2 + len > b.length) return pos + 2 + len; // read the whole EXIF segment before trusting it
+      orientation = exifOrientation(b.subarray(pos + 4, pos + 2 + len)) || orientation;
     } else if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
       const h = u16be(b, pos + 5), w = u16be(b, pos + 7);
-      if (h < 0 || w < 0) return null;
+      if (h < 0 || w < 0) return pos + 9;
       return orientation >= 5 && orientation <= 8 ? { w: h, h: w, orientation } : { w, h, orientation };
     }
     pos += 2 + len;

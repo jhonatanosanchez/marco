@@ -7,7 +7,7 @@ import { requestJson } from './lib/http.js';
 import { defaultScreen } from './core/screens.js';
 import { getConfig, paths, writeFileAtomic } from './store.js';
 import {
-  ALLOWED_EXT, ALLOWED_MIME, imageInfo as imageInfoOf, isJpeg, isGalleryFile, uploadName as coreUploadName,
+  ALLOWED_EXT, ALLOWED_MIME, imageInfo as imageInfoOf, imageHeaderNeed, isJpeg, isGalleryFile, uploadName as coreUploadName,
 } from './core/imageInfo.js';
 
 // Header parsing and the file name rules are pure (server/core/imageInfo.js); this file handles disk and multer.
@@ -142,12 +142,13 @@ export function updateMeta(fn) {
 export const isUnit = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1;
 const round4 = (v) => Math.round(v * 10000) / 10000;
 
-// Header bytes read before giving up on finding the image size (EXIF and ICC segments can be large).
-const HEADER_READS = [64 * 1024, 1024 * 1024, 16 * 1024 * 1024];
+// Header bytes read before giving up on finding the image size (EXIF and ICC segments can be large). A file that
+// is not a known image, or is broken, stops after the first read.
+const HEADER_READS = [128 * 1024, 1024 * 1024, 16 * 1024 * 1024];
 
 /**
- * Pixel size of a JPEG / PNG / WebP file from its header (see imageInfo in server/core/imageInfo.js): reads 64 KB
- * first and more only when the size comes later in the file. Returns { w, h, orientation } or null.
+ * Pixel size of a JPEG / PNG / WebP file from its header (see imageInfo in server/core/imageInfo.js): reads 128 KB
+ * first and more only when the header goes on past that. Returns { w, h, orientation } or null.
  */
 export function imageInfo(file) {
   let fd;
@@ -157,8 +158,11 @@ export function imageInfo(file) {
     for (const want of HEADER_READS) {
       const buf = Buffer.alloc(Math.min(want, size));
       const n = fs.readSync(fd, buf, 0, buf.length, 0);
-      const info = imageInfoOf(buf.subarray(0, n));
+      const head = buf.subarray(0, n);
+      const info = imageInfoOf(head);
       if (info || n >= size || n < buf.length) return info;
+      const need = imageHeaderNeed(head);
+      if (!need || need > HEADER_READS[HEADER_READS.length - 1]) return null;
     }
     return null;
   } catch {

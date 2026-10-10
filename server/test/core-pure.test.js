@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import path from 'node:path';
-import { imageInfo, exifOrientation, sniffImage, sanitizeFilename, isGalleryFile, uploadName, baseName, extName } from '../core/imageInfo.js';
+import { imageInfo, imageHeaderNeed, exifOrientation, sniffImage, sanitizeFilename, isGalleryFile, uploadName, baseName, extName } from '../core/imageInfo.js';
 import { CODE_ALPHABET, CODE_LENGTH, randomCode, normalizeCode } from '../core/pairCore.js';
 import { hash, sha1Hex, randomId } from '../core/lib/text.js';
 import { hash as nodeHash } from '../lib/text.js';
@@ -129,6 +129,33 @@ test('imageInfo / exifOrientation fuzz: every truncation of valid headers, rando
   const seg = Buffer.concat([Buffer.from('Exif\0\0MM\0\x2a\0\0\0\x08\xff\xff', 'latin1'), Buffer.alloc(20)]);
   assert.equal(exifOrientation(seg), 0);
   assert.equal(imageInfo(Buffer.concat([Buffer.from([0xff, 0xd8]), Buffer.alloc(5000, 0xff)])), null);
+});
+
+test('imageHeaderNeed: a cut-off header asks for more bytes, anything else gives 0', () => {
+  const samples = [jpeg(6000, 4000, 6), jpeg(320, 200, 3, { le: true }), png(1920, 1080),
+    webp('VP8X', 800, 600), webp('VP8 ', 800, 600), webp('VP8L', 800, 600)];
+  for (const s of samples) {
+    assert.equal(imageHeaderNeed(s), 0);
+    for (let n = 0; n < s.length; n++) {
+      const cut = s.subarray(0, n);
+      const need = imageHeaderNeed(cut);
+      if (imageInfo(cut)) assert.equal(need, 0);
+      else {
+        assert.ok(need > n && need <= s.length, `n=${n} need=${need}`);
+        // With the bytes it asked for, it either finds the size or asks for more, never fewer.
+        const more = s.subarray(0, need);
+        assert.ok(imageInfo(more) || imageHeaderNeed(more) > need);
+      }
+    }
+  }
+  // Not an image, or a broken one: more data cannot help.
+  assert.equal(imageHeaderNeed(new TextEncoder().encode('not an image at all, sorry')), 0);
+  assert.equal(imageHeaderNeed(new Uint8Array([0xff, 0xd8, 0xff, 0xda, 0, 4, 0, 0])), 0); // scan before SOF
+  assert.equal(imageHeaderNeed(new TextEncoder().encode('RIFF\0\0\0\0AVI LIST')), 0);
+  assert.equal(imageHeaderNeed(null), 0);
+  // A big segment before the size: asks for the end of the segment.
+  const big = new Uint8Array([0xff, 0xd8, 0xff, 0xe2, 0xff, 0xff, 1, 2, 3]);
+  assert.equal(imageHeaderNeed(big), 2 + 2 + 0xffff + 4);
 });
 
 test('sniffImage: JPEG, PNG and WebP by magic bytes; SVG, HEIC, GIF and short input refused', () => {
