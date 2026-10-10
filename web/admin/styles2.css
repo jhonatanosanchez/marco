@@ -1334,6 +1334,60 @@ h1 .scope {
 .mini-layout--leftRight .ml-b {
   background: transparent;
 }
+.mini-layout--people,
+.mini-layout--board {
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: 28% 1fr;
+}
+.mini-layout--people .ml-a,
+.mini-layout--board .ml-a {
+  grid-row: 1;
+  grid-column: 1 / -1;
+}
+.mini-layout--people .ml-b,
+.mini-layout--people .ml-c,
+.mini-layout--board .ml-b,
+.mini-layout--board .ml-c {
+  display: block;
+  grid-row: 2;
+}
+.mini-layout--board .ml-a {
+  background: transparent;
+}
+.mini-layout--photoFrame {
+  grid-template-columns: 1fr 34%;
+  grid-template-rows: 1fr 38%;
+}
+.mini-layout--photoFrame .ml-a {
+  display: none;
+}
+.mini-layout--photoFrame .ml-b {
+  grid-row: 2;
+  grid-column: 2;
+}
+.mini-layout--bedside {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  background: #050505;
+}
+.mini-layout--bedside .ml-a {
+  grid-row: 1;
+  background: transparent;
+  position: relative;
+}
+.mini-layout--bedside .ml-a::after {
+  content: '7:05';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #c99a76;
+  font-weight: 300;
+  font-size: 24px;
+}
+.mini-layout--bedside .ml-b {
+  display: none;
+}
 .screen-card__body {
   flex: 1;
   min-width: 0;

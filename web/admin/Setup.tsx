@@ -824,7 +824,7 @@ export function SetupWizard({ status: initial, onDone, onLang }: { status: Setup
         </Field>
         <Field label={t('Diseño')}>
           <div class="wz-presets" role="radiogroup" aria-label={t('Diseño')}>
-            {PRESETS.map((p) => (
+            {PRESETS.filter((p) => p.wizard).map((p) => (
               <button type="button" role="radio" aria-checked={preset === p.id} class={`preset ${preset === p.id ? 'is-active' : ''}`} onClick={() => setPreset(p.id)} title={t(p.desc)}>
                 <Schematic id={p.id} side="left" />
                 <div class="preset__text">
