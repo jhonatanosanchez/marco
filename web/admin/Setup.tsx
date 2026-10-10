@@ -7,7 +7,7 @@ import { passwordProblem, passwordScore, MIN_PASSWORD } from '../shared/password
 import { BrandMark } from './components/BrandMark';
 import { CopyField, Qr } from './components/share';
 import { kioskInstallCommand, REPO_URL } from '../shared/project';
-import type { Lang, LayoutPreset, SetupRequest, SetupStatus, TestIcsResponse } from '../shared/types';
+import type { GeocodeResult, Lang, LayoutPreset, SetupRequest, SetupStatus, TestIcsResponse } from '../shared/types';
 import { api, ApiError } from './api';
 import { Icon, type IconName } from './components/icons';
 import { Button, Callout, Field, Segmented, TextInput } from './components/ui';
@@ -45,16 +45,6 @@ const forgetToken = () => {
   }
 };
 
-interface GeoResult {
-  id: number;
-  name: string;
-  latitude: number;
-  longitude: number;
-  timezone?: string;
-  admin1?: string;
-  country?: string;
-  country_code?: string;
-}
 interface Place {
   name: string;
   lat: number;
@@ -175,7 +165,7 @@ export function SetupWizard({ status: initial, onDone, onLang }: { status: Setup
   const [pwTried, setPwTried] = useState(false);
   // location
   const [q, setQ] = useState('');
-  const [results, setResults] = useState<GeoResult[] | null>(null);
+  const [results, setResults] = useState<GeocodeResult[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchErr, setSearchErr] = useState('');
   const [place, setPlace] = useState<Place | null>(null);
@@ -309,20 +299,19 @@ export function SetupWizard({ status: initial, onDone, onLang }: { status: Setup
     setSearching(true);
     setSearchErr('');
     try {
-      const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?count=6&language=${lang}&name=${encodeURIComponent(q.trim())}`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const j = await r.json();
+      // Through this server (GET /api/admin/geocode): the wizard has no session yet, so it sends its setup token.
+      const j = await api.geocode(q.trim(), lang, token.trim() || undefined);
       setResults(j.results ?? []);
-    } catch {
+    } catch (e) {
       setResults(null);
-      setSearchErr(t('No se pudo buscar (¿sin conexión a Internet?). Inténtalo de nuevo.'));
+      setSearchErr((e as ApiError).status === 429 ? t('Demasiadas búsquedas seguidas. Espera unos minutos.') : t('No se pudo buscar (¿sin conexión a Internet?). Inténtalo de nuevo.'));
     } finally {
       setSearching(false);
     }
   };
-  const pick = (r: GeoResult) => {
+  const pick = (r: GeocodeResult) => {
     const name = [r.name, r.admin1 && r.admin1 !== r.name ? r.admin1 : '', r.country].filter(Boolean).join(', ');
-    const p: Place = { name, lat: r.latitude, lon: r.longitude, timezone: r.timezone || browserTz(), cc: (r.country_code || '').toUpperCase() };
+    const p: Place = { name, lat: r.lat, lon: r.lon, timezone: r.timezone || browserTz(), cc: (r.countryCode || '').toUpperCase() };
     setPlace(p);
     setManualLoc(false);
     setSkipLoc(false);

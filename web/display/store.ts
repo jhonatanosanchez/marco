@@ -1,6 +1,6 @@
 // Minimal reactive store for the display.
 import type { CountdownsResponse, DisplayConfig, EventsResponse, NewsResponse, PhotosResponse, WeatherResponse } from '../shared/types';
-import { screenNs } from './identity';
+import { isPreview, screenNs } from './identity';
 
 export interface State {
   config: DisplayConfig | null;
@@ -48,6 +48,7 @@ export function on(k: Topic | Topic[], fn: Fn): void {
  */
 const LS_PREFIX = `cs.cache.${screenNs}.`;
 export function saveCache(k: Topic, v: unknown): void {
+  if (isPreview) return; // the admin preview never writes this browser's storage (identity.ts)
   try {
     localStorage.setItem(LS_PREFIX + k, JSON.stringify(v));
   } catch { /* quota / private mode */ }

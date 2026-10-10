@@ -2,6 +2,7 @@
 // Self-hosted fonts (bundled by Vite): the display must render with no Internet.
 import '@fontsource-variable/inter';
 import '@fontsource-variable/outfit';
+import '../shared/emoji-font.css';
 import './styles.css';
 import type {
   Announcement, CountdownsResponse, DisplayConfig, EventsResponse, NewsResponse, NightCommand, WeatherResponse,
@@ -37,7 +38,8 @@ import { News } from './widgets/news';
 import { Photos } from './widgets/photos';
 import { Weather } from './widgets/weather';
 import { checkSetup, showWelcome, waitForSetup } from './widgets/welcome';
-import { pairingLang, showPairing } from './widgets/pairing';
+import { afterPairUrl, pairHealth, pairingLang, showPairing } from './widgets/pairing';
+import { healthOnce, loadEmojiWebFont } from './health';
 
 const params = ctx.params;
 const forceDemo = params.get('demo') === '1';
@@ -460,8 +462,9 @@ function denyAccess(status: number): void {
   if (accessDenied || state.demo) return;
   accessDenied = true;
   // A dead private link (kiosk URL) but this browser was paired since: use the device token instead.
+  // Marco Cloud continues at /pair, where "/" is not the display (pairing.ts afterPairUrl).
   if (status === 403 && credentialKind === 'key' && storedDeviceToken()) {
-    location.replace(`/${location.search}`);
+    void pairHealth().then((h) => location.replace(afterPairUrl(h)));
     return;
   }
   if (status === 403 && credentialKind === 'device') clearDeviceToken();
@@ -701,6 +704,7 @@ function enterDemo(): void {
 
 async function boot(): Promise<void> {
   startTicker();
+  void healthOnce().then((h) => loadEmojiWebFont(h));
   if (forceDemo) {
     enterDemo();
     startPolling();

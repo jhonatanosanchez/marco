@@ -5,7 +5,7 @@
 //     GET    /devices                               → { mode, devices: PairedDevice[] }
 //     PATCH  /devices/:id   { name?, screenId? }    → { device }
 //     DELETE /devices/:id                           → { ok }
-//     POST   /pair/claim    { code, screenId, name? } → { device }
+//     POST   /pair/claim    { code, screenId, name? } → { confirm }, then with confirm: true → { device }
 //   pairPublicRouter() mounted at /api (no auth; rate-limited):
 //     POST   /pair/start                            → { sessionId, code, expiresAt, pollMs }
 //     POST   /pair/status   { sessionId }           → { status: 'waiting' | 'paired' | 'expired', … }

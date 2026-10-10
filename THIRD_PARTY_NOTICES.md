@@ -9,6 +9,7 @@ their own licenses. Most are MIT, ISC, BSD or Apache-2.0; the ones below deserve
 |---|---|---|
 | [heic-to](https://github.com/hoppergee/heic-to) | **LGPL-3.0** | Converts iPhone HEIC/HEIF photos to JPEG in the admin's browser. It bundles [libheif](https://github.com/strukturag/libheif) and [libde265](https://github.com/strukturag/libde265) (both LGPL-3.0) compiled to WebAssembly. It is used **unmodified** and built into a **separate, lazily loaded chunk** (`dist/assets/heic-to-*.js`) that is only downloaded when a HEIC photo is selected, so it can be replaced with any compatible version (update `package.json` and rebuild). Its source code is available from the links above. |
 | [@fontsource-variable/inter](https://fontsource.org/fonts/inter), [@fontsource-variable/outfit](https://fontsource.org/fonts/outfit) | SIL Open Font License 1.1 | Inter and Outfit typefaces, self-hosted so displays render correctly without Internet access. |
+| [Noto Color Emoji](https://github.com/googlefonts/noto-emoji) | SIL Open Font License 1.1 | A subset with the emoji the admin offers (`web/shared/fonts/marco-emoji.woff2`, built by `scripts/build-emoji-font.mjs`; license in `web/shared/fonts/OFL.txt`), so the admin and the screens show the same emoji without loading fonts from other sites. Self-hosted displays may also load the full font from Google Fonts as before, when the device has no emoji font installed. |
 | [three.js](https://threejs.org/) | MIT | WebGL photo transitions and ambient effects. |
 | [Preact](https://preactjs.com/) | MIT | Admin panel UI. |
 

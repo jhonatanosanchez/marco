@@ -133,8 +133,10 @@ how much of it.
   writes access logs, leave out the query string (Caddy logs nothing by default; for nginx use a `log_format` without
   `$request_uri`/`$args`, or `access_log off` for `/api/stream` and `/media/`).
 - *Social engineering of the pairing dialog* ("type this code to fix your screen"): pairing gives the code's display a
-  token for the screen the admin picks. Only type codes shown on your own screens; the new device appears in
-  *Connected screens → Paired devices*, where it can be revoked.
+  token for the screen the admin picks. The claim has two steps: the admin first shows the address of the display
+  that is waiting with that code and asks the owner to confirm it is the screen in front of them; only the second
+  request pairs. Only type codes shown on your own screens; the new device appears in *Connected screens → Paired
+  devices*, where it can be revoked.
 - *Malicious websites in a family member's browser* (CSRF, DNS rebinding): admin actions (claim, regenerate, revoke)
   need the session cookie (`SameSite=Lax`), JSON bodies and a matching `Origin`; unknown host names get `421`. The
   pairing status endpoint needs the secret session id.

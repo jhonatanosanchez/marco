@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import { publicRouter } from '../routes/public.js';
+import { publicRouter, onThisMachine } from '../routes/public.js';
 import { FEATURE_KEYS, healthBody, liveMode, selfHostedFeatures } from '../capabilities.js';
 
 async function getHealth() {
@@ -75,4 +75,29 @@ test('MARCO_LIVE=poll makes live poll', async () => {
   assert.equal(liveMode({ MARCO_LIVE: 'websocket' }), 'sse');
   assert.equal(liveMode({}), 'sse');
   assert.equal(healthBody({ version: '1', env: { MARCO_LIVE: 'poll' } }).live, 'poll');
+});
+
+test('health lists the LAN addresses only for a client on this machine (kiosk on localhost)', async () => {
+  const get = async (headers = {}) => {
+    const app = express();
+    app.use('/api', publicRouter({ version: '9.9.9' }));
+    const srv = app.listen(0, '127.0.0.1');
+    try {
+      await new Promise((r) => srv.once('listening', r));
+      return await (await fetch(`http://127.0.0.1:${srv.address().port}/api/health`, { headers })).json();
+    } finally {
+      srv.close();
+    }
+  };
+  await withEnv({ LAN_ADDRESS: '192.0.2.10' }, async () => {
+    assert.deepEqual((await get()).lanAddresses, ['192.0.2.10']);
+    // relayed by a proxy that is not trusted: the real client is somewhere else
+    assert.equal((await get({ 'x-forwarded-for': '203.0.113.7' })).lanAddresses, undefined);
+  });
+  assert.equal(onThisMachine({ ip: '192.168.1.5', headers: {}, get: () => 'localhost' }), false);
+  assert.equal(onThisMachine({ ip: '::ffff:127.0.0.1', headers: {}, get: () => 'localhost:3000' }), true);
+  // a host name that public DNS could point here (DNS rebinding)
+  assert.equal(onThisMachine({ ip: '127.0.0.1', headers: {}, get: () => 'evil.example.com' }), false);
+  assert.equal('lanAddresses' in healthBody({ version: '1', lanAddresses: [] }), false);
+  assert.deepEqual(healthBody({ version: '1', lanAddresses: ['a', 'b', 'c', 'd'] }).lanAddresses, ['a', 'b', 'c']);
 });

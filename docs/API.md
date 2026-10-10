@@ -25,7 +25,7 @@ it until you switch in *Security*).
 |---|---|---|
 | Display key | UUIDv4, e.g. `3f6c0a52-9d1e-4b7a-a2c4-0e5b8f1d2c37` (case-insensitive) | The screen's private link `/d/<key>` (*Screen → Settings → Private link*) |
 | Device token | `md_` + 43 base64url characters (256 bits) | Pairing (below); stored by the display in `localStorage` |
-| Admin session | `cs_session` cookie | Logged-in admin (preview iframe, *View screen*) |
+| Admin session | `cs_session` cookie | Logged-in admin (preview iframe and *View screen* in open mode, which use `/?screen=`; in private mode they use the private link) |
 
 Header `X-Marco-Key: <key or token>` for `fetch`; `?k=<key or token>` is accepted only by `/api/stream` (EventSource
 cannot send headers) and `/media/*` (images). Keys and tokens are compared in constant time and never logged.
@@ -46,9 +46,13 @@ the key from its path. `GET /pair` serves the display page in pairing mode.
 |---|---|
 | `POST /api/pair/start` | `{}` → `PairStartResponse` `{ sessionId, code, expiresAt, pollMs }`. `sessionId`: 32 random bytes (base64url), known only to this display; `code`: 6 characters from `23456789ABCDEFGHJKMNPQRSTUVWXYZ`, unique among pending codes, valid 10 min. `429` after 10 starts per IPv4 address / IPv6 /64 in 10 min; `503` with 100 pending codes |
 | `POST /api/pair/status` | `{ sessionId }` → `{ status: "waiting", code, expiresAt }` · `{ status: "paired", token, screen: { id, slug, name }, device: { id, name } }` (exactly once, then the session is gone) · `404 { status: "expired" }`. Poll every `pollMs` (2 s): a code can only be claimed while its display polled within the last 15 s |
-| `POST /api/admin/pair/claim` | Admin session. `{ code, screenId, name? }` (code case-insensitive, spaces/dashes ignored) → `{ device: PairedDevice }`. `404 { code: "invalid_code" }` unknown / expired / already used / display not waiting; `400 { code: "unknown_screen" }`; `429 { code: "rate_limited" }` after 10 wrong codes per admin session + address, or 50 wrong codes overall, in 10 minutes (then even a right code waits) |
+| `POST /api/admin/pair/claim` | Admin session. Two steps. `{ code, screenId, name? }` (code case-insensitive, spaces/dashes ignored) only finds the waiting display and answers `{ confirm: { where, screenId, screenName } }` (`where`: the display's address as this server saw it, `"localhost"` on the server itself, `""` when unknown); nothing is paired yet. The admin shows it and sends the same body with `confirm: true` → `{ device: PairedDevice }`. Marco Cloud answers the same shape, with `where` = city and country. `404 { code: "invalid_code" }` unknown / expired / already used / display not waiting; `400 { code: "unknown_screen" }`; `429 { code: "rate_limited" }` after 10 wrong codes per admin session + address, or 50 wrong codes overall, in 10 minutes (then even a right code waits). Read the error code as `code`, else `error` (Marco Cloud sends `{ error: "invalid_code" }`) |
 
 The admin's QR on the pairing screen opens `/admin/#pair=<code>`, which opens the *Pair a screen* dialog prefilled.
+The pairing screen reads `pairCodeLength` from `/api/health` and says where to open the admin: this page's
+`<host>/admin`, the first of `lanAddresses` when it was opened on `localhost` (a kiosk on the server itself), or
+`adminOrigin` when the server sets it. Once paired, a display opened at `/pair` stays on `/pair`; a dead private link
+continues at `/` (at `/pair` when `edition` is not `'self-hosted'`).
 
 **Links and devices** (admin session):
 
@@ -68,7 +72,7 @@ saved without `security` (old admin builds, backups or exports from before 0.3) 
 
 | Method & path | Response |
 |---|---|
-| `GET /api/health` | `HealthResponse`: `{ ok, uptime, version, live, edition, tenancy, runtime, pairCodeLength, features, limits?, displayOrigin? }` (see below). `live` is `'sse'` unless `MARCO_LIVE=poll` is set. A server that answers `'poll'` gets no `/api/stream` connection: the display checks `/api/display/config` every 90 s and refetches events and countdowns when `revision` changes. A missing field means `'sse'` |
+| `GET /api/health` | `HealthResponse`: `{ ok, uptime, version, live, edition, tenancy, runtime, pairCodeLength, features, limits?, displayOrigin?, adminOrigin?, lanAddresses? }` (see below). `live` is `'sse'` unless `MARCO_LIVE=poll` is set. A server that answers `'poll'` gets no `/api/stream` connection: the display checks `/api/display/config` every 90 s and refetches events and countdowns when `revision` changes. A missing field means `'sse'` |
 | `GET /api/display/config?screen=` | `DisplayConfig`: flat view of one screen; `calendar.sources` only as `{ id, name, color, emoji, kind }`; enabled `schedules` for this screen |
 | `GET /api/events?screen=&from=YYYY-MM-DD&to=YYYY-MM-DD` | `{ generatedAt, hash, events: CalEvent[], errors: [{ sourceId, message }] }` |
 | `GET /api/weather?screen=` | `{ updatedAt, locationName, current, today, daily[], hourly[], indoor }` (localized descriptions, cache 10 min) |
@@ -93,7 +97,16 @@ The admin and the display read these fields to decide which sections, actions an
 - `limits` (optional): plan limits such as `screens`, `sources` or `devices`. Absent means no limit beyond the
   config validator's own caps (12 screens, 50 calendars, 20 news feeds, 1000 local events, 500 birthdays,
   100 countdowns). The admin disables "add" at the limit and flags a config that goes over it.
-- `displayOrigin` (optional): absolute origin that serves `/d/<key>` and `/pair`. Absent means the same origin.
+- `displayOrigin` (optional): absolute origin that serves `/d/<key>` and `/pair`. Absent means the same origin. The
+  admin opens screens (preview, *View screen*) at `<displayOrigin or its own origin>/d/<key>` when it has the private
+  links (a server in private mode, or one without open display access), else at `/?screen=<slug>`. The preview adds
+  `?preview=1`: that page is never counted as a connected display and does not read or write the browser's stored
+  device token, client id or cached data.
+- `adminOrigin` (optional): absolute origin of the admin, for displays served from another origin. Absent means the
+  same origin.
+- `lanAddresses` (optional): this server's LAN addresses (as in `/api/setup/status`). Only sent to a client on the
+  server itself (loopback, not relayed by an untrusted proxy, allowed host name), so the pairing screen of a kiosk on
+  `http://localhost` can say where other devices reach the admin.
 
 Clients treat a response with no `features` field (servers older than 0.5.0) as having every feature on, except
 `accountMenu`. A key missing from `features` counts as off only when `edition` is not `'self-hosted'`, and a missing
@@ -204,6 +217,7 @@ Rules for the mutating setup endpoints:
 | `PUT /api/admin/config` | Validate + save (revision + 1, backup first, SSE `config`). `400 { error, details: [{ path, message }] }` when invalid |
 | `PUT /api/admin/password` | `{ current, next }`: same password rules as the setup wizard (`400 { code: too_short \| too_common \| too_long }`); also logs out other sessions |
 | `GET /api/admin/screens/template?name=` | New `ScreenProfile` with defaults and a free slug |
+| `GET /api/admin/geocode?q=&lang=` | Place search for the weather location, through this server (Open-Meteo geocoding) so the browser only talks to Marco → `{ results: [{ name, admin1, country, countryCode, lat, lon, timezone }] }` (at most 8; `q` shorter than 2 characters gives `[]`). Also open to the setup wizard while no password exists, with the same token rules as `/api/setup/*` (`x-setup-token`). `429 { error: "rate_limited" }` after 60 searches per address in 10 minutes (600 overall); answers are cached for a day; `502 { error: "geocode_unavailable" }` when Open-Meteo cannot be reached |
 | `POST /api/admin/events/preview` | Body `{ from?, days? (1..60), screen?, eventRules?, iconRules?, localEvents?, birthdays? }` (draft values) → every event incl. hidden ones with `applied[]` rules and `ruleHits` |
 | `POST /api/admin/birthdays/parse-csv` | `{ text }`: one `name;dd/mm[/yyyy]` per line (`;`, `,` or tab) → parsed rows, duplicates, errors with line numbers |
 | `GET /api/admin/dashboard` | Next events, weather now, active schedules, recent activity, warnings |

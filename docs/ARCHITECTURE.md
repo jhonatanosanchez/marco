@@ -212,7 +212,8 @@ flagged by a local event or a style rule (nearest occurrence per title), sorted 
   replaced by *Regenerate link* (SSE clients that used the old key get `revoked` and are closed).
 - Pairing (`server/pairing.js`, memory only): `POST /api/pair/start` → `{ sessionId, code }`; the display polls
   `POST /api/pair/status` with the secret `sessionId`; an admin claims the 6-character code
-  (`POST /api/admin/pair/claim`) for a screen → a device with a random 256-bit token is created (only its hash is
+  (`POST /api/admin/pair/claim`) for a screen in two steps (the first only answers which display is waiting, the
+  owner confirms, the second pairs) → a device with a random 256-bit token is created (only its hash is
   stored) and handed to the polling display once. Codes live 10 minutes, are single use and claimable only while the
   display polled in the last 15 s. Devices of a deleted screen move to the default screen.
 - New installs start `private`; a stored config without `security` (saved by 0.2 or older) is migrated to `open` on

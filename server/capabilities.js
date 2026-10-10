@@ -25,9 +25,12 @@ export function selfHostedFeatures() {
 /** Live update channel for displays: 'sse' unless MARCO_LIVE=poll. */
 export const liveMode = (env = process.env) => (String(env.MARCO_LIVE || '').trim().toLowerCase() === 'poll' ? 'poll' : 'sse');
 
-/** Body of GET /api/health. */
-export function healthBody({ version, env = process.env }) {
-  return {
+/**
+ * Body of GET /api/health. `lanAddresses` is only passed for a client on this machine (routes/public.js): the
+ * pairing screen of a kiosk opened on http://localhost shows them instead of "localhost".
+ */
+export function healthBody({ version, env = process.env, lanAddresses }) {
+  const body = {
     ok: true,
     uptime: Math.round(process.uptime()),
     version,
@@ -38,4 +41,6 @@ export function healthBody({ version, env = process.env }) {
     pairCodeLength: CODE_LENGTH,
     features: selfHostedFeatures(),
   };
+  if (Array.isArray(lanAddresses) && lanAddresses.length) body.lanAddresses = lanAddresses.slice(0, 3);
+  return body;
 }

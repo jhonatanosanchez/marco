@@ -20,6 +20,8 @@ import type {
   DisplayLinksResponse,
   DevicesResponse,
   PairClaimRequest,
+  PairClaimResponse,
+  GeocodeResponse,
   PairedDevice,
   EventsPreviewRequest,
   EventsPreviewResponse,
@@ -178,7 +180,10 @@ export const api = {
   devices: () => request<DevicesResponse>('GET', '/api/admin/devices'),
   updateDevice: (id: string, body: { name?: string; screenId?: string }) => request<{ device: PairedDevice }>('PATCH', `/api/admin/devices/${encodeURIComponent(id)}`, body),
   revokeDevice: (id: string) => request<{ ok: true }>('DELETE', `/api/admin/devices/${encodeURIComponent(id)}`),
-  claimPairing: (body: PairClaimRequest) => request<{ device: PairedDevice }>('POST', '/api/admin/pair/claim', body),
+  claimPairing: (body: PairClaimRequest) => request<PairClaimResponse>('POST', '/api/admin/pair/claim', body),
+  // Place search through the server (the setup wizard sends its setup token, there is no session yet).
+  geocode: (query: string, lang: string, setupToken?: string) =>
+    request<GeocodeResponse>('GET', `/api/admin/geocode${q({ q: query, lang })}`, undefined, setupToken ? { headers: { 'x-setup-token': setupToken }, silent401: true } : {}),
 
   eventsPreview: (body: EventsPreviewRequest) => request<EventsPreviewResponse>('POST', '/api/admin/events/preview', body),
   parseBirthdaysCsv: (text: string) => request<BirthdayCsvResult>('POST', '/api/admin/birthdays/parse-csv', { text }),

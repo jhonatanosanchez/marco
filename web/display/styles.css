@@ -19,9 +19,9 @@
   --glass-line: rgb(255 255 255 / 0.12);
   --rain: #7fd3ff;
   --u: calc(var(--fs) * min(0.521vw, 0.926vh));
-  --font-ui: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;
+  --font-ui: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Apple Color Emoji', 'Noto Color Emoji', 'Marco Emoji', sans-serif;
   --font-num: 'Outfit Variable', 'Outfit', 'Inter Variable', 'Inter', system-ui, sans-serif;
-  --font-emoji: 'Apple Color Emoji', 'Noto Color Emoji', 'Segoe UI Emoji', sans-serif;
+  --font-emoji: 'Apple Color Emoji', 'Noto Color Emoji', 'Marco Emoji', 'Segoe UI Emoji', sans-serif;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   /* calendar metrics */

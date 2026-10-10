@@ -434,7 +434,8 @@ detrás de HTTPS.
 - **Vinculación:** sin teclear enlaces largos en una tele. Abre la dirección normal (`http://homeserver.lan:3000/` o
   `/pair`) en el dispositivo nuevo y mostrará un **código de 6 caracteres** grande y un código QR. En el móvil abre
   *Pantallas conectadas → Vincular una pantalla* (o escanea el QR: abre el panel con el código ya escrito), escribe el
-  código, elige la pantalla y un nombre. El dispositivo arranca en un par de segundos y guarda su propia llave en el
+  código, elige la pantalla y un nombre. El panel te enseña entonces la dirección de la pantalla que espera con ese
+  código; confirma que es la que tienes delante. El dispositivo arranca en un par de segundos y guarda su propia llave en el
   almacenamiento del navegador. Va bien para tablets, teles y navegadores que sigues usando. El kiosco de la
   Raspberry Pi abre Chromium en modo incógnito (nada sobrevive a un reinicio), así que a él dale el enlace privado.
 - **Dispositivos vinculados:** *Pantallas conectadas* los lista con la pantalla que muestran y cuándo se vieron por

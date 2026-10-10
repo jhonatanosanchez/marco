@@ -479,6 +479,24 @@
     },
     {
       "method": "GET",
+      "path": "/api/admin/geocode",
+      "query": [
+        "lang",
+        "q"
+      ],
+      "feature": null,
+      "callers": [
+        "geocode"
+      ],
+      "request": null,
+      "response": "GeocodeResponse",
+      "responseArray": false,
+      "responseKeys": [
+        "results"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/api/admin/google/accounts",
       "query": [],
       "feature": "googleCalendar",
@@ -629,10 +647,11 @@
         "claimPairing"
       ],
       "request": "PairClaimRequest",
-      "response": "inline",
+      "response": "PairClaimResponse",
       "responseArray": false,
       "responseKeys": [
-        "device"
+        "confirm?",
+        "device?"
       ]
     },
     {
@@ -1042,7 +1061,9 @@
         "pairCodeLength?",
         "features?",
         "limits?",
-        "displayOrigin?"
+        "displayOrigin?",
+        "adminOrigin?",
+        "lanAddresses?"
       ]
     },
     {

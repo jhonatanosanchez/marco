@@ -1,11 +1,13 @@
 // Private display access (docs/API.md "Display access"): a display that has no valid key shows
-//   - 'pair':    "Pair this screen" + a 6-character code + QR to /admin/#pair=<code> (private mode, no key yet)
+//   - 'pair':    "Pair this screen" + a code (6 characters self-hosted, pairCodeLength in /api/health) + QR to
+//                /admin/#pair=<code> (private mode, no key yet)
 //   - 'invalid': "This link is no longer valid" (regenerated link / revoked device) + the same pairing code
 // and never any family data. The page polls /api/pair/status with the secret session id every ~2 s; once an admin
 // claims the code it stores the device token and starts normally.
 import { logoSvg } from '../../shared/logo';
 import { qrSvg } from '../../shared/qr';
-import type { Lang, PairStartResponse, PairStatusResponse } from '../../shared/types';
+import type { HealthResponse, Lang, PairStartResponse, PairStatusResponse } from '../../shared/types';
+import { healthOnce } from '../health';
 import { clearCaches, saveDeviceToken } from '../identity';
 
 const TEXT: Record<Lang, Record<string, string>> = {
@@ -15,6 +17,7 @@ const TEXT: Record<Lang, Record<string, string>> = {
     invalidTitle: 'This link is no longer valid',
     invalidLead: 'Its private link was replaced or this device was removed. Open the admin to get the new link, or pair this screen again:',
     s1: 'Open the admin → Connected screens → Pair a screen',
+    s1At: 'Open {where} → Connected screens → Pair a screen',
     s2: 'Type this code or scan the QR',
     s3: 'This screen starts by itself',
     expires: 'The code changes in {t}',
@@ -31,6 +34,7 @@ const TEXT: Record<Lang, Record<string, string>> = {
     invalidTitle: 'Este enlace ya no es válido',
     invalidLead: 'Su enlace privado se ha cambiado o este dispositivo se ha quitado. Abre el panel para obtener el enlace nuevo o vuelve a vincular esta pantalla:',
     s1: 'Abre el panel → Pantallas conectadas → Vincular una pantalla',
+    s1At: 'Abre {where} → Pantallas conectadas → Vincular una pantalla',
     s2: 'Escribe este código o escanea el QR',
     s3: 'Esta pantalla arranca sola',
     expires: 'El código cambia en {t}',
@@ -47,6 +51,7 @@ const TEXT: Record<Lang, Record<string, string>> = {
     invalidTitle: 'Esta ligação já não é válida',
     invalidLead: 'A ligação privada foi substituída ou este dispositivo foi removido. Abre o painel para obter a nova ligação ou volta a emparelhar este ecrã:',
     s1: 'Abre o painel → Ecrãs ligados → Emparelhar um ecrã',
+    s1At: 'Abre {where} → Ecrãs ligados → Emparelhar um ecrã',
     s2: 'Escreve este código ou lê o QR',
     s3: 'Este ecrã arranca sozinho',
     expires: 'O código muda em {t}',
@@ -119,14 +124,53 @@ function probeAccess(kind: 'pair' | 'invalid'): void {
 }
 let probing = false;
 
-const fmtCode = (c: string) => `${c.slice(0, 3)} ${c.slice(3)}`;
+/** "ABC234" → "ABC 234", "ABCD2345" → "ABCD 2345". */
+export const fmtCode = (c: string) => {
+  const half = Math.ceil(c.length / 2);
+  return `${c.slice(0, half)} ${c.slice(half)}`;
+};
 
-/** Where the display goes once paired: the plain display page (keeps ?client= & co., drops a dead /d/<key>). */
-function afterPairUrl(): string {
-  const q = new URLSearchParams(location.search);
+/** Placeholder shown until the first code arrives, as long as the server's codes. */
+export const codePlaceholder = (length: number) => fmtCode('·'.repeat(Math.min(12, Math.max(4, length || 6))));
+
+type PairHealth = Pick<HealthResponse, 'edition' | 'pairCodeLength' | 'lanAddresses' | 'adminOrigin'>;
+
+/** GET /api/health once (pairing code length, LAN addresses for a kiosk on localhost, admin origin). {} offline. */
+export const pairHealth = (): Promise<PairHealth> => healthOnce();
+
+const isLocalHost = (host: string) => /^(localhost|127\.|\[::1\])/.test(host);
+
+/**
+ * Where people open the admin to pair this screen. `where` is shown in the steps ("192.168.1.20:3000/admin"), `url`
+ * is the QR target base. On a kiosk opened on http://localhost the server's LAN address is used instead (from
+ * health.lanAddresses), and a display served from its own origin (Marco Cloud) points at health.adminOrigin.
+ * where = '' when nothing better than "localhost" is known.
+ */
+export function adminTarget(h: PairHealth, loc: { protocol: string; host: string; hostname: string; port: string; origin: string } = location): { where: string; url: string } {
+  let origin = loc.origin;
+  if (typeof h.adminOrigin === 'string' && /^https?:\/\//.test(h.adminOrigin)) {
+    try {
+      origin = new URL(h.adminOrigin).origin;
+    } catch { /* keep this origin */ }
+  } else if (isLocalHost(loc.hostname)) {
+    const ip = Array.isArray(h.lanAddresses) ? h.lanAddresses.find((a) => typeof a === 'string' && /^[0-9a-f.:]+$/i.test(a)) : undefined;
+    if (!ip) return { where: '', url: `${loc.origin}/admin/` };
+    const host = ip.includes(':') ? `[${ip}]` : ip;
+    origin = `${loc.protocol}//${host}${loc.port ? `:${loc.port}` : ''}`;
+  }
+  return { where: `${new URL(origin).host}/admin`, url: `${origin}/admin/` };
+}
+
+/**
+ * Path of the display page once paired, keeping ?client= & co. and dropping a dead /d/<key>: a page opened at /pair
+ * stays there, and so does every display of a server where "/" is not the display (Marco Cloud).
+ */
+export function afterPairUrl(h: Pick<HealthResponse, 'edition'> = {}, loc: { pathname: string; search: string } = location): string {
+  const q = new URLSearchParams(loc.search);
   q.delete('k');
   const s = q.toString();
-  return `/${s ? `?${s}` : ''}`;
+  const home = loc.pathname === '/pair' || (h.edition != null && h.edition !== 'self-hosted') ? '/pair' : '/';
+  return `${home}${s ? `?${s}` : ''}`;
 }
 
 /**
@@ -153,7 +197,7 @@ export function showPairing(kind: 'pair' | 'invalid', lang: Lang): void {
         <p class="wl-lead">${esc(kind === 'invalid' ? T.invalidLead : T.pairLead)}</p>
         <div class="wl-code" aria-live="polite"><span class="wl-code__txt">··· ···</span></div>
         <ol class="wl-steps">
-          <li><span>1</span>${esc(T.s1)}</li>
+          <li class="wl-step1"><span>1</span>${esc(T.s1)}</li>
           <li><span>2</span>${esc(T.s2)}</li>
           <li><span>3</span>${esc(T.s3)}</li>
         </ol>
@@ -170,6 +214,13 @@ export function showPairing(kind: 'pair' | 'invalid', lang: Lang): void {
   };
   tick();
   setInterval(tick, 10_000);
+  void pairHealth().then((h) => {
+    const codeEl = root?.querySelector('.wl-code__txt');
+    if (codeEl && /^[· ]+$/.test(codeEl.textContent || '')) codeEl.textContent = codePlaceholder(Number(h.pairCodeLength) || 6);
+    const where = adminTarget(h).where;
+    const text = root?.querySelector('.wl-step1')?.lastChild;
+    if (text && where) text.textContent = T.s1At.replace('{where}', where);
+  });
   if (!running) {
     running = true;
     void pairLoop(T);
@@ -201,7 +252,7 @@ async function pairLoop(T: Record<string, string>): Promise<void> {
     const s = start.json;
     codeEl.textContent = fmtCode(s.code);
     el.querySelector('.wl-code')!.setAttribute('aria-label', s.code.split('').join(' '));
-    const adminUrl = `${location.origin}/admin/#pair=${s.code}`;
+    const adminUrl = `${adminTarget(await pairHealth()).url}#pair=${s.code}`;
     try {
       qrEl.innerHTML = qrSvg(adminUrl, { dark: '#0b0d11', light: '#ffffff', title: adminUrl });
     } catch {
@@ -233,7 +284,8 @@ async function pairLoop(T: Record<string, string>): Promise<void> {
         codeEl.textContent = '✓';
         statusEl.textContent = T.paired;
         el.classList.add('is-paired');
-        setTimeout(() => location.replace(afterPairUrl()), 900);
+        const h = await pairHealth();
+        setTimeout(() => location.replace(afterPairUrl(h)), 900);
         return;
       }
       if (st.status === 404 || j?.status === 'expired' || Date.now() > expiresAt) {

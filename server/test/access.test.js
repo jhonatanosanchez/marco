@@ -19,7 +19,7 @@ import {
   syncDisplayKeys, onDisplayAccessConfig, listDisplayLinks, KEY_RE, DEVICE_TOKEN_RE, _resetDisplayAccess, revalidateStreams,
 } from '../displayAccess.js';
 import {
-  startPairing, pairingStatus, claimPairing, normalizeCode, _resetPairing, _pendingCount, CODE_ALPHABET, CODE_LENGTH,
+  startPairing, pairingStatus, claimPairing, displayAddress, normalizeCode, _resetPairing, _pendingCount, CODE_ALPHABET, CODE_LENGTH,
   PAIR_TTL_MS, WAITING_GRACE_MS, CLAIM_FAIL_LIMIT, CLAIM_FAIL_GLOBAL, START_LIMIT,
 } from '../pairing.js';
 import { redactSecrets } from '../core/activityCore.js';
@@ -166,7 +166,7 @@ test('private mode: access matrix (no key 401, valid key, revoked key 403, devic
     assert.match(kitchenKey, KEY_RE);
     // a paired device for the kitchen
     const st = await ctx.call('POST', '/api/pair/start', { body: {} });
-    const claim = await ctx.call('POST', '/api/admin/pair/claim', { cookie, body: { code: st.json.code, screenId: 's_kitchen', name: 'Hall tablet' } });
+    const claim = await ctx.call('POST', '/api/admin/pair/claim', { cookie, body: { code: st.json.code, screenId: 's_kitchen', name: 'Hall tablet', confirm: true } });
     assert.equal(claim.status, 200, claim.text);
     const deviceToken = (await ctx.call('POST', '/api/pair/status', { body: { sessionId: st.json.sessionId } })).json.token;
     assert.match(deviceToken, DEVICE_TOKEN_RE);
@@ -303,7 +303,7 @@ test('screens deleted → their links stop working; devices move to the default 
     const cookie = await ctx.login();
     const kitchenKey = keyOf('kitchen');
     const st = startPairing({ ip: '192.168.1.40', get: () => '' });
-    const out = claimPairing({ ip: '127.0.0.1', session: { epoch: 'x', user: { email: 'admin' } } }, { code: st.code, screenId: 's_kitchen' });
+    const out = claimPairing({ ip: '127.0.0.1', session: { epoch: 'x', user: { email: 'admin' } } }, { code: st.code, screenId: 's_kitchen', confirm: true });
     assert.ok(out.device);
     const token = pairingStatus(st.sessionId).token;
     const cfg = (await ctx.call('GET', '/api/admin/config', { cookie })).json;
@@ -339,7 +339,16 @@ test('pairing over HTTP: start → claim (admin) → status hands the token once
     assert.equal(wrong.json.code, 'invalid_code');
     // lower case + separators are accepted
     const pretty = `${code.slice(0, 3)}-${code.slice(3)}`.toLowerCase();
-    const claim = await ctx.call('POST', '/api/admin/pair/claim', { cookie, body: { code: pretty, screenId: 's_kitchen', name: '  Hall   tablet ' } });
+    // step 1: only says which display is waiting; nothing is paired yet
+    const ask = await ctx.call('POST', '/api/admin/pair/claim', { cookie, body: { code: pretty, screenId: 's_kitchen', name: '  Hall   tablet ' } });
+    assert.equal(ask.status, 200, ask.text);
+    assert.equal(ask.json.device, undefined);
+    assert.deepEqual(ask.json.confirm, { where: 'localhost', screenId: 's_kitchen', screenName: ask.json.confirm.screenName });
+    assert.ok(ask.json.confirm.screenName);
+    assert.equal((await ctx.call('POST', '/api/pair/status', { body: { sessionId } })).json.status, 'waiting');
+    assert.equal((await ctx.call('GET', '/api/admin/devices', { cookie })).json.devices.length, 0);
+    // step 2: confirm: true pairs
+    const claim = await ctx.call('POST', '/api/admin/pair/claim', { cookie, body: { code: pretty, screenId: 's_kitchen', name: '  Hall   tablet ', confirm: true } });
     assert.equal(claim.status, 200, claim.text);
     assert.equal(claim.json.device.name, 'Hall tablet');
     assert.equal(claim.json.device.screenId, 's_kitchen');
@@ -387,6 +396,34 @@ test('pairing over HTTP: start → claim (admin) → status hands the token once
 const fakeDisplay = (ip = '192.168.1.50') => ({ ip, get: () => 'Chromium' });
 const admin = (ip = '127.0.0.1', epoch = 'e1') => ({ ip, session: { epoch, user: { email: 'admin' } } });
 
+test('pairing claim has two steps: the first only names the waiting display, confirm: true pairs it', async () => {
+  await withServer(async () => {
+    const t0 = Date.now();
+    const st = startPairing(fakeDisplay('::ffff:192.168.1.77'), t0);
+    const ask = claimPairing(admin(), { code: st.code, screenId: 's_kitchen', name: 'Hall' }, t0 + 100);
+    assert.equal(ask.device, undefined);
+    assert.equal(ask.error, undefined);
+    assert.equal(ask.confirm.where, '192.168.1.77');
+    assert.equal(ask.confirm.screenId, 's_kitchen');
+    assert.equal(typeof ask.confirm.screenName, 'string');
+    // asking again is fine, and still nothing is paired
+    assert.ok(claimPairing(admin(), { code: st.code, screenId: 's_kitchen' }, t0 + 200).confirm);
+    assert.equal(pairingStatus(st.sessionId, t0 + 300).status, 'waiting');
+    // anything but the boolean true is only a question
+    assert.ok(claimPairing(admin(), { code: st.code, screenId: 's_kitchen', confirm: 'true' }, t0 + 400).confirm);
+    const done = claimPairing(admin(), { code: st.code, screenId: 's_kitchen', name: 'Hall', confirm: true }, t0 + 500);
+    assert.equal(done.device.name, 'Hall');
+    assert.equal(done.confirm, undefined);
+    assert.equal(pairingStatus(st.sessionId, t0 + 600).status, 'paired');
+    // a wrong code fails at the first step too, and counts as a wrong code
+    const wrong = claimPairing(admin('127.0.0.1', 'e9'), { code: 'ZZZZZZ', screenId: 's_kitchen' }, t0 + 700);
+    assert.equal(wrong.status, 404);
+    assert.equal(wrong.code, 'invalid_code');
+    assert.equal(displayAddress('127.0.0.1'), 'localhost');
+    assert.equal(displayAddress(''), '');
+  });
+});
+
 test('pairing rules: TTL, only while the display waits, single use, rate limits (per admin + global, start)', async () => {
   await withServer(async () => {
     const t0 = Date.now();
@@ -400,7 +437,7 @@ test('pairing rules: TTL, only while the display waits, single use, rate limits 
     st = startPairing(fakeDisplay(), t0);
     assert.equal(claimPairing(admin(), { code: st.code, screenId: 's_main' }, t0 + WAITING_GRACE_MS + 1000).code, 'invalid_code');
     pairingStatus(st.sessionId, t0 + WAITING_GRACE_MS + 2000);
-    assert.ok(claimPairing(admin(), { code: st.code, screenId: 's_main' }, t0 + WAITING_GRACE_MS + 3000).device);
+    assert.ok(claimPairing(admin(), { code: st.code, screenId: 's_main', confirm: true }, t0 + WAITING_GRACE_MS + 3000).device);
     assert.equal(claimPairing(admin(), { code: st.code, screenId: 's_main' }, t0 + WAITING_GRACE_MS + 3500).code, 'invalid_code', 'single use');
     _resetPairing();
     // malformed codes
@@ -412,7 +449,7 @@ test('pairing rules: TTL, only while the display waits, single use, rate limits 
     for (let i = 0; i < CLAIM_FAIL_LIMIT; i++) assert.equal(claimPairing(admin(), { code: 'ZZZZZZ', screenId: 's_main' }, t0).status, 404);
     assert.equal(claimPairing(admin(), { code: st.code, screenId: 's_main' }, t0).status, 429);
     // another admin session is not blocked by it…
-    assert.ok(claimPairing(admin('127.0.0.1', 'e2'), { code: st.code, screenId: 's_main' }, t0).device);
+    assert.ok(claimPairing(admin('127.0.0.1', 'e2'), { code: st.code, screenId: 's_main', confirm: true }, t0).device);
     // …and the window passes
     _resetPairing();
     // global limit across sessions / addresses
@@ -511,7 +548,7 @@ test('export with secrets → import on another install keeps private links and 
     const cookie = await ctx.login();
     const key = keyOf('kitchen');
     const st = startPairing(fakeDisplay(), Date.now());
-    claimPairing(admin(), { code: st.code, screenId: 's_kitchen', name: 'Hall tablet' });
+    claimPairing(admin(), { code: st.code, screenId: 's_kitchen', name: 'Hall tablet', confirm: true });
     const token = pairingStatus(st.sessionId).token;
     const plain = (await ctx.call('POST', '/api/admin/export', { cookie, body: { includeSecrets: false } })).json;
     assert.ok(!JSON.stringify(plain).includes(key), 'keys only travel in exports that include secrets');
@@ -543,7 +580,7 @@ const ended = async (s, ms = 2000) => {
 /** Pair a device to `screenId` and return its token. */
 const pairDevice = (screenId, name = 'Tablet') => {
   const st = startPairing(fakeDisplay(), Date.now());
-  const c = claimPairing(admin(), { code: st.code, screenId, name });
+  const c = claimPairing(admin(), { code: st.code, screenId, name, confirm: true });
   assert.ok(c.device, JSON.stringify(c));
   return { token: pairingStatus(st.sessionId).token, id: c.device.id };
 };

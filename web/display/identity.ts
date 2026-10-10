@@ -5,6 +5,13 @@
 
 const params = new URLSearchParams(location.search);
 
+/**
+ * Admin preview iframe (`?preview=1`): live updates but never registered as a connected display. It also leaves this
+ * browser's storage alone: no stored device token is read or written and no client id is kept, so a preview opened
+ * where a real display runs (same browser) cannot replace that display's key, token or id.
+ */
+export const isPreview = params.get('preview') === '1';
+
 /** Private-link key from the path (/d/<key>); '' when the page was opened at / or /pair. */
 export const linkKey = (() => {
   const m = /^\/d\/([^/?#]+)/.exec(location.pathname);
@@ -18,6 +25,7 @@ export const linkKey = (() => {
 const DEVICE_LS = 'marco.deviceToken';
 /** Paired-device token (stored by the pairing screen). */
 export function storedDeviceToken(): string {
+  if (isPreview) return '';
   try {
     const v = localStorage.getItem(DEVICE_LS) || '';
     return /^md_[A-Za-z0-9_-]{43}$/.test(v) ? v : '';
@@ -26,11 +34,13 @@ export function storedDeviceToken(): string {
   }
 }
 export function saveDeviceToken(token: string): void {
+  if (isPreview) return;
   try {
     localStorage.setItem(DEVICE_LS, token);
   } catch { /* storage disabled: the screen pairs again after a reload */ }
 }
 export function clearDeviceToken(): void {
+  if (isPreview) return;
   try {
     localStorage.removeItem(DEVICE_LS);
   } catch { /* ignore */ }
@@ -49,6 +59,7 @@ export const screenNs = linkKey ? `k_${linkKey.slice(0, 6).replace(/[^A-Za-z0-9]
 
 /** Forget every cached data set (a revoked link or device must not keep showing family data). */
 export function clearCaches(): void {
+  if (isPreview) return;
   try {
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const k = localStorage.key(i);
@@ -90,6 +101,7 @@ function randomId(): string {
 function resolveClientId(): string {
   const fromUrl = sanitizeClient(params.get('client') || '');
   if (fromUrl) return fromUrl;
+  if (isPreview) return randomId(); // this page load only
   try {
     const stored = localStorage.getItem('cs.clientId');
     if (stored && CLIENT_RE.test(stored)) return stored;
@@ -104,8 +116,6 @@ function resolveClientId(): string {
 
 export const clientId = resolveClientId();
 
-/** Admin preview iframe (`?preview=1`): live updates but never registered as a connected display. */
-export const isPreview = params.get('preview') === '1';
 
 /** Append `screen=` (when set) to an API path. */
 export function withScreen(path: string): string {

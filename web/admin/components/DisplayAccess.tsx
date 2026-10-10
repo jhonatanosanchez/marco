@@ -2,7 +2,10 @@
 // openPairDialog(), e.g. the QR on a waiting display → /admin/#pair=<code>), paired devices list and the
 // open-mode recommendation. Server side: server/displayAccess.js, server/pairing.js; docs/API.md "Display access".
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import type { DisplayAccessMode, DisplayLinksResponse, PairedDevice, ScreenProfile, StoredConfig } from '../../shared/types';
+import type { DisplayAccessMode, DisplayLinksResponse, PairConfirm, PairedDevice, ScreenProfile, StoredConfig } from '../../shared/types';
+import { pairCodeLength } from '../caps';
+import { claimErrorCode, cleanCode, confirmWhere, formatCode } from '../pairCode';
+import { displayOriginOf, refreshDisplayLinks } from '../displayLinks';
 import { api, ApiError } from '../api';
 import { fmtDateTime } from '../dates';
 import { relTime, t } from '../i18n';
@@ -12,11 +15,9 @@ import { kioskInstallCommand } from '../../shared/project';
 import { CopyField, Qr } from './share';
 import { Button, Callout, Card, Empty, Field, Modal, Select, TextInput } from './ui';
 
-export const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
-const CODE_LENGTH = 6;
-
-/** Keep only code characters (upper-cased): "abc-23o" → "ABC23". */
-export const cleanCode = (v: string) => v.toUpperCase().split('').filter((c) => CODE_ALPHABET.includes(c)).join('').slice(0, CODE_LENGTH);
+export { CODE_ALPHABET, cleanCode, formatCode, claimErrorCode, confirmWhere } from '../pairCode';
+/** Longest code any server uses (caps.ts accepts 4 to 12). */
+const MAX_CODE_LENGTH = 12;
 
 export const isLocalhost = () => /^(localhost|127\.|\[::1\])/.test(location.hostname);
 
@@ -25,7 +26,10 @@ export const isLocalhost = () => /^(localhost|127\.|\[::1\])/.test(location.host
  * PUBLIC_URL or this machine's LAN address (same as the setup wizard); '' when neither is known (Docker without
  * LAN_ADDRESS): then the QR code and kiosk command are hidden instead of pointing devices at "localhost".
  */
-export function shareOrigin(data: Pick<DisplayLinksResponse, 'lanAddresses' | 'publicUrl'> | null): string {
+export function shareOrigin(data: Pick<DisplayLinksResponse, 'lanAddresses' | 'publicUrl' | 'displayOrigin'> | null): string {
+  // Marco Cloud serves the display pages from their own origin.
+  const display = displayOriginOf(data as DisplayLinksResponse | null);
+  if (display) return display;
   if (!isLocalhost()) return location.origin;
   if (data?.publicUrl) return data.publicUrl;
   const ip = data?.lanAddresses?.[0];
@@ -54,7 +58,8 @@ export function PrivateLinkCard({ screenId, saved, mode, go }: { screenId: strin
   }, [saved.revision]);
   const link = data?.links.find((l) => l.screenId === screenId);
   const origin = shareOrigin(data);
-  // What other devices open / scan / put in KIOSK_URL ("Open" below stays on this browser's own origin).
+  // What other devices open / scan / put in KIOSK_URL ("Open" below stays on this browser's own origin, or the
+  // display origin when the server has one).
   const url = link ? `${origin || location.origin}${link.path}` : '';
 
   const regenerate = async () => {
@@ -69,7 +74,7 @@ export function PrivateLinkCard({ screenId, saved, mode, go }: { screenId: strin
     setBusy(true);
     try {
       await api.regenerateLink(screenId);
-      await load();
+      await Promise.all([load(), refreshDisplayLinks()]);
       toast(t('Enlace regenerado · el anterior ya no funciona'));
     } catch (e) {
       toast((e as ApiError).message, 'error');
@@ -118,7 +123,7 @@ export function PrivateLinkCard({ screenId, saved, mode, go }: { screenId: strin
                 <Callout kind="warn">{t('Estás en «localhost» y no se conoce la dirección de red de este servidor: abre el panel con su IP o su nombre (o define LAN_ADDRESS) para obtener el QR y el comando de la Raspberry Pi.')}</Callout>
               )}
               <div class="plink__actions">
-                <a class="btn btn--default btn--sm" href={link.path} target="_blank" rel="noopener noreferrer">
+                <a class="btn btn--default btn--sm" href={`${displayOriginOf(data) ?? ''}${link.path}`} target="_blank" rel="noopener noreferrer">
                   <Icon name="external" size={15} />
                   <span>{t('Abrir')}</span>
                 </a>
@@ -159,7 +164,7 @@ let pairReq: { code: string } | null = null;
 const pairListeners = new Set<() => void>();
 /** Open the "Pair a screen" dialog (optionally prefilled, e.g. from /admin/#pair=<code>). */
 export function openPairDialog(code = '') {
-  pairReq = { code: cleanCode(code) };
+  pairReq = { code: cleanCode(code, MAX_CODE_LENGTH) };
   pairListeners.forEach((l) => l());
 }
 
@@ -179,14 +184,23 @@ export function PairDialogHost({ saved, defaultScreenId, onPaired }: { saved: St
 }
 
 function PairDialog({ initialCode, screens, defaultScreenId, onClose, onPaired }: { initialCode: string; screens: ScreenProfile[]; defaultScreenId: string; onClose: () => void; onPaired?: (d: PairedDevice) => void }) {
-  const [code, setCode] = useState(initialCode);
+  const len = pairCodeLength();
+  const [code, setCode] = useState(() => cleanCode(initialCode, len));
   const [screenId, setScreenId] = useState(screens.some((s) => s.id === defaultScreenId) ? defaultScreenId : screens[0]?.id ?? '');
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  // Second step: the server found the waiting display; the owner confirms it is the one in front of them.
+  const [ask, setAsk] = useState<PairConfirm | null>(null);
   const [done, setDone] = useState<PairedDevice | null>(null);
-  const complete = code.length === CODE_LENGTH;
+  const complete = code.length === len;
   const screenName = screens.find((s) => s.id === screenId)?.name ?? '';
+
+  const paired = (device: PairedDevice) => {
+    setDone(device);
+    onPaired?.(device);
+    toast(t('Pantalla vinculada: {name}', { name: device.name }));
+  };
 
   const submit = async (e?: Event) => {
     e?.preventDefault();
@@ -194,19 +208,22 @@ function PairDialog({ initialCode, screens, defaultScreenId, onClose, onPaired }
     setBusy(true);
     setErr('');
     try {
-      const r = await api.claimPairing({ code, screenId, name: name.trim() || undefined });
-      setDone(r.device);
-      onPaired?.(r.device);
-      toast(t('Pantalla vinculada: {name}', { name: r.device.name }));
+      const r = await api.claimPairing({ code, screenId, name: name.trim() || undefined, ...(ask ? { confirm: true } : {}) });
+      if (r.device) paired(r.device);
+      else if (r.confirm) setAsk({ ...r.confirm, where: confirmWhere(r.confirm), screenName: r.confirm.screenName || screenName });
+      else setErr(t('Respuesta inesperada del servidor. Inténtalo de nuevo.'));
     } catch (e2) {
       const ae = e2 as ApiError;
-      const c = (ae.body as { code?: string } | null)?.code;
+      const c = claimErrorCode(ae.body);
+      setAsk(null);
       setErr(
-        ae.status === 429
+        ae.status === 429 || c === 'rate_limited'
           ? t('Demasiados códigos incorrectos. Espera unos minutos.')
           : c === 'invalid_code'
             ? t('Código no encontrado o caducado. Comprueba el código que muestra la pantalla (debe seguir encendida en la página de vinculación).')
-            : ae.message,
+            : c === 'device_limit'
+              ? t('Has llegado al máximo de dispositivos vinculados. Revoca uno que ya no uses.')
+              : ae.message,
       );
     } finally {
       setBusy(false);
@@ -225,13 +242,22 @@ function PairDialog({ initialCode, screens, defaultScreenId, onClose, onPaired }
           <Button variant="primary" icon="check" onClick={onClose}>
             {t('Hecho')}
           </Button>
+        ) : ask ? (
+          <>
+            <Button variant="ghost" onClick={() => setAsk(null)} disabled={busy}>
+              {t('Atrás')}
+            </Button>
+            <Button variant="primary" icon="link" loading={busy} onClick={() => submit()}>
+              {t('Sí, vincular')}
+            </Button>
+          </>
         ) : (
           <>
             <Button variant="ghost" onClick={onClose}>
               {t('Cancelar')}
             </Button>
-            <Button variant="primary" icon="link" loading={busy} disabled={!complete || !screenId} onClick={() => submit()}>
-              {t('Vincular')}
+            <Button variant="primary" loading={busy} disabled={!complete || !screenId} onClick={() => submit()}>
+              {t('Continuar')}
             </Button>
           </>
         )
@@ -242,26 +268,37 @@ function PairDialog({ initialCode, screens, defaultScreenId, onClose, onPaired }
           <span class="pair-done__ico">
             <Icon name="check" size={26} />
           </span>
-          <strong>{t('¡Listo! «{name}» muestra ahora {screen}.', { name: done.name, screen: done.screenName })}</strong>
+          <strong>{t('¡Listo! «{name}» muestra ahora {screen}.', { name: done.name, screen: done.screenName || ask?.screenName || screenName })}</strong>
           <p class="muted small">{t('La pantalla arranca sola en unos segundos. Puedes renombrarla o revocarla en Pantallas conectadas.')}</p>
         </div>
+      ) : ask ? (
+        <form class="stack pair-confirm" onSubmit={submit}>
+          <div class="pair-confirm__code mono">{formatCode(code, len)}</div>
+          <p>
+            {ask.where
+              ? t('Hay una pantalla en {where} esperando con este código. Mostrará «{screen}».', { where: ask.where, screen: ask.screenName })
+              : t('Hay una pantalla esperando con este código. Mostrará «{screen}».', { screen: ask.screenName })}
+          </p>
+          <Callout kind="warn">{t('Vincula solo una pantalla que tengas delante. Si el código te llegó en un enlace o un mensaje de otra persona, cancela.')}</Callout>
+          <button type="submit" hidden />
+        </form>
       ) : (
         <form class="stack" onSubmit={submit}>
-          <p class="muted small">{t('Abre Marco en la pantalla nueva (o la dirección /pair): mostrará un código de 6 caracteres. Escríbelo aquí.')}</p>
+          <p class="muted small">{t('Abre Marco en la pantalla nueva (o la dirección /pair): mostrará un código de {n} caracteres. Escríbelo aquí.', { n: len })}</p>
           <Field label={t('Código de la pantalla')} error={err || undefined}>
             <input
               class={`input pair-code ${err ? 'is-invalid' : ''}`}
-              value={code.length > 3 ? `${code.slice(0, 3)} ${code.slice(3)}` : code}
+              value={formatCode(code, len)}
               inputMode="text"
               autoComplete="one-time-code"
               autoCapitalize="characters"
               spellcheck={false}
-              placeholder="ABC 234"
+              placeholder={formatCode('ABCDEFGH23456789'.slice(0, Math.ceil(len / 2)) + '23456789'.slice(0, len - Math.ceil(len / 2)), len)}
               aria-label={t('Código de la pantalla')}
-              maxLength={7}
+              maxLength={len + 1}
               data-autofocus
               onInput={(e) => {
-                setCode(cleanCode(e.currentTarget.value));
+                setCode(cleanCode(e.currentTarget.value, len));
                 setErr('');
               }}
             />

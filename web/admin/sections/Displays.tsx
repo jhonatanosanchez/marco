@@ -7,6 +7,7 @@ import { Icon } from '../components/icons';
 import { Button, Callout, Card, Empty, PageHeader, StatusDot } from '../components/ui';
 import { fmtDateTime } from '../dates';
 import { has } from '../caps';
+import { screenHref, useDisplayLinks } from '../displayLinks';
 import { formatDuration, relTime, nScreens, t } from '../i18n';
 import type { SectionProps } from './common';
 
@@ -138,6 +139,9 @@ function AccessBadge({ d }: { d: DisplayInfo }) {
   return <span class="badge badge--access badge--warn-soft" title={t('Entra sin clave (modo abierto)')}>{t('Sin clave')}</span>;
 }
 
+/** "/?screen=x" → "https://host/?screen=x" (absolute URLs unchanged). */
+const absUrl = (u: string | null) => (u ? new URL(u, location.origin).href : '');
+
 export function DisplaysSection({ saved, go }: SectionProps) {
   const [data, setData] = useState<DisplaysResponse | null>(null);
   const [err, setErr] = useState('');
@@ -145,6 +149,7 @@ export function DisplaysSection({ saved, go }: SectionProps) {
   const [busy, setBusy] = useState<Record<string, string>>({});
   const [showOffline, setShowOffline] = useState(true);
   const timer = useRef<number | undefined>(undefined);
+  const links = useDisplayLinks(saved);
 
   const load = async () => {
     try {
@@ -264,7 +269,7 @@ export function DisplaysSection({ saved, go }: SectionProps) {
           <Empty icon="monitor" title={t('Ninguna pantalla conectada')}>
             {saved.security?.displayAccess === 'open' ? (
               <>
-                {t('Abre')} <code>{location.origin}/?screen={saved.screens.find((s) => s.id === (filter || saved.defaultScreen))?.slug}</code> {t('en el dispositivo y aparecerá aquí.')}
+                {t('Abre')} <code>{absUrl(screenHref(saved, filter || saved.defaultScreen, links))}</code> {t('en el dispositivo y aparecerá aquí.')}
               </>
             ) : (
               t('Abre en el dispositivo el enlace privado de la pantalla (Pantalla → Ajustes) o vincúlalo con un código y aparecerá aquí.')

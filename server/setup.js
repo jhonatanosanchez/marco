@@ -119,6 +119,18 @@ function tokenGate(req, res) {
   return false;
 }
 
+/**
+ * For routes outside /api/setup that the wizard also calls (GET /api/admin/geocode): true while the install has
+ * no password and the request passes the same token rules as the wizard; otherwise the error response is sent.
+ */
+export function setupGate(req, res) {
+  if (!needsSetup()) {
+    res.status(401).json({ error: 'unauthorized' });
+    return false;
+  }
+  return tokenGate(req, res);
+}
+
 /** 409 once the install has a password. */
 function openGate(res) {
   if (needsSetup()) return true;

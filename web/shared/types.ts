@@ -238,6 +238,40 @@ export interface PairClaimRequest {
   code: string;
   screenId: string;
   name?: string;
+  /** Second step: pair now. Without it the server only answers `confirm` (which display is waiting). */
+  confirm?: boolean;
+}
+
+/** First step of POST /api/admin/pair/claim: the display that shows this code, for the owner to confirm. */
+export interface PairConfirm {
+  /** Where the waiting display is: its LAN address (self-hosted) or "City, Country" (Marco Cloud); '' = unknown. */
+  where: string;
+  screenId: string;
+  screenName: string;
+}
+
+/** POST /api/admin/pair/claim: `confirm` without `confirm: true` in the request, else `device`. */
+export interface PairClaimResponse {
+  confirm?: PairConfirm;
+  device?: PairedDevice;
+}
+
+/** GET /api/admin/geocode?q=&lang= (Open-Meteo geocoding through the server). */
+export interface GeocodeResult {
+  name: string;
+  /** region / state; '' when unknown */
+  admin1: string;
+  country: string;
+  /** ISO 3166-1 alpha-2, upper case; '' when unknown */
+  countryCode: string;
+  lat: number;
+  lon: number;
+  /** IANA time zone; '' when unknown */
+  timezone: string;
+}
+
+export interface GeocodeResponse {
+  results: GeocodeResult[];
 }
 
 /**
@@ -471,6 +505,10 @@ export interface HealthResponse {
   limits?: Limits;
   /** Absolute origin that serves the display pages (/d/<key>, /pair). Absent = same origin as the admin. */
   displayOrigin?: string;
+  /** Absolute origin of the admin, for a display served from another origin. Absent = same origin as the display. */
+  adminOrigin?: string;
+  /** This server's LAN addresses; only sent to a client on the server itself (a kiosk on http://localhost). */
+  lanAddresses?: string[];
 }
 
 /** SSE /api/stream?screen=&client= event payloads (docs/ARCHITECTURE.md) */

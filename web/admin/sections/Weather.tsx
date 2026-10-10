@@ -3,26 +3,19 @@ import { HaEntityPicker } from '../components/HaEntityPicker';
 import { Icon } from '../components/icons';
 import { Button, Callout, Card, Field, NumberInput, PageHeader, Segmented, TextInput, ToggleRow } from '../components/ui';
 import { ScopeBadge } from '../components/ui';
+import type { GeocodeResult } from '../../shared/types';
+import { api, ApiError } from '../api';
+import { toast } from '../components/feedback';
 import { has } from '../caps';
 import { getLang, t } from '../i18n';
 import type { SectionProps } from './common';
-
-interface GeoResult {
-  id: number;
-  name: string;
-  latitude: number;
-  longitude: number;
-  admin1?: string;
-  country?: string;
-  country_code?: string;
-}
 
 export function WeatherSection({ cfg, set, errors }: SectionProps) {
   const w = cfg.weather;
   const haOffered = has('homeassistant');
   const haOn = haOffered && cfg.homeassistant.enabled;
   const [q, setQ] = useState('');
-  const [results, setResults] = useState<GeoResult[] | null>(null);
+  const [results, setResults] = useState<GeocodeResult[] | null>(null);
   const [searching, setSearching] = useState(false);
 
   const search = async (e?: Event) => {
@@ -30,11 +23,13 @@ export function WeatherSection({ cfg, set, errors }: SectionProps) {
     if (!q.trim()) return;
     setSearching(true);
     try {
-      const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?count=6&language=${getLang()}&name=${encodeURIComponent(q.trim())}`);
-      const j = await r.json();
+      // Through this server (GET /api/admin/geocode), so the browser only talks to its own server.
+      const j = await api.geocode(q.trim(), getLang());
       setResults(j.results ?? []);
-    } catch {
+    } catch (e) {
       setResults([]);
+      if ((e as ApiError).status === 429) toast(t('Demasiadas búsquedas seguidas. Espera unos minutos.'), 'error');
+      else toast(t('No se pudo buscar (¿sin conexión a Internet?). Inténtalo de nuevo.'), 'error');
     } finally {
       setSearching(false);
     }
@@ -83,8 +78,8 @@ export function WeatherSection({ cfg, set, errors }: SectionProps) {
                     class="geo-result"
                     onClick={() => {
                       set((d) => {
-                        d.weather.lat = Math.round(r.latitude * 1000) / 1000;
-                        d.weather.lon = Math.round(r.longitude * 1000) / 1000;
+                        d.weather.lat = Math.round(r.lat * 1000) / 1000;
+                        d.weather.lon = Math.round(r.lon * 1000) / 1000;
                         d.weather.locationName = [r.name, r.admin1].filter(Boolean).join(', ');
                       });
                       setResults(null);
@@ -96,7 +91,7 @@ export function WeatherSection({ cfg, set, errors }: SectionProps) {
                       <strong>{r.name}</strong> <span class="muted">{[r.admin1, r.country].filter(Boolean).join(', ')}</span>
                     </span>
                     <span class="mono small muted">
-                      {r.latitude.toFixed(3)}, {r.longitude.toFixed(3)}
+                      {r.lat.toFixed(3)}, {r.lon.toFixed(3)}
                     </span>
                   </button>
                 ))}

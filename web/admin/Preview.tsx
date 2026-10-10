@@ -2,14 +2,18 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { Icon } from './components/icons';
 import { t } from './i18n';
 
-/** Live, scaled-down preview of the display ("/") in an iframe. Reloaded whenever `reloadKey` changes. */
-export function Preview({ reloadKey, portrait, onClose, variant, slug, screenName }: { reloadKey: number; portrait: boolean; onClose?: () => void; variant: 'side' | 'sheet'; slug: string | null; screenName?: string }) {
+/**
+ * Live, scaled-down preview of a screen in an iframe. Reloaded whenever `reloadKey` changes.
+ * `url` is the preview address (displayLinks.ts useScreenUrl with preview: the display then neither registers as a
+ * connected screen nor writes its storage), `openUrl` the same screen for a new tab; null while it is not known yet.
+ */
+export function Preview({ reloadKey, portrait, onClose, variant, saved, url, openUrl, screenName }: { reloadKey: number; portrait: boolean; onClose?: () => void; variant: 'side' | 'sheet'; saved: boolean; url: string | null; openUrl: string | null; screenName?: string }) {
   const box = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [orient, setOrient] = useState<'land' | 'port'>(portrait ? 'port' : 'land');
   useEffect(() => setOrient(portrait ? 'port' : 'land'), [portrait]);
-  useEffect(() => setLoaded(false), [reloadKey, orient, slug]);
+  useEffect(() => setLoaded(false), [reloadKey, orient, url]);
   useEffect(() => {
     const el = box.current;
     if (!el) return;
@@ -42,8 +46,8 @@ export function Preview({ reloadKey, portrait, onClose, variant, slug, screenNam
               <rect x="6" y="3" width="12" height="18" rx="2" />
             </svg>
           </button>
-          {slug != null && (
-            <a class="icon-btn" href={`/?screen=${encodeURIComponent(slug)}`} target="_blank" rel="noopener" title={t('Abrir pantalla')}>
+          {saved && openUrl && (
+            <a class="icon-btn" href={openUrl} target="_blank" rel="noopener" title={t('Abrir pantalla')}>
               <Icon name="external" size={15} />
             </a>
           )}
@@ -56,12 +60,12 @@ export function Preview({ reloadKey, portrait, onClose, variant, slug, screenNam
       </div>
       <div class="preview__frame-wrap" ref={box}>
         <div class="preview__frame" style={{ width: `${W * scale}px`, height: `${H * scale}px` }}>
-          {slug == null ? (
+          {!saved ? (
             <div class="preview__unsaved muted small">{t('Guarda para previsualizar esta pantalla')}</div>
-          ) : w > 0 && (
+          ) : w > 0 && url && (
             <iframe
-              key={`${reloadKey}-${orient}-${slug}`}
-              src={`/?preview=1&screen=${encodeURIComponent(slug)}&v=${reloadKey}`}
+              key={`${reloadKey}-${orient}-${url}`}
+              src={`${url}${url.includes('?') ? '&' : '?'}v=${reloadKey}`}
               title={t('Vista previa')}
               loading="lazy"
               tabIndex={-1}
@@ -69,7 +73,7 @@ export function Preview({ reloadKey, portrait, onClose, variant, slug, screenNam
               onLoad={() => setLoaded(true)}
             />
           )}
-          {slug != null && !loaded && <div class="preview__loading shimmer" />}
+          {saved && !loaded && <div class="preview__loading shimmer" />}
         </div>
       </div>
       <p class="preview__hint muted small">{t('Se recarga al guardar. Los cambios sin guardar no aparecen aquí.')}</p>

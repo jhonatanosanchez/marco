@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'preact/hooks';
 import { slugify, SLUG_RE } from '../../shared/screens';
-import type { DisplayInfo, DisplayLinksResponse, ScreenProfile } from '../../shared/types';
+import type { DisplayInfo, ScreenProfile } from '../../shared/types';
 import { api, ApiError } from '../api';
 import { openPairDialog, shareOrigin } from '../components/DisplayAccess';
 import { confirmDialog, toast } from '../components/feedback';
 import { Icon } from '../components/icons';
 import { Button, Callout, Card, Field, Modal, PageHeader, ReorderButtons, Select, TextInput } from '../components/ui';
 import { atLimit, limit } from '../caps';
+import { screenHref, useDisplayLinks } from '../displayLinks';
 import { LimitNote } from '../components/LimitNote';
 import { t } from '../i18n';
 import { takeIntent } from '../intent';
@@ -101,14 +102,8 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
   // Private mode (default): a device opens its screen's private link or is paired; ?screen= only works in open mode
   // (and in this admin's own previews).
   const openMode = saved.security?.displayAccess === 'open';
-  const [links, setLinks] = useState<DisplayLinksResponse | null>(null);
-  useEffect(() => {
-    if (openMode) return;
-    api
-      .displayLinks()
-      .then(setLinks)
-      .catch(() => {});
-  }, [openMode, saved.revision]);
+  const linkState = useDisplayLinks(saved);
+  const links = linkState.data;
   const screens = full.screens;
   const taken = (exceptId: string) => new Set(screens.filter((s) => s.id !== exceptId).map((s) => s.slug));
   const upd = (id: string, fn: (s: ScreenProfile) => void) =>
@@ -286,10 +281,12 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
                   <Button size="sm" variant="ghost" icon="copy" disabled={atLimit('screens', screens.length)} onClick={() => duplicate(s)}>
                     {t('Duplicar')}
                   </Button>
-                  <a class="btn btn--ghost btn--sm" href={`/?screen=${encodeURIComponent(savedSlug ?? '')}`} target="_blank" rel="noopener">
-                    <Icon name="external" size={15} />
-                    <span>{t('Abrir')}</span>
-                  </a>
+                  {screenHref(saved, s.id, linkState) && (
+                    <a class="btn btn--ghost btn--sm" href={screenHref(saved, s.id, linkState)!} target="_blank" rel="noopener">
+                      <Icon name="external" size={15} />
+                      <span>{t('Abrir')}</span>
+                    </a>
+                  )}
                   {on > 0 && (
                     <Button size="sm" variant="ghost" icon="refresh" onClick={() => reload(s)}>
                       {t('Recargar')}

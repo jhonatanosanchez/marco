@@ -15,6 +15,7 @@ import { systemRouter } from './routes/system.js';
 import { eventsAdminRouter, eventsPublicRouter } from './routes/localEvents.js';
 import { accessAdminRouter, pairPublicRouter } from './routes/access.js';
 import { setupRouter } from './setup.js';
+import { geocodeRouter } from './geocode.js';
 import { hostGuard } from './lib/net.js';
 import { redactSecrets } from './core/activityCore.js';
 import { displayAuth, mediaAuth } from './displayAccess.js';
@@ -62,6 +63,8 @@ export function createApp({ version, dist = path.join(ROOT, 'dist') }) {
   app.use('/api/setup', setupRouter({ version }));
   // Webhooks (bearer API tokens, no cookies → outside the CSRF guard) (docs/ARCHITECTURE.md).
   app.use('/api/hooks', hooksRouter());
+  // Place search: an admin session, or the setup wizard before the first password exists (server/geocode.js).
+  app.use('/api/admin', geocodeRouter());
   // Admin routers: each one applies requireAuth; unmatched paths fall through to the next one.
   app.use('/api/admin', adminRouter());
   app.use('/api/admin', screensAdminRouter(), announceRouter(), systemRouter({ version }), eventsAdminRouter(), accessAdminRouter());

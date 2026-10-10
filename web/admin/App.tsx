@@ -42,6 +42,7 @@ import { ScreensSection } from './sections/Screens';
 import { StatusSection } from './sections/Status';
 import { WeatherSection } from './sections/Weather';
 import { UNAUTHORIZED_EVENT } from './api';
+import { usesPrivateLinks, useScreenUrl } from './displayLinks';
 import { clone, produce, sectionForError, sectionForServerPath, validateAll, type Errors } from './util';
 
 interface NavItem extends NavMeta {
@@ -391,6 +392,9 @@ export function App() {
   // Preview and "view" links use the SAVED slug: the draft one changes on every keystroke and the server
   // doesn't know it until saved (null = screen not saved yet).
   const savedSlug = (curScreen && saved?.screens.find((s) => s.id === curScreen.id)?.slug) || null;
+  // Private link on the display origin (Marco Cloud, self-hosted private mode) or /?screen=<slug> (open mode).
+  const previewUrl = useScreenUrl(saved, savedSlug ? curScreen?.id : null, { preview: true });
+  const viewUrl = useScreenUrl(saved, savedSlug ? curScreen?.id : null);
 
   /* ---------- draft state */
   const dirty = useMemo(() => !!draft && !!saved && JSON.stringify(draft) !== JSON.stringify(saved), [draft, saved]);
@@ -593,7 +597,7 @@ export function App() {
       { id: 'a-export', group: gActions, icon: 'download', label: t('Exportar copia'), keywords: 'export backup descargar', run: run('backups/bk-export', 'export') },
       { id: 'a-backup', group: gActions, icon: 'archive', label: t('Crear copia de seguridad ahora'), keywords: 'backup snapshot', run: run('backups/bk-auto', 'backup') },
       { id: 'a-token', group: gActions, icon: 'key', label: t('Crear token de API'), keywords: 'token webhook home assistant', run: run('api/api-tokens', 'new') },
-      { id: 'a-view', group: gActions, icon: 'external', label: t('Ver pantalla'), hint: curScreen?.name, run: () => window.open(`/?screen=${encodeURIComponent(savedSlug ?? '')}`, '_blank') },
+      { id: 'a-view', group: gActions, icon: 'external', label: t('Ver pantalla'), hint: curScreen?.name, run: () => viewUrl && window.open(viewUrl, '_blank', 'noopener') },
       { id: 'a-theme', group: gActions, icon: 'moon', label: t('Cambiar tema del panel'), keywords: 'dark light theme', run: () => setAdminTheme((x) => (x === 'dark' ? 'light' : x === 'light' ? '' : 'dark')) },
     ];
     items.push(...filterActions(actions, caps));
@@ -604,7 +608,7 @@ export function App() {
         group: gScreens,
         icon: 'monitor',
         label: t('Cambiar a pantalla {name}', { name: s.name }),
-        hint: s.id === screenId ? t('editando') : `?screen=${s.slug}`,
+        hint: s.id === screenId ? t('editando') : usesPrivateLinks(saved) ? undefined : `?screen=${s.slug}`,
         keywords: `${s.name} ${s.slug} screen switch`,
         run: () => {
           setScreenId(s.id);
@@ -620,7 +624,7 @@ export function App() {
     for (const b of draft.birthdays.items) items.push({ id: `b-${b.id}`, group: t('Cumpleaños'), emoji: b.emoji || draft.birthdays.emoji || '🎂', label: b.name, hint: `${String(b.day).padStart(2, '0')}/${String(b.month).padStart(2, '0')}`, keywords: 'birthday cumpleaños', run: run('birthdays') });
     for (const e of draft.localEvents.items) items.push({ id: `l-${e.id}`, group: t('Eventos locales'), emoji: e.emoji || '📅', label: e.title, hint: e.date, keywords: 'evento local', run: run('local') });
     return items;
-  }, [draft, screenId, dirty, lang, savedSlug, nav, caps]);
+  }, [draft, saved, screenId, dirty, lang, savedSlug, viewUrl, nav, caps]);
 
   /* ---------- render */
   const accent = view?.screen.accent && /^#[0-9a-f]{6}$/i.test(view.screen.accent) ? view.screen.accent : '#ff5a4e';
@@ -722,7 +726,6 @@ export function App() {
   const online: Record<string, number> = {};
   for (const d of displays ?? []) if (d.connected) online[d.screenId] = (online[d.screenId] ?? 0) + 1;
   const onlineTotal = Object.values(online).reduce((a, b) => a + b, 0);
-  const viewUrl = `/?screen=${encodeURIComponent(savedSlug ?? '')}`;
   const multi = draft.screens.length > 1;
 
   const sectionProps: SectionProps = {
@@ -843,7 +846,7 @@ export function App() {
             <button type="button" class="icon-btn topbar__search" title={`${t('Buscar')} (Ctrl K)`} aria-label={t('Buscar')} onClick={() => setPalette(true)}>
               <Icon name="search" size={18} />
             </button>
-            <a class="btn btn--ghost hide-sm hide-lg" href={viewUrl} target="_blank" rel="noopener" title={t('Ver pantalla')}>
+            <a class="btn btn--ghost hide-sm hide-lg" href={viewUrl ?? undefined} target="_blank" rel="noopener" title={t('Ver pantalla')}>
               <Icon name="external" size={16} />
               <span>{t('Ver pantalla')}</span>
             </a>
@@ -885,7 +888,7 @@ export function App() {
                         </span>
                       )}
                     </div>
-                    <a class="menu__item show-lg" href={viewUrl} target="_blank" rel="noopener" onClick={() => setMenuOpen(false)}>
+                    <a class="menu__item show-lg" href={viewUrl ?? undefined} target="_blank" rel="noopener" onClick={() => setMenuOpen(false)}>
                       <Icon name="external" size={16} /> {t('Ver pantalla')} · {curScreen.name}
                     </a>
                     {liveCommands && (
@@ -942,7 +945,7 @@ export function App() {
           </main>
           {previewSide && (
             <aside class="preview-col">
-              <Preview variant="side" slug={savedSlug} screenName={multi ? curScreen.name : ''} reloadKey={previewKey} portrait={portrait} onClose={() => (setShowPreview(false), lsSet(LS_PREVIEW, '0'))} />
+              <Preview variant="side" saved={savedSlug != null} url={previewUrl} openUrl={viewUrl} screenName={multi ? curScreen.name : ''} reloadKey={previewKey} portrait={portrait} onClose={() => (setShowPreview(false), lsSet(LS_PREVIEW, '0'))} />
             </aside>
           )}
         </div>
@@ -972,7 +975,7 @@ export function App() {
       {sheet && !previewSide && (
         <div class="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && setSheet(false)}>
           <div class="sheet">
-            <Preview variant="sheet" slug={savedSlug} screenName={multi ? curScreen.name : ''} reloadKey={previewKey} portrait={portrait} onClose={() => setSheet(false)} />
+            <Preview variant="sheet" saved={savedSlug != null} url={previewUrl} openUrl={viewUrl} screenName={multi ? curScreen.name : ''} reloadKey={previewKey} portrait={portrait} onClose={() => setSheet(false)} />
           </div>
         </div>
       )}

@@ -8,6 +8,7 @@ import { Icon } from '../components/icons';
 import { Button, Callout, Card, Empty, StatusDot } from '../components/ui';
 import { daysBetween, eventDay, eventTimeLabel, fmtDay, relDays, todayIn } from '../dates';
 import { has, runtime } from '../caps';
+import { screenHref, useDisplayLinks } from '../displayLinks';
 import { formatDuration, locale, nScreens, relTime, t } from '../i18n';
 import type { SectionProps } from './common';
 
@@ -39,6 +40,7 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
   const [busy, setBusy] = useState('');
   const cmdsOn = has('displayCommands');
   const annOn = has('announcements');
+  const links = useDisplayLinks(saved);
   const [, tick] = useState(0);
 
   const load = async () => {
@@ -197,9 +199,11 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
                   >
                     <Icon name="edit" size={15} />
                   </button>
-                  <a class="icon-btn" href={`/?screen=${encodeURIComponent(s.slug)}`} target="_blank" rel="noopener" title={t('Abrir pantalla')}>
-                    <Icon name="external" size={15} />
-                  </a>
+                  {screenHref(saved, s.id, links) && (
+                    <a class="icon-btn" href={screenHref(saved, s.id, links)!} target="_blank" rel="noopener" title={t('Abrir pantalla')}>
+                      <Icon name="external" size={15} />
+                    </a>
+                  )}
                 </li>
               );
             })}

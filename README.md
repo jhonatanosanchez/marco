@@ -410,8 +410,9 @@ makes Marco safe on shared networks (flat-share Wi-Fi, office) and lets you reac
   `?screen=` is ignored), so keep it to your own devices.
 - **Pairing:** no long links to type on a TV. Open the plain address (`http://homeserver.lan:3000/` or `/pair`) on the
   new device and it shows a big **6-character code** and a QR code. On your phone open *Connected screens → Pair a
-  screen* (or scan the QR: it opens the admin with the code filled in), type the code, pick the screen and a name. The
-  device starts within two seconds and keeps its own device token in the browser's storage. This suits tablets, TVs
+  screen* (or scan the QR: it opens the admin with the code filled in), type the code, pick the screen and a name.
+  The admin then shows the address of the screen that is waiting with that code; confirm it is the one in front of
+  you. The device starts within two seconds and keeps its own device token in the browser's storage. This suits tablets, TVs
   and browsers you keep using. The Raspberry Pi kiosk runs Chromium in incognito mode (nothing survives a restart),
   so give it the private link instead.
 - **Paired devices:** *Connected screens* lists them with the screen they show and when they were last seen; **Edit**

@@ -12,6 +12,8 @@ import { resolveScreen, displayConfig as projectDisplayConfig } from '../core/sc
 import { requestScreen } from '../displayAccess.js';
 import { addDays, localDate, isDateStr, daysBetween } from '../core/lib/tz.js';
 import { healthBody } from '../capabilities.js';
+import { lanAddresses } from '../setup.js';
+import { hostAllowed, hostnameOf, untrustedProxy } from '../lib/net.js';
 
 /** GET /api/display/config payload for `screenKey` (slug or id; empty → default screen). */
 export function displayConfig(cfg, screenKey) {
@@ -25,12 +27,21 @@ function displayConfigFor(cfg, req) {
   return projectDisplayConfig(cfg, screen, { fallback });
 }
 
+/** The request comes from this machine (loopback, not relayed by an untrusted proxy) under an allowed host name. */
+export function onThisMachine(req) {
+  const ip = String(req.ip || '').replace(/^::ffff:/i, '');
+  if (ip !== '::1' && !ip.startsWith('127.')) return false;
+  return !untrustedProxy(req) && hostAllowed(hostnameOf(req.get('host')));
+}
+
 export function publicRouter({ version }) {
   const r = Router();
   const noStore = (req, res, next) => { if (!res.get('cache-control')) res.set('cache-control', 'private, no-store'); next(); };
   r.use(noStore);
 
-  r.get('/health', (req, res) => res.json(healthBody({ version })));
+  // A display opened on the server itself (a kiosk on http://localhost) gets this machine's LAN addresses, so its
+  // pairing screen can say where other devices reach the admin. Nobody else gets them.
+  r.get('/health', (req, res) => res.json(healthBody({ version, lanAddresses: onThisMachine(req) ? lanAddresses() : undefined })));
 
   r.get('/display/config', (req, res) => res.json(displayConfigFor(getConfig(), req)));
 

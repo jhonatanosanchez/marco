@@ -4382,6 +4382,18 @@ h1 .scope {
   text-transform: uppercase;
   height: 56px;
 }
+.pair-confirm p {
+  margin: 0;
+}
+.pair-confirm__code {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-align: center;
+  padding: 10px 0;
+  border-radius: var(--r);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
 .pair-done {
   display: flex;
   flex-direction: column;

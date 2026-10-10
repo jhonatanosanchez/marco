@@ -6,6 +6,7 @@ import { ROWS6 } from './i18n-dict6';
 import { ROWS7 } from './i18n-dict7';
 import { ROWS8 } from './i18n-dict8';
 import { ROWS9 } from './i18n-dict9';
+import { ROWS10 } from './i18n-dict10';
 // Translations for the admin panel. Spanish is the source language (key); [es, en, pt].
 const ROWS: [string, string, string][] = [
   ['(ninguno)', '(none)', '(nenhum)'],
@@ -403,7 +404,7 @@ for (const [es, en, pt] of ROWS) {
   PT[es] = pt;
 }
 // v2 pages; existing rows win on duplicates.
-for (const [es, en, pt] of [...ROWS2, ...ROWS3, ...ROWS4, ...ROWS5, ...ROWS6, ...ROWS7, ...ROWS8, ...ROWS9]) {
+for (const [es, en, pt] of [...ROWS2, ...ROWS3, ...ROWS4, ...ROWS5, ...ROWS6, ...ROWS7, ...ROWS8, ...ROWS9, ...ROWS10]) {
   if (!(es in EN)) EN[es] = en;
   if (!(es in PT)) PT[es] = pt;
 }
