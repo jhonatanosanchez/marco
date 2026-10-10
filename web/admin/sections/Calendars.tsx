@@ -316,7 +316,7 @@ function GoogleAccounts({ cfg, set, me, dirty, save }: SectionProps) {
                   {a.picture ? <img class="avatar" src={a.picture} alt="" referrerpolicy="no-referrer" /> : <span class="avatar avatar--letter">{(a.name || a.email)[0].toUpperCase()}</span>}
                   <div class="gaccount__who">
                     <strong>{a.name || a.email}</strong>
-                    <span class="muted small">{a.email}</span>
+                    {a.name && a.name !== a.email && <span class="muted small">{a.email}</span>}
                   </div>
                   <Button size="sm" variant="ghost" icon="x" onClick={() => disconnect(a)}>
                     {t('Desvincular')}

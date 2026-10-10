@@ -110,7 +110,8 @@ export const DEFAULT_ICON_RULES: IconRule[] = [
 
 export function guessKind(nameOrId: string): SourceKind {
   const s = normalize(nameOrId);
-  if (/airbnb|booking|reserv|al\b|alojamento/.test(s)) return 'airbnb';
+  // vacation rentals only on clear words: a bare "al" also matched "Portugal", "Personal" or "Festival"
+  if (/airbnb|booking|vrbo|reserv|alojamento/.test(s)) return 'airbnb';
   if (/birthday|cumple|aniversar|contacts/.test(s)) return 'birthdays';
   if (/holiday|festivo|feriado/.test(s)) return 'holidays';
   return 'generic';
