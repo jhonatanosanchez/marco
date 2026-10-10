@@ -4745,3 +4745,35 @@ h1 .scope {
   .glass-pv__card { left: 10px; right: 10px; bottom: 10px; padding: 8px 11px; border-radius: 15px; }
   .glass-pv__temp { font-size: 23px; }
 }
+
+/* Gallery storage on a server with a plan (Photos.tsx QuotaBar) */
+.photo-quota {
+  margin: 14px 0 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+.photo-quota__head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin-bottom: 8px;
+}
+.photo-quota.is-low .progress span {
+  background: var(--warn);
+}
+.photo-quota.is-full .progress span {
+  background: var(--err);
+}
+.photo-quota__note {
+  margin: 8px 0 0;
+}
+.photo-quota.is-low .photo-quota__note {
+  color: var(--warn);
+}
+.photo-quota.is-full .photo-quota__note {
+  color: var(--err);
+}

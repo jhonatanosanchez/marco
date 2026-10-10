@@ -1,4 +1,5 @@
 import { SINGULAR4 } from './i18n-dict4';
+import { SINGULAR12 } from './i18n-dict12';
 // Singular forms for count strings (used by t() when vars.n === 1): Spanish key → [es, en, pt].
 export const SINGULAR: Record<string, [string, string, string]> = {
   'Copia restaurada · se corrigieron {n} valores no válidos (ver Actividad)': ['Copia restaurada · se corrigió 1 valor no válido (ver Actividad)', 'Backup restored · 1 invalid value was fixed (see Activity)', 'Cópia restaurada · foi corrigido 1 valor inválido (ver Atividade)'],
@@ -45,4 +46,5 @@ export const SINGULAR: Record<string, [string, string, string]> = {
   '{n} noticias': ['1 noticia', '1 item', '1 notícia'],
   '{n} segundos': ['1 segundo', '1 second', '1 segundo'],
   ...SINGULAR4,
+  ...SINGULAR12,
 };

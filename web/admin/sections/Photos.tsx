@@ -6,6 +6,7 @@ import { confirmDialog, toast } from '../components/feedback';
 import { Icon } from '../components/icons';
 import { ConflictDialog, FocusEditor, type ConflictItem } from '../components/PhotoDialogs';
 import { Button, Callout, Card, Empty, PageHeader, Segmented } from '../components/ui';
+import { limit, runtime } from '../caps';
 import { locale, t } from '../i18n';
 import { isJpegName, jpgName, looksLikeImage, MAX_UPLOAD_BYTES, optimizePhoto, PhotoError, TARGET_SIDE } from '../photoTools';
 import { formatBytes } from '../util';
@@ -40,6 +41,9 @@ export function needsWork(p: AdminPhoto): boolean {
   return !processed || (p.size > HEAVY && !(p.hasThumb && hasFocus(p)));
 }
 
+/** Servers that run on Workers (Marco Cloud) store photos with a plan: one photo per request, always optimized. */
+const onWorkers = () => runtime() === 'workers';
+
 function errorText(e: unknown): string {
   if (e instanceof PhotoError) {
     if (e.code === 'too-big') return t('Supera el límite de 100 MB');
@@ -48,7 +52,16 @@ function errorText(e: unknown): string {
     return t('El navegador no puede leer esta imagen. Guárdala como JPG y vuelve a intentarlo.');
   }
   if (e instanceof ApiError) {
-    if (e.status === 413) return t('Supera el límite de 100 MB');
+    if (e.code === 'photo_quota') {
+      const b = (e.body ?? {}) as { reason?: string; limit?: number; maxPhotos?: number };
+      if (b.reason === 'count') return t('Has llegado al máximo de {n} fotos. Borra alguna para subir más.', { n: b.maxPhotos ?? limit('photos') ?? '' });
+      return t('La galería está llena ({max}). Borra alguna foto para subir más.', { max: formatBytes(b.limit ?? limit('totalPhotoBytes') ?? 0) });
+    }
+    if (e.status === 413) {
+      const each = limit('photoBytes');
+      return each != null ? t('Ocupa más de {size} incluso optimizada.', { size: formatBytes(each) }) : t('Supera el límite de 100 MB');
+    }
+    if (e.status === 429 && onWorkers()) return t('Demasiadas subidas seguidas. Espera un minuto y vuelve a intentarlo.');
     if (e.status === 415) return t('Formato no admitido (usa JPG, PNG o WebP)');
     if (e.status === 0) return t('Sin conexión con el servidor');
     return e.message;
@@ -95,6 +108,10 @@ export function PhotosSection({ cfg, set }: SectionProps) {
   const input = useRef<HTMLInputElement>(null);
   const urls = useRef<string[]>([]);
   const busy = !!queue?.running;
+  const cloud = onWorkers();
+  const maxTotal = limit('totalPhotoBytes');
+  const maxCount = limit('photos');
+  const maxEach = limit('photoBytes');
 
   const load = async () => {
     try {
@@ -146,6 +163,16 @@ export function PhotosSection({ cfg, set }: SectionProps) {
   const uploadFiles = async (list: File[]) => {
     const files = Array.from(list);
     if (!files.length) return;
+    // A plan with a storage limit: say so before optimizing anything when the gallery is already full.
+    const usedNow = (photos ?? []).reduce((s, p) => s + (p.size || 0), 0);
+    if (maxTotal != null && usedNow >= maxTotal) {
+      toast(t('La galería está llena ({max}). Borra alguna foto para subir más.', { max: formatBytes(maxTotal) }), 'error', 9000);
+      return;
+    }
+    if (maxCount != null && (photos?.length ?? 0) >= maxCount) {
+      toast(t('Has llegado al máximo de {n} fotos. Borra alguna para subir más.', { n: maxCount }), 'error', 9000);
+      return;
+    }
     clearQueue();
     const items: (QueueItem & { file: File; target: string })[] = files.map((f) => ({
       id: ++seq, name: f.name, file: f, target: jpgName(f.name), status: 'waiting', pct: 0, before: f.size,
@@ -196,7 +223,9 @@ export function PhotosSection({ cfg, set }: SectionProps) {
     }
 
     setQueue({ kind: 'upload', items, running: true });
-    let uploaded = 0, failed = 0, before = 0, after = 0;
+    let uploaded = 0, failed = 0, before = 0, after = 0, noRoom = 0;
+    // Room left in the plan (the server checks it again, atomically).
+    let room = maxTotal != null ? maxTotal - usedNow : Infinity;
     for (const it of ok) {
       const policy = policies[it.id] ?? 'rename';
       if (policy === 'skip') {
@@ -207,15 +236,26 @@ export function PhotosSection({ cfg, set }: SectionProps) {
         let up: { blob: Blob; name: string; thumb?: Blob; focusX?: number; focusY?: number };
         let note = '';
         try {
-          const o = await optimizePhoto(it.file, { onStage: (s) => patch(it.id, { status: s, pct: s === 'heic' ? 0.1 : 0.2 }) });
+          const o = await optimizePhoto(it.file, { strip: cloud, onStage: (s) => patch(it.id, { status: s, pct: s === 'heic' ? 0.1 : 0.2 }) });
           up = o;
           patch(it.id, { thumb: thumbUrl(o.thumb), after: o.after });
         } catch (e) {
           // A JPG/PNG/WebP this browser can't decode still goes up as it is (the server accepts it).
-          if (e instanceof PhotoError && e.code === 'decode' && SERVER_TYPES.test(it.file.name) && /^image\/(jpeg|png|webp)$/.test(it.file.type)) {
+          // On Workers every photo is optimized (metadata such as the location must not be stored).
+          if (!cloud && e instanceof PhotoError && e.code === 'decode' && SERVER_TYPES.test(it.file.name) && /^image\/(jpeg|png|webp)$/.test(it.file.type)) {
             up = { blob: it.file, name: it.file.name };
             note = t('subida sin optimizar');
           } else throw e;
+        }
+        if (maxEach != null && up.blob.size > maxEach) {
+          failed++;
+          patch(it.id, { status: 'error', error: t('Ocupa más de {size} incluso optimizada.', { size: formatBytes(maxEach) }) });
+          continue;
+        }
+        if (policy !== 'replace' && up.blob.size > room) {
+          noRoom++;
+          patch(it.id, { status: 'error', error: t('No cabe: quedan {free} libres en la galería.', { free: formatBytes(Math.max(0, room)) }) });
+          continue;
         }
         patch(it.id, { status: 'uploading', pct: 0.4 });
         const res = await uploadPhotos([up], up.name === jpgName(it.file.name) ? policy : 'rename', (fr) => patch(it.id, { pct: 0.4 + fr * 0.6 }));
@@ -225,6 +265,7 @@ export function PhotosSection({ cfg, set }: SectionProps) {
           continue;
         }
         uploaded++;
+        if (f.status !== 'replaced') room -= f.size;
         before += it.file.size;
         after += up.blob.size;
         const extra = f.status === 'replaced' ? t('reemplazada') : f.status === 'renamed' ? t('guardada como {name}', { name: f.file }) : '';
@@ -237,6 +278,7 @@ export function PhotosSection({ cfg, set }: SectionProps) {
     setQueue((q) => q && { ...q, running: false });
     if (uploaded) toast(t('{n} fotos subidas · {before} → {after}', { n: uploaded, before: formatBytes(before), after: formatBytes(after) }));
     if (failed) toast(t('{n} archivos no se pudieron subir', { n: failed }), 'error');
+    if (noRoom) toast(t('{n} fotos no caben en la galería', { n: noRoom }), 'error', 9000);
     load();
   };
 
@@ -276,7 +318,7 @@ export function PhotosSection({ cfg, set }: SectionProps) {
         const blob = await res.blob();
         const file = new File([blob], p.file, { type: blob.type || 'image/jpeg' });
         const keepFocus = hasFocus(p) ? { focusX: p.focusX!, focusY: p.focusY! } : undefined;
-        const o = await optimizePhoto(file, { keepFocus, onStage: (s) => patch(id, { status: s, pct: 0.2 }) });
+        const o = await optimizePhoto(file, { keepFocus, strip: cloud, onStage: (s) => patch(id, { status: s, pct: 0.2 }) });
         patch(id, { thumb: thumbUrl(o.thumb), status: 'uploading', pct: 0.5 });
         let note = '';
         if (o.kept && jpgName(p.file) === p.file) {
@@ -377,7 +419,10 @@ export function PhotosSection({ cfg, set }: SectionProps) {
 
   return (
     <>
-      <PageHeader title={t('Galería')} desc={t('Tus fotos para el fondo de pantalla. Se guardan en el propio servidor.')} />
+      <PageHeader
+        title={t('Galería')}
+        desc={cloud ? t('Tus fotos para el fondo de pantalla. Se guardan en tu cuenta de Marco.') : t('Tus fotos para el fondo de pantalla. Se guardan en el propio servidor.')}
+      />
       {cfg.background.source === 'stock' && (
         <Callout>
           {t('Ahora mismo el fondo usa fotos de stock.')}{' '}
@@ -422,8 +467,13 @@ export function PhotosSection({ cfg, set }: SectionProps) {
         />
         <span class="dropzone__icon">{busy ? <span class="spinner" /> : <Icon name="upload" size={26} />}</span>
         <strong>{busy ? t('Procesando fotos…') : t('Arrastra fotos aquí o haz clic para elegir')}</strong>
-        <span class="muted small">{t('JPG, HEIC, PNG, WebP… · hasta 100 MB cada una · se optimizan en tu navegador antes de subir')}</span>
+        <span class="muted small">
+          {cloud
+            ? t('JPG, HEIC, PNG, WebP… · tu navegador las reduce, las convierte y les quita los datos de ubicación antes de subirlas')
+            : t('JPG, HEIC, PNG, WebP… · hasta 100 MB cada una · se optimizan en tu navegador antes de subir')}
+        </span>
       </div>
+      {maxTotal != null && photos !== null && <QuotaBar used={total} max={maxTotal} count={photos.length} maxCount={maxCount} />}
 
       {queue && <div ref={queueRef}><UploadQueue queue={queue} onClose={clearQueue} /></div>}
 
@@ -617,6 +667,36 @@ export function PhotosSection({ cfg, set }: SectionProps) {
         />
       )}
     </>
+  );
+}
+
+/** Storage used against the plan: "X MB de 200 MB · N fotos". */
+function QuotaBar({ used, max, count, maxCount }: { used: number; max: number; count: number; maxCount: number | null }) {
+  const frac = max > 0 ? Math.min(1, used / max) : 1;
+  const full = used >= max || (maxCount != null && count >= maxCount);
+  const low = !full && frac >= 0.9;
+  return (
+    <div class={`photo-quota ${full ? 'is-full' : low ? 'is-low' : ''}`}>
+      <div class="photo-quota__head">
+        <strong>{t('Espacio de la galería')}</strong>
+        <span class="muted small">
+          {t('{used} de {max} · {n} fotos', { used: formatBytes(used), max: formatBytes(max), n: count })}
+          {!full && ` · ${t('quedan {free} libres', { free: formatBytes(max - used) })}`}
+        </span>
+      </div>
+      <div class="progress photo-quota__bar" role="progressbar" aria-label={t('Espacio de la galería')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(frac * 100)}>
+        <span style={{ transform: `scaleX(${frac})` }} />
+      </div>
+      {full ? (
+        <p class="photo-quota__note small">
+          {maxCount != null && count >= maxCount
+            ? t('Has llegado al máximo de {n} fotos. Borra alguna para subir más.', { n: maxCount })
+            : t('La galería está llena ({max}). Borra alguna foto para subir más.', { max: formatBytes(max) })}
+        </p>
+      ) : (
+        low && <p class="photo-quota__note small">{t('Queda poco espacio. Borra las fotos que ya no uses para subir más.')}</p>
+      )}
+    </div>
   );
 }
 
