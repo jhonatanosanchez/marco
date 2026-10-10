@@ -400,12 +400,71 @@ export interface PhotosResponse {
   photos: Photo[];
 }
 
+/** Feature flags in GET /api/health. A self-hosted server turns them all on except googleCalendar and googleLogin
+ *  (on when Google credentials are set) and accountMenu. No `features` field at all (older servers) means every
+ *  feature is on; a missing key counts as off only when `edition` is not 'self-hosted'. */
+export interface Features {
+  homeassistant: boolean;
+  news: boolean;
+  customCss: boolean;
+  gallery: boolean;
+  schedules: boolean;
+  announcements: boolean;
+  displayCommands: boolean;
+  openDisplayAccess: boolean;
+  insecureTls: boolean;
+  googleCalendar: boolean;
+  googleLogin: boolean;
+  passwordLogin: boolean;
+  apiTokens: boolean;
+  webhooks: boolean;
+  backups: boolean;
+  importExport: boolean;
+  includeSecrets: boolean;
+  activity: boolean;
+  setupWizard: boolean;
+  status: boolean;
+  accountMenu: boolean;
+}
+
+export type FeatureName = keyof Features;
+
+/** Plan limits in GET /api/health. Absent (self-hosted) = no limit. */
+export interface Limits {
+  screens?: number;
+  sources?: number;
+  devices?: number;
+  photos?: number;
+  /** bytes per photo */
+  photoBytes?: number;
+  /** bytes for all photos together */
+  totalPhotoBytes?: number;
+  newsFeeds?: number;
+  apiTokens?: number;
+  backups?: number;
+  /** webhook commands per day */
+  hookCommandsPerDay?: number;
+  /** bytes of custom CSS per screen */
+  customCssBytes?: number;
+}
+
 export interface HealthResponse {
   ok: boolean;
-  uptime: number;
+  /** seconds since the server started; null where there is no long-running process */
+  uptime: number | null;
   version: string;
   /** How displays get live updates: 'sse' = /api/stream, 'poll' = config revision poll. Absent (old servers) = 'sse'. */
   live?: 'sse' | 'poll';
+  /** Absent on servers older than 0.5.0. */
+  edition?: 'self-hosted' | 'cloud';
+  tenancy?: 'single' | 'multi';
+  runtime?: 'node' | 'workers';
+  /** Characters in a pairing code shown on a TV (6 when absent). */
+  pairCodeLength?: number;
+  features?: Partial<Features>;
+  limits?: Limits;
+  /** Absolute origin that serves the display pages (/d/<key>, /pair). Absent = same origin as the admin. */
+  displayOrigin?: string;
 }
 
 /** SSE /api/stream?screen=&client= event payloads (docs/ARCHITECTURE.md) */
@@ -426,7 +485,16 @@ export interface AuthUser {
   email: string;
   name: string;
   picture?: string;
-  method: 'password' | 'google';
+  method: 'password' | 'google' | 'account';
+}
+
+/** Marco Cloud: where the account pages live and which household the admin edits. */
+export interface AccountInfo {
+  loginUrl: string;
+  accountUrl: string;
+  sessionsUrl: string;
+  deleteUrl: string;
+  household: { name: string; role: 'owner' | 'member' };
 }
 
 export interface AuthMeResponse {
@@ -439,6 +507,8 @@ export interface AuthMeResponse {
   needsSetup?: boolean;
   /** The initial password came from ADMIN_PASSWORD (headless install): the panel offers to change it. */
   passwordFromEnv?: boolean;
+  /** Only when user.method is 'account' (Marco Cloud). */
+  account?: AccountInfo;
 }
 
 /** GET /api/setup/status */

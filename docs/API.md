@@ -68,7 +68,7 @@ saved without `security` (old admin builds, backups or exports from before 0.3) 
 
 | Method & path | Response |
 |---|---|
-| `GET /api/health` | `{ ok, uptime, version, live }`; `live` is `'sse'` here. A server that answers `'poll'` gets no `/api/stream` connection: the display checks `/api/display/config` every 90 s and refetches events and countdowns when `revision` changes. A missing field means `'sse'` |
+| `GET /api/health` | `HealthResponse`: `{ ok, uptime, version, live, edition, tenancy, runtime, pairCodeLength, features, limits?, displayOrigin? }` (see below). `live` is `'sse'` unless `MARCO_LIVE=poll` is set. A server that answers `'poll'` gets no `/api/stream` connection: the display checks `/api/display/config` every 90 s and refetches events and countdowns when `revision` changes. A missing field means `'sse'` |
 | `GET /api/display/config?screen=` | `DisplayConfig`: flat view of one screen; `calendar.sources` only as `{ id, name, color, emoji, kind }`; enabled `schedules` for this screen |
 | `GET /api/events?screen=&from=YYYY-MM-DD&to=YYYY-MM-DD` | `{ generatedAt, hash, events: CalEvent[], errors: [{ sourceId, message }] }` |
 | `GET /api/weather?screen=` | `{ updatedAt, locationName, current, today, daily[], hourly[], indoor }` (localized descriptions, cache 10 min) |
@@ -78,6 +78,23 @@ saved without `security` (old admin builds, backups or exports from before 0.3) 
 | `POST /api/display/heartbeat` | Body `DisplayHeartbeat` (≤ 4 kB: clientId, screen, version, resolution, dpr, webgl, night state, photo frame…) → `HeartbeatResponse` |
 | `GET /api/stream?screen=&client=&k=` | Server-Sent Events, see below |
 | `GET /media/photos/<file>`, `GET /media/thumbs/<file>` | Gallery images and thumbnails |
+
+### Capabilities in `/api/health`
+
+The admin and the display read these fields to decide which sections, actions and limits apply.
+
+- `edition`: `'self-hosted'` here. `tenancy`: `'single'`. `runtime`: `'node'`.
+- `pairCodeLength`: characters in the pairing code a TV shows (`6`).
+- `features`: one boolean per feature: `homeassistant`, `news`, `customCss`, `gallery`, `schedules`,
+  `announcements`, `displayCommands`, `openDisplayAccess`, `insecureTls`, `googleCalendar`, `googleLogin`,
+  `passwordLogin`, `apiTokens`, `webhooks`, `backups`, `importExport`, `includeSecrets`, `activity`, `setupWizard`,
+  `status`, `accountMenu`. A self-hosted server turns all of them on, except `googleCalendar` and `googleLogin`
+  (on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set) and `accountMenu` (always off).
+- `limits` (optional): plan limits such as `screens`, `sources` or `devices`. Absent means no limit.
+- `displayOrigin` (optional): absolute origin that serves `/d/<key>` and `/pair`. Absent means the same origin.
+
+Clients treat a response with no `features` field (servers older than 0.5.0) as having every feature on. A key
+missing from `features` counts as off only when `edition` is not `'self-hosted'`.
 
 `CalEvent`: `{ id, sourceId, title, start, end, allDay, location, color, emoji, kind, multiDay, age? }`. `start`/`end`
 are ISO strings with offset, or `YYYY-MM-DD` for all-day events (`end` exclusive).
@@ -104,7 +121,7 @@ Displays whose screen has alerts disabled do not receive `announce`.
 
 | Method & path | Notes |
 |---|---|
-| `GET /api/auth/me` | `{ user: { email, name, picture, method } \| null, needsSetup, googleConfigured, passwordLoginEnabled, mustChangePassword, passwordFromEnv }` |
+| `GET /api/auth/me` | `{ user: { email, name, picture, method } \| null, needsSetup, googleConfigured, passwordLoginEnabled, mustChangePassword, passwordFromEnv }`. `method` is `'password'` or `'google'` here; Marco Cloud answers `'account'` and adds `account: { loginUrl, accountUrl, sessionsUrl, deleteUrl, household: { name, role } }` |
 | `POST /api/auth/login` | `{ password }`; `409 { needsSetup: true }` while the install has no password yet |
 | `POST /api/auth/logout`, `POST /api/auth/logout-all` | log out this session / every session |
 | `GET /auth/google/login` | "Sign in with Google" (email must be in `auth.allowedGoogleEmails`; if the list is empty, the first Google login made while already logged in with the password adds itself) |

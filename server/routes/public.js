@@ -11,6 +11,7 @@ import { streamInit, streamHello, onStreamOpen, onStreamClose } from '../display
 import { resolveScreen, displayConfig as projectDisplayConfig } from '../screens.js';
 import { requestScreen } from '../displayAccess.js';
 import { addDays, localDate, isDateStr, daysBetween } from '../lib/tz.js';
+import { healthBody } from '../capabilities.js';
 
 /** GET /api/display/config payload for `screenKey` (slug or id; empty → default screen). */
 export function displayConfig(cfg, screenKey) {
@@ -29,7 +30,7 @@ export function publicRouter({ version }) {
   const noStore = (req, res, next) => { if (!res.get('cache-control')) res.set('cache-control', 'private, no-store'); next(); };
   r.use(noStore);
 
-  r.get('/health', (req, res) => res.json({ ok: true, uptime: Math.round(process.uptime()), version, live: 'sse' }));
+  r.get('/health', (req, res) => res.json(healthBody({ version })));
 
   r.get('/display/config', (req, res) => res.json(displayConfigFor(getConfig(), req)));
 
