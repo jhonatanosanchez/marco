@@ -101,6 +101,17 @@ confirm step, place search through the server, and the shared logic moved into `
 - Weather or background settings saved with a feature the server turns off stay visible with a note, so they can be
   changed back.
 - Sign-in redirects reject paths with whitespace or control characters.
+- Installer: run as a regular user with no terminal (`curl | bash` from a script, `marco update` from cron), it
+  stopped at `sudo -v` even when sudo needs no password, as on Raspberry Pi OS. On a 0.4.0 install made as a regular
+  user, `marco update` still asks for the sudo password once (it runs the 0.4.0 installer); with no terminal, use
+  `sudo marco update` or run the one-line installer again.
+- Installer: Raspberry Pi OS 32-bit on a Pi 4 or 5 (64-bit kernel, 32-bit programs) gets the armv7l Node.js build
+  instead of an arm64 one that cannot run.
+- Kiosk: the log `/tmp/marco-kiosk.log` (`marco logs` on a screen-only device) is written with Wayfire, LXDE-pi and
+  other desktops too, not only labwc. Chromium from a snap (Ubuntu) gets a profile folder it is allowed to write to.
+- Installer: a kiosk link with no server address is refused; updating a screen-only install shows the saved link;
+  an all-in-one install warns when `kiosk.env` still points at another server. `marco help` no longer prints a
+  line of code.
 
 
 ## [0.4.0] - 2026-10-09
