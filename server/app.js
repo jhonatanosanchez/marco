@@ -38,8 +38,16 @@ export function createApp({ version, dist = path.join(ROOT, 'dist'), updater = n
   const trustProxy = process.env.TRUST_PROXY?.trim();
   app.set('trust proxy', !trustProxy ? 'loopback' : trustProxy === 'true' ? true : /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy.split(',').map((x) => x.trim()));
 
-  // Private display links live in the URL (/d/<key>): never leak them through the Referer header.
-  app.use((req, res, next) => { res.set('referrer-policy', 'no-referrer'); next(); });
+  // Browser hardening on every response. Private display links live in the URL (/d/<key>): never leak them
+  // through the Referer header. No MIME sniffing. Only this same origin may frame a page (the admin's live
+  // preview iframes the display; nothing else can, so no clickjacking of the admin).
+  app.use((req, res, next) => {
+    res.set('referrer-policy', 'no-referrer');
+    res.set('x-content-type-options', 'nosniff');
+    res.set('x-frame-options', 'SAMEORIGIN');
+    res.set('content-security-policy', "frame-ancestors 'self'");
+    next();
+  });
   // DNS-rebinding guard: only LAN host names, IP literals, PUBLIC_URL and ALLOWED_HOSTS (lib/net.js).
   app.use(hostGuard());
   app.use(sessionMiddleware());
@@ -101,8 +109,11 @@ export function createApp({ version, dist = path.join(ROOT, 'dist'), updater = n
   if (fs.existsSync(path.join(dist, 'index.html'))) {
     app.use(express.static(dist, { index: false, maxAge: '1h', setHeaders: (res, p) => {
       if (p.includes(`${path.sep}assets${path.sep}`)) res.set('cache-control', 'public, max-age=31536000, immutable');
+      // The display and admin pages (also as /index.html, /admin/index.html) are never cached: a new build or a
+      // revoked link takes effect on the next load.
+      else if (p.endsWith('.html')) res.set('cache-control', 'no-store');
     } }));
-    const sendHtml = (file, cache = 'no-cache') => (req, res) => {
+    const sendHtml = (file, cache = 'no-store') => (req, res) => {
       res.set('cache-control', cache);
       res.sendFile(path.join(dist, file));
     };

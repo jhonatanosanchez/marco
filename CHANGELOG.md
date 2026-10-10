@@ -26,6 +26,11 @@ All notable changes to this project are documented here. The format is based on
 - **Google Calendar** leaves out Google Workspace working-location entries ("Home", "Office").
 - The linked accounts chooser closes with an X instead of a Cancel button.
 
+### Security
+- Every response now sends `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN` and
+  `frame-ancestors 'self'`, so no other site can frame the admin. The display and admin pages (also as `/index.html`
+  and `/admin/index.html`) are never cached, and admin changes refuse a `Sec-Fetch-Site` other than `same-origin`.
+
 ### Fixed
 - A very long title in the next-event capsule under the clock no longer pushes it past the edge of the side panel.
 - Today: when the all-day chips do not fit next to the title, the last ones are left out instead of the first one

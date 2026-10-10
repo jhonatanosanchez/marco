@@ -772,3 +772,45 @@ test('display-links tells an admin on localhost how other devices reach the serv
     }
   }
 });
+test('browser headers: no referrer, nosniff, same-origin framing only, display and admin pages never cached', async () => {
+  await withServer(async (ctx) => {
+    for (const url of ['/', '/index.html', '/?screen=salon', '/pair', '/admin/', '/admin/index.html', '/api/health', `/d/${keyOf('kitchen')}`]) {
+      const r = await ctx.call('GET', url);
+      assert.equal(r.status, 200, url);
+      assert.equal(r.headers.get('referrer-policy'), 'no-referrer', url);
+      assert.equal(r.headers.get('x-content-type-options'), 'nosniff', url);
+      assert.equal(r.headers.get('x-frame-options'), 'SAMEORIGIN', url);
+      assert.match(r.headers.get('content-security-policy'), /frame-ancestors 'self'/, url);
+      if (url !== '/api/health') assert.match(r.headers.get('cache-control'), /no-store/, url);
+    }
+  });
+});
+
+test('admin CSRF: same-origin only, by Origin and Sec-Fetch-Site; works on the LAN address and through an SSH tunnel', async () => {
+  const http = await import('node:http');
+  await withServer(async (ctx) => {
+    const cookie = await ctx.login();
+    const { port } = new URL(ctx.base);
+    // Raw request so the Host header can be what the browser sent (LAN IP, or localhost through a tunnel).
+    const post = (headers) => new Promise((resolve, reject) => {
+      const body = '{}';
+      const req = http.request({ host: '127.0.0.1', port, method: 'POST', path: '/api/admin/backups',
+        headers: { cookie, 'content-type': 'application/json', 'content-length': Buffer.byteLength(body), ...headers } }, (res) => {
+        res.resume();
+        res.on('end', () => resolve(res.statusCode));
+      });
+      req.on('error', reject);
+      req.end(body);
+    });
+    assert.equal(await post({ host: '192.168.1.50:3100', origin: 'http://192.168.1.50:3100' }), 200);
+    assert.equal(await post({ host: 'localhost:3100', origin: 'http://localhost:3100', 'sec-fetch-site': 'same-origin' }), 200);
+    assert.equal(await post({ host: '192.168.1.50:3100' }), 200, 'no Origin (old clients, curl) still works');
+    assert.equal(await post({ host: 'localhost:3100', origin: 'http://localhost:3100', 'sec-fetch-site': 'cross-site' }), 403);
+    assert.equal(await post({ host: 'localhost:3100', origin: 'http://localhost:3100', 'sec-fetch-site': 'same-site' }), 403);
+    assert.equal(await post({ host: 'localhost:3100', 'sec-fetch-site': 'cross-site' }), 403, 'Sec-Fetch-Site alone refuses');
+    assert.equal(await post({ host: '192.168.1.50:3100', origin: 'http://evil.example' }), 403);
+    assert.equal(await post({ host: '192.168.1.50:3100', origin: 'http://192.168.1.50:3101' }), 403, 'another port is another origin');
+    // the display's own POSTs (no admin cookie) are outside the guard
+    assert.notEqual((await ctx.call('POST', '/api/display/heartbeat', { body: { clientId: 'kiosk-x' }, headers: { 'sec-fetch-site': 'cross-site' } })).status, 403);
+  }, { mode: 'open' });
+});

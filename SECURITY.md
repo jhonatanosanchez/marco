@@ -63,6 +63,10 @@ used on shared networks or behind an HTTPS reverse proxy on the Internet:
   `secrets.json`; an unreadable `secrets.json` stops the server instead of silently reopening setup. Wrong tokens are
   counted on every setup endpoint (10 per IPv4 address / IPv6 /64 → 10-minute lockout). An `ADMIN_PASSWORD` that
   breaks the same rules (headless installs) is only accepted from LAN clients and the panel forces a change.
+- Every response carries `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`,
+  `Content-Security-Policy: frame-ancestors 'self'` (only the admin's own preview can frame a page) and
+  `Referrer-Policy: no-referrer`; the display and admin pages are sent with `Cache-Control: no-store`. Admin changes
+  also refuse a `Sec-Fetch-Site` other than `same-origin`.
 - Webhooks (`/api/hooks/*`) only accept `Authorization: Bearer <token>`; tokens are stored as SHA-256 hashes and
   rate-limited (30 requests/minute per token).
 - Secrets (`data/secrets.json`, `.env`, exports that include secrets, `data/backups/`) must be kept private.

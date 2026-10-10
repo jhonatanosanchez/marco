@@ -149,6 +149,9 @@ export function rotateSessionEpoch() {
 export function csrfGuard({ multipartPaths = [] } = {}) {
   return (req, res, next) => {
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+    // Sec-Fetch-Site, when the browser sends it (HTTPS and localhost only), must be same-origin.
+    const site = req.get('sec-fetch-site');
+    if (site && site !== 'same-origin') return res.status(403).json({ error: 'bad origin' });
     const origin = req.get('origin');
     if (origin && origin !== 'null') {
       let host;
