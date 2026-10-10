@@ -32,6 +32,8 @@ All notable changes to this project are documented here. The format is based on
   and `/admin/index.html`) are never cached, and admin changes refuse a `Sec-Fetch-Site` other than `same-origin`.
 
 ### Fixed
+- Turning *Rotate busy days* off now brings back the "+N more" label at once; before, a busy day kept its page
+  count ("1/2") and kept turning it until the screen reloaded.
 - With the Modern style, emoji in text fall back to the bundled emoji font, so an offline device without a color
   emoji font no longer shows empty boxes.
 - The activity log names the *Display access* change instead of showing the raw `security` key, and the search

@@ -454,6 +454,9 @@ export class MonthCalendar {
       }
       this.planWrap(segs, hidden, L, labels);
     }
+    // Rotation off (it can be turned off while the screen runs): forget the pages, or the "+N" cells would keep a
+    // stale page indicator.
+    if (c.rotateBusyDays === false) this.busyPages.clear();
     const pieces = c.rotateBusyDays === false ? [] : this.planBusyDays(ws, segs, hidden, moreCount, L);
     for (const sg of [...segs, ...pieces]) {
       if (hidden.has(sg)) continue;
