@@ -147,7 +147,8 @@ color de la foto, transparencia, desenfoque y borde de luz:
 - **Panel de inicio:** pantallas conectadas, próximos eventos, estado de los calendarios, tiempo, avisos activos,
   actividad reciente y acciones rápidas (recargar, identificar, modo noche, enviar un aviso).
 - **Calendarios:** URL iCal/ICS (incluidas `webcal://` y HTTPS con certificado autofirmado), **Google Calendar**
-  mediante OAuth, festivos predefinidos, y por calendario: color, emoji, tipo (general / alquiler vacacional /
+  mediante OAuth, **Outlook / Microsoft 365**, **Apple iCloud** (con una guía para sacar el enlace público del
+  calendario), festivos predefinidos, y por calendario: color, emoji, tipo (general / alquiler vacacional /
   cumpleaños / festivos) y frecuencia de actualización.
 - **Eventos locales** (puntuales o que se repiten cada semana / mes / año, con excepciones) y **cumpleaños** (con
   importación desde CSV).
@@ -155,6 +156,7 @@ color de la foto, transparencia, desenfoque y borde de luz:
   en directo de los próximos 14 días. **Reglas de iconos** con un probador. **Cuentas atrás**.
 - **Galería de fotos:** arrastrar y soltar, optimización en el navegador (rotación EXIF, redimensionado, miniaturas),
   conversión de **HEIC** del iPhone, punto focal automático con editor manual y gestión de nombres duplicados.
+- **CSS personalizado** por pantalla, para los cambios que no cubren los ajustes.
 - **Varias pantallas** (salón, cocina, pasillo), cada una con su propio diseño, fondo, calendarios y widgets, y una
   página de **Pantallas conectadas** (resolución, navegador, versión, recargar / identificar / modo noche por
   dispositivo).
@@ -749,6 +751,21 @@ hora y se guarda el último). *Desvincular* los borra; desde aquí no se pueden 
 retirar el acceso entra en <https://account.live.com/consent/Manage> (cuenta personal) o en
 <https://myapps.microsoft.com> (cuenta del trabajo o del centro educativo). Los secretos de cliente caducan (de 6 a 24
 meses): crea uno nuevo antes y actualiza `.env`.
+
+## Añadir un calendario de Apple iCloud
+
+iCloud no se vincula con una cuenta como Google o Microsoft: Marco lee el enlace público de cada calendario.
+*Calendarios → Cuentas vinculadas → Vincular cuenta → Apple iCloud* abre una guía corta para sacarlo:
+
+- **iPhone o iPad:** app Calendario → *Calendarios* → ⓘ junto al calendario → activa *Calendario público* →
+  *Compartir enlace* → *Copiar*.
+- **Mac:** app Calendario → icono de compartir junto al calendario (o clic derecho → *Compartir calendario*) →
+  *Calendario público* → copia la dirección `webcal://`.
+- **iCloud.com:** icloud.com/calendar → icono de compartir junto al calendario → *Calendario público* → *Copiar*.
+
+Pega el enlace en la guía: Marco lo prueba y lo añade como calendario iCal (los enlaces `webcal://` valen). No hace
+falta configurar nada en el servidor. Cualquiera que tenga el enlace puede ver el calendario, aunque es largo e
+imposible de adivinar; para retirarlo, desactiva *Calendario público* en iCloud.
 
 ## Otras integraciones
 

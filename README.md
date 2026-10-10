@@ -141,13 +141,14 @@ transparency, blur and a light edge:
 
 - **Home dashboard:** connected screens, next events, calendar health, weather, active alerts, recent activity and
   quick actions (refresh, identify, night mode, send an alert).
-- **Calendars:** iCal/ICS URLs (including `webcal://` and self-signed HTTPS), **Google Calendar** through OAuth, public
-  holiday presets, per-calendar colour, emoji, type (general / vacation rental / birthdays / holidays) and refresh rate.
+- **Calendars:** iCal/ICS URLs (including `webcal://` and self-signed HTTPS), **Google Calendar** through OAuth,
+  **Outlook / Microsoft 365**, **Apple iCloud** (a guide to get the calendar's public link), public holiday presets, per-calendar colour, emoji, type (general / vacation rental / birthdays / holidays) and refresh rate.
 - **Local events** (one-off or repeating weekly / monthly / yearly, with exceptions) and **birthdays** (with CSV import).
 - **Filters and overrides:** hide ("Not available"), rename, or force emoji/colour for a series, with a live preview of
   the next 14 days. **Icon rules** with a tester. **Countdowns**.
 - **Photo gallery:** drag and drop, in-browser optimisation (EXIF rotation, resize, thumbnails), iPhone **HEIC**
   conversion, automatic focal point with a manual editor, duplicate-name handling.
+- **Custom CSS** per screen, for the changes the settings do not cover.
 - **Multiple screens** (living room, kitchen, hallway) each with its own layout, background, calendars and widgets,
   and a **Connected displays** page (resolution, browser, version, reload / identify / night mode per device).
 - **Private display links and pairing:** every screen has an unguessable link (`/d/<key>`, QR code, one-click
@@ -707,6 +708,21 @@ Marco keeps each account's tokens in `data/secrets.json` (Microsoft hands out a 
 newest one is kept). *Unlink* deletes them; Microsoft has no way to revoke them from here, so to remove the access
 itself go to <https://account.live.com/consent/Manage> (personal) or <https://myapps.microsoft.com> (work or school).
 Client secrets expire (6 to 24 months): create a new one before that and update `.env`.
+
+## Adding an Apple iCloud calendar
+
+iCloud is not linked with an account like Google or Microsoft: Marco reads each calendar's public link.
+*Calendars → Linked accounts → Link account → Apple iCloud* opens a short guide to get it:
+
+- **iPhone or iPad:** Calendar app → *Calendars* → ⓘ next to the calendar → turn on *Public Calendar* → *Share Link*
+  → *Copy*.
+- **Mac:** Calendar app → the share icon next to the calendar (or Control-click → *Share Calendar*) → *Public
+  Calendar* → copy the `webcal://` address.
+- **iCloud.com:** icloud.com/calendar → the share icon next to the calendar → *Public Calendar* → *Copy*.
+
+Paste the link in the guide: Marco tests it and adds it as an iCal calendar (`webcal://` links work). Nothing to set
+up on the server. Anyone who has the link can see the calendar, but it is long and impossible to guess; to withdraw
+it, turn off *Public Calendar* in iCloud.
 
 ## Other integrations
 
