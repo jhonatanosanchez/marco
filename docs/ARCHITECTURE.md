@@ -22,7 +22,7 @@ display and the server guarantee. The HTTP endpoints and event formats are in [A
 
 | Folder | Content |
 |---|---|
-| `server/` | API and logic: ICS + recurrences (`node-ical`, `rrule`), Google Calendar, weather, RSS, photos, auth, SSE, backups, activity |
+| `server/` | API and logic: ICS + recurrences (`node-ical`, `rrule`), Google Calendar, weather, RSS, photos, auth, SSE and the poll channel (`pollHub.js`), backups, activity |
 | `server/app.js` | `createApp()`: the whole Express stack (host guard, sessions, CSRF, display access, routers, static files); `server/index.js` adds the store, listen and shutdown |
 | `server/core/` | Pure logic shared with Marco Cloud, which copies the folder as it is: config schema and validation (`validate.js`, `defaults.js`, `screens.js`, `iconRules.js`), backups and import (`backupsCore.js`), announcements (`announceCore.js`), feed parsing (`newsParse.js`), image headers and photo names (`imageInfo.js`), activity helpers (`activityCore.js`), pairing codes (`pairCore.js`), CSV, schedules and `lib/` (text, time zones, server strings). No Node built-ins, no store, SSE or HTTP modules (checked by `server/test/core-lint.test.js`); the files next to it (`backups.js`, `announce.js`, `photos.js`, `news.js`, `activity.js`, `pairing.js`) add the files, network and SSE |
 | `server/displayAccess.js`, `server/pairing.js` | Private display links, paired devices and pairing codes (see *Display access* below) |
@@ -175,8 +175,12 @@ flagged by a local event or a style rule (nearest occurrence per title), sorted 
   15 min, photos per interval; the DOM is patched in place. Day rollover at midnight re-renders the grid.
 - Offline tolerant: last data is cached in `localStorage` per screen; a small status dot appears when the server is
   unreachable; SSE reconnects automatically.
-- Live mode comes from `GET /api/health`: `live: 'poll'` replaces the SSE stream with a config revision check every
-  90 s (no announcements, identify, night or remote reload in that mode). No field or `'sse'` keeps the stream.
+- Live mode comes from `GET /api/health`: `live: 'poll'` replaces the SSE stream with `GET /api/display/poll`. The
+  answer carries the same events as commands (announcements, identify, night, reload, photos, events), the config
+  revision, the screen id and the server version, so version reloads and moved devices work too. The server picks
+  the delay (`next`); the heartbeat drops to every 10 min. A server without the poll endpoint (404) gets a config
+  revision check every 90 s instead. No field or `'sse'` keeps the stream. `web/display/live.ts` holds one
+  `dispatch` that both transports use, so every event is checked the same way.
 - Raspberry Pi friendly: WebGL capped at 30 fps and `devicePixelRatio ≤ 1`, paused when hidden; `?lite=1` or
   `ambient: none` + `transition: fade` disables three.js entirely; CSS transforms/opacity only.
 - Photos are cropped around their focal point; displays report the bands covered by the clock and weather cards in the

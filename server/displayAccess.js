@@ -16,6 +16,7 @@ import crypto from 'node:crypto';
 import { getConfig, getSecrets, updateSecrets, flushSecrets } from './store.js';
 import { sessionValid, isLanClient, authEvents, SESSION_MAX_AGE } from './auth.js';
 import { listClients, dropClient } from './sse.js';
+import { listPollers } from './pollHub.js';
 import { logActivity } from './activity.js';
 import { resolveScreen } from './core/screens.js';
 
@@ -198,11 +199,11 @@ export function regenerateKey(screenId, { req } = {}) {
 
 const deviceInfo = (d, cfg = getConfig()) => {
   const s = cfg.screens.find((x) => x.id === d.screenId);
-  const live = listClients().filter((c) => c.access?.deviceId === d.id && !c.preview);
+  const live = [...listClients(), ...listPollers()].filter((c) => c.access?.deviceId === d.id && !c.preview);
   return {
     id: d.id, name: d.name, prefix: d.prefix, screenId: d.screenId, screenSlug: s?.slug || '', screenName: s?.name || '',
     createdAt: d.createdAt, lastSeenAt: d.lastSeenAt ?? null, lastIp: d.lastIp ?? null, userAgent: d.userAgent ?? '',
-    connected: live.length > 0, clientIds: live.filter((c) => !c.anonymous).map((c) => c.clientId),
+    connected: live.length > 0, clientIds: [...new Set(live.filter((c) => !c.anonymous).map((c) => c.clientId))],
   };
 };
 

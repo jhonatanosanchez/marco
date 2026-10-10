@@ -7,7 +7,7 @@ import { getWeather } from '../weather.js';
 import { getNews } from '../news.js';
 import { getPhotos } from '../photos.js';
 import { sseHandler } from '../sse.js';
-import { streamInit, streamHello, onStreamOpen, onStreamClose } from '../displays.js';
+import { streamInit, streamHello, onStreamOpen, onStreamClose, pollDisplay } from '../displays.js';
 import { resolveScreen, displayConfig as projectDisplayConfig } from '../core/screens.js';
 import { requestScreen } from '../displayAccess.js';
 import { addDays, localDate, isDateStr, daysBetween } from '../core/lib/tz.js';
@@ -91,6 +91,9 @@ export function publicRouter({ version }) {
       next(err);
     }
   });
+
+  // Poll channel for displays without a stream: GET /api/display/poll?client=&cursor=&rev=&hidden= (docs/API.md).
+  r.get('/display/poll', (req, res) => res.json(pollDisplay(req)));
 
   // SSE: GET /api/stream?screen=<slug|id>&client=<clientId>[&k=<key|device token>] (docs/ARCHITECTURE.md).
   r.get('/stream', sseHandler({ init: streamInit, hello: streamHello, onOpen: onStreamOpen, onClose: onStreamClose }));

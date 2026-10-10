@@ -12,7 +12,7 @@ import {
   cleanupTempUploads, isUnit, isGalleryFile, isThumbField, storeThumb, validThumb, CONFLICT_POLICIES,
 } from '../photos.js';
 import fs from 'node:fs';
-import { broadcast, clientCount } from '../sse.js';
+import { publish, connectedCount } from '../pollHub.js';
 import { isHttpUrl } from '../core/validate.js';
 import { logActivity } from '../activity.js';
 import { resolveScreenList } from '../displays.js';
@@ -130,7 +130,7 @@ export function adminRouter({ onConfigSaved } = {}) {
     }
     for (const [seq, p] of thumbs) if (!photos.some((f) => f.seq === seq)) fs.rmSync(p, { force: true }); // unpaired
     writeMeta(meta);
-    if (files.length) broadcast('photos', {});
+    if (files.length) publish('photos', {});
     res.json({ ok: true, files, skipped });
   });
   // Body: { focusX, focusY } (focal point) and/or { hidden } (excluded from the rotation).
@@ -150,7 +150,7 @@ export function adminRouter({ onConfigSaved } = {}) {
       photo = getPhoto(req.params.file);
     }
     if (!photo) return res.status(404).json({ error: 'not found' });
-    broadcast('photos', hasHidden && hidden ? { hidden: [photo.file] } : {});
+    publish('photos', hasHidden && hidden ? { hidden: [photo.file] } : {});
     res.json(photo);
   });
   // Bulk show / hide: { files: string[], hidden: boolean }.
@@ -161,7 +161,7 @@ export function adminRouter({ onConfigSaved } = {}) {
     }
     if (typeof hidden !== 'boolean') return res.status(400).json({ error: 'hidden must be a boolean' });
     const { updated, missing } = setHidden(files, hidden);
-    if (updated.length) broadcast('photos', hidden ? { hidden: updated } : {});
+    if (updated.length) publish('photos', hidden ? { hidden: updated } : {});
     const all = listGallery();
     res.json({ ok: true, updated, missing, total: all.length, inRotation: all.filter((p) => !p.hidden).length });
   });
@@ -176,7 +176,7 @@ export function adminRouter({ onConfigSaved } = {}) {
   });
   r.delete('/photos/:file', (req, res) => {
     if (!deletePhoto(req.params.file)) return res.status(404).json({ error: 'not found' });
-    broadcast('photos', {});
+    publish('photos', {});
     res.json({ ok: true });
   });
 
@@ -184,9 +184,9 @@ export function adminRouter({ onConfigSaved } = {}) {
   r.post('/refresh-displays', (req, res) => {
     const scr = resolveScreenList(getConfig(), req.body?.screens);
     if (scr.error) return res.status(400).json({ error: scr.error, ...(scr.unknown ? { unknown: scr.unknown } : {}) });
-    const delivered = broadcast('reload', {}, scr.ids.length ? { screenIds: scr.ids } : null);
+    const delivered = publish('reload', {}, scr.ids.length ? { screenIds: scr.ids } : null);
     logActivity('display.command', { req, data: { action: 'reload', ...(scr.ids.length ? { screens: scr.ids } : {}), delivered } });
-    res.json({ ok: true, displays: clientCount(), delivered });
+    res.json({ ok: true, displays: connectedCount(), delivered });
   });
 
   r.get('/status', (req, res) => {
@@ -194,7 +194,7 @@ export function adminRouter({ onConfigSaved } = {}) {
       sources: sourceStatus(),
       weather: { ...weatherStatus },
       news: { ...newsStatus },
-      displays: clientCount(),
+      displays: connectedCount(),
       uptime: Math.round(process.uptime()),
     });
   });

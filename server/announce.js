@@ -2,7 +2,7 @@
 // ({ active, history }). See docs/API.md and docs/ARCHITECTURE.md.
 import fs from 'node:fs';
 import { getConfig, paths, writeFileAtomic } from './store.js';
-import { broadcast } from './sse.js';
+import { publish } from './pollHub.js';
 import {
   ACTIVE_MAX, HISTORY_MAX, makeAnnouncement, splitExpired, activeFor as activeIn, alertsFilter as alertsFilterFor,
 } from './core/announceCore.js';
@@ -70,12 +70,12 @@ export function createAnnouncement(value, { via, by, now = new Date() }) {
     const old = state.active.shift();
     old.clearedAt = now.toISOString();
     state.history.unshift(old);
-    broadcast('announce-clear', { id: old.id });
+    publish('announce-clear', { id: old.id });
   }
   state.history = state.history.slice(0, HISTORY_MAX);
   save();
   scheduleExpiry();
-  const delivered = broadcast('announce', a, a.screenIds.length ? { screenIds: a.screenIds } : null, alertsFilter);
+  const delivered = publish('announce', a, a.screenIds.length ? { screenIds: a.screenIds } : null, alertsFilter);
   return { announcement: a, delivered };
 }
 
@@ -104,7 +104,7 @@ export function clearAnnouncements(id = null) {
   state.history = state.history.slice(0, HISTORY_MAX);
   save();
   scheduleExpiry();
-  broadcast('announce-clear', { id: id === null ? null : id });
+  publish('announce-clear', { id: id === null ? null : id });
   return cleared;
 }
 

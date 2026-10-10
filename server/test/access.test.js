@@ -137,6 +137,7 @@ const ENDPOINTS = [
   { name: 'photos', method: 'GET', url: '/api/photos' },
   { name: 'countdowns', method: 'GET', url: '/api/countdowns' },
   { name: 'heartbeat', method: 'POST', url: '/api/display/heartbeat', body: { clientId: 'kiosk-test-1' } },
+  { name: 'poll', method: 'GET', url: '/api/display/poll?client=kiosk-test-3' },
   { name: 'stream', method: 'GET', url: '/api/stream?client=kiosk-test-2', sse: true, query: true },
   { name: 'photo file', method: 'GET', url: '/media/photos/family.jpg', query: true },
   { name: 'thumbnail', method: 'GET', url: '/media/thumbs/family.jpg', query: true },

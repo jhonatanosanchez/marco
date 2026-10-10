@@ -3,10 +3,11 @@
 import fs from 'node:fs';
 import { getConfig, paths, writeFileAtomic } from './store.js';
 import { resolveScreen } from './core/screens.js';
-import { listClients, broadcast, send, matches } from './sse.js';
+import { listClients, send, matches } from './sse.js';
+import { publish, recordIdentify, readSince, trackPoller, nextDelay, POLL_CONNECTED_MS, _resetPoll } from './pollHub.js';
 import { logActivityThrottled } from './activity.js';
 import { activeFor } from './announce.js';
-import { deviceName } from './displayAccess.js';
+import { deviceName, requestScreen } from './displayAccess.js';
 
 export const MAX_DISPLAYS = 100;
 const PRUNE_OFFLINE_MS = 30 * 24 * 3600_000;
@@ -32,20 +33,23 @@ function load() {
     const list = JSON.parse(fs.readFileSync(paths.displays, 'utf8'));
     for (const d of Array.isArray(list) ? list : list.displays || []) {
       if (d && typeof d.clientId === 'string' && CLIENT_ID_RE.test(d.clientId) && !d.clientId.startsWith('anon-')) {
-        registry.set(d.clientId, { ...d, connected: false, streams: 0, connectedAt: null });
+        registry.set(d.clientId, { ...d, connected: false, streams: 0, connectedAt: null, polledAt: 0 });
       }
     }
   } catch { /* no file yet */ }
   prune();
 }
 
+/** Connected: an open stream, or a poll in the last 4 minutes (GET /api/display/poll). */
+const isLive = (d, now = Date.now()) => (d.streams || 0) > 0 || (d.polledAt > 0 && now - d.polledAt < POLL_CONNECTED_MS);
+
 function prune(now = Date.now()) {
   for (const [id, d] of registry) {
-    if (!d.streams && now - Date.parse(d.lastSeen || 0) > PRUNE_OFFLINE_MS) registry.delete(id);
+    if (!isLive(d, now) && now - Date.parse(d.lastSeen || 0) > PRUNE_OFFLINE_MS) registry.delete(id);
   }
   if (registry.size > MAX_DISPLAYS) {
     // Drop the oldest offline entries first.
-    const offline = [...registry.values()].filter((d) => !d.streams).sort((a, b) => (a.lastSeen < b.lastSeen ? -1 : 1));
+    const offline = [...registry.values()].filter((d) => !isLive(d, now)).sort((a, b) => (a.lastSeen < b.lastSeen ? -1 : 1));
     while (registry.size > MAX_DISPLAYS && offline.length) registry.delete(offline.shift().clientId);
   }
 }
@@ -62,7 +66,7 @@ export function flushDisplays() {
   if (!registry || !dirty) return;
   dirty = false;
   const list = [...registry.values()].filter((d) => !d.clientId.startsWith('anon-'))
-    .map(({ streams, connected, connectedAt, ...d }) => d);
+    .map(({ streams, connected, connectedAt, polledAt, ...d }) => d);
   try { writeFileAtomic(paths.displays, JSON.stringify(list, null, 2)); } catch (err) { console.warn('[displays] save failed:', err.message); }
 }
 
@@ -104,7 +108,7 @@ function blankEntry(clientId, now) {
     clientId, screenKey: '', screenId: '', ip: '', userAgent: '', firstSeen: now, lastSeen: now,
     viewport: null, screenRes: null, dpr: null, webgl: null, lite: null, version: null, build: null,
     night: null, nightOverride: null, uptimeSec: null, lastError: null, lastConnectAt: null,
-    streams: 0, connectedAt: null, access: 'open', deviceId: null,
+    streams: 0, connectedAt: null, polledAt: 0, access: 'open', deviceId: null,
   };
 }
 
@@ -180,14 +184,15 @@ export function onStreamOpen(client) {
   if (!d) {
     // A kiosk restart may come back with a new id: drop offline entries from the same ip + screen.
     for (const [id, x] of registry) {
-      if (!x.streams && x.ip === client.ip && x.screenId === client.screenId) registry.delete(id);
+      if (!isLive(x, nowMs) && x.ip === client.ip && x.screenId === client.screenId) registry.delete(id);
     }
     d = blankEntry(client.clientId, nowIso);
     registry.set(client.clientId, d);
   }
-  const wasOfflineFor = d.streams ? 0 : nowMs - Date.parse(d.lastSeen || nowIso);
+  const wasLive = isLive(d, nowMs);
+  const wasOfflineFor = wasLive ? 0 : nowMs - Date.parse(d.lastSeen || nowIso);
   d.streams = (d.streams || 0) + 1;
-  d.connectedAt = d.streams === 1 ? new Date(client.since).toISOString() : d.connectedAt;
+  d.connectedAt = wasLive ? d.connectedAt : new Date(client.since).toISOString();
   d.ip = client.ip;
   d.userAgent = client.userAgent;
   d.screenKey = client.screenKey;
@@ -198,7 +203,7 @@ export function onStreamOpen(client) {
   d.lastConnectAt = nowIso;
   prune(nowMs);
   scheduleSave();
-  if (isNew || (d.streams === 1 && wasOfflineFor > RECONNECT_LOG_MS)) {
+  if (isNew || (!wasLive && wasOfflineFor > RECONNECT_LOG_MS)) {
     const m = screenMeta(getConfig(), client.screenId);
     // /api/stream is public: brand-new / anonymous ids are throttled per ip + screen (and globally), so
     // opening thousands of streams can't flush the audit log.
@@ -214,6 +219,99 @@ export function onStreamOpen(client) {
   if (screen?.alerts.enabled !== false) for (const a of activeFor(client.screenId)) send(client, 'announce', a);
 }
 
+// ---------- poll channel (GET /api/display/poll) ----------
+const POLL_SAVE_MS = 5 * 60_000;
+
+/** A display polled: register it like an opened stream, without the 25 s stream bookkeeping. */
+function notePoll(client, req, nowMs = Date.now()) {
+  trackPoller(client, nowMs);
+  const nowIso = new Date(nowMs).toISOString();
+  const ip = req?.ip || '';
+  let d = registry.get(client.clientId);
+  const isNew = !d;
+  if (!d) {
+    for (const [id, x] of registry) {
+      if (!isLive(x, nowMs) && x.ip === ip && x.screenId === client.screenId) registry.delete(id);
+    }
+    if (registry.size >= MAX_DISPLAYS) prune(nowMs);
+    if (registry.size >= MAX_DISPLAYS) return;
+    d = blankEntry(client.clientId, nowIso);
+    registry.set(client.clientId, d);
+  }
+  const wasLive = isLive(d, nowMs);
+  const wasOfflineFor = wasLive ? 0 : nowMs - Date.parse(d.lastSeen || nowIso);
+  const access = client.access?.via || 'open';
+  const changed = isNew || !wasLive || d.screenId !== client.screenId || d.screenKey !== client.screenKey || d.ip !== ip
+    || d.access !== access || nowMs - Date.parse(d.lastSeen || 0) > POLL_SAVE_MS;
+  if (!wasLive) {
+    d.connectedAt = nowIso;
+    d.lastConnectAt = nowIso;
+  }
+  d.polledAt = nowMs;
+  d.ip = ip;
+  d.userAgent = String(req?.get?.('user-agent') || d.userAgent || '').slice(0, 300);
+  d.screenKey = client.screenKey;
+  d.screenId = client.screenId;
+  d.access = access;
+  d.deviceId = client.access?.deviceId || null;
+  d.lastSeen = nowIso;
+  if (!changed) return;
+  prune(nowMs);
+  scheduleSave();
+  if (isNew || wasOfflineFor > RECONNECT_LOG_MS) {
+    const m = screenMeta(getConfig(), client.screenId);
+    const key = isNew ? `new|${ip}|${client.screenId}` : `id|${client.clientId}`;
+    logActivityThrottled('display.connected', key, { everyMs: RECONNECT_LOG_MS, perMinute: 20 }, {
+      actor: 'system', ip,
+      data: { clientId: client.clientId, screen: m.screenSlug, ua: shortUserAgent(d.userAgent) },
+    });
+  }
+}
+
+/**
+ * GET /api/display/poll?client=&cursor=&rev=&hidden=&preview= → PollResponse. The commands are the SSE events
+ * since `cursor`, already filtered to this display; a reset replays the announcements still active on its screen.
+ * Preview polls get the commands but are not registered as displays.
+ */
+export function pollDisplay(req, nowMs = Date.now()) {
+  load();
+  const cfg = getConfig();
+  const q = req.query || {};
+  const { screen } = requestScreen(cfg, req);
+  const raw = typeof q.client === 'string' ? q.client.trim() : '';
+  const preview = q.preview === '1';
+  const anonymous = preview || !CLIENT_ID_RE.test(raw) || raw.startsWith('anon-');
+  const bound = boundScreen(cfg, req);
+  const client = {
+    clientId: anonymous ? '' : raw,
+    screenId: screen.id,
+    screenKey: bound || (typeof q.screen === 'string' ? q.screen.trim().slice(0, 64) : ''),
+    anonymous,
+    preview,
+    access: accessOf(req),
+    deviceId: accessOf(req).deviceId,
+  };
+  if (!anonymous) notePoll(client, req, nowMs);
+  const alertsOn = screen.alerts.enabled !== false;
+  const out = readSince(typeof q.cursor === 'string' ? q.cursor : '', client, (id) => cfg.screens.find((x) => x.id === id) || null, nowMs);
+  const active = () => (alertsOn ? activeFor(screen.id) : []);
+  const commands = out.reset ? active().map((a) => ({ ...a, type: 'announce' })) : out.commands;
+  const res = {
+    revision: cfg.revision,
+    screenId: screen.id,
+    now: new Date(nowMs).toISOString(),
+    serverVersion,
+    cursor: out.cursor,
+    reset: out.reset,
+    commands,
+    next: nextDelay(q.hidden === '1', nowMs),
+  };
+  if (out.reset || commands.some((c) => c.type === 'announce' || c.type === 'announce-clear')) {
+    res.activeAnnouncementIds = active().map((a) => a.id);
+  }
+  return res;
+}
+
 export function onStreamClose(client) {
   load();
   if (client.preview) return;
@@ -221,7 +319,7 @@ export function onStreamClose(client) {
   if (!d) return;
   d.streams = Math.max(0, (d.streams || 1) - 1);
   d.lastSeen = new Date().toISOString();
-  if (!d.streams) d.connectedAt = null;
+  if (!isLive(d)) d.connectedAt = null;
   scheduleSave();
 }
 
@@ -317,7 +415,7 @@ export function recordHeartbeat(body, req) {
 /** DisplayInfo for one entry. */
 function toInfo(d, cfg) {
   const m = screenMeta(cfg, d.screenId);
-  const connected = (d.streams || 0) > 0;
+  const connected = isLive(d);
   return {
     clientId: d.clientId,
     ...m,
@@ -362,7 +460,7 @@ export function forgetDisplay(clientId) {
   load();
   const d = registry.get(clientId);
   if (!d) return 'not_found';
-  if (d.streams > 0) return 'connected';
+  if (isLive(d)) return 'connected';
   registry.delete(clientId);
   scheduleSave();
   return 'ok';
@@ -401,10 +499,11 @@ export function runCommand(cmd) {
   }
   const target = { screenIds: scr.ids, clientIds };
   let delivered = 0;
-  if (action === 'reload') delivered = broadcast('reload', {}, target);
-  else if (action === 'night') delivered = broadcast('night', { mode: cmd.mode }, target);
+  if (action === 'reload') delivered = publish('reload', {}, target);
+  else if (action === 'night') delivered = publish('night', { mode: cmd.mode }, target);
   else {
-    // identify: each client gets its own screen name + clientId.
+    // identify: each client gets its own screen name + clientId (pollers get theirs when they read it).
+    delivered = recordIdentify(target);
     for (const c of listClients()) {
       if (!matches(c, target)) continue;
       const s = cfg.screens.find((x) => x.id === c.screenId);
@@ -425,8 +524,9 @@ export function reresolveDisplays(cfg) {
   if (changed) scheduleSave();
 }
 
-/** Testing helper: forget the in-memory registry (next call reloads from disk). */
+/** Testing helper: forget the in-memory registry (next call reloads from disk) and the poll channel state. */
 export function _resetDisplays() {
+  _resetPoll();
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = null;
   dirty = false;

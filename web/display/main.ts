@@ -5,7 +5,7 @@ import '@fontsource-variable/outfit';
 import '../shared/emoji-font.css';
 import './styles.css';
 import type {
-  Announcement, CountdownsResponse, DisplayConfig, EventsResponse, NewsResponse, NightCommand, WeatherResponse,
+  Announcement, CountdownsResponse, DisplayConfig, EventsResponse, NewsResponse, NightCommand, StreamHello, WeatherResponse,
 } from '../shared/types';
 import { addDays, startOfWeek } from '../shared/i18n';
 import { api, ApiError } from './api';
@@ -24,8 +24,8 @@ import type { WeatherFxLayer } from './gl/weatherFxLayer';
 import { precipOf, sunnyOf } from './icons';
 import { mockAnnouncements, mockConfig, mockCountdowns, mockEvents, mockNews, mockPhotos, mockWeather } from './mock';
 import { loadCache, on, saveCache, set, state } from './store';
-import { detectLiveMode, startConfigPoll } from './live';
-import { connectStream } from './stream';
+import { detectLiveMode, startConfigPoll, startPoll, type StreamHandlers } from './live';
+import { connectStream, pollUrl } from './stream';
 import { current, onTick, setClockOffset, setTimezone, startTicker, type Tick } from './time';
 import { Agenda } from './widgets/agenda';
 import { Announcements, IdentifyOverlay, ScheduleBanners, setServerNow } from './widgets/alerts';
@@ -455,7 +455,7 @@ function setOnline(ok: boolean): void {
 // Display access (private links / paired devices): 401 → pairing screen, 403 → "link no longer valid"
 // ---------------------------------------------------------------------------------------------
 let accessDenied = false;
-let liveStream: { close(): void } | null = null;
+let liveStream: { close(): void; tick?(): Promise<void> } | null = null;
 
 /** Stop everything, forget cached data and show the pairing / invalid-link screen (no family data). */
 function denyAccess(status: number): void {
@@ -791,8 +791,7 @@ async function goLive(): Promise<void> {
   void fetchCountdowns();
   if (streamStarted) return;
   streamStarted = true;
-  heartbeat.start();
-  // A server without SSE (live: 'poll' in /api/health) gets a config revision poll instead of the stream.
+  // A server without SSE (live: 'poll' in /api/health) gets the poll channel instead of the stream.
   const mode = await detectLiveMode({
     health: () => api.health(),
     answered: (e) => e instanceof ApiError && e.status > 0,
@@ -800,58 +799,88 @@ async function goLive(): Promise<void> {
   });
   if (!mode || accessDenied) return;
   if (mode === 'poll') {
-    // No hello here, so no version reload either: the nightly 04:00 reload picks up a new build.
-    liveStream = startConfigPoll({
+    // The poll answer carries the server time and revision, so the heartbeat only reports what the screen runs.
+    heartbeat.start(10 * 60_000);
+    liveStream = startPoll({
+      poll: (cursor, rev, hidden) => api.poll(pollUrl(cursor, rev, hidden)),
       revision: () => state.config?.revision,
-      fetchConfig,
-      changed: () => {
-        void fetchEvents();
-        void fetchCountdowns();
+      screenId: () => state.config?.screenId,
+      handlers: {
+        ...liveHandlers,
+        first: onHello,
+        screenChanged: () => location.reload(),
+        now: (iso) => setServerNow(iso),
+        sync: (ids) => announcements.sync(ids),
+      },
+      denied: (e) => deniedBy(e),
+      status: (e) => (e instanceof ApiError ? e.status : 0),
+      hidden: () => document.hidden,
+      // A server that says 'poll' but has no /api/display/poll: check the config revision every 90 s.
+      fallback: () => {
+        liveStream = startConfigPoll({
+          revision: () => state.config?.revision,
+          fetchConfig,
+          changed: () => {
+            void fetchEvents();
+            void fetchCountdowns();
+          },
+        });
       },
     });
     heartbeat.soon();
     return;
   }
-  liveStream = connectStream({
-    hello: (d) => {
-      setOnline(true);
-      setServerNow(d.now);
-      if (Array.isArray(d.activeAnnouncementIds)) announcements.sync(d.activeAnnouncementIds);
-      if (typeof d.revision === 'number' && d.revision !== state.config?.revision) void fetchConfig();
-      void fetchEvents();
-      void fetchCountdowns();
-      heartbeat.soon();
-      if (d.serverVersion) void maybeReloadForVersion(d.serverVersion);
-    },
-    // Config can change the event range (weeks/weekStart), colours, icons and countdowns → refetch them too.
-    config: () => void fetchConfig().then((ok) => (ok ? Promise.all([fetchEvents(), fetchCountdowns()]) : undefined)),
-    // gallery changed in the admin (upload, replace, delete, focal point, shown / hidden) → fresh list;
-    // a photo taken out of the rotation while on screen is replaced right away
-    photos: (d) =>
-      void fetchPhotos().then(() => {
-        if (photos.currentFile && d.hidden?.includes(photos.currentFile)) void photos.next();
-      }),
-    events: (d) => {
-      if (!state.events || d.hash !== state.events.hash) void fetchEvents();
-      void fetchCountdowns();
-    },
-    reload: () => location.reload(),
-    announce: (a) => announcements.show(a),
-    announceClear: (d) => announcements.clear(d.id),
-    identify: (d) => {
-      identify.show(d, { name: ctx.cfg.screen.name, slug: state.config?.slug || screenKey, clientId });
-      heartbeat.soon();
-    },
-    night: (d) => {
-      setNightCommand(d.mode);
-      heartbeat.soon();
-    },
-    // Link regenerated / device revoked → "no longer valid"; switched to private without a key → pairing.
-    revoked: (d) => denyAccess(d.code === 'key_required' ? 401 : 403),
-    open: () => setOnline(true),
-    down: () => setOnline(false),
-  });
+  heartbeat.start();
+  liveStream = connectStream({ ...liveHandlers, hello: onHello });
 }
+
+/** SSE `hello`, and the first answer (or a reset) of the poll channel. */
+function onHello(d: Partial<StreamHello>): void {
+  setOnline(true);
+  setServerNow(d.now);
+  if (Array.isArray(d.activeAnnouncementIds)) announcements.sync(d.activeAnnouncementIds);
+  if (typeof d.revision === 'number' && d.revision !== state.config?.revision) void fetchConfig();
+  void fetchEvents();
+  void fetchCountdowns();
+  heartbeat.soon();
+  if (d.serverVersion) void maybeReloadForVersion(d.serverVersion);
+}
+
+/** What each live event does, whichever transport brought it (live.ts dispatch). */
+const liveHandlers: StreamHandlers = {
+  // Config can change the event range (weeks/weekStart), colours, icons and countdowns → refetch them too.
+  config: () => void fetchConfig().then((ok) => (ok ? Promise.all([fetchEvents(), fetchCountdowns()]) : undefined)),
+  // gallery changed in the admin (upload, replace, delete, focal point, shown / hidden) → fresh list;
+  // a photo taken out of the rotation while on screen is replaced right away
+  photos: (d) =>
+    void fetchPhotos().then(() => {
+      if (photos.currentFile && d.hidden?.includes(photos.currentFile)) void photos.next();
+    }),
+  events: (d) => {
+    if (!state.events || d.hash !== state.events.hash) void fetchEvents();
+    void fetchCountdowns();
+  },
+  reload: () => location.reload(),
+  announce: (a) => announcements.show(a),
+  announceClear: (d) => announcements.clear(d.id),
+  identify: (d) => {
+    identify.show(d, { name: ctx.cfg.screen.name, slug: state.config?.slug || screenKey, clientId });
+    heartbeat.soon();
+  },
+  night: (d) => {
+    setNightCommand(d.mode);
+    heartbeat.soon();
+  },
+  // Link regenerated / device revoked → "no longer valid"; switched to private without a key → pairing.
+  revoked: (d) => denyAccess(d.code === 'key_required' ? 401 : 403),
+  open: () => setOnline(true),
+  down: () => setOnline(false),
+};
+
+// Back on screen after being hidden: poll right away instead of waiting for the hidden-page delay.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) void liveStream?.tick?.();
+});
 
 /**
  * The server runs a newer build than this page (hello.serverVersion ≠ __APP_VERSION__): reload once, but never

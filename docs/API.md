@@ -72,7 +72,7 @@ saved without `security` (old admin builds, backups or exports from before 0.3) 
 
 | Method & path | Response |
 |---|---|
-| `GET /api/health` | `HealthResponse`: `{ ok, uptime, version, live, edition, tenancy, runtime, pairCodeLength, features, limits?, displayOrigin?, adminOrigin?, lanAddresses? }` (see below). `live` is `'sse'` unless `MARCO_LIVE=poll` is set. A server that answers `'poll'` gets no `/api/stream` connection: the display checks `/api/display/config` every 90 s and refetches events and countdowns when `revision` changes. A missing field means `'sse'` |
+| `GET /api/health` | `HealthResponse`: `{ ok, uptime, version, live, edition, tenancy, runtime, pairCodeLength, features, limits?, displayOrigin?, adminOrigin?, lanAddresses? }` (see below). `live` is `'sse'` unless `MARCO_LIVE=poll` is set. A server that answers `'poll'` gets no `/api/stream` connection: the display polls `GET /api/display/poll` instead (see below). A server that answers `404` there gets a config check every 90 s, which refetches events and countdowns when `revision` changes. A missing field means `'sse'` |
 | `GET /api/display/config?screen=` | `DisplayConfig`: flat view of one screen; `calendar.sources` only as `{ id, name, color, emoji, kind }`; enabled `schedules` for this screen |
 | `GET /api/events?screen=&from=YYYY-MM-DD&to=YYYY-MM-DD` | `{ generatedAt, hash, events: CalEvent[], errors: [{ sourceId, message }] }` |
 | `GET /api/weather?screen=` | `{ updatedAt, locationName, current, today, daily[], hourly[], indoor }` (localized descriptions, cache 10 min) |
@@ -81,6 +81,7 @@ saved without `security` (old admin builds, backups or exports from before 0.3) 
 | `GET /api/countdowns?screen=` | `{ generatedAt, today, hash, items: [{ id, title, emoji, color, date, days, origin, age? }] }` |
 | `POST /api/display/heartbeat` | Body `DisplayHeartbeat` (≤ 4 kB: clientId, screen, version, resolution, dpr, webgl, night state, photo frame…) → `HeartbeatResponse` |
 | `GET /api/stream?screen=&client=&k=` | Server-Sent Events, see below |
+| `GET /api/display/poll?screen=&client=&cursor=&rev=&hidden=&preview=` | `PollResponse`: the same events as commands, for displays without a stream. See below |
 | `GET /media/photos/<file>`, `GET /media/thumbs/<file>` | Gallery images and thumbnails |
 
 ### Capabilities in `/api/health`
@@ -153,6 +154,39 @@ are ISO strings with offset, or `YYYY-MM-DD` for all-day events (`end` exclusive
 | `revoked` | `{ code: "invalid_key" \| "key_required" }` | the link was regenerated or replaced by an import, the device revoked or dropped by an import, the screen deleted, display access switched to private for a keyless display, or (`key_required`) the admin session a stream was opened with ended (logout, logout everywhere, password change); the server then closes the stream. Every stream's credential is re-checked after config saves, imports, session revocation and on each heartbeat |
 
 Displays whose screen has alerts disabled do not receive `announce`.
+
+### Poll channel (`/api/display/poll`)
+
+Used when `/api/health` says `live: 'poll'`. The credential travels in `X-Marco-Key`, as for the other display
+endpoints, and the same `401` / `403` answers apply (the display then shows the pairing or "no longer valid" screen,
+so there is no `revoked` command).
+
+| Query | Meaning |
+|---|---|
+| `client` | the display's client id (as on `/api/stream`) |
+| `cursor` | the `cursor` of the previous answer; empty on the first poll |
+| `rev` | the config revision the display has |
+| `hidden` | `1` while the page is hidden |
+| `preview` | `1` for the admin preview: commands still arrive, but the poll is not listed as a display |
+
+Answer `{ revision, screenId, now, serverVersion, cursor, reset, commands, activeAnnouncementIds?, next }`:
+
+- `commands`: in order and already filtered to this display. Each one is `{ type, ...payload }` with the SSE event
+  names and payloads: `reload`, `night`, `identify` (filled in for this display), `announce`, `announce-clear`,
+  `photos` and `events`.
+- `reset: true` on the first poll, after a server restart, or for a cursor the server no longer knows. `commands` then
+  only holds the announcements still active on this screen, like the replay on `/api/stream`, and old commands are
+  never replayed.
+- `activeAnnouncementIds`: present on a reset and whenever `commands` holds `announce` or `announce-clear`.
+- `revision`: the display refetches its config, events and countdowns when it differs from its own. `screenId`: a
+  different one (the paired device was moved) reloads the page. `serverVersion`: a newer server reloads the page once.
+- `next`: milliseconds until the next poll. Self-hosted answers 30 s, 3 min while hidden, and 5 s while someone has
+  *Connected screens* open or just sent a command. The display adds ±10 % and keeps it between 3 s and 15 min; on
+  errors it waits 5 s, doubling up to 5 min.
+
+The self-hosted server keeps the last 500 events in memory. Commands expire: `identify` after 60 s, `announce` at
+its `expiresAt`, the others after 10 min. A display that polled in the last 4 minutes is listed as connected and
+counts in `delivered`.
 
 ## Authentication
 

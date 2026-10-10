@@ -493,7 +493,10 @@ export interface HealthResponse {
   /** seconds since the server started; null where there is no long-running process */
   uptime: number | null;
   version: string;
-  /** How displays get live updates: 'sse' = /api/stream, 'poll' = config revision poll. Absent (old servers) = 'sse'. */
+  /**
+   * How displays get live updates: 'sse' = /api/stream, 'poll' = GET /api/display/poll (the display falls back to a
+   * config revision poll when that answers 404). Absent (old servers) = 'sse'.
+   */
   live?: 'sse' | 'poll';
   /** Absent on servers older than 0.5.0. */
   edition?: 'self-hosted' | 'cloud';
@@ -1038,6 +1041,41 @@ export interface StreamHello {
   now: string; // server ISO time (clock-offset for announcement expiry)
   /** announcements still active for this screen; the display drops any other it is showing (missed clears) */
   activeAnnouncementIds: string[];
+}
+
+/**
+ * A live command for one display, as GET /api/display/poll returns it. Names and payloads are the SSE event names
+ * and payloads (StreamEvent), so one dispatcher (web/display/live.ts) serves both transports.
+ */
+export type DisplayCommand =
+  | { type: 'reload' }
+  | { type: 'night'; mode: NightCommand }
+  | ({ type: 'identify' } & IdentifyPayload)
+  | ({ type: 'announce' } & Announcement)
+  | { type: 'announce-clear'; id: string | null }
+  | { type: 'photos'; hidden?: string[] }
+  /** self-hosted only: calendar data changed */
+  | { type: 'events'; hash: string };
+
+/** GET /api/display/poll?client=&cursor=&rev=&hidden=&preview= (docs/API.md) */
+export interface PollResponse {
+  /** config revision; a different one makes the display refetch its config, events and countdowns */
+  revision: number;
+  /** screen bound to this display now; a different one (device moved) reloads the page */
+  screenId: string;
+  /** server ISO time (clock offset for announcement expiry) */
+  now: string;
+  serverVersion: string;
+  /** opaque; send it back on the next poll */
+  cursor: string;
+  /** true on the first poll or after an unknown cursor: `commands` only replays the active announcements */
+  reset: boolean;
+  /** in order, already filtered to this display */
+  commands: DisplayCommand[];
+  /** present on a reset and whenever `commands` holds announce or announce-clear */
+  activeAnnouncementIds?: string[];
+  /** ms until the next poll, chosen by the server */
+  next: number;
 }
 
 export interface IdentifyPayload {

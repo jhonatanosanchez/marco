@@ -234,7 +234,7 @@ with a screen) or as a new `marco` system user (server only).
 
 ```
 ~/marco/                  (or /opt/marco)
-├── current -> releases/0.4.0   the running version, switched in one step on update
+├── current -> releases/0.5.0   the running version, switched in one step on update
 ├── releases/                   the current version and the previous one (for rollback)
 ├── data/                       config, secrets, photos, backups (kept on update and uninstall)
 └── .env                        port and other settings, see .env.example
@@ -750,7 +750,7 @@ Limits: 30 requests/minute per token; errors `401` (bad token), `400` (invalid d
 | `TRUST_PROXY` | `loopback` | IP(s)/ranges of reverse proxies allowed to set `X-Forwarded-*`. Needed for a proxy on another host and for any proxy in front of Docker (`172.16.0.0/12`) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | none | Google OAuth client ([guide](#connecting-google-calendar)) |
 | `NODE_EXTRA_CA_CERTS` | none | Extra CA certificates for iCal feeds with a private CA |
-| `MARCO_LIVE` | `sse` | `poll` = displays get no `/api/stream` connection and check for changes every 90 s instead. Useful behind a proxy that buffers server-sent events. Alerts and display commands (refresh, night mode, identify) still need the stream, so they do not reach displays in this mode yet |
+| `MARCO_LIVE` | `sse` | `poll` = displays get no `/api/stream` connection and poll `/api/display/poll` instead (every 30 s, every 5 s while *Connected screens* is open). Alerts and display commands (refresh, night mode, identify) still arrive, a little later than over the stream. Useful behind a proxy that buffers server-sent events |
 | `TZ` | the zone set in *Date & time* (follows changes live) | Process time zone (used for "floating" iCal times). Setting it here pins it |
 
 With Docker Compose only the variables listed in `docker-compose.yml` reach the container; `.env` next to it fills

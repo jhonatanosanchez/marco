@@ -1,5 +1,5 @@
-// Display heartbeat (docs/ARCHITECTURE.md): POST /api/display/heartbeat on every SSE open, every 60 s and right after
-// handling a night / identify command. Lets the admin's "Pantallas conectadas" page show what each screen runs.
+// Display heartbeat (docs/ARCHITECTURE.md): POST /api/display/heartbeat on every SSE open, every 60 s (10 min in poll
+// mode) and right after handling a night / identify command. Lets the admin's "Pantallas conectadas" page show what each screen runs.
 import type { PhotoFrame } from '../shared/focus';
 import type { DisplayHeartbeat, NightCommand } from '../shared/types';
 import { api } from './api';
@@ -52,9 +52,10 @@ export class Heartbeat {
 
   constructor(private src: HeartbeatSource, private onResponse?: (now: string) => void) {}
 
-  start(): void {
+  /** Every 60 s with the SSE stream; poll mode passes 10 min (the poll answer already carries the server time). */
+  start(intervalMs = 60_000): void {
     if (this.timer || this.stopped) return;
-    this.timer = setInterval(() => void this.send(), 60_000);
+    this.timer = setInterval(() => void this.send(), intervalMs);
   }
 
   stop(): void {

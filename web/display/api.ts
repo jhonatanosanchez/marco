@@ -3,7 +3,7 @@
 // display credential (private-link key or paired-device token) in X-Marco-Key.
 import type {
   CountdownsResponse, DisplayConfig, DisplayHeartbeat, EventsResponse, HealthResponse, HeartbeatResponse, NewsResponse,
-  PhotosResponse, WeatherResponse,
+  PhotosResponse, PollResponse, WeatherResponse,
 } from '../shared/types';
 import { authHeaders, withScreen } from './identity';
 
@@ -58,6 +58,8 @@ export const api = {
     getJSON<PhotosResponse>(withScreen(`/api/photos?count=${count}${after ? `&after=${encodeURIComponent(after)}` : ''}`)),
   countdowns: () => getJSON<CountdownsResponse>(withScreen('/api/countdowns')),
   health: () => getJSON<HealthResponse>('/api/health', 5000),
+  /** `q` from stream.ts pollUrl (client, cursor, rev, hidden, preview). */
+  poll: (q: string) => getJSON<PollResponse>(withScreen(`/api/display/poll?${q}`), 10000),
   heartbeat: (hb: DisplayHeartbeat) =>
     request<HeartbeatResponse>('/api/display/heartbeat', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(hb),
