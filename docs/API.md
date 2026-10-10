@@ -93,8 +93,10 @@ The admin and the display read these fields to decide which sections, actions an
 - `features`: one boolean per feature: `homeassistant`, `news`, `customCss`, `gallery`, `schedules`,
   `announcements`, `displayCommands`, `openDisplayAccess`, `insecureTls`, `googleCalendar`, `googleLogin`,
   `passwordLogin`, `apiTokens`, `webhooks`, `backups`, `importExport`, `includeSecrets`, `activity`, `setupWizard`,
-  `status`, `accountMenu`. A self-hosted server turns all of them on, except `googleCalendar` and `googleLogin`
-  (on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set) and `accountMenu` (always off).
+  `status`, `accountMenu`, `updates`. A self-hosted server turns all of them on, except `googleCalendar` and
+  `googleLogin` (on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set) and `accountMenu` (always off).
+  `updates` is the update banner, *Status → Updates* and `/api/admin/update*`; Marco Cloud answers `false` and shows
+  the CHANGELOG section of a new version once instead.
 - `limits` (optional): plan limits such as `screens`, `sources` or `devices`. Absent means no limit beyond the
   config validator's own caps (12 screens, 50 calendars, 20 news feeds, 1000 local events, 500 birthdays,
   100 countdowns). The admin disables "add" at the limit and flags a config that goes over it.
@@ -110,8 +112,8 @@ The admin and the display read these fields to decide which sections, actions an
   `http://localhost` can say where other devices reach the admin.
 
 Clients treat a response with no `features` field (servers older than 0.5.0) as having every feature on, except
-`accountMenu`. A key missing from `features` counts as off only when `edition` is not `'self-hosted'`, and a missing
-`accountMenu` is always off.
+`accountMenu` and `updates`. A key missing from `features` counts as off only when `edition` is not `'self-hosted'`,
+and a missing `accountMenu` or `updates` is always off.
 
 ### Account mode
 
@@ -312,6 +314,15 @@ Rules for the mutating setup endpoints:
 | `POST /api/admin/import/apply` | `{ bundle, sections?, includeSecrets? }` → `{ ok, config, loggedOut? }`. `security.displayAccess` is never taken from the bundle (restores keep it too). Imported keys / devices close the streams of replaced keys and dropped devices |
 | `GET /api/admin/activity?type=&level=&q=&actor=&before=&limit=` | Newest first, paged with `before=<id>` |
 | `DELETE /api/admin/activity` | Clear the log |
+
+**Updates** (self-hosted, `features.updates`; see docs/ARCHITECTURE.md *Updates*)
+
+| Method & path | Notes |
+|---|---|
+| `GET /api/admin/update` | `UpdateInfo`: `{ current, latest: { version, name, notes, url, publishedAt } \| null, available, checkedAt, error, checks: 'on'\|'off'\|'env-off', install: { kind: 'release'\|'checkout'\|'docker'\|'manual', canApply, cli }, settings: { check, auto, from, to }, status, log }`. `status` is the last update: `{ state: 'requested'\|'running'\|'done'\|'current'\|'failed', from, to, target, by: 'admin'\|'auto', at, rolledBack, stalled }`; `log` the last lines of the installer's output |
+| `PUT /api/admin/update/settings` | `{ check?, auto?, from?, to? }` (`HH:MM`, time zone of *Date & time*) → `UpdateInfo` |
+| `POST /api/admin/update/check` | Ask GitHub now (a second call within 20 s answers the stored result) → `UpdateInfo`; `409 checks_disabled` with `MARCO_UPDATE_CHECK=0` |
+| `POST /api/admin/update/apply` | Ask the update service for the latest release → `UpdateInfo` with `status.state: 'requested'`. `409` with `error`: `not_supported` (not a release install with `marco-update.path`), `busy`, `up_to_date` |
 
 ## Webhooks (`/api/hooks/*`)
 

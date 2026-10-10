@@ -287,6 +287,7 @@ with a screen) or as a new `marco` system user (server only).
 └── .env                        port and other settings, see .env.example
 /etc/marco.conf                 what was installed and where (read by the marco command)
 /usr/local/bin/marco            the marco command
+/etc/systemd/system/marco-update.path, marco-update.service   the admin's Update button (see Updates below)
 ~/.config/marco/kiosk.env       kiosk settings (screen and all-in-one modes)
 ```
 
@@ -301,6 +302,31 @@ with a screen) or as a new `marco` system user (server only).
 | `marco url` | Admin address and the private link of every screen, with QR codes |
 | `marco version` | Installed version and the latest release |
 | `marco uninstall [--purge]` | Remove Marco; your data is kept unless you add `--purge`. It asks first (the default answer is no); without a terminal it needs `--yes` |
+
+### Updates
+
+Once a day the server asks GitHub which release is the latest. When there is a newer one, the admin shows a banner,
+*Marco 0.5.1 is available*, with the release notes. How you update depends on how Marco was installed:
+
+| Install | How to update |
+|---|---|
+| One-line installer | **Update now** in the admin (or `marco update` on the server). The new version is downloaded, its checksum checked, switched in one step and rolled back if it does not start. The admin follows the progress and reloads itself, and the screens reload on their own |
+| Docker | `git pull && docker compose up -d --build` in the folder with `docker-compose.yml` (the admin shows it) |
+| Git checkout | `marco update` when it was set up with `deploy/install.sh`, otherwise `git pull && npm ci && npm run build` and a restart |
+
+**Automatic updates** are off by default. Turn them on in *Status → Updates* (installs made with the one-line
+installer) and choose the hours, by default between 03:00 and 05:00 in the time zone of *Date & time*. A version that
+fails to start is rolled back and not tried again; the next release is.
+
+How the button works: the server runs as a normal user and cannot update itself. It writes
+`data/update/request`; a systemd path unit installed by the installer (`marco-update.path`) sees it and starts
+`marco-update.service`, which runs `marco update --requested` as root, the same as `sudo marco update`. Nothing in the
+request is read except that it exists, so all the server can ask for is "the latest release". Progress and the
+installer's output go to `data/update/` for the admin. Installs updated from 0.4 get the button after running
+`marco update` once more on the server (it says the version is up to date and adds the units).
+
+Privacy: the check is one `GET` to `api.github.com` a day, with no identifier or version in it (an unchanged answer is
+not even downloaded again). Turn it off in *Status → Updates*, or for good with `MARCO_UPDATE_CHECK=0` in `.env`.
 
 ### Docker
 
@@ -819,6 +845,7 @@ can also send at most 500 alerts and commands a day through its tokens.
 | `NODE_EXTRA_CA_CERTS` | none | Extra CA certificates for iCal feeds with a private CA |
 | `MARCO_LIVE` | `sse` | `poll` = displays get no `/api/stream` connection and poll `/api/display/poll` instead (every 30 s, every 5 s while *Connected screens* is open). Alerts and display commands (refresh, night mode, identify) still arrive, a little later than over the stream. Useful behind a proxy that buffers server-sent events |
 | `TZ` | the zone set in *Date & time* (follows changes live) | Process time zone (used for "floating" iCal times). Setting it here pins it |
+| `MARCO_UPDATE_CHECK` | on | `0` = never ask GitHub for a newer release (no update banner) |
 
 With Docker Compose only the variables listed in `docker-compose.yml` reach the container; `.env` next to it fills
 them in.
@@ -835,7 +862,8 @@ data/
 ├── cache/               # feed caches
 ├── activity.jsonl       # activity log
 ├── announcements.json   # active alerts + history
-└── displays.json        # known displays
+├── displays.json        # known displays
+└── update/              # last update check, update settings and the log of the last update
 ```
 
 Back up the whole folder (or use *Export*) to keep everything.
@@ -881,6 +909,8 @@ Marco was designed for a home network; since 0.3 the displays are **private by d
 - Keep `.env`, `data/secrets.json`, exports with secrets and `data/backups/` private.
 - The installer and `marco update` check the SHA-256 of every release package (and of Node.js) before installing it.
   Builds from git (only before the first release, or on installs that were built from git) have no checksum to check.
+- The admin's *Update now* button never gives the server root rights: it only creates a file that a root-owned systemd
+  unit watches, and that unit always installs the latest release, checksum checked ([Updates](#updates)).
 
 See [SECURITY.md](SECURITY.md) to report a vulnerability.
 

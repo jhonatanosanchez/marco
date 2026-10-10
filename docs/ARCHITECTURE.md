@@ -26,7 +26,8 @@ display and the server guarantee. The HTTP endpoints and event formats are in [A
 | `server/app.js` | `createApp()`: the whole Express stack (host guard, sessions, CSRF, display access, routers, static files); `server/index.js` adds the store, listen and shutdown |
 | `server/core/` | Pure logic shared with Marco Cloud, which copies the folder as it is: config schema and validation (`validate.js`, `defaults.js`, `screens.js`, `iconRules.js`), backups and import (`backupsCore.js`), announcements (`announceCore.js`), feed parsing (`newsParse.js`), image headers and photo names (`imageInfo.js`), activity helpers (`activityCore.js`), pairing codes (`pairCore.js`), CSV, schedules and `lib/` (text, time zones, server strings). No Node built-ins, no store, SSE or HTTP modules (checked by `server/test/core-lint.test.js`); the files next to it (`backups.js`, `announce.js`, `photos.js`, `news.js`, `activity.js`, `pairing.js`) add the files, network and SSE |
 | `server/displayAccess.js`, `server/pairing.js` | Private display links, paired devices and pairing codes (see *Display access* below) |
-| `server/routes/` | Express routers: `public.js` (display API), `admin.js`, `screens.js`, `announce.js`, `hooks.js`, `system.js`, `localEvents.js`, `access.js` (links, devices, pairing) |
+| `server/routes/` | Express routers: `public.js` (display API), `admin.js`, `screens.js`, `announce.js`, `hooks.js`, `system.js`, `localEvents.js`, `access.js` (links, devices, pairing), `updates.js` |
+| `server/updates.js` | Daily check for a newer release, update settings, the request read by `marco-update.path` (see *Updates* below) |
 | `server/test/` | `node --test` suites and fixtures |
 | `web/index.html`, `web/display/` | The display (vanilla TypeScript + three.js) |
 | `web/admin/` | The admin panel (Preact + TypeScript) |
@@ -53,6 +54,7 @@ failing source never breaks the others.
 | `activity.jsonl` | Activity log (≈ 5000 newest entries) |
 | `announcements.json` | Active announcements + history (50) |
 | `displays.json` | Known displays registry (≤ 100, offline > 30 days pruned) |
+| `update/` | `check.json` (last answer from GitHub, ETag), `settings.json`, `request` (while an update is asked for), `status.json` and `update.log` (last update) |
 
 ## Configuration schema (v2)
 
@@ -287,6 +289,12 @@ photo routes, and the outbound address filter used by the unauthenticated setup 
   it says so and stops (`--force` rebuilds).
 - **Checkout installs** (made with `git clone` + `deploy/install.sh`): updated in place with `git pull --ff-only`,
   `npm ci` and `npm run build`; data stays in `<checkout>/data`.
+- **Updates from the admin** (release installs): see *Updates* below. The units are written by the installer from its
+  own text (never from files in the install folder, which belongs to the service user), on install and on every
+  update, also when the version is already up to date; `--uninstall` and a switch to a checkout remove them. The
+  files that run as root (`marco`, the stored installer, `marco.service`) are copied out of the release package
+  right after its checksum is checked, before the release folder is handed to the service user, and they replace
+  the old ones by rename (a running `marco update` keeps reading its own copy).
 - `/etc/marco.conf` records mode, layout, folder and user for the `marco` command (`deploy/marco`, installed to
   `/usr/local/bin/marco`); the installer keeps a copy of itself in `/usr/local/lib/marco/install.sh` for
   `marco update` and `marco uninstall`.
@@ -304,3 +312,34 @@ photo routes, and the outbound address filter used by the unauthenticated setup 
   `docs/screenshots/` (WebP).
 - Testing hooks (not for normal use): `--tarball-url <url>` or `MARCO_TARBALL_URL` installs a given tarball (its
   `.sha256` must sit next to it), `MARCO_REPO_URL` changes the git source.
+
+## Updates
+
+- **Check** (`server/updates.js`): once a day (first 1 to 3 minutes after start, then a 15 minute timer that only uses
+  the network when a day has passed, 6 hours after a failure) one `GET` to
+  `https://api.github.com/repos/mr-reb00t/marco/releases/latest` with `User-Agent: Marco` and the stored ETag
+  (`If-None-Match`). Drafts and pre-releases are ignored, the notes are the release body without its install
+  instructions. Off with `MARCO_UPDATE_CHECK=0` or the admin switch (`data/update/settings.json`). Testing only:
+  `MARCO_UPDATE_URL` points the check at another URL that answers like that API.
+- **Install type** (`detectInstall`): `/etc/marco.conf` with `MARCO_LAYOUT=release` and the running code under
+  `<dir>/releases/` is a release install, and the button works when `/etc/systemd/system/marco-update.path` exists
+  and `DATA_DIR` is `<dir>/data`; the Docker image sets `MARCO_INSTALL=docker`; a `.git` folder is a checkout. The
+  admin shows the button for the first and the commands for the others.
+- **Request**: `POST /api/admin/update/apply` (or the automatic update inside its window) writes `data/update/request`
+  and `status.json` (`requested`). `marco-update.path` (`PathExists=`) starts `marco-update.service` (oneshot, root),
+  which runs `marco update --requested`: it removes the request, writes `running`, runs the installer
+  (`--update --yes`) with its output going to `data/update/update.log`, and writes `done`, `current` or `failed`
+  (`rolledBack` when the previous version is running again). Everything in `data/update/` is written as the service
+  user. A request no service picks up within 2 minutes is reported as `stalled`.
+- **After the update** the installer restarts the server. Displays reload when the `serverVersion` of the stream's
+  `hello` (or of a poll answer) differs from their build; the admin polls `GET /api/admin/update` every 2.5 s while
+  an update runs and reloads itself once the server reports a newer version. The new server records the outcome in
+  the activity log (`update.finished` / `update.failed`) the first time it reads it.
+- **Automatic updates** (off by default): when on, the timer requests an update inside the `from`/`to` window (time
+  zone of *Date & time*, may cross midnight) once a newer version is known. A version that failed is not retried.
+- **Marco Cloud** (`runtime: 'workers'`, `features.updates: false`) has no banner; the admin build carries the
+  CHANGELOG section of its version (`__APP_NOTES__`, a separate chunk) and shows it once per browser after a newer
+  version (`components/Updates.tsx` `WhatsNewHost`).
+- **Testing the whole flow**: `MARCO_RELEASES_URL` (installer and `marco`, from `/etc/marco.conf` only) points at a
+  server that answers like GitHub releases (`<url>/latest` redirects to `<url>/tag/v<x.y.z>`, packages at
+  `<url>/download/v<x.y.z>/marco-<x.y.z>.tar.gz`).

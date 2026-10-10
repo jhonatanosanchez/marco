@@ -11,6 +11,19 @@ A Modern display style with glass options, six new layouts, a choice of free wea
 confirm step, place search through the server, and the shared logic moved into `server/core`.
 
 ### Added
+- **Update notices and updates from the admin**: once a day the server asks GitHub which release is the latest (one
+  `GET` to the public API, no identifier, `If-None-Match` so an unchanged answer is not downloaded again) and the
+  admin shows a banner, *Marco 0.5.1 is available*, with the release notes. On installs made with the one-line
+  installer, **Update now** installs it from the admin: the server writes `data/update/request`, a systemd path unit
+  (`marco-update.path`, installed by the installer) runs `marco update --requested` as root, and the admin follows
+  the progress, shows the log and the result (updated, or rolled back to the previous version) and reloads itself;
+  the screens reload on their own. Docker and git installs get the commands to copy instead. *Status → Updates* has
+  the daily check switch, *Check now* and **automatic updates** (off by default) inside a time window, 03:00 to
+  05:00 by default; a version that fails is not retried. `MARCO_UPDATE_CHECK=0` turns the check off. New feature
+  flag `updates` in `/api/health` (self-hosted only) and `GET /api/admin/update`, `PUT /api/admin/update/settings`,
+  `POST /api/admin/update/check`, `POST /api/admin/update/apply`. Marco Cloud shows a one-time *What's new* with the
+  CHANGELOG section of a new version instead. Installs updated from 0.4 get the button after one more
+  `marco update` on the server.
 - **More date formats** (*Date & time > Date format*): US style with the year ("Saturday, October 10, 2026"), numeric month/day/year and day/month/year ("Saturday, 10/10/2026", tagged in the admin so the order is clear) and ISO 8601 ("Saturday, 2026-10-10"). The admin preview now uses the display's own renderer. *Custom* takes your own pattern (`datetime.dateCustom`, up to 60 characters) with `{dddd}` `{ddd}` `{d}` `{dd}` `{mmmm}` `{mmm}` `{m}` `{mm}` `{yyyy}` `{yy}` and any text, with clickable variables and a live preview. Date formats are a compact grid.
 - **Weather sources** (*Weather → Data source*, `weather.provider`): besides Open-Meteo, the forecast can now come from
   [MET Norway](https://api.met.no/) (Locationforecast 2.0, worldwide, no key) or [Pirate Weather](https://pirateweather.net/)
@@ -143,6 +156,11 @@ confirm step, place search through the server, and the shared logic moved into `
   instead of an arm64 one that cannot run.
 - Kiosk: the log `/tmp/marco-kiosk.log` (`marco logs` on a screen-only device) is written with Wayfire, LXDE-pi and
   other desktops too, not only labwc. Chromium from a snap (Ubuntu) gets a profile folder it is allowed to write to.
+- Installer: the files that run as root (the `marco` command, the stored installer, the systemd unit) are taken from
+  the release package right after its checksum is checked, not from the install folder that belongs to the service
+  user, and a rollback puts the previous systemd unit back as it was. The `marco` command and the stored installer are
+  replaced by rename, so a running `marco update` keeps reading its own copy. Links in place of `releases/`,
+  `current` or `.env` are refused, and folders are handed to the service user without following links.
 - Installer: a kiosk link with no server address is refused; updating a screen-only install shows the saved link;
   an all-in-one install warns when `kiosk.env` still points at another server. `marco help` no longer prints a
   line of code.

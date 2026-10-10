@@ -303,6 +303,7 @@ inicio de sesión automático en el escritorio (modos con pantalla) o como un us
 └── .env                        puerto y otros ajustes, consulta .env.example
 /etc/marco.conf                 qué se instaló y dónde (lo lee el comando marco)
 /usr/local/bin/marco            el comando marco
+/etc/systemd/system/marco-update.path, marco-update.service   el botón Actualizar del panel (ver Actualizaciones)
 ~/.config/marco/kiosk.env       ajustes del kiosco (modos pantalla y todo en uno)
 ```
 
@@ -317,6 +318,32 @@ inicio de sesión automático en el escritorio (modos con pantalla) o como un us
 | `marco url` | Dirección del panel y el enlace privado de cada pantalla, con códigos QR |
 | `marco version` | Versión instalada y la última publicada |
 | `marco uninstall [--purge]` | Desinstala Marco; tus datos se conservan salvo que añadas `--purge`. Pregunta antes (la respuesta por defecto es no); sin terminal necesita `--yes` |
+
+### Actualizaciones
+
+Una vez al día el servidor pregunta a GitHub cuál es la última versión. Si hay una más nueva, el panel muestra un
+aviso, *Marco 0.5.1 disponible*, con las novedades. Cómo se actualiza depende de cómo instalaste Marco:
+
+| Instalación | Cómo actualizar |
+|---|---|
+| Instalador de una línea | **Actualizar ahora** en el panel (o `marco update` en el servidor). Se descarga la nueva versión, se comprueba su suma, se cambia en un solo paso y se vuelve atrás si no arranca. El panel enseña el progreso y se recarga solo, y las pantallas se recargan por su cuenta |
+| Docker | `git pull && docker compose up -d --build` en la carpeta de `docker-compose.yml` (el panel lo indica) |
+| Copia de git | `marco update` si se preparó con `deploy/install.sh`; si no, `git pull && npm ci && npm run build` y reiniciar |
+
+Las **actualizaciones automáticas** vienen desactivadas. Actívalas en *Estado → Actualizaciones* (instalaciones hechas
+con el instalador de una línea) y elige el horario, por defecto entre las 03:00 y las 05:00 en la zona horaria de
+*Fecha y hora*. Una versión que no arranca se deshace y no se vuelve a intentar; la siguiente sí.
+
+Cómo funciona el botón: el servidor se ejecuta con un usuario normal y no puede actualizarse a sí mismo. Escribe
+`data/update/request`; una unidad *path* de systemd que instala el instalador (`marco-update.path`) lo detecta y arranca
+`marco-update.service`, que ejecuta `marco update --requested` como root, igual que `sudo marco update`. Del aviso solo
+importa que exista, así que lo único que el servidor puede pedir es «la última versión». El progreso y la salida del
+instalador quedan en `data/update/` para el panel. Las instalaciones que se actualizan desde la 0.4 tienen el botón
+después de ejecutar `marco update` una vez más en el servidor (dice que ya está al día y añade las unidades).
+
+Privacidad: la comprobación es un único `GET` diario a `api.github.com`, sin identificador ni versión (si la respuesta
+no ha cambiado, ni siquiera se vuelve a descargar). Desactívala en *Estado → Actualizaciones*, o del todo con
+`MARCO_UPDATE_CHECK=0` en `.env`.
 
 ### Docker
 
@@ -857,6 +884,7 @@ JSON), `429` (límite de peticiones). Referencia completa: [docs/API.md](docs/AP
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | ninguno | Cliente OAuth de Google ([guía](#conectar-google-calendar)) |
 | `NODE_EXTRA_CA_CERTS` | ninguno | Certificados de CA adicionales para fuentes iCal con una CA privada |
 | `TZ` | la zona de *Fecha y hora* (sigue los cambios al momento) | Zona horaria del proceso (usada para las horas iCal "flotantes"). Definirla aquí la fija |
+| `MARCO_UPDATE_CHECK` | activada | `0` = no preguntar nunca a GitHub si hay una versión nueva (sin aviso de actualización) |
 
 Con Docker Compose solo llegan al contenedor las variables que aparecen en `docker-compose.yml`; el `.env` de al lado
 les da valor.
@@ -874,7 +902,8 @@ data/
 ├── cache/               # cachés de las fuentes
 ├── activity.jsonl       # registro de actividad
 ├── announcements.json   # avisos activos + historial
-└── displays.json        # pantallas conocidas
+├── displays.json        # pantallas conocidas
+└── update/              # última comprobación, ajustes de actualización y registro de la última actualización
 ```
 
 Haz copia de seguridad de toda la carpeta (o usa *Exportar*) para conservarlo todo.
@@ -925,6 +954,9 @@ Marco se diseñó para una red doméstica; desde la 0.3 las pantallas son **priv
 - El instalador y `marco update` comprueban el SHA-256 de cada paquete (y de Node.js) antes de instalarlo.
   Las compilaciones desde git (solo antes de la primera versión, o en instalaciones que se compilaron desde git) no
   tienen suma que comprobar.
+- El botón *Actualizar ahora* del panel nunca da permisos de root al servidor: solo crea un archivo que vigila una
+  unidad de systemd de root, y esa unidad siempre instala la última versión, con la suma comprobada
+  ([Actualizaciones](#actualizaciones)).
 
 Consulta [SECURITY.md](SECURITY.md) para informar de una vulnerabilidad.
 
