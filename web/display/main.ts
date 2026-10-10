@@ -23,7 +23,7 @@ import type { Engine } from './gl/engine';
 import type { PhotoLayer } from './gl/photoLayer';
 import type { PrecipLayer } from './gl/precipLayer';
 import type { WeatherFxLayer } from './gl/weatherFxLayer';
-import { precipOf, sunnyOf } from './icons';
+import { weatherFxOf } from './icons';
 import { mockAnnouncements, mockConfig, mockCountdowns, mockEvents, mockNews, mockPhotos, mockWeather } from './mock';
 import { loadCache, on, saveCache, set, state } from './store';
 import { detectLiveMode, startConfigPoll, startPoll, type StreamHandlers } from './live';
@@ -416,9 +416,12 @@ function renderWeather(tick: Tick): void {
   const p = effectivePreset(ctx.cfg);
   if (p === 'photoFrame' || p === 'bedside') renderView(tick);
   const cur = ctx.cfg.weather.enabled ? state.weather?.current : undefined;
-  const pm = cur ? precipOf(cur.code) : null;
-  if (precip) precip.mode = pm;
-  if (wxfx) wxfx.mode = pm ?? (cur && sunnyOf(cur.code, cur.isDay) ? 'sun' : null);
+  const plan = cur ? weatherFxOf(cur.code, cur.isDay) : { mode: null, level: 0, storm: false };
+  if (precip) {
+    precip.mode = plan.mode === 'rain' || plan.mode === 'snow' ? plan.mode : null;
+    precip.level = plan.level;
+  }
+  if (wxfx) wxfx.set(plan.mode, plan.level, plan.storm);
 }
 
 function renderAll(): void {
@@ -826,6 +829,13 @@ function enterDemo(): void {
 async function boot(): Promise<void> {
   startTicker();
   void healthOnce().then((h) => loadEmojiWebFont(h));
+  // ?demo=1&pair=1|invalid (&pairLen=6|8) → preview of the pairing / invalid-link screen with a sample code
+  const demoPair = forceDemo ? params.get('pair') : null;
+  if (demoPair) {
+    heartbeat.stop();
+    showPairing(demoPair === 'invalid' ? 'invalid' : 'pair', pairingLang(params), { length: Number(params.get('pairLen')) || 6 });
+    return;
+  }
   if (forceDemo) {
     enterDemo();
     startPolling();

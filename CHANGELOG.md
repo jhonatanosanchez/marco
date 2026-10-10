@@ -80,6 +80,20 @@ confirm step, place search through the server, and the shared logic moved into `
   the admin and the display show the same glyphs.
 
 ### Changed
+- **Ambient backdrop**: the *Aurora* now looks like real northern lights: folding curtains with fine vertical rays
+  that shimmer slowly, green and teal at the lower edge fading to violet at the top, gentle brightness pulses and a
+  dither so the soft gradients never band. In the light theme it is a very faint pastel tint. *Particles* are now
+  soft bokeh dust in three depths (small specks far away, larger blurred discs close by, a few big out-of-focus orbs)
+  drifting with parallax and a slight twinkle, tinted by the accent colour; on the light theme they are soft pastel
+  discs. Same cost as before: the aurora still renders at ¼ resolution and refreshes at 15 fps, at most 150 particles,
+  nothing with `?lite=1`.
+- **Weather effect**: it now follows how strong the weather is (drizzle and light snow are sparse, heavy rain and
+  snow dense). *Rich*: drops on the glass act as small lenses (the photo seen through them flipped, a darker rim and
+  a highlight) with a mist of micro droplets, sliding drops stop and go and leave a trail of beads, rain streaks fall
+  at three depths, thunderstorms add a slanted downpour and lightning (a flash and a second flicker, never at night;
+  plain rain no longer flashes), snow falls at four depths with soft out-of-focus flakes close by, fog shows slow
+  banks of mist near the bottom, and clear days get softer sun shafts with a faint lens flare. *Simple*: rain and snow
+  particles have depth (size, speed and softness). The photo and the text are never blurred.
 - Every screen link in the admin (preview, *View screen*, screen cards, Home, Connected screens) comes from one
   helper. With private links it opens `/d/<key>` (with `?preview=1` for the preview); in open mode it keeps
   `/?screen=<slug>`.
@@ -90,6 +104,10 @@ confirm step, place search through the server, and the shared logic moved into `
 - `MARCO_LIVE` is passed through in `docker-compose.yml`.
 
 ### Fixed
+- Pairing and “link no longer valid” screens: the code no longer runs under the QR code. Everything is sized from
+  the width as well as the height (a tall browser window no longer makes the text, the code and the QR wider than
+  their columns), the code shrinks to fit its column for 6 or 8 characters, and on 1440p, 4K and large desktop
+  windows the card stops growing and stays centred. Preview with `?demo=1&pair=1` (or `pair=invalid`, `&pairLen=8`).
 - Modern style, *Big time* layout: the agenda card no longer runs under the news bar. It shows whole rows only and
   drops the ones that do not fit (then the countdowns), instead of a faded, cut off last row. In portrait the weather
   card spans the full width again.

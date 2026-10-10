@@ -394,7 +394,7 @@ token and some activity history. Your real `data/` folder is never touched.
 
 Just want to see the display? Any running instance shows a built-in sample dataset at `/?demo=1`
 (add `&lang=es`, `&preset=agenda`, `&theme=light`, `&style=modern`, `&announce=success`, `&sched=1`, `&now=2026-10-09T10:42`,
-`&wx=rain|snow|clear` with `&wxfx=rich` to see the weather effect).
+`&wx=rain|snow|clear` with `&wxfx=rich` to see the weather effect, `&pair=1` for the pairing screen).
 
 **Demo video.** A 48-second tour of the demo: the living room screen with photo transitions, an alert and a scheduled
 message, the kitchen and portrait screens, and pairing a new screen.
@@ -795,7 +795,9 @@ Back up the whole folder (or use *Export*) to keep everything.
 | `?preset=…` `?view=month\|agenda\|week` `?theme=dark\|light` `?style=classic\|modern` `?side=left\|right` `?clock=analog` | Override layout options (handy for testing) |
 | `?preset=today\|people\|photoFrame\|twoWeeks\|board\|bedside` `?people=<calendar ids, comma separated>` `?corner=tl\|tr\|bl\|br` | Preview the newer layouts, the *Per person* columns and the *Photo frame* corner |
 | `?glass=clear\|tinted\|auto` `?glassOpacity=0..1` `?glassBlur=0..40` `?glassTint=dark\|light\|photo` `?glassEdge=0\|1` | Override the glass options of the Modern style |
-| `?wxfx=off\|simple\|rich` | Override the weather effect; with `?demo=1`, `?wx=rain\|snow\|clear\|thunder` forces the weather |
+| `?wxfx=off\|simple\|rich` | Override the weather effect; with `?demo=1`, `?wx=rain\|drizzle\|thunder\|snow\|clear` (or a WMO code, e.g. `45` for fog) forces the weather |
+| `?ambient=aurora\|particles\|none` | Override the ambient backdrop behind the calendar |
+| `?demo=1&pair=1` `?demo=1&pair=invalid` `&pairLen=6\|8` | Preview the pairing screen or the “link no longer valid” screen with a sample code (no server needed) |
 | `?empty=1` `?photos=0` | With `?demo=1`: no events, countdowns or to-dos, or no background photo (to check the empty states) |
 | `?client=<name>` | Name of this device in *Connected displays* (the kiosk script sets it) |
 

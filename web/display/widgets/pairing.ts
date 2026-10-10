@@ -173,11 +173,20 @@ export function afterPairUrl(h: Pick<HealthResponse, 'edition'> = {}, loc: { pat
   return `${home}${s ? `?${s}` : ''}`;
 }
 
+/** Sets the code text and its length (the CSS sizes the code so it always fits its column). */
+function setCode(el: HTMLElement, text: string): void {
+  el.textContent = text;
+  (el.parentElement ?? el).style.setProperty('--chars', String(Math.max(4, text.length)));
+}
+
+/** Code shown by the preview (?demo=1&pair=1|invalid&pairLen=6|8): no server, no polling. */
+const DEMO_CODE = 'K7M3QXWD';
+
 /**
  * Full-screen pairing / invalid-link screen. Returns to the dashboard by reloading: once paired, or (keyless
- * pairing screen) when display access is open again.
+ * pairing screen) when display access is open again. `demo` = a static preview with a sample code.
  */
-export function showPairing(kind: 'pair' | 'invalid', lang: Lang): void {
+export function showPairing(kind: 'pair' | 'invalid', lang: Lang, demo?: { length: number }): void {
   const T = TEXT[lang] ?? TEXT.en;
   clearCaches();
   document.documentElement.classList.add('needs-setup', 'needs-pairing');
@@ -214,9 +223,20 @@ export function showPairing(kind: 'pair' | 'invalid', lang: Lang): void {
   };
   tick();
   setInterval(tick, 10_000);
+  const codeEl = root.querySelector('.wl-code__txt') as HTMLElement;
+  if (demo) {
+    const code = DEMO_CODE.slice(0, Math.min(DEMO_CODE.length, Math.max(4, demo.length || 6)));
+    setCode(codeEl, fmtCode(code));
+    const url = `${location.origin}/admin/#pair=${code}`;
+    try {
+      (root.querySelector('.wl-qr__img') as HTMLElement).innerHTML = qrSvg(url, { dark: '#0b0d11', light: '#ffffff', title: url });
+    } catch { /* no QR */ }
+    (root.querySelector('.wl-status') as HTMLElement).textContent = T.expires.replace('{t}', '9:41');
+    return;
+  }
+  setCode(codeEl, codeEl.textContent || '');
   void pairHealth().then((h) => {
-    const codeEl = root?.querySelector('.wl-code__txt');
-    if (codeEl && /^[· ]+$/.test(codeEl.textContent || '')) codeEl.textContent = codePlaceholder(Number(h.pairCodeLength) || 6);
+    if (/^[· ]+$/.test(codeEl.textContent || '')) setCode(codeEl, codePlaceholder(Number(h.pairCodeLength) || 6));
     const where = adminTarget(h).where;
     const text = root?.querySelector('.wl-step1')?.lastChild;
     if (text && where) text.textContent = T.s1At.replace('{where}', where);
@@ -250,7 +270,7 @@ async function pairLoop(T: Record<string, string>): Promise<void> {
       continue;
     }
     const s = start.json;
-    codeEl.textContent = fmtCode(s.code);
+    setCode(codeEl, fmtCode(s.code));
     el.querySelector('.wl-code')!.setAttribute('aria-label', s.code.split('').join(' '));
     const adminUrl = `${adminTarget(await pairHealth()).url}#pair=${s.code}`;
     try {
