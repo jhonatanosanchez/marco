@@ -5,6 +5,7 @@ import { api, ApiError } from '../api';
 import { AnnounceForm } from '../components/AnnounceForm';
 import { toast } from '../components/feedback';
 import { Icon } from '../components/icons';
+import { WelcomeCard } from '../components/WelcomeCard';
 import { Button, Callout, Card, Empty, StatusDot } from '../components/ui';
 import { daysBetween, eventDay, eventTimeLabel, fmtDay, relDays, todayIn } from '../dates';
 import { has, runtime } from '../caps';
@@ -45,6 +46,7 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
   const annOn = has('announcements');
   const links = useDisplayLinks(saved);
   const [, tick] = useState(0);
+  const [welcome, setWelcome] = useState(false);
 
   const load = async () => {
     try {
@@ -121,10 +123,13 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
         </div>
       </div>
 
+      <WelcomeCard me={me} dash={d} go={go} onShown={setWelcome} />
+
       {err && !d && <Callout kind="error">{t('No se pudo cargar el resumen')}: {err}</Callout>}
       {d?.warnings.map((w) => {
         const info = WARN_TEXT[w];
-        if (!info) return null;
+        // The welcome card already says how to put the screen on a TV.
+        if (!info || (welcome && w === 'no_displays')) return null;
         return (
           <button type="button" class={`warn-row warn-row--${info.kind}`} onClick={() => go(info.route)}>
             <Icon name={info.kind === 'info' ? 'info' : 'alert'} size={16} />

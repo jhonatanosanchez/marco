@@ -3,9 +3,9 @@
 // open-mode recommendation. Server side: server/displayAccess.js, server/pairing.js; docs/API.md "Display access".
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { DisplayAccessMode, DisplayLinksResponse, PairConfirm, PairedDevice, ScreenProfile, StoredConfig } from '../../shared/types';
-import { pairCodeLength } from '../caps';
+import { caps, pairCodeLength } from '../caps';
 import { claimErrorCode, cleanCode, confirmWhere, formatCode } from '../pairCode';
-import { displayOriginOf, refreshDisplayLinks } from '../displayLinks';
+import { displayOriginOf, refreshDisplayLinks, useDisplayLinks, usesPrivateLinks } from '../displayLinks';
 import { api, ApiError } from '../api';
 import { fmtDateTime } from '../dates';
 import { relTime, t } from '../i18n';
@@ -180,11 +180,34 @@ export function PairDialogHost({ saved, defaultScreenId, onPaired }: { saved: St
     pairReq = null;
     force((n) => n + 1);
   };
-  return <PairDialog key={pairReq.code} initialCode={pairReq.code} screens={saved.screens} defaultScreenId={defaultScreenId} onClose={close} onPaired={onPaired} />;
+  return <PairDialog key={pairReq.code} initialCode={pairReq.code} saved={saved} defaultScreenId={defaultScreenId} onClose={close} onPaired={onPaired} />;
 }
 
-function PairDialog({ initialCode, screens, defaultScreenId, onClose, onPaired }: { initialCode: string; screens: ScreenProfile[]; defaultScreenId: string; onClose: () => void; onPaired?: (d: PairedDevice) => void }) {
+/** "Or open the private link": the selected screen's private link with a QR code, folded under the pairing form. */
+function PrivateLinkAlt({ saved, screenId }: { saved: StoredConfig; screenId: string }) {
+  const links = useDisplayLinks(saved);
+  const link = links.data?.links.find((l) => l.screenId === screenId);
+  if (!usesPrivateLinks(saved) || !link) return null;
+  const origin = shareOrigin(links.data);
+  const url = `${origin || location.origin}${link.path}`;
+  return (
+    <details class="pair-alt">
+      <summary>{t('O abre el enlace privado de la pantalla')}</summary>
+      <p class="muted small">{t('Ábrelo en el navegador de la tele o la tablet, o escanea el QR. Quien tenga el enlace ve esta pantalla: compártelo solo con tus dispositivos.')}</p>
+      <div class="pair-alt__body">
+        {origin && <Qr text={url} label={t('Código QR del enlace privado')} />}
+        <CopyField value={url} />
+      </div>
+    </details>
+  );
+}
+
+function PairDialog({ initialCode, saved, defaultScreenId, onClose, onPaired }: { initialCode: string; saved: StoredConfig; defaultScreenId: string; onClose: () => void; onPaired?: (d: PairedDevice) => void }) {
+  const screens = saved.screens;
   const len = pairCodeLength();
+  // Marco Cloud serves the pairing page from its display origin: name the exact address to open on the TV.
+  const displayOrigin = caps().displayOrigin;
+  const pairAddress = displayOrigin ? `${displayOrigin.replace(/^https?:\/\//, '').replace(/\/$/, '')}/pair` : '';
   const [code, setCode] = useState(() => cleanCode(initialCode, len));
   const [screenId, setScreenId] = useState(screens.some((s) => s.id === defaultScreenId) ? defaultScreenId : screens[0]?.id ?? '');
   const [name, setName] = useState('');
@@ -284,7 +307,11 @@ function PairDialog({ initialCode, screens, defaultScreenId, onClose, onPaired }
         </form>
       ) : (
         <form class="stack" onSubmit={submit}>
-          <p class="muted small">{t('Abre Marco en la pantalla nueva (o la dirección /pair): mostrará un código de {n} caracteres. Escríbelo aquí.', { n: len })}</p>
+          <p class="muted small">
+            {pairAddress
+              ? t('En la tele, abre {url}: mostrará un código de {n} caracteres. Escríbelo aquí.', { url: pairAddress, n: len })
+              : t('Abre Marco en la pantalla nueva (o la dirección /pair): mostrará un código de {n} caracteres. Escríbelo aquí.', { n: len })}
+          </p>
           <Field label={t('Código de la pantalla')} error={err || undefined}>
             <input
               class={`input pair-code ${err ? 'is-invalid' : ''}`}
@@ -310,6 +337,7 @@ function PairDialog({ initialCode, screens, defaultScreenId, onClose, onPaired }
             <TextInput value={name} maxLength={60} placeholder={screenName} onValue={setName} />
           </Field>
           <button type="submit" hidden />
+          <PrivateLinkAlt saved={saved} screenId={screenId} />
         </form>
       )}
     </Modal>

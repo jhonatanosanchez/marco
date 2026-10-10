@@ -4979,3 +4979,69 @@ h1 .scope {
     flex-wrap: wrap;
   }
 }
+
+/* ---------------------------------------------------------------- first-run welcome card (Inicio, Marco Cloud) */
+.welcome-card {
+  position: relative;
+  padding: 22px 24px;
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+}
+.welcome-card h2 {
+  margin: 0 36px 6px 0;
+  font-size: 20px;
+}
+.welcome-card p {
+  margin: 0;
+}
+.welcome-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0 12px;
+}
+.welcome-card__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+@media (max-width: 520px) {
+  .welcome-card {
+    padding: 18px 16px;
+  }
+  .welcome-card__actions .btn {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}
+
+/* pairing dialog: "or open the private link" */
+.pair-alt {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.pair-alt summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.pair-alt > p {
+  margin: 8px 0 0;
+}
+.pair-alt__body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+.pair-alt__body .qr {
+  width: 150px;
+  height: 150px;
+}
+.pair-alt__body .copy-field {
+  align-self: stretch;
+}
+.pair-alt .copy-field code {
+  font-size: 12.5px;
+}

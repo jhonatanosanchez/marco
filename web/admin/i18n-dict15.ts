@@ -72,4 +72,21 @@ export const ROWS15: [string, string, string][] = [
   ['Marco ha vuelto a la versión {v}', 'Marco went back to version {v}', 'O Marco voltou à versão {v}'],
   ['Actualizaciones automáticas activadas ({from}–{to})', 'Automatic updates on ({from}–{to})', 'Atualizações automáticas ativadas ({from}–{to})'],
   ['Ajustes de actualización guardados', 'Update settings saved', 'Definições de atualização guardadas'],
+  // First-run welcome card on Inicio (Marco Cloud) and the pairing dialog's private link option.
+  ['Tu pantalla está lista', 'Your screen is ready', 'O teu ecrã está pronto'],
+  ['Ahora ponla en la tele y añade tus calendarios.', 'Now put it on the TV and add your calendars.', 'Agora põe-no na televisão e adiciona os teus calendários.'],
+  ['Poner en la tele', 'Put it on the TV', 'Pôr na televisão'],
+  ['Añadir calendarios', 'Add calendars', 'Adicionar calendários'],
+  ['Todo se puede cambiar después y puedes crear más pantallas.', 'You can change everything later and create more screens.', 'Podes mudar tudo depois e criar mais ecrãs.'],
+  ['O abre el enlace privado de la pantalla', 'Or open the screen’s private link', 'Ou abre a ligação privada do ecrã'],
+  [
+    'Ábrelo en el navegador de la tele o la tablet, o escanea el QR. Quien tenga el enlace ve esta pantalla: compártelo solo con tus dispositivos.',
+    'Open it in the browser of the TV or tablet, or scan the QR code. Anyone with the link can see this screen, so only share it with your own devices.',
+    'Abre-a no navegador da televisão ou do tablet, ou lê o QR. Quem tiver a ligação vê este ecrã: partilha-a só com os teus dispositivos.',
+  ],
+  [
+    'En la tele, abre {url}: mostrará un código de {n} caracteres. Escríbelo aquí.',
+    'On the TV, open {url}. It shows a code with {n} characters. Type it here.',
+    'Na televisão, abre {url}: vai mostrar um código de {n} caracteres. Escreve-o aqui.',
+  ],
 ];

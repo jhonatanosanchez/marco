@@ -1,5 +1,5 @@
 // Pairing codes: generation and normalisation, shared by self-hosted Marco (server/pairing.js, 6 characters) and
-// Marco Cloud (8 characters). The alphabet has 31 symbols without look-alikes (0/O, 1/I/L). No Node APIs.
+// Marco Cloud (its own length, 6 today). The alphabet has 31 symbols without look-alikes (0/O, 1/I/L). No Node APIs.
 
 export const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
 /** Self-hosted code length. GET /api/health reports the length a server uses as `pairCodeLength`. */
