@@ -20,7 +20,7 @@
 
 <a href="https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4"><img src="docs/media/hero.webp" width="100%" alt="Marco on a living room screen: photo background, clock, weather and a month calendar; an alert from Home Assistant slides in saying the washing machine is done"></a>
 
-[Watch the 48-second demo video (MP4)](https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4) · [marcohome.app](https://marcohome.app)
+[Website: marcohome.app](https://marcohome.app) · [Marco Cloud](https://app.marcohome.app/signup) · [Demo video (MP4)](https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4)
 
 ```bash
 curl -fsSL https://marcohome.app/install | bash
@@ -28,12 +28,24 @@ curl -fsSL https://marcohome.app/install | bash
 
 </div>
 
+### Two ways to run it
+
+- **On your own hardware (self-hosted):** a Raspberry Pi, home server or NAS on your network, installed with the
+  one-line command above, [Docker](#docker) or [by hand](#manual-install-nodejs). Free and open source, and your data
+  stays at home. Everything in this README is about this option.
+- **Marco Cloud, if you don't want to run a server:** the same app and the same admin panel, hosted by us at
+  [app.marcohome.app](https://app.marcohome.app). It is free for families, runs on Cloudflare and keeps your data in
+  the EU. [Create an account](https://app.marcohome.app/signup), add your calendars and open your screen's link on a
+  TV, tablet or Raspberry Pi.
+
+More about both on the website: [marcohome.app](https://marcohome.app).
+
 ## Why
 
 Marco is inspired by [DAKboard](https://dakboard.com/): a wall display that shows your family calendar,
 the time, the weather, photos and news at a glance. It is a **free, open-source, self-hosted alternative** that you run
-on your own Raspberry Pi, home server or NAS **inside your local network**. There is no account, no subscription and
-no cloud in the middle: your configuration, photos and calendar data stay at home. The only outbound traffic goes to the
+on your own Raspberry Pi, home server or NAS **inside your local network**. When you host it yourself, there is no
+account, no subscription and no cloud in the middle: your configuration, photos and calendar data stay at home. The only outbound traffic goes to the
 calendars, weather and news feeds *you* connect.
 
 > Marco is an independent project. It is not affiliated with, endorsed by or connected to DAKboard;
@@ -49,13 +61,30 @@ calendars, weather and news feeds *you* connect.
 
 ### The display
 
-![Marco on a 1920x1080 display: clock, highlights, countdowns, weather and a month calendar with events, birthdays and vacation-rental stays](docs/screenshots/display-1920x1080.webp)
+![Marco on a 1920x1080 display in the Modern style: clock, highlights, countdowns, weather and a month calendar with events, birthdays and vacation-rental stays](docs/screenshots/display-1920x1080.webp)
 
 | | |
 |---|---|
 | ![Agenda layout with the next days listed in two columns](docs/screenshots/display-agenda.webp) | ![Big clock layout over a full-screen photo](docs/screenshots/display-bigtime.webp) |
 | ![Week view](docs/screenshots/display-week.webp) | ![Light theme with the calendar on the left and the photo on the right](docs/screenshots/display-light.webp) |
 | ![Announcement overlay sent from Home Assistant](docs/screenshots/display-announcement.webp) | ![Analog clock, rain effect over the photo and a scheduled message](docs/screenshots/display-rain.webp) |
+
+**Layouts for every room.** *Today*, *Per person*, *Photo frame*, *Two weeks*, *Board* and *Bedside*:
+
+| | |
+|---|---|
+| ![Today layout: the day hour by hour with a line for now, the next event in large type and the hourly weather](docs/screenshots/display-today.webp) | ![Per person layout: one column per calendar with today and tomorrow](docs/screenshots/display-people.webp) |
+| ![Photo frame layout: the photo with a small clock card in a corner](docs/screenshots/display-photoframe.webp) | ![Two weeks layout: the month grid with two roomy rows](docs/screenshots/display-twoweeks.webp) |
+| ![Board layout: agenda, message of the day, countdowns, to-dos and birthdays](docs/screenshots/display-board.webp) | ![Bedside layout: a large, dim clock with the next event and the temperature](docs/screenshots/display-bedside.webp) |
+
+**Modern or Classic, per screen.** Modern is the default; Classic keeps the original look:
+
+![The same screen in the Modern style (left) and the Classic style (right)](docs/screenshots/display-modern-vs-classic.webp)
+
+**Glass options** (Modern style): automatic, clear or tinted glass, with a dark, light or photo-coloured tint,
+transparency, blur and a light edge:
+
+![The side panel with five glass settings: automatic (the default), clear, tinted, light tint and photo tint](docs/screenshots/display-glass.webp)
 
 <img src="docs/screenshots/display-portrait-1080x1920.webp" width="280" align="right" alt="Portrait layout at 1080x1920">
 
@@ -70,6 +99,8 @@ calendars, weather and news feeds *you* connect.
   dims further at night. *Two weeks* is the month grid with two roomy rows.
 - **Two styles per screen:** *Modern* (the default), a minimal Apple-like look with glass cards over the photo,
   a Lock Screen clock and an iOS-style month grid, or *Classic*. The style is independent of the layout.
+- **Glass options** for the Modern style, per screen: automatic (adapts to each photo), clear or tinted; transparency,
+  blur, a dark, light or photo-coloured tint and a light edge, with a live preview in *Layout*.
 - **Automatic emoji:** 🎂 birthdays, ✈️ flights, 🩺 doctor, 🎒 school, ⚽ sports, 🍽️ dinners, 💼 meetings, 🏖️
   holidays, 🚗 car, 🐾 vet and more, from editable keyword rules (35 categories with about 400 keywords in English,
   Spanish and Portuguese out of the box).
@@ -130,7 +161,11 @@ calendars, weather and news feeds *you* connect.
 | ![Command palette searching for night mode actions and settings](docs/screenshots/admin-home-palette.webp) | ![Local event editor: date, time, repeat, location and countdown](docs/screenshots/admin-local-edit.webp) | ![Upload conflict dialog: replace, keep both or skip](docs/screenshots/admin-photos-conflict.webp) |
 | ![Screens: one profile per room with its own layout and private link](docs/screenshots/admin-screens.webp) | ![Alerts page: send an alert now](docs/screenshots/admin-alerts.webp) | ![Activity log with filters](docs/screenshots/admin-activity.webp) |
 | ![Backups: export, import and automatic backups with restore](docs/screenshots/admin-backups.webp) | ![Countdowns: manual dates and automatic countdowns](docs/screenshots/admin-countdowns.webp) | ![Icon rules with a live tester for event titles](docs/screenshots/admin-icons.webp) |
-| ![Layout page with the live preview of the screen](docs/screenshots/admin-layout.webp) | ![Local events list with upcoming appointments](docs/screenshots/admin-local.webp) | ![Sign-in page of the admin panel](docs/screenshots/admin-login.webp) |
+| ![Layout page: Modern or Classic style, glass settings and the live preview of the screen](docs/screenshots/admin-layout.webp) | ![Local events list with upcoming appointments](docs/screenshots/admin-local.webp) | ![Sign-in page of the admin panel](docs/screenshots/admin-login.webp) |
+
+| | |
+|---|---|
+| ![Layout page: the eleven layouts with thumbnails](docs/screenshots/admin-layouts.webp) | ![Glass settings with a preview over a dark and a bright photo](docs/screenshots/admin-layout-glass.webp) |
 
 <p align="center">
   <img src="docs/screenshots/mobile-home.webp" width="230" alt="Admin on a phone: home">
