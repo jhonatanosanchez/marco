@@ -76,7 +76,8 @@ export function defaultConfig() {
     calendar: { sources: DEFAULT_SOURCES, iconRules: DEFAULT_ICON_RULES },
     datetime: { timezone: 'Europe/Lisbon' },
     weather: {
-      provider: 'open-meteo', locationName: 'Lisbon, Portugal', lat: 38.7223, lon: -9.1393, units: 'metric',
+      // provider: a source of server/core/weather.js (or 'homeassistant'); model: an Open-Meteo forecast model
+      provider: 'open-meteo', model: 'best_match', locationName: 'Lisbon, Portugal', lat: 38.7223, lon: -9.1393, units: 'metric',
       haWeatherEntity: '', haIndoorTempEntity: '', haIndoorHumidityEntity: '',
     },
     news: {

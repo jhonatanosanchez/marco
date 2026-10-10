@@ -75,7 +75,7 @@ saved without `security` (old admin builds, backups or exports from before 0.3) 
 | `GET /api/health` | `HealthResponse`: `{ ok, uptime, version, live, edition, tenancy, runtime, pairCodeLength, features, limits?, displayOrigin?, adminOrigin?, lanAddresses? }` (see below). `live` is `'sse'` unless `MARCO_LIVE=poll` is set. A server that answers `'poll'` gets no `/api/stream` connection: the display polls `GET /api/display/poll` instead (see below). A server that answers `404` there gets a config check every 90 s, which refetches events and countdowns when `revision` changes. A missing field means `'sse'` |
 | `GET /api/display/config?screen=` | `DisplayConfig`: flat view of one screen; `calendar.sources` only as `{ id, name, color, emoji, kind }`; enabled `schedules` for this screen |
 | `GET /api/events?screen=&from=YYYY-MM-DD&to=YYYY-MM-DD` | `{ generatedAt, hash, events: CalEvent[], errors: [{ sourceId, message }] }` |
-| `GET /api/weather?screen=` | `{ updatedAt, locationName, current, today, daily[], hourly[], indoor }` (localized descriptions, cache 10 min) |
+| `GET /api/weather?screen=` | `{ updatedAt, locationName, current, today, daily[], hourly[], indoor, source }` (localized descriptions). `source` = `{ provider, name, model, modelName, url, licence, licenceUrl, also? }`: where the data comes from, for the credit line. Values a source does not give are `null` (MET Norway: no chance of rain outside the Nordics; some Open-Meteo models: no UV). Cached per place for at least 10 minutes (15 for Pirate Weather, MET Norway's `Expires` when longer), the last answer is kept for 6 hours when the source fails |
 | `GET /api/news` | `{ updatedAt, items: [{ id, title, summary, source, date, image? }] }` (cache 15 min) |
 | `GET /api/photos?screen=&count=20&after=` | `{ photos: [{ url, author?, title?, source: "stock"\|"gallery", file?, focusX?, focusY? }] }`. Gallery photos follow the screen's `background.order` (`random` \| `newest` \| `name`); hidden photos are never returned. `after` = gallery `file` the display showed last: sequential orders continue right after it (wrapping around), `random` avoids starting with it. Without `after`, the server remembers where the previous batch for that screen ended. Falls back to stock when no gallery photo is in rotation |
 | `GET /api/countdowns?screen=` | `{ generatedAt, today, hash, items: [{ id, title, emoji, color, date, days, origin, age? }] }`. An admin session is still accepted here in 0.5 for admin pages loaded before the update; the admin itself uses `GET /api/admin/countdowns` |
@@ -261,7 +261,7 @@ Rules for the mutating setup endpoints:
 | `GET /api/admin/countdowns?screen=` | Same answer as `GET /api/countdowns` for the screen with that id or slug (unknown → default screen); used by the Countdowns page |
 | `POST /api/admin/birthdays/parse-csv` | `{ text }`: one `name;dd/mm[/yyyy]` per line (`;`, `,` or tab) → parsed rows, duplicates, errors with line numbers |
 | `GET /api/admin/dashboard` | Next events, weather now, active schedules, recent activity, warnings |
-| `GET /api/admin/status` | Per-source last fetch / errors, weather and news status, display count, uptime |
+| `GET /api/admin/status` | Per-source last fetch / errors, weather (`ok`, `updatedAt`, `error`, `errorCode`: `key_missing`, `key_invalid`, `rate_limited`, `http`, `bad_response`, `provider`) and news status, display count, uptime |
 
 **Sources and integrations**
 
@@ -274,6 +274,8 @@ Rules for the mutating setup endpoints:
 | `POST /api/admin/test/homeassistant` | `{ url, token? }` → `{ ok, version?, error? }` |
 | `GET /api/admin/homeassistant/entities?domain=sensor\|weather` | `[{ entity_id, name, state, unit }]` |
 | `PUT /api/admin/homeassistant/token` | `{ token }` |
+| `GET /api/admin/weather/key` | `{ set, hint }`: whether an API key for a weather source that needs one (Pirate Weather) is stored, and its last 4 characters. The key itself is never sent back |
+| `PUT /api/admin/weather/key` | `{ key }` (letters, digits, `-` and `_`, 8 to 128; `""` removes it). A new key is tried once at the configured place: `400 { error: "key_invalid" }` when the source refuses it (nothing is stored); `{ set, hint, checked }` otherwise (`checked: false` when the source could not be reached). Saving the config with `weather.provider: "pirate-weather"` while no key is stored answers `400` with `weather.apiKey` |
 
 **Photos**
 

@@ -20,6 +20,8 @@ export function exportSecrets(sec) {
   return structuredClone({
     ...(sec.passwordHash ? { passwordHash: sec.passwordHash } : {}),
     homeassistant: { ...(sec.homeassistant?.token ? { token: sec.homeassistant.token } : {}) },
+    // A weather source's own API key (Pirate Weather), only when one is stored.
+    ...(sec.weather?.apiKey ? { weather: { apiKey: sec.weather.apiKey } } : {}),
     google: { accounts: sec.google?.accounts || {} },
     apiTokens: sec.apiTokens || [],
     // Private display links and paired devices (token hashes only): an import on a new server keeps every
@@ -70,6 +72,9 @@ export function sanitizeImportedSecrets(s) {
   if (typeof s.passwordHash === 'string' && /^scrypt\$[A-Za-z0-9+/=]+\$[A-Za-z0-9+/=]+$/.test(s.passwordHash)) out.passwordHash = s.passwordHash;
   if (isObj(s.homeassistant) && typeof s.homeassistant.token === 'string' && s.homeassistant.token.length <= 1000) {
     out.haToken = s.homeassistant.token;
+  }
+  if (isObj(s.weather) && typeof s.weather.apiKey === 'string' && /^[A-Za-z0-9_-]{0,128}$/.test(s.weather.apiKey)) {
+    out.weatherKey = s.weather.apiKey;
   }
   if (isObj(s.google) && isObj(s.google.accounts)) {
     const acc = {};

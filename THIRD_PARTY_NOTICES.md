@@ -29,7 +29,9 @@ and their dependencies are only used to build the web UI and are not part of the
 
 ## Services (not bundled)
 
-Weather data by [Open-Meteo](https://open-meteo.com/) (CC BY 4.0, attribution appears in the README),
-stock photos by [Lorem Picsum](https://picsum.photos/) (photos from Unsplash under the Unsplash license).
+Weather data by the source chosen in *Weather*: [Open-Meteo](https://open-meteo.com/) (CC BY 4.0),
+[MET Norway](https://api.met.no/) (CC BY 4.0 and NLOD) or [Pirate Weather](https://pirateweather.net/) (the user's own
+key, under its terms). The display credits the source next to the weather and the admin links to it and its licence.
+Stock photos by [Lorem Picsum](https://picsum.photos/) (photos from Unsplash under the Unsplash license).
 
 To list every installed package with its license: `npx license-checker --summary`.

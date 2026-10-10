@@ -4455,6 +4455,28 @@ h1 .scope {
   color: var(--muted);
   line-height: 1.45;
 }
+.access-mode.wx-sources {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+.wx-sources .access-mode__opt strong {
+  flex-wrap: wrap;
+}
+.wx-sources__name {
+  white-space: nowrap;
+}
+.wx-key-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.wx-key-saved .ico {
+  color: var(--ok, var(--accent));
+}
+.wx-credit {
+  margin: 0;
+}
 .pair-code {
   font-family: var(--mono);
   font-size: 26px;

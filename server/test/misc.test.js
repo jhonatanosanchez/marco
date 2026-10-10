@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { wmoDescription, windDirLabel } from '../core/lib/i18n.js';
 import { isoWithOffset, zonedMidnight, localDate, addDays } from '../core/lib/tz.js';
-import { mapOpenMeteo } from '../weather.js';
+import { mapOpenMeteo } from '../core/weather.js';
 import { sanitizeFilename, isGalleryFile } from '../photos.js';
 import { hashPassword, verifyPassword } from '../auth.js';
 import { displayConfig } from '../routes/public.js';

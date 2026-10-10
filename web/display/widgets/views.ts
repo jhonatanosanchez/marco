@@ -10,6 +10,7 @@ import { ctx } from '../ctx';
 import { esc, setHTML } from '../dom';
 import { type NEvent, sortForDay } from '../eventModel';
 import { weatherIcon } from '../icons';
+import { sourceCredit } from './weather';
 import type { Tick } from '../time';
 import { Clock } from './clock';
 import { upcomingCountdowns } from './countdowns';
@@ -503,5 +504,6 @@ function weatherLine(w: WeatherResponse | null, full = true): string {
   const c = w.current;
   const r = (n: number | null | undefined) => (n === null || n === undefined || Number.isNaN(n) ? '–' : String(Math.round(n)));
   const hilo = full && w.today ? `<span class="v-hl">${esc(ctx.t('hiShort'))} ${r(w.today.max)}° · ${esc(ctx.t('loShort'))} ${r(w.today.min)}°</span>` : '';
-  return `<span class="v-wx-ic">${weatherIcon(c.code, c.isDay, { animated: !ctx.lite })}</span><span class="v-temp">${r(c.temp)}°</span><span class="v-cond"><span>${esc(c.description || '')}</span>${hilo}</span>`;
+  const src = full ? `<span class="wx-src">${esc(sourceCredit(w))}</span>` : '';
+  return `<span class="v-wx-ic">${weatherIcon(c.code, c.isDay, { animated: !ctx.lite })}</span><span class="v-temp">${r(c.temp)}°</span><span class="v-cond"><span>${esc(c.description || '')}</span>${hilo}${src}</span>`;
 }

@@ -156,6 +156,7 @@ function loadSecrets() {
   s.google ??= {};
   s.google.accounts ??= {};
   s.homeassistant ??= {};
+  s.weather ??= {}; // { apiKey } of a weather source that needs one (server/weather.js)
   if (!Array.isArray(s.apiTokens)) s.apiTokens = []; // webhook tokens (hashed), see docs/ARCHITECTURE.md
   if (!s.sessionSecret) s.sessionSecret = crypto.randomBytes(32).toString('hex');
   writeFileAtomic(paths.secrets, JSON.stringify(s, null, 2), 0o600);
@@ -171,9 +172,10 @@ export const getSecrets = () => secrets;
  * `baseRevision` (the revision the caller's copy was loaded at) turns on the revision guard: when the config was
  * saved since then, nothing is written and the result has `conflict: true`. Without it the last write wins.
  * @param {unknown} input
- * @param {{ reason?: string, req?: any, backup?: boolean, baseRevision?: number | null }} [opts] reason/req are passed to 'config' listeners
+ * `checks` is passed to validateConfig (the admin save asks for the weather API key check).
+ * @param {{ reason?: string, req?: any, backup?: boolean, baseRevision?: number | null, checks?: { weatherKeySet?: boolean } }} [opts] reason/req are passed to 'config' listeners
  */
-export function saveConfig(input, { reason = 'server', req = null, backup = true, baseRevision = null } = {}) {
+export function saveConfig(input, { reason = 'server', req = null, backup = true, baseRevision = null, checks = {} } = {}) {
   if (baseRevision !== null && baseRevision !== undefined && baseRevision !== (config?.revision || 0)) {
     return { ok: false, conflict: true, errors: [], config };
   }
@@ -182,7 +184,7 @@ export function saveConfig(input, { reason = 'server', req = null, backup = true
   if (input && typeof input === 'object' && !Array.isArray(input) && input.security === undefined && config?.security) {
     input = { ...input, security: structuredClone(config.security) };
   }
-  const { ok, errors, value } = validateConfig(input);
+  const { ok, errors, value } = validateConfig(input, checks);
   if (!ok) return { ok, errors, config };
   value.revision = (config?.revision || 0) + 1;
   if (backup) {

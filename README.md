@@ -79,8 +79,11 @@ calendars, weather and news feeds *you* connect.
   guests as 🧑🏻🧒🏻👶🏻🐶 icons, 🚪 check-outs, "Check-in today" highlights and blocked dates you can hide.
 - **Highlights and countdowns:** "In 18 min · Client call", "Check-out · Tomorrow", "🎃 Halloween party · Tomorrow!",
   "✈️ Trip to Madeira · In 12 days".
-- **Weather:** current conditions, hourly and daily forecast from [Open-Meteo](https://open-meteo.com/) (no API key),
-  or your own [Home Assistant](https://www.home-assistant.io/) weather entity and indoor sensors; animated rain/snow, or an optional
+- **Weather:** current conditions, hourly and daily forecast from a free source of your choice:
+  [Open-Meteo](https://open-meteo.com/) (no API key, with a choice of forecast model: ECMWF, DWD ICON, NOAA GFS,
+  Météo-France, UK Met Office and more), [MET Norway](https://api.met.no/) (no API key) or
+  [Pirate Weather](https://pirateweather.net/) (your own free key). The screens credit the source in small type.
+  Add your own [Home Assistant](https://www.home-assistant.io/) weather entity and indoor sensors; animated rain/snow, or an optional
   realistic effect with drops on the glass, layered snow and sun rays on clear days (the photo is never blurred).
 - **News ticker** from any RSS/Atom feed, a to-do list and a message of the day.
 - **Photo background:** stock photos or your own gallery, WebGL transitions, slow zoom, a soft "aurora" ambient
@@ -626,8 +629,18 @@ disable password login if you want.
   "Reservation · Guest" bars (blocked dates can be hidden with a filter); feeds that already format titles like
   `🏠 Guest - 4p+1m` keep their emoji and turn guest counts into icons; `Adults: 2 / Children: 1 / Infants: 1 / Pets: 1`
   lines in the description (also `Adultos/Niños/Bebés/Mascotas`) give 🧑🏻🧑🏻 🧒🏻 👶🏻 🐶.
-- **Weather:** [Open-Meteo](https://open-meteo.com/), no key needed: just set the location (search by name or
-  coordinates) and units in *Weather*.
+- **Weather:** set the location (search by name or coordinates) and units in *Weather*, then pick the source in
+  *Weather → Data source* (`weather.provider`). All of them are free:
+
+  | Source | Key | Notes |
+  |---|---|---|
+  | [Open-Meteo](https://open-meteo.com/) (default) | none | Picks the best model for your area, or the one you choose in *Forecast model* (`weather.model`: `best_match`, `ecmwf_ifs`, `icon_seamless`, `gfs_seamless`, `meteofrance_seamless`, `ukmo_seamless`, `gem_seamless`, `jma_seamless`). Some models have no chance of rain or UV index, or fewer days; those values are left out. Free for non-commercial use; data under CC BY 4.0. |
+  | [MET Norway](https://api.met.no/) | none | Locationforecast 2.0 of the Norwegian Meteorological Institute, worldwide. Chance of rain only in the Nordic countries; sunrise and sunset are computed. Marco identifies itself with its User-Agent and waits for the `Expires` time the service gives (about 30 minutes). Data under CC BY 4.0 and NLOD. |
+  | [Pirate Weather](https://pirateweather.net/) | your own, free | Create a key at [pirate-weather.apiable.io](https://pirate-weather.apiable.io/) and paste it in *Weather*. The free plan allows 10,000 calls a month; Marco asks at most every 15 minutes (about 3,000). The key is checked once and kept in `data/secrets.json`. |
+
+  Every source is cached per place for at least 10 minutes and shared by all the screens and languages; if the
+  source fails, the screens keep the last forecast for up to 6 hours. The screens show the source's name in small
+  type next to the weather (*Open-Meteo*, *Open-Meteo · ECMWF IFS*, *MET Norway*), as the CC BY licence asks.
 - **Home Assistant:** in Home Assistant open your **profile → Security → Long-lived access tokens → Create token**;
   in *Admin → Home Assistant* enter the URL (e.g. `http://homeassistant.local:8123`) and the token, *Test connection*,
   then choose a `weather.*` entity and/or indoor temperature/humidity `sensor.*` entities in *Weather*. The token stays
@@ -771,7 +784,7 @@ them in.
 data/
 ├── config.json          # all settings (screens, calendars, rules, events, birthdays)
 ├── secrets.json         # password hash, session secret, Google & Home Assistant tokens, API token hashes,
-│                        #   private-link keys per screen, paired-device token hashes (mode 600)
+│                        #   private-link keys per screen, paired-device token hashes, weather API key (mode 600)
 ├── photos/              # gallery (+ .thumbs/ and .meta.json with focal points, hidden flags)
 ├── backups/             # automatic and manual configuration backups
 ├── cache/               # feed caches
@@ -859,7 +872,8 @@ HEIC decoder (LGPL-3.0, loaded as a separate unmodified chunk) and the Inter / O
 ## Acknowledgements
 
 - [DAKboard](https://dakboard.com/) for the idea of a wall dashboard (this project is unaffiliated).
-- [Open-Meteo](https://open-meteo.com/): free weather API (data under CC BY 4.0).
+- [Open-Meteo](https://open-meteo.com/) and [MET Norway](https://api.met.no/): free weather APIs (data under CC BY 4.0),
+  and [Pirate Weather](https://pirateweather.net/).
 - [Lorem Picsum](https://picsum.photos/) and the Unsplash photographers for the stock photos.
 - [three.js](https://threejs.org/), [Preact](https://preactjs.com/), [Vite](https://vite.dev/),
   [Express](https://expressjs.com/), [node-ical](https://github.com/jens-maus/node-ical), [rrule](https://github.com/jkbrzt/rrule),

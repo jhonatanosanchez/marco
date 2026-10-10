@@ -308,9 +308,15 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
                 <div class="wx-now__meta">
                   <strong>{d.weather.locationName}</strong>
                   <span class="muted small">
-                    ↓ {Math.round(d.weather.min)}° · ↑ {Math.round(d.weather.max)}° · 💧 {d.weather.humidity}% · 💨 {Math.round(d.weather.windKmh)} km/h
+                    ↓ {Math.round(d.weather.min)}° · ↑ {Math.round(d.weather.max)}°
+                    {d.weather.humidity != null && <> · 💧 {d.weather.humidity}%</>}
+                    {d.weather.windKmh != null && <> · 💨 {Math.round(d.weather.windKmh)} km/h</>}
                   </span>
-                  <span class="muted small">{t('Actualizado {when}', { when: relTime(d.weather.updatedAt) })}</span>
+                  <span class="muted small">
+                    {t('Actualizado {when}', { when: relTime(d.weather.updatedAt) })}
+                    {' · '}
+                    {t('Datos de {source}', { source: [d.weather.source?.name ?? 'Open-Meteo', d.weather.source?.modelName].filter(Boolean).join(' · ') })}
+                  </span>
                 </div>
               </div>
             )}

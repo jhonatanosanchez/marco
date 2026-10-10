@@ -41,6 +41,7 @@ import type {
   GoogleCalendarListItem,
   HaEntity,
   TestHomeAssistantResponse,
+  WeatherKeyStatus,
   TestIcsResponse,
   TestRssResponse,
 } from '../shared/types';
@@ -150,6 +151,9 @@ export const api = {
   haEntities: (domain: 'sensor' | 'weather') =>
     request<HaEntity[]>('GET', `/api/admin/homeassistant/entities?domain=${domain}`),
   setHaToken: (token: string) => request<unknown>('PUT', '/api/admin/homeassistant/token', { token }),
+  weatherKey: () => request<WeatherKeyStatus>('GET', '/api/admin/weather/key'),
+  /** '' removes the key; a key the provider refuses answers 400 key_invalid */
+  setWeatherKey: (key: string) => request<WeatherKeyStatus>('PUT', '/api/admin/weather/key', { key }),
 
   photos: () => request<AdminPhoto[]>('GET', '/api/admin/photos'),
   deletePhoto: (file: string) => request<unknown>('DELETE', `/api/admin/photos/${encodeURIComponent(file)}`),

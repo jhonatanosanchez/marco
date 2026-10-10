@@ -241,6 +241,10 @@ function baseWeather(now: Date): WeatherResponse {
     },
     today: { sunrise: isoAt(T, 7, 39), sunset: isoAt(T, 19, 7), min: 14, max: 22, precipChance: 10 },
     daily, hourly, indoor: { temp: 22.3, humidity: 54 },
+    source: {
+      provider: 'open-meteo', name: 'Open-Meteo', model: null, modelName: null, url: 'https://open-meteo.com/',
+      licence: 'CC BY 4.0', licenceUrl: 'https://creativecommons.org/licenses/by/4.0/',
+    },
   };
 }
 
