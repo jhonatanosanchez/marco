@@ -332,7 +332,22 @@ function applyConfig(raw: DisplayConfig): void {
   announcements.applyConfig(cfg);
   renderScreenNote(raw);
   renderAll();
-  app.classList.remove('booting');
+  revealApp(cfg);
+}
+
+/**
+ * First paint: with the Modern style over a photo, wait for the photo (or 1.8 s at most) before fading the screen
+ * in, so the glass cards appear already blurring the photo instead of a black background that changes a second later.
+ */
+let revealArmed = false;
+function revealApp(cfg: DisplayConfig): void {
+  if (!app.classList.contains('booting') || revealArmed) return;
+  const waitPhoto = cfg.screen.style === 'modern' && cfg.background.enabled && !lite;
+  if (!waitPhoto) return void app.classList.remove('booting');
+  revealArmed = true;
+  const show = () => app.classList.remove('booting');
+  window.addEventListener('marco:photo-tone', show, { once: true });
+  setTimeout(show, 1800);
 }
 
 /** Small unobtrusive notice when ?screen= did not match any screen (the default one is shown instead). */
