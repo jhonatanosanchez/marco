@@ -232,29 +232,41 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
                   )}
                   {isNew && <span class="badge badge--soft">{t('Nueva')}</span>}
                 </div>
-                <div class="screen-card__slug">
-                  <TextInput
-                    mono
-                    class="input--sm"
-                    value={s.slug}
-                    error={!slugOk}
-                    prefix={<span class="mono small">?screen=</span>}
-                    onValue={(v) => upd(s.id, (x) => void (x.slug = v.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 32)))}
-                  />
-                  <button type="button" class="icon-btn" title={t('Generar desde el nombre')} onClick={() => upd(s.id, (x) => void (x.slug = uniqueSlug(x.name, taken(s.id))))}>
-                    <Icon name="wand" size={15} />
-                  </button>
-                  <button
-                    type="button"
-                    class="icon-btn"
-                    title={openMode ? t('Copiar URL') : url ? t('Copiar enlace privado') : t('Guarda la pantalla para obtener su enlace privado.')}
-                    disabled={!url}
-                    onClick={() => copy(url)}
-                  >
-                    <Icon name="copy" size={15} />
-                  </button>
-                </div>
-                {!slugOk && <div class="field__error">{t('Solo minúsculas, números y guiones; no puede repetirse')}</div>}
+                {openMode ? (
+                  <div class="screen-card__slug">
+                    <TextInput
+                      mono
+                      class="input--sm"
+                      value={s.slug}
+                      error={!slugOk}
+                      prefix={<span class="mono small">?screen=</span>}
+                      onValue={(v) => upd(s.id, (x) => void (x.slug = v.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 32)))}
+                    />
+                    <button type="button" class="icon-btn" title={t('Generar desde el nombre')} onClick={() => upd(s.id, (x) => void (x.slug = uniqueSlug(x.name, taken(s.id))))}>
+                      <Icon name="wand" size={15} />
+                    </button>
+                    <button type="button" class="icon-btn" title={t('Copiar URL')} onClick={() => copy(url)}>
+                      <Icon name="copy" size={15} />
+                    </button>
+                  </div>
+                ) : (
+                  // Private links: the screen's own link, read only, ready to copy (the slug does not open anything here)
+                  <div class="screen-card__slug screen-card__link">
+                    <input
+                      class="input input--mono input--sm"
+                      value={url}
+                      readOnly
+                      spellcheck={false}
+                      aria-label={t('Enlace privado')}
+                      placeholder={isNew ? t('Guarda la pantalla para obtener su enlace privado.') : t('Cargando el enlace…')}
+                      onFocus={(e) => e.currentTarget.select()}
+                    />
+                    <button type="button" class="btn btn--sm btn--ghost" title={url ? t('Copiar enlace privado') : t('Guarda la pantalla para obtener su enlace privado.')} disabled={!url} onClick={() => copy(url)}>
+                      <Icon name="copy" size={15} /> {t('Copiar')}
+                    </button>
+                  </div>
+                )}
+                {openMode && !slugOk && <div class="field__error">{t('Solo minúsculas, números y guiones; no puede repetirse')}</div>}
                 {openMode && slugChanged && slugOk && <div class="field__hint warn-text">{t('Las pantallas que usan ?screen={old} mostrarán la predeterminada hasta que cambies su URL.', { old: savedSlug! })}</div>}
                 <div class="screen-card__meta">
                   <span>

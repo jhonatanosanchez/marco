@@ -364,3 +364,13 @@ test('dashboard greeting: first name, none for an email address', () => {
   assert.equal(util.greetingName(''), '');
   assert.equal(util.greetingName(undefined), '');
 });
+
+test('guessKind: vacation rentals only on clear words', () => {
+  assert.equal(util.guessKind('Festivos en Portugal'), 'holidays');
+  assert.equal(util.guessKind('Familia'), 'generic');
+  assert.equal(util.guessKind('Calendario personal'), 'generic');
+  assert.equal(util.guessKind('AL CUSTOM'), 'generic');
+  assert.equal(util.guessKind('Reservas Airbnb'), 'airbnb');
+  assert.equal(util.guessKind('Booking.com'), 'airbnb');
+  assert.equal(util.guessKind('Cumpleaños'), 'birthdays');
+});
