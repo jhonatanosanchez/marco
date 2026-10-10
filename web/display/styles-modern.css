@@ -19,7 +19,7 @@
   --m-r-sm: 1.2rem;
   --m-fill: rgb(255 255 255 / 0.07);
   --m-sep: rgb(255 255 255 / 0.12);
-  --m-glass: rgb(22 22 26 / min(0.9, calc(0.3 * var(--panel-shade, 1))));
+  --m-glass: rgb(22 22 26 / min(0.9, calc((0.24 + var(--tone-bottom, 0.5) * 0.24) * var(--panel-shade, 1))));
   --m-blur: blur(calc(var(--panel-blur, 18) * 0.17rem)) saturate(1.8);
   --m-shadow: 0 0.8rem 3.2rem rgb(0 0 0 / 0.16);
   --m-ink: rgb(255 255 255 / 0.92);
@@ -322,6 +322,18 @@
 .style-modern .wxm-day .p { font-size: 1.3rem; font-weight: 600; color: var(--rain); }
 .style-modern .wxm-day .dmx { font-size: 1.9rem; font-weight: 600; font-feature-settings: 'tnum'; }
 .style-modern .wxm-day .dmn { font-size: 1.7rem; font-weight: 500; color: var(--m-ink-2); font-feature-settings: 'tnum'; }
+/* portrait band: head on the left, the next days on the right (a full-width stack leaves the card mostly empty) */
+.style-modern #app.portrait:not(.preset-topBottom) .side .side-bottom .weather {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  column-gap: 2.8rem;
+  align-items: center;
+}
+.style-modern #app.portrait:not(.preset-topBottom) .weather > .wxm-head { grid-area: 1 / 1; }
+.style-modern #app.portrait:not(.preset-topBottom) .weather > .wxm-days { grid-area: 1 / 2; }
+.style-modern #app.portrait:not(.preset-topBottom) .weather > .wx-hourly,
+.style-modern #app.portrait:not(.preset-topBottom) .weather > .wx-meta { grid-column: 1 / -1; grid-row: auto; }
+.style-modern #app.portrait:not(.preset-topBottom) .weather .wxm-days { margin-top: 0; padding: 0 0 0 2.8rem; border-top: 0; border-left: 1px solid var(--m-sep); }
 /* compact bands (portrait, top/bottom): head + days only */
 .style-modern #app.portrait .weather .wx-meta,
 .style-modern .preset-topBottom .weather .wx-meta { display: none; }
@@ -438,11 +450,17 @@
   transform: none;
 }
 .style-modern.theme-light .cal.is-week .ev.timed { background: rgb(var(--c) / 0.16); }
-.style-modern .preset-topBottom .cal { --num-h: 4.2rem; }
-.style-modern .preset-topBottom .num { padding-top: 0.6rem; }
+.style-modern .preset-topBottom .cal { --num-h: 3.8rem; }
+.style-modern .preset-topBottom .num { padding-top: 0.6rem; font-size: 2.4rem; }
+.style-modern .preset-topBottom .cal-head { padding-bottom: 0.8rem; }
+.style-modern .preset-topBottom .cal-title { font-size: 3rem; }
+.style-modern .preset-topBottom .cal-dow { padding-bottom: 0.4rem; }
+.style-modern .preset-topBottom .more { margin-top: 0.8rem; }
 
 /* ------------------------------------------------------------------------------- agenda (list rows in cards) */
 .style-modern .agenda { column-gap: 3.2rem; padding: 0.4rem 0.8rem 1.6rem; }
+/* fill the columns in order: with the default balancing Chrome lets the last day card of a column run under the news */
+.style-modern .main > .agenda { column-fill: auto; }
 .style-modern .ag-day { margin-bottom: 2.4rem; }
 .style-modern .ag-date { border-bottom: 0; padding: 0 0.4rem 1rem; gap: 1rem; }
 .style-modern .ag-date b { font-size: 2.4rem; font-weight: 700; letter-spacing: -0.01em; }

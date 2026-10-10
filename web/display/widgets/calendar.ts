@@ -31,7 +31,10 @@ function textWidth(text: string, px: number, weight: number): number {
     }
   }
   if (!measureCtx) return text.length * px * 0.55;
-  measureCtx.font = `${weight} ${px}px 'Inter Variable', Inter, system-ui, sans-serif`;
+  // Modern measures with the font it renders with (SF on Apple devices, Inter elsewhere), so wrapping matches
+  measureCtx.font = ctx.cfg.screen.style === 'modern'
+    ? `${weight} ${px}px -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter Variable', Inter, system-ui, sans-serif`
+    : `${weight} ${px}px 'Inter Variable', Inter, system-ui, sans-serif`;
   return measureCtx.measureText(text).width;
 }
 
