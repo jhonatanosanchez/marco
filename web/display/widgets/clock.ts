@@ -15,6 +15,8 @@ export class Clock {
   private face: HTMLElement;
   /** epoch second of the previous update: digit animations only run on a normal 1 s step */
   private lastSec = 0;
+  /** minute of the last fit check: the width only changes when the digits, the layout or the font size change */
+  private fitKey = '';
 
   /** @param opts.seconds force the seconds on / off (layouts with a small or a bedside clock); default: the config */
   constructor(private root: HTMLElement, private opts: { seconds?: boolean } = {}) {
@@ -22,6 +24,23 @@ export class Clock {
     root.innerHTML = `<div class="clock"></div><div class="date"></div>`;
     this.face = root.querySelector('.clock')!;
     this.dateEl = root.querySelector('.date')!;
+    // A large font size (screen.fontScale) or a narrow panel must never push the digits onto a second line:
+    // the clock shrinks to the width it has.
+    if ('ResizeObserver' in window) new ResizeObserver(() => this.fit()).observe(root);
+  }
+
+  /** Scale the digital clock down (CSS zoom) when it is wider than its column; never up. */
+  private fit(): void {
+    const f = this.face;
+    if (!f.classList.contains('digital')) return void f.style.removeProperty('zoom');
+    f.style.removeProperty('zoom');
+    // the wrap can grow with the clock, so measure the column it sits in
+    const parent = this.root.parentElement;
+    const cs = parent ? getComputedStyle(parent) : null;
+    const col = parent && cs ? parent.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) : 0;
+    const avail = col > 0 ? Math.min(col, this.root.clientWidth || col) : this.root.clientWidth;
+    const need = f.scrollWidth;
+    if (avail > 0 && need > avail + 1) f.style.zoom = String(Math.max(0.3, (avail / need) * 0.98));
   }
 
   private build(): void {
@@ -95,6 +114,11 @@ export class Clock {
       setText(this.ampm, !dt.format24 && dt.showAmPm ? (hour < 12 ? 'AM' : 'PM') : '');
     }
     setHTML(this.dateEl, esc(formatDateLine(ctx.lang, tick.dayKey, dt.dateFormat, dt.dateCustom)));
+    const key = `${this.mode}|${hour}|${minute}|${getComputedStyle(document.documentElement).getPropertyValue('--fs')}`;
+    if (key !== this.fitKey) {
+      this.fitKey = key;
+      this.fit();
+    }
   }
 
   private setDigit(e: HTMLElement | undefined, ch: string, animate: boolean): void {

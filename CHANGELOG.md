@@ -11,6 +11,10 @@ All notable changes to this project are documented here. The format is based on
   allowed emails set) keep it.
 - **Google Calendar** leaves out Google Workspace working-location entries ("Home", "Office").
 - The linked accounts chooser closes with an X instead of a Cancel button.
+
+### Fixed
+- A large font size (*Screen → Font size*) no longer pushes the clock's last digit onto a second line: the clock
+  never wraps and shrinks to the width of its column.
 - Marco Cloud: sign-up goes straight to Inicio, with a welcome card to put Marco on a TV.
 
 ### Added

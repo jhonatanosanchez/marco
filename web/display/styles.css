@@ -280,6 +280,8 @@ body {
   font-variant-numeric: tabular-nums;
   margin-right: -0.06em;
 }
+.clock .hm { white-space: nowrap; }
+.clock.digital { flex-wrap: nowrap; white-space: nowrap; }
 .clock .d { display: inline-block; width: 0.555em; text-align: center; will-change: transform; }
 .clock .d.blank { width: 0.3em; }
 .clock .colon { display: inline-block; width: 0.24em; text-align: center; transform: translateY(-0.07em); opacity: 0.9; }
