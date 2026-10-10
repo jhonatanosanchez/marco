@@ -4,6 +4,7 @@
 // this browser). A self-hosted server has its own setup wizard and never shows it.
 import { useEffect, useState } from 'preact/hooks';
 import type { AuthMeResponse, DashboardResponse } from '../../shared/types';
+import { api } from '../api';
 import { caps, has } from '../caps';
 import { t } from '../i18n';
 import { openPairDialog } from './DisplayAccess';
@@ -63,6 +64,24 @@ export function WelcomeCard({ me, dash, go, onShown }: { me: AuthMeResponse; das
       setDone(true);
     }
   }, [offered, anyDisplay, done]);
+  // A TV paired from another browser that has not connected yet still counts.
+  const waiting = offered && !done && !!dash && !anyDisplay;
+  useEffect(() => {
+    if (!waiting) return;
+    let live = true;
+    api
+      .devices()
+      .then((r) => {
+        if (live && r.devices.length > 0) {
+          markDone(me);
+          setDone(true);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [waiting]);
   useEffect(() => {
     if (done) return;
     const onPaired = () => {
