@@ -31,12 +31,17 @@ function textWidth(text: string, px: number, weight: number): number {
     }
   }
   if (!measureCtx) return text.length * px * 0.55;
-  measureCtx.font = `${weight} ${px}px 'Inter Variable', Inter, system-ui, sans-serif`;
+  // Modern measures with the font it renders with (SF on Apple devices, Inter elsewhere), so wrapping matches
+  measureCtx.font = ctx.cfg.screen.style === 'modern'
+    ? `${weight} ${px}px -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter Variable', Inter, system-ui, sans-serif`
+    : `${weight} ${px}px 'Inter Variable', Inter, system-ui, sans-serif`;
   return measureCtx.measureText(text).width;
 }
 
 export class MonthCalendar {
   readonly root: HTMLElement;
+  /** Two weeks layout: rows are tall, so chips may wrap onto four lines (five for the only event of a day). */
+  roomy = false;
   private head: HTMLElement;
   private dow: HTMLElement;
   private weeks: HTMLElement;
@@ -212,12 +217,18 @@ export class MonthCalendar {
       for (let l = 0; l < L; l++) if (!blocked[l][2 * d] && !blocked[l][2 * d + 1]) free.push(l);
       if (free.length < day.length) continue;
       day.sort((a, b) => a.lane - b.lane);
-      const maxSpan = day.length === 1 ? 3 : 2;
+      const maxSpan = this.roomy ? (day.length === 1 ? 5 : 4) : day.length === 1 ? 3 : 2;
+      const base = day.map((sg) => {
+        const lb = labels.get(sg);
+        return this.linesNeeded(sg.e, lb?.tm ?? '', lb?.extra ?? '');
+      });
+      // Two weeks: columns are narrow for long words, so wrapping wastes more of each line. Give every chip of the
+      // day one spare line, but only when all of them get it (a busy day keeps the tighter estimate).
+      const spare = this.roomy && base.reduce((n, b) => n + Math.min(maxSpan, b + 1), 0) <= free.length ? 1 : 0;
       let p = 0;
       day.forEach((sg, i) => {
-        const lb = labels.get(sg);
         const scale = this.wordScale(sg.e);
-        const need = this.linesNeeded(sg.e, lb?.tm ?? '', lb?.extra ?? '');
+        const need = base[i] + spare;
         const want = scale === 0 ? 1 : Math.min(maxSpan, need);
         const rest = day.length - i - 1;
         let span = 1;

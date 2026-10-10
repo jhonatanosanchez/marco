@@ -4,6 +4,8 @@ import '@fontsource-variable/inter';
 import '@fontsource-variable/outfit';
 import '../shared/emoji-font.css';
 import './styles.css';
+import './styles-views.css';
+import './styles-modern.css';
 import type {
   Announcement, CountdownsResponse, DisplayConfig, EventsResponse, NewsResponse, NightCommand, StreamHello, WeatherResponse,
 } from '../shared/types';
@@ -35,8 +37,10 @@ import { Clock } from './widgets/clock';
 import { renderMessage, renderTodo } from './widgets/extras';
 import { Highlights } from './widgets/highlights';
 import { News } from './widgets/news';
-import { Photos } from './widgets/photos';
+import { Photos, photoStats } from './widgets/photos';
+import { glassVars, normalizeGlass } from '../shared/glass';
 import { Weather } from './widgets/weather';
+import { VIEW_PRESETS, Views } from './widgets/views';
 import { checkSetup, showWelcome, waitForSetup } from './widgets/welcome';
 import { afterPairUrl, pairHealth, pairingLang, showPairing } from './widgets/pairing';
 import { healthOnce, loadEmojiWebFont } from './health';
@@ -72,6 +76,7 @@ const countdowns = new Countdowns($('#countdowns'), $('#cd-strip'));
 const schedules = new ScheduleBanners($('#sched'), $('#sched-strip'));
 const announcements = new Announcements($('#alerts'));
 const identify = new IdentifyOverlay($('#identify'));
+const views = new Views($('#view'));
 const screenNote = $('#screen-note');
 const statusDot = $('#status');
 const night = $('#night');
@@ -180,9 +185,13 @@ function hueShift(hex: string, deg: number): string {
   return toHex([(r1 + m) * 255, (g1 + m) * 255, (b1 + m) * 255]);
 }
 
+const PRESETS = ['bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda', 'today', 'people', 'photoFrame', 'twoWeeks', 'board', 'bedside'];
+/** Newer layouts built on an older one's frame: they also get its class, so its rules (and the Modern ones) apply. */
+const PRESET_BASE: Record<string, string> = { today: 'bigCalendar', twoWeeks: 'bigCalendar', people: 'topBottom', board: 'topBottom' };
+
 function effectivePreset(cfg: DisplayConfig): string {
   const p = params.get('preset') || cfg.layout.preset;
-  return ['bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda'].includes(p) ? p : 'bigCalendar';
+  return PRESETS.includes(p) ? p : 'bigCalendar';
 }
 
 function isPortrait(cfg: DisplayConfig): boolean {
@@ -197,16 +206,42 @@ function applyLayout(): void {
   const preset = effectivePreset(cfg);
   const portrait = isPortrait(cfg);
   const side = params.get('side') || cfg.layout.sidePanel;
+  const corner = params.get('corner') || cfg.layout.corner || 'br';
   app.className = [
     `preset-${preset}`, `side-${side === 'right' ? 'right' : 'left'}`, portrait ? 'portrait' : 'landscape',
     cfg.background.enabled ? 'has-photo' : 'no-photo',
-  ].join(' ');
+    PRESET_BASE[preset] ? `preset-${PRESET_BASE[preset]}` : '',
+    preset === 'photoFrame' ? `corner-${['tl', 'tr', 'bl', 'br'].includes(corner) ? corner : 'br'}` : '',
+  ].filter(Boolean).join(' ');
+  app.classList.toggle('has-view', VIEW_PRESETS.includes(preset));
+  views.setPreset(preset);
   const view = params.get('view') || cfg.calendar.view;
   const showAgendaMain = preset === 'agenda' || view === 'agenda';
   app.classList.toggle('view-agenda', showAgendaMain);
   app.classList.toggle('cal-off', !cfg.calendar.enabled);
   engine?.invalidate();
 }
+
+/**
+ * Modern style glass: settings + current photo → a few custom properties on <html> (no extra layers).
+ * Re-run on every new photo, since Auto and "from the photo" depend on it.
+ */
+const GLASS_VARS = ['--g-rgb', '--g-solid', '--g-a', '--g-a-wx', '--g-filter', '--g-sheet-rgb', '--g-sheet-a', '--g-sheet-filter', '--g-edge'];
+function applyGlass(): void {
+  const cfg = ctx.cfg;
+  const root = document.documentElement;
+  if (cfg.screen.style !== 'modern') {
+    for (const k of GLASS_VARS) root.style.removeProperty(k);
+    root.classList.remove('glass-ink-dark', 'glass-no-edge', 'glass-thin');
+    return;
+  }
+  const g = glassVars(cfg.screen.glass, cfg.background.enabled ? photoStats : null, { lite, hasPhoto: cfg.background.enabled });
+  for (const [k, v] of Object.entries(g.vars)) root.style.setProperty(k, v);
+  root.classList.toggle('glass-ink-dark', g.inkDark);
+  root.classList.toggle('glass-no-edge', !g.edge);
+  root.classList.toggle('glass-thin', g.thin);
+}
+window.addEventListener('marco:photo-tone', () => applyGlass());
 
 function applyConfig(raw: DisplayConfig): void {
   const cfg = normalizeConfig(raw);
@@ -217,6 +252,19 @@ function applyConfig(raw: DisplayConfig): void {
   if (pc === 'analog' || pc === 'digital') cfg.datetime.clock = pc;
   const pt = params.get('theme');
   if (pt === 'light' || pt === 'dark') cfg.screen.theme = pt;
+  const ps = params.get('style');
+  if (ps === 'classic' || ps === 'modern') cfg.screen.style = ps;
+  // glass previews: ?glass=clear|tinted|auto &glassOpacity=0..1 &glassBlur=0..40 &glassTint=dark|light|photo &glassEdge=0|1
+  const gq = (k: string) => params.get(k);
+  if (gq('glass') || gq('glassOpacity') || gq('glassBlur') || gq('glassTint') || gq('glassEdge')) {
+    const g = { ...cfg.screen.glass } as Record<string, unknown>;
+    if (gq('glass')) g.appearance = gq('glass');
+    if (gq('glassOpacity')) g.opacity = gq('glassOpacity');
+    if (gq('glassBlur')) g.blur = gq('glassBlur');
+    if (gq('glassTint')) g.tint = gq('glassTint');
+    if (gq('glassEdge')) g.edge = gq('glassEdge') !== '0';
+    cfg.screen.glass = normalizeGlass(g);
+  }
   const pa = params.get('ambient');
   if (pa === 'aurora' || pa === 'particles' || pa === 'none') cfg.background.ambient = pa;
   const ptr = params.get('transition');
@@ -225,8 +273,19 @@ function applyConfig(raw: DisplayConfig): void {
   if (pfx === 'off' || pfx === 'simple' || pfx === 'rich') cfg.background.weatherFx = pfx;
   // the top-bottom preset has a shorter calendar: cap the number of week rows so chips stay readable
   if (effectivePreset(cfg) === 'topBottom') cfg.calendar.weeks = Math.min(cfg.calendar.weeks, 4);
+  // Two weeks: the month grid with two roomy rows (more events per day)
+  if (effectivePreset(cfg) === 'twoWeeks') {
+    cfg.calendar.view = 'month';
+    cfg.calendar.weeks = 2;
+    cfg.calendar.maxEventsPerDay = Math.max(cfg.calendar.maxEventsPerDay, 8);
+  }
+  // Bedside: a dark room, no photo and no animated background
+  if (effectivePreset(cfg) === 'bedside') {
+    cfg.background.enabled = false;
+    cfg.background.ambient = 'none';
+  }
   // Small landscape screens (e.g. 1280×720 on the Pi): one week fewer so text can be bigger.
-  if (window.innerWidth > window.innerHeight && window.innerHeight <= 820) cfg.calendar.weeks = Math.min(cfg.calendar.weeks, 4);
+  if (window.innerWidth > window.innerHeight && window.innerHeight <= 820 && effectivePreset(cfg) !== 'twoWeeks') cfg.calendar.weeks = Math.min(cfg.calendar.weeks, 4);
   setCtxConfig(cfg);
   setTimezone(ctx.tz);
   const root = document.documentElement;
@@ -234,6 +293,9 @@ function applyConfig(raw: DisplayConfig): void {
   const accent = cfg.screen.accent;
   const light = cfg.screen.theme === 'light';
   root.classList.toggle('theme-light', light);
+  // Display style (independent of the layout): 'modern' scopes every rule in styles-modern.css; classic adds nothing.
+  root.classList.toggle('style-modern', cfg.screen.style === 'modern');
+  applyGlass();
   root.style.setProperty('--accent', accent);
   root.style.setProperty('--accent-rgb', parseColor(accent).join(' '));
   root.style.setProperty('--fs', String(cfg.screen.fontScale));
@@ -254,7 +316,7 @@ function applyConfig(raw: DisplayConfig): void {
 
   // WebGL needs
   const preset = effectivePreset(cfg);
-  const wantAmbient = !lite && cfg.background.ambient !== 'none' && (preset === 'bigCalendar' || preset === 'agenda' || preset === 'topBottom');
+  const wantAmbient = !lite && cfg.background.ambient !== 'none' && ['bigCalendar', 'agenda', 'topBottom', 'today', 'twoWeeks', 'people'].includes(preset);
   const wantGLPhoto = !lite && cfg.background.enabled && cfg.background.transition === 'webgl';
   if ((wantAmbient || wantGLPhoto) && !engine && !glFailed) {
     void initGL().then(() => {
@@ -285,7 +347,7 @@ function applyGL(wantAmbient: boolean, accent: string, light: boolean): void {
   const cfg = ctx.cfg;
   const root = document.documentElement;
   if (engine) {
-    const bg = light ? '#f4f2ee' : '#000000';
+    const bg = light ? (cfg.screen.style === 'modern' ? '#f2f2f7' : '#f4f2ee') : '#000000';
     engine.setClearColor(bg);
     if (ambient) {
       ambient.mode = wantAmbient ? cfg.background.ambient : 'none';
@@ -316,11 +378,25 @@ function renderCalendar(tick: Tick): void {
   const evs = eventsNormalized();
   const cfg = ctx.cfg;
   const preset = effectivePreset(cfg);
+  renderView(tick);
   if (!cfg.calendar.enabled) return;
+  // layouts with their own view (today, people, …) do not show the month grid / agenda
+  if (VIEW_PRESETS.includes(preset)) {
+    if (preset === 'today') highlights.render(evs, tick);
+    return;
+  }
   if (app.classList.contains('view-agenda')) agenda.render(evs, tick);
-  else calendar.render(evs, tick);
+  else {
+    calendar.roomy = preset === 'twoWeeks';
+    calendar.render(evs, tick);
+  }
   if (preset === 'leftRight' || preset === 'bigTime') sideAgenda.render(evs, tick);
   highlights.render(evs, tick);
+}
+
+/** Content of the layouts with their own view (no-op for the others). */
+function renderView(tick: Tick): void {
+  views.render({ events: ctx.cfg.calendar.enabled ? eventsNormalized() : [], weather: state.weather, countdowns: state.countdowns }, tick);
 }
 
 function renderCountdowns(tick: Tick): void {
@@ -332,10 +408,13 @@ function renderCountdowns(tick: Tick): void {
       .map((e) => e.title),
   );
   countdowns.render(state.countdowns, today, shown);
+  if (effectivePreset(ctx.cfg) === 'board') renderView(tick);
 }
 
 function renderWeather(tick: Tick): void {
   weather.render(state.weather, tick.dayKey);
+  const p = effectivePreset(ctx.cfg);
+  if (p === 'photoFrame' || p === 'bedside') renderView(tick);
   const cur = ctx.cfg.weather.enabled ? state.weather?.current : undefined;
   const pm = cur ? precipOf(cur.code) : null;
   if (precip) precip.mode = pm;
@@ -363,6 +442,8 @@ function renderAll(): void {
 const FIT_STEPS = ['fit-1', 'fit-2', 'fit-3'];
 function fitSide(): void {
   fitSideContent();
+  fitMidRows();
+  views.fit();
   photos.reframe(); // what's left uncovered of the photo may have changed
 }
 function fitSideContent(): void {
@@ -378,12 +459,51 @@ function fitSideContent(): void {
   for (const c of cdChips) c.classList.remove('fit-hide');
   fitStrip();
   if (!overflowing()) return;
+  // Today: the forecast for the next hours matters more than the countdowns
+  if (app.classList.contains('preset-today')) {
+    for (let i = cdChips.length - 1; i >= 0 && overflowing(); i--) cdChips[i].classList.add('fit-hide');
+    if (!overflowing()) return;
+  }
   app.classList.add('fit-1');
   for (let i = cdChips.length - 1; i >= 1 && overflowing(); i--) cdChips[i].classList.add('fit-hide');
   if (!overflowing()) return;
   for (const step of FIT_STEPS.slice(1)) {
     app.classList.add(step);
     if (!overflowing()) break;
+  }
+}
+
+/**
+ * Modern big time (landscape; portrait shows a chip strip): no fade-out mask, so the side agenda shows whole rows only. Drop rows from the end (and days
+ * left empty), then countdowns, until the mid column fits. Classic keeps its masked fade and is not touched.
+ */
+function fitMidRows(): void {
+  const mid = sideEl.querySelector('.side-mid') as HTMLElement;
+  const rows = Array.from(document.querySelectorAll<HTMLElement>('#side-agenda .ag-ev, #side-agenda .ag-more, #side-agenda .ag-day'));
+  for (const r of rows) r.classList.remove('fit-hide');
+  const agendaEl = document.getElementById('side-agenda');
+  agendaEl?.classList.remove('fit-hide');
+  if (!document.documentElement.classList.contains('style-modern') || !app.classList.contains('preset-bigTime') || app.classList.contains('portrait') || !mid) return;
+  const over = () => mid.scrollHeight > mid.clientHeight + 1;
+  if (!over()) return;
+  const days = Array.from(document.querySelectorAll<HTMLElement>('#side-agenda .ag-day')).reverse();
+  for (const day of days) {
+    const items = Array.from(day.querySelectorAll<HTMLElement>('.ag-ev, .ag-more')).reverse();
+    for (const it of items) {
+      it.classList.add('fit-hide');
+      if (!over()) break;
+    }
+    // a day header with no rows left goes too
+    if (!day.querySelector('.ag-ev:not(.fit-hide)')) day.classList.add('fit-hide');
+    if (!over()) return;
+  }
+  agendaEl?.classList.add('fit-hide');
+  if (!over()) return;
+  // still too tall (message, to-do and banners take the room): countdowns from the furthest one
+  const cds = Array.from(document.querySelectorAll<HTMLElement>('#countdowns > .cd:not(.fit-hide)')).reverse();
+  for (const c of cds) {
+    c.classList.add('fit-hide');
+    if (!over()) return;
   }
 }
 
@@ -630,6 +750,7 @@ function startPolling(): void {
 
 onTick((tick) => {
   clock.update(tick);
+  views.tick(tick);
   if (tick.minuteChanged) {
     renderCalendar(tick);
     renderWeather(tick);

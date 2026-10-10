@@ -3,7 +3,11 @@
 import type { PhotoFrame } from './focus';
 
 export type Lang = 'es' | 'en' | 'pt';
-export type LayoutPreset = 'bigCalendar' | 'leftRight' | 'topBottom' | 'bigTime' | 'agenda';
+export type LayoutPreset =
+  | 'bigCalendar' | 'leftRight' | 'topBottom' | 'bigTime' | 'agenda'
+  | 'today' | 'people' | 'photoFrame' | 'twoWeeks' | 'board' | 'bedside';
+/** Corner of the clock card in the 'photoFrame' layout: top-left, top-right, bottom-left, bottom-right. */
+export type FrameCorner = 'tl' | 'tr' | 'bl' | 'br';
 export type SourceKind = 'generic' | 'airbnb' | 'birthdays' | 'holidays';
 export type SourceType = 'ics' | 'google';
 export type DateFormat = 'weekday_month_d' | 'weekday_d_month' | 'weekday_d_dot_month';
@@ -15,11 +19,31 @@ export interface NightMode {
   dim: number; // 0..1 (brightness multiplier applied at night)
 }
 
+export type DisplayStyle = 'classic' | 'modern';
+
+/** Glass material of the Modern style (like iOS Liquid Glass): ignored by Classic. */
+export interface GlassConfig {
+  /** 'auto' follows the photo (clearer over dark photos, more tinted over bright ones); 'clear' or 'tinted' fix it. */
+  appearance: 'auto' | 'clear' | 'tinted';
+  /** 0 = most see-through, 1 = most solid (0.5 = the default Modern look). */
+  opacity: number;
+  /** Background blur, 0..40 (0 = none). */
+  blur: number;
+  /** Tint colour: dark, light, or taken from the current photo. */
+  tint: 'dark' | 'light' | 'photo';
+  /** Thin light ring along the card edge. */
+  edge: boolean;
+}
+
 export interface ScreenConfig {
   name: string;
   language: Lang;
   fontScale: number;
   theme: 'dark' | 'light' | string;
+  /** Display style, independent of the layout: 'classic' (default) or 'modern' (glass cards, Apple-like). */
+  style?: DisplayStyle;
+  /** Glass options for the Modern style. Missing = defaults (GLASS_DEFAULTS). */
+  glass?: GlassConfig;
   accent: string;
   orientation: 'auto' | 'landscape' | 'portrait' | string;
   customCss: string;
@@ -30,6 +54,10 @@ export interface LayoutConfig {
   preset: LayoutPreset;
   sidePanel: 'left' | 'right';
   sideWidth: number; // 0..1 fraction of the screen width
+  /** 'people' layout: calendar ids shown as columns (max 5); null / missing = automatic. */
+  people?: string[] | null;
+  /** 'photoFrame' layout: corner of the clock card (default 'br'). */
+  corner?: FrameCorner;
 }
 
 export interface BackgroundConfig {

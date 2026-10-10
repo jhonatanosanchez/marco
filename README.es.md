@@ -59,9 +59,19 @@ El único tráfico saliente va a los calendarios, al tiempo y a las fuentes de n
 
 <img src="docs/screenshots/display-portrait-1080x1920.webp" width="280" align="right" alt="Diseño vertical de 1080x1920">
 
-- **Calendario:** vistas de mes (con número de semanas configurable), agenda y semana; cinco diseños (*calendario
-  grande*, *izquierda/derecha*, *arriba/abajo*, *hora grande*, *agenda*), en horizontal o vertical, y cada calendario
-  con su propio color.
+- **Calendario:** vistas de mes (con número de semanas configurable), agenda y semana; once diseños (*calendario
+  grande*, *dos semanas*, *izquierda/derecha*, *arriba/abajo*, *agenda*, *hoy*, *por persona*, *tablero*, *hora
+  grande*, *marco de fotos*, *mesilla*), en horizontal o vertical, y cada calendario con su propio color.
+- **Un diseño para cada habitación:** *Hoy* muestra el día hora a hora con una línea de ahora, el próximo evento en
+  grande y el tiempo de las próximas horas (la cocina por la mañana). *Por persona* da a cada calendario su columna
+  con lo de hoy y lo de mañana (eliges hasta cinco en *Diseño*). *Tablero* es un tablón de organización familiar:
+  tareas, cuentas atrás, el mensaje del día, los próximos cumpleaños y una agenda corta. *Marco de fotos* deja la
+  foto sola, con una tarjeta pequeña con la hora en la esquina que elijas. *Mesilla* es un reloj enorme y muy tenue
+  con el próximo evento y la temperatura, que se atenúa más por la noche. *Dos semanas* es la cuadrícula del mes con
+  dos filas amplias.
+- **Dos estilos por pantalla:** *Moderno* (el de serie), un aspecto minimalista al estilo de Apple, con tarjetas de
+  cristal sobre la foto, reloj de pantalla de bloqueo y una cuadrícula de mes como la de iOS, o *Clásico*. El estilo
+  es independiente del diseño.
 - **Emojis automáticos:** 🎂 cumpleaños, ✈️ vuelos, 🩺 médico, 🎒 colegio, ⚽ deporte, 🍽️ cenas, 💼 reuniones, 🏖️
   vacaciones, 🚗 coche, 🐾 veterinario y más, a partir de reglas de palabras clave editables (35 categorías con unas
   400 palabras clave en inglés, español y portugués de serie).
@@ -406,7 +416,7 @@ carpeta `data/` real nunca se toca.
 ![La pantalla de la cocina de la demo: tema claro, agenda, lista de tareas y tiempo en directo](docs/screenshots/display-kitchen-live.webp)
 
 ¿Solo quieres ver la pantalla? Cualquier instancia en marcha muestra un conjunto de datos de ejemplo integrado en
-`/?demo=1` (añade `&lang=es`, `&preset=agenda`, `&theme=light`, `&announce=success`, `&sched=1`,
+`/?demo=1` (añade `&lang=es`, `&preset=agenda`, `&theme=light`, `&style=modern`, `&announce=success`, `&sched=1`,
 `&now=2026-10-09T10:42`).
 
 **Vídeo de demostración.** Un recorrido de 48 segundos por la demo: la pantalla del salón con transiciones de fotos,
@@ -829,7 +839,10 @@ Haz copia de seguridad de toda la carpeta (o usa *Exportar*) para conservarlo to
 | `?lite=1` | Sin efectos WebGL (dispositivos lentos) |
 | `?demo=1` | Datos de ejemplo integrados (no necesita datos del servidor) |
 | `?lang=en\|es\|pt` | Fuerza el idioma |
-| `?preset=…` `?view=month\|agenda\|week` `?theme=dark\|light` `?side=left\|right` `?clock=analog` | Fuerza opciones de diseño (útil para hacer pruebas) |
+| `?preset=…` `?view=month\|agenda\|week` `?theme=dark\|light` `?style=classic\|modern` `?side=left\|right` `?clock=analog` | Fuerza opciones de diseño (útil para hacer pruebas) |
+| `?preset=today\|people\|photoFrame\|twoWeeks\|board\|bedside` `?people=<ids de calendario, separados por comas>` `?corner=tl\|tr\|bl\|br` | Prueba los diseños nuevos, las columnas de *Por persona* y la esquina de *Marco de fotos* |
+| `?glass=clear\|tinted\|auto` `?glassOpacity=0..1` `?glassBlur=0..40` `?glassTint=dark\|light\|photo` `?glassEdge=0\|1` | Fuerza las opciones de cristal del estilo Moderno |
+| `?empty=1` `?photos=0` | Con `?demo=1`: sin eventos, cuentas atrás ni tareas, o sin foto de fondo (para ver los estados vacíos) |
 | `?client=<name>` | Nombre de este dispositivo en *Pantallas conectadas* (lo define el script del kiosco) |
 
 ## Seguridad

@@ -7,10 +7,44 @@ All notable changes to this project are documented here. The format is based on
 
 ## [0.5.0] - 2026-10-10
 
-Alerts and display commands in poll mode, a capability block in `/api/health` that the admin follows, a pairing
+A Modern display style with glass options, six new layouts, alerts and display commands in poll mode, a capability block in `/api/health` that the admin follows, a pairing
 confirm step, place search through the server, and the shared logic moved into `server/core`.
 
 ### Added
+- **Display style** (*Layout → Display style*, `screen.style`): every screen can now be *Modern* or *Classic* (the look so far).
+  New installs and new screens start Modern; screens saved before this release keep Classic, so nothing changes
+  until you pick it. *Modern* is a more minimal, Apple-like look: glass widget
+  cards over the photo with a light edge, a Lock Screen clock with the date on top, the month grid in the iOS
+  Calendar idiom (no column lines, today as a filled circle, colour dots for timed events), agenda days as list
+  cards, a Weather-widget layout, notification-style alerts and scheduled messages. It works with every layout,
+  portrait and landscape, the light and dark themes, night mode, the weather effect and `?lite=1` (solid cards
+  instead of blur). Modern uses the system font (SF on Apple devices) and falls back to the bundled Inter
+  elsewhere. Preview it with `?style=modern` (or `?style=classic`).
+- **Glass options for the Modern style** (*Layout → Glass*, `screen.glass`, shown when a screen uses Modern), in the
+  spirit of the iPhone's glass settings: *Appearance* (*Clear*, *Tinted*, or *Automatic*, which follows each photo:
+  clearer over dark photos, more tinted over bright ones), *Transparency* (from see-through to solid), *Blur*, *Tint*
+  (*Dark*, *Light* with dark text, or *From the photo*, a deep version of the current photo's colour) and *Edge
+  highlight*. A live preview over a dark and a bright sample photo shows the result. The defaults are the Modern look
+  as it was. Everything is a few CSS variables, so it costs nothing extra on the Pi; with `?lite=1` there is still no
+  blur and the cards stay solid. Preview with `?glass=clear|tinted|auto`, `&glassOpacity=0..1`, `&glassBlur=0..40`,
+  `&glassTint=dark|light|photo`, `&glassEdge=0|1`.
+- **Six new layouts** (*Layout*, `layout.preset`), each in landscape and portrait, Classic and Modern, light and dark,
+  night mode and `?lite=1`:
+  - *Today* (`today`): the day hour by hour with a line for now and past events dimmed, the next event in large type
+    and the weather for the coming hours. Made for the kitchen in the morning.
+  - *Per person* (`people`): one column per calendar with today and tomorrow. Choose up to five calendars in
+    *Layout → Columns per person* (`layout.people`); holidays and birthdays go in a shared line above.
+  - *Photo frame* (`photoFrame`): the photo with a small clock, temperature and next event card in a corner of your
+    choice (`layout.corner`: `tl`, `tr`, `bl`, `br`). Made for a portrait frame.
+  - *Two weeks* (`twoWeeks`): this week and the next as a roomy grid, today highlighted.
+  - *Board* (`board`): a family organisation board with the to-do list, countdowns, the message of the day, upcoming
+    birthdays and a short agenda.
+  - *Bedside* (`bedside`): a huge, very dim clock with the next event and the temperature; deeper and dimmer during
+    the night window. No photo and no animation.
+  Preview with `?preset=today|people|photoFrame|twoWeeks|board|bedside`, `&people=<ids>` and `&corner=tl|tr|bl|br`.
+  The setup wizard still offers the five original layouts; the new ones are in *Layout*.
+- Demo URL parameters `?empty=1` (no events, countdowns or to-dos) and `?photos=0` (no background photo) to check
+  the empty states of every layout.
 - **Poll channel for displays** (`GET /api/display/poll`): with `MARCO_LIVE=poll` (or any server that answers
   `live: 'poll'`), displays get announcements, identify, night mode, refresh, gallery and calendar changes from a
   short poll instead of the stream. The server picks the delay: 30 s, 5 s while *Connected screens* is open or right
@@ -56,6 +90,9 @@ confirm step, place search through the server, and the shared logic moved into `
 - `MARCO_LIVE` is passed through in `docker-compose.yml`.
 
 ### Fixed
+- Modern style, *Big time* layout: the agenda card no longer runs under the news bar. It shows whole rows only and
+  drops the ones that do not fit (then the countdowns), instead of a faded, cut off last row. In portrait the weather
+  card spans the full width again.
 - Broken or non-image files in the gallery are read once instead of up to three times (up to 16 MB) each time the
   photo list is rebuilt.
 - The admin preview no longer reads or writes the browser's stored device token, client id or cached data, so it
@@ -64,6 +101,7 @@ confirm step, place search through the server, and the shared logic moved into `
 - Weather or background settings saved with a feature the server turns off stay visible with a note, so they can be
   changed back.
 - Sign-in redirects reject paths with whitespace or control characters.
+
 
 ## [0.4.0] - 2026-10-09
 

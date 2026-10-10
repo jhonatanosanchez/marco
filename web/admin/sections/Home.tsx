@@ -164,218 +164,225 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
       )}
 
       <div class="dash-grid">
-        <Card
-          title={t('Pantallas')}
-          icon="monitor"
-          actions={
-            <Button size="sm" variant="ghost" onClick={() => go('displays')}>
-              {t('Ver conectadas')}
-            </Button>
-          }
-        >
-          <ul class="dash-screens">
-            {screens.map((s) => {
-              const prof = full.screens.find((p) => p.id === s.id);
-              const ds = d?.displays.filter((x) => x.screenId === s.id) ?? [];
-              const on = ds.filter((x) => x.connected).length;
-              return (
-                <li>
-                  <span class="dash-screens__sw" style={{ background: prof?.screen.accent ?? 'var(--accent)' }} />
-                  <div class="dash-screens__main">
-                    <strong>
-                      {s.name} {s.isDefault && <span class="star" title={t('Pantalla predeterminada')}>★</span>}
-                    </strong>
-                    {saved.security?.displayAccess === 'open' && <span class="muted small mono">?screen={s.slug}</span>}
-                  </div>
-                  <span class={`online-pill ${on ? 'is-on' : ''}`}>
-                    <StatusDot state={on ? 'ok' : 'idle'} /> {on ? t('{n} en línea', { n: on }) : t('sin conexión')}
-                  </span>
-                  <button
-                    type="button"
-                    class="icon-btn"
-                    title={t('Editar esta pantalla')}
-                    onClick={() => {
-                      setScreenId(s.id);
-                      go('layout');
-                    }}
-                  >
-                    <Icon name="edit" size={15} />
-                  </button>
-                  {screenHref(saved, s.id, links) && (
-                    <a class="icon-btn" href={screenHref(saved, s.id, links)!} target="_blank" rel="noopener" title={t('Abrir pantalla')}>
-                      <Icon name="external" size={15} />
-                    </a>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-
-        <Card title={t('Tiempo ahora')} icon="cloud">
-          {!d ? (
-            <div class="skeleton" />
-          ) : !d.weather ? (
-            <Empty icon="cloud" title={t('Sin datos del tiempo todavía')}>
-              {t('Se descargan cuando una pantalla los pide.')}
-            </Empty>
-          ) : (
-            <div class="wx-now">
-              <span class="wx-now__icon">{wmoEmoji(d.weather.code, d.weather.isDay)}</span>
-              <div>
-                <div class="wx-now__temp">{Math.round(d.weather.temp)}°</div>
-                <div class="muted small">{d.weather.description}</div>
-              </div>
-              <div class="wx-now__meta">
-                <strong>{d.weather.locationName}</strong>
-                <span class="muted small">
-                  ↓ {Math.round(d.weather.min)}° · ↑ {Math.round(d.weather.max)}° · 💧 {d.weather.humidity}% · 💨 {Math.round(d.weather.windKmh)} km/h
-                </span>
-                <span class="muted small">{t('Actualizado {when}', { when: relTime(d.weather.updatedAt) })}</span>
-              </div>
-            </div>
-          )}
-        </Card>
-
-        <Card
-          title={t('Próximos eventos')}
-          icon="calendar"
-          class="dash-grid__tall"
-          actions={
-            <Button size="sm" variant="ghost" onClick={() => go('filters')}>
-              {t('Filtrar')}
-            </Button>
-          }
-        >
-          {!d ? (
-            <div class="skeleton-list">
-              <div class="skeleton" />
-              <div class="skeleton" />
-              <div class="skeleton" />
-            </div>
-          ) : d.nextEvents.length === 0 ? (
-            <Empty icon="calendar" title={t('Nada en los próximos 7 días')} />
-          ) : (
-            <ul class="ev-list">
-              {d.nextEvents.map((e, i) => {
-                const day = eventDay(e);
-                const prev = i > 0 ? eventDay(d.nextEvents[i - 1]) : '';
-                const n = daysBetween(today, day);
+        <div class="dash-col">
+          <Card
+            class="dash-o1"
+            title={t('Pantallas')}
+            icon="monitor"
+            actions={
+              <Button size="sm" variant="ghost" onClick={() => go('displays')}>
+                {t('Ver conectadas')}
+              </Button>
+            }
+          >
+            <ul class="dash-screens">
+              {screens.map((s) => {
+                const prof = full.screens.find((p) => p.id === s.id);
+                const ds = d?.displays.filter((x) => x.screenId === s.id) ?? [];
+                const on = ds.filter((x) => x.connected).length;
                 return (
-                  <>
-                    {day !== prev && <li class="ev-list__day">{n <= 1 && n >= 0 ? relDays(n) : fmtDay(day)}</li>}
-                    <li class="ev-list__ev" style={{ '--ev': e.color } as any}>
-                      <span class="ev-list__emoji">{e.emoji || '•'}</span>
-                      <span class="ev-list__title">
-                        {e.title}
-                        {e.age != null && ` (${e.age})`}
+                  <li>
+                    <span class="dash-screens__sw" style={{ background: prof?.screen.accent ?? 'var(--accent)' }} />
+                    <div class="dash-screens__main">
+                      <strong>
+                        {s.name} {s.isDefault && <span class="star" title={t('Pantalla predeterminada')}>★</span>}
+                      </strong>
+                      {saved.security?.displayAccess === 'open' && <span class="muted small mono">?screen={s.slug}</span>}
+                    </div>
+                    <span class={`online-pill ${on ? 'is-on' : ''}`}>
+                      <StatusDot state={on ? 'ok' : 'idle'} /> {on ? t('{n} en línea', { n: on }) : t('sin conexión')}
+                    </span>
+                    <button
+                      type="button"
+                      class="icon-btn"
+                      title={t('Editar esta pantalla')}
+                      onClick={() => {
+                        setScreenId(s.id);
+                        go('layout');
+                      }}
+                    >
+                      <Icon name="edit" size={15} />
+                    </button>
+                    {screenHref(saved, s.id, links) && (
+                      <a class="icon-btn" href={screenHref(saved, s.id, links)!} target="_blank" rel="noopener" title={t('Abrir pantalla')}>
+                        <Icon name="external" size={15} />
+                      </a>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+
+          <Card
+            class="dash-o3"
+            title={t('Próximos eventos')}
+            icon="calendar"
+            actions={
+              <Button size="sm" variant="ghost" onClick={() => go('filters')}>
+                {t('Filtrar')}
+              </Button>
+            }
+          >
+            {!d ? (
+              <div class="skeleton-list">
+                <div class="skeleton" />
+                <div class="skeleton" />
+                <div class="skeleton" />
+              </div>
+            ) : d.nextEvents.length === 0 ? (
+              <Empty icon="calendar" title={t('Nada en los próximos 7 días')} />
+            ) : (
+              <ul class="ev-list">
+                {d.nextEvents.map((e, i) => {
+                  const day = eventDay(e);
+                  const prev = i > 0 ? eventDay(d.nextEvents[i - 1]) : '';
+                  const n = daysBetween(today, day);
+                  return (
+                    <>
+                      {day !== prev && <li class="ev-list__day">{n <= 1 && n >= 0 ? relDays(n) : fmtDay(day)}</li>}
+                      <li class="ev-list__ev" style={{ '--ev': e.color } as any}>
+                        <span class="ev-list__emoji">{e.emoji || '•'}</span>
+                        <span class="ev-list__title">
+                          {e.title}
+                          {e.age != null && ` (${e.age})`}
+                        </span>
+                        <span class="ev-list__time muted small">{eventTimeLabel(e)}</span>
+                      </li>
+                    </>
+                  );
+                })}
+              </ul>
+            )}
+          </Card>
+
+          <Card
+            class="dash-o6"
+            title={t('Actividad reciente')}
+            icon="history"
+            actions={
+              <Button size="sm" variant="ghost" onClick={() => go('activity')}>
+                {t('Ver todo')}
+              </Button>
+            }
+          >
+            {!d ? (
+              <div class="skeleton" />
+            ) : d.activity.length === 0 ? (
+              <div class="muted small">{t('Sin actividad registrada.')}</div>
+            ) : (
+              <ul class="act-mini">
+                {d.activity.map((a) => {
+                  const x = describeActivity(a);
+                  return (
+                    <li class={`act-mini__i act--${a.level}`}>
+                      <span class="act-mini__icon">
+                        <Icon name={x.icon} size={13} />
                       </span>
-                      <span class="ev-list__time muted small">{eventTimeLabel(e)}</span>
+                      <span class="act-mini__text">{x.text}</span>
+                      <span class="muted small act-mini__meta" title={`${actorLabel(a.actor)} · ${a.ts}`}>
+                        {relTime(a.ts)}
+                      </span>
                     </li>
-                  </>
-                );
-              })}
-            </ul>
-          )}
-        </Card>
+                  );
+                })}
+              </ul>
+            )}
+          </Card>
+        </div>
+        <div class="dash-col">
+          <Card class="dash-o2" title={t('Tiempo ahora')} icon="cloud">
+            {!d ? (
+              <div class="skeleton" />
+            ) : !d.weather ? (
+              <Empty icon="cloud" title={t('Sin datos del tiempo todavía')}>
+                {t('Se descargan cuando una pantalla los pide.')}
+              </Empty>
+            ) : (
+              <div class="wx-now">
+                <span class="wx-now__icon">{wmoEmoji(d.weather.code, d.weather.isDay)}</span>
+                <div>
+                  <div class="wx-now__temp">{Math.round(d.weather.temp)}°</div>
+                  <div class="muted small">{d.weather.description}</div>
+                </div>
+                <div class="wx-now__meta">
+                  <strong>{d.weather.locationName}</strong>
+                  <span class="muted small">
+                    ↓ {Math.round(d.weather.min)}° · ↑ {Math.round(d.weather.max)}° · 💧 {d.weather.humidity}% · 💨 {Math.round(d.weather.windKmh)} km/h
+                  </span>
+                  <span class="muted small">{t('Actualizado {when}', { when: relTime(d.weather.updatedAt) })}</span>
+                </div>
+              </div>
+            )}
+          </Card>
 
-        <Card
-          title={t('Salud de los calendarios')}
-          icon="activity"
-          actions={
-            <Button size="sm" variant="ghost" onClick={() => go('status')}>
-              {t('Detalles')}
-            </Button>
-          }
-        >
-          {!d ? (
-            <div class="skeleton" />
-          ) : d.sources.length === 0 ? (
-            <Empty icon="calendar" title={t('No hay calendarios configurados')} />
-          ) : (
-            <ul class="health-list">
-              {d.sources.map((s) => {
-                const meta = full.calendar.sources.find((x) => x.id === s.id);
-                const color = meta?.color ?? (s.id === 'birthdays' ? full.birthdays.color : s.id === 'local' ? full.localEvents.color : '#888');
-                const state = s.enabled === false ? 'idle' : s.ok ? 'ok' : s.lastFetch ? 'error' : 'idle';
-                return (
-                  <li title={s.error ?? ''}>
-                    <StatusDot state={state} />
-                    <span class="dot-color" style={{ background: color }} />
-                    <span class="health-list__name">{s.name}</span>
-                    <span class={`small ${s.ok ? 'muted' : 'err-text'}`}>{s.ok ? t('{n} eventos', { n: s.count }) : s.enabled === false ? t('Desactivado') : s.error || t('Pendiente')}</span>
+          <Card
+            class="dash-o4"
+            title={t('Salud de los calendarios')}
+            icon="activity"
+            actions={
+              <Button size="sm" variant="ghost" onClick={() => go('status')}>
+                {t('Detalles')}
+              </Button>
+            }
+          >
+            {!d ? (
+              <div class="skeleton" />
+            ) : d.sources.length === 0 ? (
+              <Empty icon="calendar" title={t('No hay calendarios configurados')} />
+            ) : (
+              <ul class="health-list">
+                {d.sources.map((s) => {
+                  const meta = full.calendar.sources.find((x) => x.id === s.id);
+                  const color = meta?.color ?? (s.id === 'birthdays' ? full.birthdays.color : s.id === 'local' ? full.localEvents.color : '#888');
+                  const state = s.enabled === false ? 'idle' : s.ok ? 'ok' : s.lastFetch ? 'error' : 'idle';
+                  return (
+                    <li title={s.error ?? ''}>
+                      <StatusDot state={state} />
+                      <span class="dot-color" style={{ background: color }} />
+                      <span class="health-list__name">{s.name}</span>
+                      <span class={`small ${s.ok ? 'muted' : 'err-text'}`}>{s.ok ? t('{n} eventos', { n: s.count }) : s.enabled === false ? t('Desactivado') : s.error || t('Pendiente')}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Card>
+
+          <Card
+            class="dash-o5"
+            title={t('Avisos')}
+            icon="megaphone"
+            actions={
+              <Button size="sm" variant="ghost" onClick={() => go('alerts')}>
+                {t('Gestionar')}
+              </Button>
+            }
+          >
+            {!d ? (
+              <div class="skeleton" />
+            ) : d.announcements.length === 0 && d.schedulesNow.length === 0 ? (
+              <div class="muted small">{t('No hay avisos activos ni mensajes programados en este momento.')}</div>
+            ) : (
+              <ul class="mini-alerts">
+                {d.announcements.map((a) => (
+                  <li class={`mini-alerts__a mini-alerts__a--${a.style}`}>
+                    <span>{a.emoji || '🔔'}</span>
+                    <strong>{a.title || a.body}</strong>
+                    <span class="muted small">{t('hasta {time}', { time: new Date(a.expiresAt).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }) })}</span>
                   </li>
-                );
-              })}
-            </ul>
-          )}
-        </Card>
-
-        <Card
-          title={t('Avisos')}
-          icon="megaphone"
-          actions={
-            <Button size="sm" variant="ghost" onClick={() => go('alerts')}>
-              {t('Gestionar')}
-            </Button>
-          }
-        >
-          {!d ? (
-            <div class="skeleton" />
-          ) : d.announcements.length === 0 && d.schedulesNow.length === 0 ? (
-            <div class="muted small">{t('No hay avisos activos ni mensajes programados en este momento.')}</div>
-          ) : (
-            <ul class="mini-alerts">
-              {d.announcements.map((a) => (
-                <li class={`mini-alerts__a mini-alerts__a--${a.style}`}>
-                  <span>{a.emoji || '🔔'}</span>
-                  <strong>{a.title || a.body}</strong>
-                  <span class="muted small">{t('hasta {time}', { time: new Date(a.expiresAt).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }) })}</span>
-                </li>
-              ))}
-              {d.schedulesNow.map((s) => (
-                <li class="mini-alerts__a mini-alerts__a--sched">
-                  <span>{s.emoji || '🗓️'}</span>
-                  <strong>{s.title}</strong>
-                  <span class="muted small">{t('programado · hasta {time}', { time: new Date(s.until).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }) })}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-
-        <Card
-          title={t('Actividad reciente')}
-          icon="history"
-          actions={
-            <Button size="sm" variant="ghost" onClick={() => go('activity')}>
-              {t('Ver todo')}
-            </Button>
-          }
-        >
-          {!d ? (
-            <div class="skeleton" />
-          ) : d.activity.length === 0 ? (
-            <div class="muted small">{t('Sin actividad registrada.')}</div>
-          ) : (
-            <ul class="act-mini">
-              {d.activity.map((a) => {
-                const x = describeActivity(a);
-                return (
-                  <li class={`act-mini__i act--${a.level}`}>
-                    <span class="act-mini__icon">
-                      <Icon name={x.icon} size={13} />
-                    </span>
-                    <span class="act-mini__text">{x.text}</span>
-                    <span class="muted small act-mini__meta" title={`${actorLabel(a.actor)} · ${a.ts}`}>
-                      {relTime(a.ts)}
-                    </span>
+                ))}
+                {d.schedulesNow.map((s) => (
+                  <li class="mini-alerts__a mini-alerts__a--sched">
+                    <span>{s.emoji || '🗓️'}</span>
+                    <strong>{s.title}</strong>
+                    <span class="muted small">{t('programado · hasta {time}', { time: new Date(s.until).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }) })}</span>
                   </li>
-                );
-              })}
-            </ul>
-          )}
-        </Card>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
       </div>
     </>
   );

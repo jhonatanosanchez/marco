@@ -48,6 +48,11 @@ export class Weather {
       );
     }
 
+    if (cfg.screen.style === 'modern') {
+      setHTML(this.root, this.modern(w, todayKey, meta.filter(Boolean)));
+      return;
+    }
+
     const hi = w.today ? `<span class="hilo"><b>${r(w.today.max)}°</b><i>/</i>${r(w.today.min)}°</span>` : '';
     let html = `<div class="wx-now">
         <div class="wx-icon">${weatherIcon(c.code, c.isDay, { animated: !ctx.lite })}</div>
@@ -83,5 +88,44 @@ export class Weather {
       html += `<div class="wx-days">${pills.join('')}</div>`;
     }
     setHTML(this.root, html);
+  }
+
+  /**
+   * Modern style: an iOS Weather-like widget. Place and big temperature on the left, symbol, condition and
+   * high / low on the right, then a quiet details line, an hourly row (.wx-hourly, so the side-panel fitting
+   * still drops it first) and the next days as columns.
+   */
+  private modern(w: WeatherResponse, todayKey: string, meta: string[]): string {
+    const { cfg, lang, tz, t } = ctx;
+    const wc = cfg.weather;
+    const c = w.current!;
+    const f24 = cfg.datetime.format24;
+    const place = (w.locationName || wc.locationName || '').split(',')[0].trim();
+    const hilo = w.today
+      ? `<span class="wxm-hl"><span>${esc(t('hiShort'))} <b>${r(w.today.max)}°</b></span><span>${esc(t('loShort'))} <b>${r(w.today.min)}°</b></span></span>`
+      : '';
+    let html = `<div class="wxm-head">
+        <div class="wxm-main"><span class="wxm-loc">${esc(place)}</span><span class="wxm-temp">${r(c.temp)}°</span></div>
+        <div class="wxm-side"><span class="wxm-icon">${weatherIcon(c.code, c.isDay, { animated: !ctx.lite })}</span><span class="wxm-cond">${esc(c.description || '')}</span>${hilo}</div>
+      </div>
+      <div class="wx-meta">${meta.join('')}</div>`;
+    if (wc.showHourly && this.opts.hourly !== false && w.hourly?.length) {
+      const hrs = w.hourly.slice(0, 6).map((h, i) => {
+        const p = zonedParts(new Date(h.time), tz);
+        const lbl = i === 0 ? t('now') : f24 ? `${p.hour}` : `${p.hour % 12 === 0 ? 12 : p.hour % 12}${p.hour < 12 ? 'a' : 'p'}`;
+        const pc = wc.showPrecipChance && h.precipChance >= 20 ? `<span class="p">${r(h.precipChance)}%</span>` : '';
+        return `<div class="h"><span class="hl">${esc(lbl)}</span>${weatherIcon(h.code, h.isDay)}${pc}<span class="hv">${r(h.temp)}°</span></div>`;
+      });
+      html += `<div class="wx-hourly">${hrs.join('')}</div>`;
+    }
+    if (this.opts.days !== false && w.daily?.length) {
+      const days = w.daily.filter((d) => d.date > todayKey).slice(0, Math.max(1, wc.forecastDays - 1));
+      const cols = days.map((d) => {
+        const pc = wc.showPrecipChance && d.precipChance >= 30 ? `<span class="p">${r(d.precipChance)}%</span>` : '';
+        return `<div class="wxm-day"><span class="dn">${esc(weekdayName(lang, d.date, 'short'))}</span>${weatherIcon(d.code, true)}${pc}<span class="dmx">${r(d.max)}°</span><span class="dmn">${r(d.min)}°</span></div>`;
+      });
+      if (cols.length) html += `<div class="wx-days wxm-days">${cols.join('')}</div>`;
+    }
+    return html;
   }
 }

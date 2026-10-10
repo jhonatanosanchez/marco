@@ -9,6 +9,8 @@ const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
+/** Screen layouts (docs/ARCHITECTURE.md); the display, the admin and server/setup.js use the same ids. */
+export const LAYOUT_PRESETS = ['bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda', 'today', 'people', 'photoFrame', 'twoWeeks', 'board', 'bedside'];
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,255}$/;
 
 export function isHttpUrl(s, protocols = ['http:', 'https:']) {
@@ -196,10 +198,15 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
 
   const sc = obj(ctx, `${p}.screen`, x.screen);
   const nm = obj(ctx, `${p}.screen.nightMode`, sc.nightMode);
+  const gl = obj(ctx, `${p}.screen.glass`, sc.glass);
+  const GD = D.screen.glass;
   const screen = {
     language: oneOf(ctx, `${p}.screen.language`, sc.language, D.screen.language, LANGS),
     fontScale: num(ctx, `${p}.screen.fontScale`, sc.fontScale, D.screen.fontScale, 0.5, 3),
     theme: oneOf(ctx, `${p}.screen.theme`, sc.theme, D.screen.theme, ['dark', 'light', 'auto']),
+    // display style: 'classic' (the original look) or 'modern' (glass cards, Apple-like); independent of the layout.
+    // New configs start Modern (defaults.js); a config saved before styles existed keeps the look it always had.
+    style: oneOf(ctx, `${p}.screen.style`, sc.style, 'classic', ['classic', 'modern']),
     accent: color(ctx, `${p}.screen.accent`, sc.accent, D.screen.accent),
     orientation: oneOf(ctx, `${p}.screen.orientation`, sc.orientation, D.screen.orientation, ['auto', 'landscape', 'portrait']),
     customCss: str(ctx, `${p}.screen.customCss`, sc.customCss, '', 20000).replace(/<\/style/gi, ''),
@@ -209,13 +216,25 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
       to: hhmm(ctx, `${p}.screen.nightMode.to`, nm.to, D.screen.nightMode.to),
       dim: num(ctx, `${p}.screen.nightMode.dim`, nm.dim, D.screen.nightMode.dim, 0, 1),
     },
+    // glass material of the Modern style: appearance, transparency (0 = see-through, 1 = solid), blur, tint, light edge
+    glass: {
+      appearance: oneOf(ctx, `${p}.screen.glass.appearance`, gl.appearance, GD.appearance, ['auto', 'clear', 'tinted']),
+      opacity: num(ctx, `${p}.screen.glass.opacity`, gl.opacity, GD.opacity, 0, 1),
+      blur: num(ctx, `${p}.screen.glass.blur`, gl.blur, GD.blur, 0, 40, true),
+      tint: oneOf(ctx, `${p}.screen.glass.tint`, gl.tint, GD.tint, ['dark', 'light', 'photo']),
+      edge: bool(ctx, `${p}.screen.glass.edge`, gl.edge, GD.edge),
+    },
   };
 
   const ly = obj(ctx, `${p}.layout`, x.layout);
   const layout = {
-    preset: oneOf(ctx, `${p}.layout.preset`, ly.preset, D.layout.preset, ['bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda']),
+    preset: oneOf(ctx, `${p}.layout.preset`, ly.preset, D.layout.preset, LAYOUT_PRESETS),
     sidePanel: oneOf(ctx, `${p}.layout.sidePanel`, ly.sidePanel, D.layout.sidePanel, ['left', 'right']),
     sideWidth: num(ctx, `${p}.layout.sideWidth`, ly.sideWidth, D.layout.sideWidth, 0.2, 0.6),
+    // 'people' layout: the calendars shown as columns (null = automatic, at most 5, no duplicates)
+    people: ly.people === null || ly.people === undefined ? null : [...new Set(idList(ctx, `${p}.layout.people`, ly.people, 5))],
+    // 'photoFrame' layout: corner of the clock card
+    corner: oneOf(ctx, `${p}.layout.corner`, ly.corner, D.layout.corner, ['tl', 'tr', 'bl', 'br']),
   };
 
   const bg = obj(ctx, `${p}.background`, x.background);
@@ -614,7 +633,9 @@ export function mergeDefaults(stored) {
   const src = migrateConfig(isObj(stored) ? stored : {});
   const out = merge(D, src);
   if (Array.isArray(src.screens) && src.screens.length) {
-    out.screens = src.screens.map((s) => (isObj(s) ? merge(defaultScreenProfile({ id: s.id, slug: s.slug, name: s.name }), s) : s));
+    // a screen saved before display styles existed keeps the Classic look; only new screens start Modern
+    const keepStyle = (s) => (isObj(s.screen) && 'style' in s.screen ? s : { ...s, screen: { ...(isObj(s.screen) ? s.screen : {}), style: 'classic' } });
+    out.screens = src.screens.map((s) => (isObj(s) ? merge(defaultScreenProfile({ id: s.id, slug: s.slug, name: s.name }), keepStyle(s)) : s));
   }
   return out;
 }

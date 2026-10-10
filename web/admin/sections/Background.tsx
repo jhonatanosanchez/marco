@@ -104,6 +104,7 @@ export function BackgroundSection({ cfg, set, errors }: SectionProps) {
               <Slider value={b.brightness} min={0.2} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => set((d) => void (d.background.brightness = v))} />
             </Field>
           </div>
+          {cfg.screen.style === 'modern' && <Callout kind="info">{t('Con el estilo Moderno, las tarjetas de cristal se ajustan en Diseño > Cristal.')}</Callout>}
           <div class="grid grid--2">
             <Field label={t('Desenfoque del panel del tiempo')} hint={t('0 = sin desenfoque. En la Raspberry Pi, menos desenfoque es más ligero.')}>
               <Slider value={b.panelBlur ?? 18} min={0} max={40} step={1} format={(v) => (v ? `${v}` : t('Sin desenfoque'))} onChange={(v) => set((d) => void (d.background.panelBlur = v))} />
