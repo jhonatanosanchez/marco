@@ -186,7 +186,8 @@ Answer `{ revision, screenId, now, serverVersion, cursor, reset, commands, activ
 
 The self-hosted server keeps the last 500 events in memory. Commands expire: `identify` after 60 s, `announce` at
 its `expiresAt`, the others after 10 min. A display that polled in the last 4 minutes is listed as connected and
-counts in `delivered`.
+counts in `delivered` (at most 24 client ids per address, as for streams). A new private link, a revoked device or
+a switch to private access takes its pollers off the list at once; their next poll gets `401` / `403`.
 
 ## Authentication
 

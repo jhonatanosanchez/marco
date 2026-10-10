@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { getConfig, paths, writeFileAtomic } from './store.js';
 import { resolveScreen } from './core/screens.js';
 import { listClients, send, matches } from './sse.js';
-import { publish, recordIdentify, readSince, trackPoller, nextDelay, POLL_CONNECTED_MS, _resetPoll } from './pollHub.js';
+import { publish, recordIdentify, readSince, trackPoller, isPolling, nextDelay, _resetPoll } from './pollHub.js';
 import { logActivityThrottled } from './activity.js';
 import { activeFor } from './announce.js';
 import { deviceName, requestScreen } from './displayAccess.js';
@@ -33,15 +33,18 @@ function load() {
     const list = JSON.parse(fs.readFileSync(paths.displays, 'utf8'));
     for (const d of Array.isArray(list) ? list : list.displays || []) {
       if (d && typeof d.clientId === 'string' && CLIENT_ID_RE.test(d.clientId) && !d.clientId.startsWith('anon-')) {
-        registry.set(d.clientId, { ...d, connected: false, streams: 0, connectedAt: null, polledAt: 0 });
+        registry.set(d.clientId, { ...d, connected: false, streams: 0, connectedAt: null });
       }
     }
   } catch { /* no file yet */ }
   prune();
 }
 
-/** Connected: an open stream, or a poll in the last 4 minutes (GET /api/display/poll). */
-const isLive = (d, now = Date.now()) => (d.streams || 0) > 0 || (d.polledAt > 0 && now - d.polledAt < POLL_CONNECTED_MS);
+/**
+ * Connected: an open stream, or a poll in the last 4 minutes (GET /api/display/poll) by a poller that was not dropped
+ * since (credential revoked, pollHub.js dropPollers).
+ */
+const isLive = (d, now = Date.now()) => (d.streams || 0) > 0 || isPolling(d.clientId, now);
 
 function prune(now = Date.now()) {
   for (const [id, d] of registry) {
@@ -66,7 +69,7 @@ export function flushDisplays() {
   if (!registry || !dirty) return;
   dirty = false;
   const list = [...registry.values()].filter((d) => !d.clientId.startsWith('anon-'))
-    .map(({ streams, connected, connectedAt, polledAt, ...d }) => d);
+    .map(({ streams, connected, connectedAt, ...d }) => d);
   try { writeFileAtomic(paths.displays, JSON.stringify(list, null, 2)); } catch (err) { console.warn('[displays] save failed:', err.message); }
 }
 
@@ -108,7 +111,7 @@ function blankEntry(clientId, now) {
     clientId, screenKey: '', screenId: '', ip: '', userAgent: '', firstSeen: now, lastSeen: now,
     viewport: null, screenRes: null, dpr: null, webgl: null, lite: null, version: null, build: null,
     night: null, nightOverride: null, uptimeSec: null, lastError: null, lastConnectAt: null,
-    streams: 0, connectedAt: null, polledAt: 0, access: 'open', deviceId: null,
+    streams: 0, connectedAt: null, access: 'open', deviceId: null,
   };
 }
 
@@ -224,10 +227,12 @@ const POLL_SAVE_MS = 5 * 60_000;
 
 /** A display polled: register it like an opened stream, without the 25 s stream bookkeeping. */
 function notePoll(client, req, nowMs = Date.now()) {
-  trackPoller(client, nowMs);
   const nowIso = new Date(nowMs).toISOString();
-  const ip = req?.ip || '';
+  const ip = client.ip;
   let d = registry.get(client.clientId);
+  const wasLive = Boolean(d) && isLive(d, nowMs);
+  // Not tracked (too many pollers, or too many client ids from this ip): served, but not listed.
+  if (!trackPoller(client, nowMs)) return;
   const isNew = !d;
   if (!d) {
     for (const [id, x] of registry) {
@@ -238,7 +243,6 @@ function notePoll(client, req, nowMs = Date.now()) {
     d = blankEntry(client.clientId, nowIso);
     registry.set(client.clientId, d);
   }
-  const wasLive = isLive(d, nowMs);
   const wasOfflineFor = wasLive ? 0 : nowMs - Date.parse(d.lastSeen || nowIso);
   const access = client.access?.via || 'open';
   const changed = isNew || !wasLive || d.screenId !== client.screenId || d.screenKey !== client.screenKey || d.ip !== ip
@@ -247,7 +251,6 @@ function notePoll(client, req, nowMs = Date.now()) {
     d.connectedAt = nowIso;
     d.lastConnectAt = nowIso;
   }
-  d.polledAt = nowMs;
   d.ip = ip;
   d.userAgent = String(req?.get?.('user-agent') || d.userAgent || '').slice(0, 300);
   d.screenKey = client.screenKey;
@@ -288,8 +291,9 @@ export function pollDisplay(req, nowMs = Date.now()) {
     screenKey: bound || (typeof q.screen === 'string' ? q.screen.trim().slice(0, 64) : ''),
     anonymous,
     preview,
-    access: accessOf(req),
-    deviceId: accessOf(req).deviceId,
+    ip: req?.ip || '',
+    // credential details, re-checked by displayAccess.js revalidateStreams like an open stream's
+    access: streamAccess(req),
   };
   if (!anonymous) notePoll(client, req, nowMs);
   const alertsOn = screen.alerts.enabled !== false;

@@ -17,7 +17,7 @@ import { _resetActivityThrottle } from '../activity.js';
 import { _resetPairing } from '../pairing.js';
 import { syncDisplayKeys, listDisplayLinks, _resetDisplayAccess } from '../displayAccess.js';
 import {
-  _resetPoll, readSince, record, currentCursor, pollEpoch, RING_SIZE, POLL_FAST_MS, POLL_HIDDEN_MS, POLL_NEXT_MS,
+  _resetPoll, readSince, record, currentCursor, pollEpoch, RING_SIZE, MAX_POLLERS_PER_IP, POLL_FAST_MS, POLL_HIDDEN_MS, POLL_NEXT_MS,
 } from '../pollHub.js';
 
 const realFetch = globalThis.fetch;
@@ -244,6 +244,44 @@ test('a paired device moved to another screen sees the new screen id on its next
     assert.equal(p2.json.screenId, 's_main');
     await call('DELETE', `/api/admin/devices/${dev.id}`, { cookie });
     assert.equal((await call('GET', '/api/display/poll?client=tab-1', { headers: { 'x-marco-key': token } })).status, 403);
+  });
+});
+
+test('a revoked credential stops a poller counting as connected at once: new link, revoked device', async () => {
+  await withServer(async ({ call, login, poll }) => {
+    const cookie = await login();
+    await poll('kitchen', { client: 'kiosk-k1' });
+    await poll('hall', { client: 'kiosk-h1' });
+    const st = await call('POST', '/api/pair/start', { body: {} });
+    await call('POST', '/api/admin/pair/claim', { cookie, body: { code: st.json.code, screenId: 's_kitchen', name: 'Tablet', confirm: true } });
+    const token = (await call('POST', '/api/pair/status', { body: { sessionId: st.json.sessionId } })).json.token;
+    assert.equal((await call('GET', '/api/display/poll?client=tab-1', { headers: { 'x-marco-key': token } })).status, 200);
+    const connected = async () => (await call('GET', '/api/admin/displays', { cookie })).json.displays
+      .filter((d) => d.connected).map((d) => d.clientId).sort();
+    assert.deepEqual(await connected(), ['kiosk-h1', 'kiosk-k1', 'tab-1']);
+    // a new private link for the kitchen: the old link's poller is no longer connected and can be forgotten
+    assert.equal((await call('POST', '/api/admin/display-links/s_kitchen/regenerate', { cookie })).status, 200);
+    assert.deepEqual(await connected(), ['kiosk-h1', 'tab-1']);
+    assert.equal((await call('DELETE', '/api/admin/displays/kiosk-k1', { cookie })).status, 200);
+    // a revoked device: the same
+    const dev = (await call('GET', '/api/admin/devices', { cookie })).json.devices[0];
+    assert.equal((await call('DELETE', `/api/admin/devices/${dev.id}`, { cookie })).status, 200);
+    assert.deepEqual(await connected(), ['kiosk-h1']);
+    assert.equal((await call('DELETE', '/api/admin/displays/tab-1', { cookie })).status, 200);
+    assert.equal((await call('GET', '/api/admin/status', { cookie })).json.displays, 1);
+  });
+});
+
+test('one address cannot list more than MAX_POLLERS_PER_IP pollers, but every poll is answered', async () => {
+  await withServer(async ({ poll }) => {
+    for (let i = 0; i < MAX_POLLERS_PER_IP + 5; i++) {
+      const r = await poll('kitchen', { client: `flood-${i}` });
+      assert.equal(r.reset, true);
+    }
+    assert.equal(listDisplays().length, MAX_POLLERS_PER_IP);
+    // a display already listed keeps polling as before
+    await poll('kitchen', { client: 'flood-0' });
+    assert.equal(listDisplays().filter((d) => d.connected).length, MAX_POLLERS_PER_IP);
   });
 });
 

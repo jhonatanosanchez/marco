@@ -14,6 +14,8 @@ export const POLL_NEXT_MS = 30_000;
 export const POLL_FAST_MS = 5_000;
 export const POLL_HIDDEN_MS = 180_000;
 const MAX_POLLERS = 200;
+/** Same cap as open streams per ip (sse.js MAX_STREAMS_PER_IP): more client ids from one address are not listed. */
+export const MAX_POLLERS_PER_IP = 24;
 
 /** How long a command stays deliverable. `announce` lives until its own expiresAt. */
 const TTL_MS = { reload: 600_000, night: 600_000, identify: 60_000, 'announce-clear': 600_000, photos: 600_000, events: 600_000 };
@@ -23,7 +25,7 @@ let epoch = crypto.randomBytes(4).toString('hex');
 let seq = 0;
 let ring = [];
 let fastUntil = 0;
-/** clientId → { clientId, screenId, screenKey, anonymous, preview, deviceId, at } of displays that poll. */
+/** clientId → { clientId, screenId, screenKey, anonymous, preview, ip, access, at } of displays that poll. */
 const pollers = new Map();
 
 export const pollEpoch = () => epoch;
@@ -52,12 +54,41 @@ export function listPollers(now = Date.now()) {
   return [...pollers.values()];
 }
 
-/** Remember a display that polled (preview and anonymous polls are not tracked). */
+/** True while `clientId` counts as a connected poller. */
+export function isPolling(clientId, now = Date.now()) {
+  const p = pollers.get(clientId);
+  return Boolean(p && live(p, now));
+}
+
+/**
+ * Remember a display that polled (preview and anonymous polls are not tracked). Returns false when it was not
+ * tracked: the list is full, or its ip already has MAX_POLLERS_PER_IP other client ids.
+ */
 export function trackPoller(p, now = Date.now()) {
-  if (p.preview || p.anonymous || !p.clientId) return;
-  if (!pollers.has(p.clientId) && pollers.size >= MAX_POLLERS) prunePollers(now);
-  if (!pollers.has(p.clientId) && pollers.size >= MAX_POLLERS) return;
+  if (p.preview || p.anonymous || !p.clientId) return false;
+  if (!pollers.has(p.clientId)) {
+    prunePollers(now);
+    if (pollers.size >= MAX_POLLERS) return false;
+    let fromIp = 0;
+    for (const x of pollers.values()) if (x.ip === p.ip) fromIp++;
+    if (fromIp >= MAX_POLLERS_PER_IP) return false;
+  }
   pollers.set(p.clientId, { ...p, at: now });
+  return true;
+}
+
+/**
+ * Forget the pollers that match `filter` (their credential was revoked or no longer applies): they stop counting as
+ * connected right away instead of after 4 minutes, and their next poll gets 401 / 403. Returns how many.
+ */
+export function dropPollers(filter) {
+  let n = 0;
+  for (const [id, p] of pollers) {
+    if (!filter(p)) continue;
+    pollers.delete(id);
+    n++;
+  }
+  return n;
 }
 
 /** Displays reached by a live event: open streams (not previews) plus pollers without a stream of their own. */
