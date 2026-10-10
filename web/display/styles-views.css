@@ -29,7 +29,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
-  max-width: 44rem;
+  max-width: min(44rem, 100%);
   padding: 0.55rem 1.2rem;
   border-radius: 0.8rem;
   background: rgb(var(--c));

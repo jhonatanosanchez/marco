@@ -28,6 +28,8 @@ const DEMO_LANG = (() => {
 /** Pick the demo string for the current language: L('English', 'Español', 'Português?'). */
 /** ?empty=1: no events, no countdowns, no to-dos (empty states). */
 const EMPTY = new URLSearchParams(location.search).get('empty') === '1';
+/** ?busy=1: a day with more events than fit, and long titles (to see the sliding titles and the busy-day pages). */
+const BUSY = new URLSearchParams(location.search).get('busy') === '1';
 const L = (en: string, es: string, pt?: string) => (DEMO_LANG === 'es' ? es : DEMO_LANG === 'pt' ? (pt ?? en) : en);
 
 export const MOCK_SOURCES: PublicCalendarSource[] = [
@@ -180,6 +182,24 @@ export function mockEvents(now = new Date()): EventsResponse {
   out.push(ev('c_kids', L('Pediatrician – Mateo', 'Pediatra – Mateo', 'Pediatra – Mateo'), D(-1), { at: [10, 0], dur: 30 }));
   out.push(ev('c_kids', L('Swimming lesson', 'Clase de natación', 'Aula de natação'), D(2), { at: [17, 0], dur: 45 }));
   out.push(ev('c_kids', L('School play', 'Función del colegio', 'Teatro da escola'), D(10), { at: [18, 30], dur: 90 }));
+
+  if (BUSY) {
+    out.push(ev('c_fam', L('Grandparents visiting from Porto for the long weekend', 'Los abuelos vienen de Oporto a pasar el puente', 'Os avós vêm do Porto passar o fim de semana prolongado'), D(1), { endKey: D(4) }));
+    out.push(ev('c_kids', L('Bring the signed permission slip for the science museum trip', 'Llevar firmada la autorización para la excursión al museo de la ciencia', 'Levar assinada a autorização para a visita ao museu da ciência'), T));
+    out.push(ev('c_work', L('Quarterly planning workshop with the whole design and product team', 'Taller de planificación trimestral con todo el equipo de diseño y producto', 'Workshop de planeamento trimestral com toda a equipa de design e produto'), T, { at: [14, 0], dur: 90 }));
+    const busy: [string, string, string, number, number, string][] = [
+      ['Breakfast with Marta', 'Desayuno con Marta', 'Pequeno-almoço com a Marta', 8, 0, 'c_fam'],
+      ['Drop the kids at school', 'Llevar a los niños al colegio', 'Levar os miúdos à escola', 8, 45, 'c_kids'],
+      ['Budget review', 'Revisión del presupuesto', 'Revisão do orçamento', 10, 0, 'c_work'],
+      ['Haircut', 'Peluquería', 'Cabeleireiro', 12, 30, 'c_fam'],
+      ['Lunch with the new team', 'Comida con el equipo nuevo', 'Almoço com a equipa nova', 13, 30, 'c_work'],
+      ['Piano lesson', 'Clase de piano', 'Aula de piano', 16, 0, 'c_kids'],
+      ['Pick up the parcel', 'Recoger el paquete', 'Levantar a encomenda', 17, 15, 'c_fam'],
+      ['Parents association meeting', 'Reunión del AMPA', 'Reunião da associação de pais', 18, 30, 'c_kids'],
+      ['Call grandma', 'Llamar a la abuela', 'Ligar à avó', 20, 0, 'c_fam'],
+    ];
+    for (const [en, es, pt, h, m, src] of busy) out.push(ev(src, L(en, es, pt), D(2), { at: [h, m], dur: 45 }));
+  }
 
   // Sort: allDay first, then start
   out.sort((a, b) => (a.allDay === b.allDay ? sortKey(a).localeCompare(sortKey(b)) : a.allDay ? -1 : 1));

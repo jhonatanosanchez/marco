@@ -9,6 +9,14 @@ All notable changes to this project are documented here. The format is based on
 - **Apple iCloud calendars**: *Calendars → Linked accounts → Link account* now offers Apple iCloud. It opens a short
   guide (iPhone or iPad, Mac, iCloud.com) to get the calendar's public link, then tests the link and adds it as an
   iCal calendar. `webcal://` links are accepted. No server setup needed.
+- **Long titles slide**: an all-day or multi-day bar in the month or week grid, or a title in the Agenda, Today,
+  Per person and Board views, that does not fit slides slowly to show the rest, waits, and slides back. Titles that
+  fit never move, timed chips in month cells keep their "…", and nothing moves when the device asks for reduced
+  motion. With `?lite=1` at most six titles move at once.
+- **Busy days take turns**: a day in the month or Two weeks grid with more events than fit shows them in turns every
+  8 seconds, and the "+N more" label becomes a page count ("1/2"). Bars that cover several days stay where they are.
+- Both are on by default and can be turned off per screen in *Calendars → Calendar view*; `?marquee=0` and
+  `?rotate=0` turn them off for a test, and `?demo=1&busy=1` adds a busy day and long titles to the demo.
 
 ### Changed
 - **Sign in with Google is off on self-hosted servers** by default: the admin uses the server's password, and Google
@@ -18,6 +26,9 @@ All notable changes to this project are documented here. The format is based on
 - The linked accounts chooser closes with an X instead of a Cancel button.
 
 ### Fixed
+- A very long title in the next-event capsule under the clock no longer pushes it past the edge of the side panel.
+- Today: when the all-day chips do not fit next to the title, the last ones are left out instead of the first one
+  losing the start of its title.
 - A large font size (*Screen → Font size*) no longer pushes the clock's last digit onto a second line: the clock
   never wraps and shrinks to the width of its column.
 - With the Modern style the screen now fades in once the first photo is ready, so the glass cards never show a

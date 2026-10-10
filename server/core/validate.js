@@ -276,6 +276,8 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
     showLegend: bool(ctx, `${p}.calendar.showLegend`, ca.showLegend, D.calendar.showLegend),
     hidePast: bool(ctx, `${p}.calendar.hidePast`, ca.hidePast, D.calendar.hidePast),
     maxEventsPerDay: num(ctx, `${p}.calendar.maxEventsPerDay`, ca.maxEventsPerDay, D.calendar.maxEventsPerDay, 1, 20, true),
+    marquee: bool(ctx, `${p}.calendar.marquee`, ca.marquee, D.calendar.marquee),
+    rotateBusyDays: bool(ctx, `${p}.calendar.rotateBusyDays`, ca.rotateBusyDays, D.calendar.rotateBusyDays),
     sourceIds: ca.sourceIds === null || ca.sourceIds === undefined ? null : idList(ctx, `${p}.calendar.sourceIds`, ca.sourceIds),
   };
 

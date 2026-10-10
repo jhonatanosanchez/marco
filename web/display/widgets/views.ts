@@ -93,16 +93,20 @@ function fitRows(box: HTMLElement, pick: () => HTMLElement | null, after?: (row:
   }
 }
 
-/** Single-line chip rows: drop the chips that would overflow the line. */
+/**
+ * Single-line chip rows: drop the chips that would overflow the line, from the last one. The Today line is aligned to
+ * the right, so it overflows on the left: its first chip would lose the start of its title.
+ */
 function fitLine(line: HTMLElement): void {
   const chips = Array.from(line.children) as HTMLElement[];
   for (const c of chips) c.classList.remove('fit-hide');
-  const right = line.getBoundingClientRect().right + 1;
-  let hide = false;
-  for (const c of chips) {
-    if (!hide && c.getBoundingClientRect().right > right) hide = true;
-    if (hide) c.classList.add('fit-hide');
-  }
+  const box = line.getBoundingClientRect();
+  const over = () => {
+    const vis = chips.filter((c) => !c.classList.contains('fit-hide'));
+    if (vis.length < 2) return false;
+    return vis[0].getBoundingClientRect().left < box.left - 1 || vis[vis.length - 1].getBoundingClientRect().right > box.right + 1;
+  };
+  for (let i = chips.length - 1; i > 0 && over(); i--) chips[i].classList.add('fit-hide');
 }
 
 export class Views {

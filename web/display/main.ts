@@ -44,6 +44,7 @@ import { VIEW_PRESETS, Views } from './widgets/views';
 import { checkSetup, showWelcome, waitForSetup } from './widgets/welcome';
 import { afterPairUrl, pairHealth, pairingLang, showPairing } from './widgets/pairing';
 import { healthOnce, loadEmojiWebFont } from './health';
+import { refreshMarquee } from './marquee';
 
 const params = ctx.params;
 const forceDemo = params.get('demo') === '1';
@@ -265,6 +266,11 @@ function applyConfig(raw: DisplayConfig): void {
     if (gq('glassEdge')) g.edge = gq('glassEdge') !== '0';
     cfg.screen.glass = normalizeGlass(g);
   }
+  // ?marquee=0|1 (titles that slide) and ?rotate=0|1 (busy days that page through their events)
+  const pm = params.get('marquee');
+  if (pm === '0' || pm === '1') cfg.calendar.marquee = pm === '1';
+  const pr = params.get('rotate');
+  if (pr === '0' || pr === '1') cfg.calendar.rotateBusyDays = pr === '1';
   const pa = params.get('ambient');
   if (pa === 'aurora' || pa === 'particles' || pa === 'none') cfg.background.ambient = pa;
   const ptr = params.get('transition');
@@ -407,6 +413,7 @@ function renderCalendar(tick: Tick): void {
   }
   if (preset === 'leftRight' || preset === 'bigTime') sideAgenda.render(evs, tick);
   highlights.render(evs, tick);
+  refreshMarquee();
 }
 
 /** Content of the layouts with their own view (no-op for the others). */
@@ -463,6 +470,7 @@ function fitSide(): void {
   fitMidRows();
   views.fit();
   photos.reframe(); // what's left uncovered of the photo may have changed
+  refreshMarquee(); // titles are measured once everything that does not fit is gone
 }
 function fitSideContent(): void {
   const mid = sideEl.querySelector('.side-mid') as HTMLElement;

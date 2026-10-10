@@ -128,6 +128,10 @@ export interface CalendarConfig<S = CalendarSource> {
   showLegend: boolean;
   hidePast: boolean;
   maxEventsPerDay: number;
+  /** Titles cut short in bars and lists slide slowly to show the rest (default true). */
+  marquee: boolean;
+  /** A day with more events than fit in the month grid pages through them every few seconds (default true). */
+  rotateBusyDays: boolean;
   /** v2, per screen: null = every enabled source (incl. 'local' + 'birthdays'); array = only these ids. */
   sourceIds?: string[] | null;
   sources: S[];
@@ -896,7 +900,7 @@ export interface ScreenProfile {
   screen: Omit<ScreenConfig, 'name'>;
   layout: LayoutConfig;
   background: BackgroundConfig;
-  calendar: Pick<CalendarConfig, 'enabled' | 'view' | 'weeks' | 'weekStart' | 'showLocation' | 'showEndTime' | 'showDayXofY' | 'showLegend' | 'hidePast' | 'maxEventsPerDay'> & { sourceIds: string[] | null };
+  calendar: Pick<CalendarConfig, 'enabled' | 'view' | 'weeks' | 'weekStart' | 'showLocation' | 'showEndTime' | 'showDayXofY' | 'showLegend' | 'hidePast' | 'maxEventsPerDay' | 'marquee' | 'rotateBusyDays'> & { sourceIds: string[] | null };
   datetime: Omit<DateTimeConfig, 'timezone'>;
   weather: Pick<WeatherConfig, 'enabled' | 'forecastDays' | 'showHourly' | 'showPrecipChance'>;
   news: { enabled: boolean; rotateSec: number };
