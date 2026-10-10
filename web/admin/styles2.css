@@ -5017,6 +5017,7 @@ h1 .scope {
 
 /* pairing dialog: "or open the private link" */
 .pair-alt {
+  min-width: 0;
   border-top: 1px solid var(--border);
   padding-top: 12px;
 }
@@ -5029,9 +5030,9 @@ h1 .scope {
   margin: 8px 0 0;
 }
 .pair-alt__body {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
   gap: 12px;
   margin-top: 12px;
 }
@@ -5040,7 +5041,8 @@ h1 .scope {
   height: 150px;
 }
 .pair-alt__body .copy-field {
-  align-self: stretch;
+  justify-self: stretch;
+  min-width: 0;
 }
 .pair-alt .copy-field code {
   font-size: 12.5px;
