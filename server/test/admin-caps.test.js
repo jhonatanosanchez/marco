@@ -25,7 +25,7 @@ const { capsFrom, hasFeature, limitOf, setCaps } = capsMod;
 const cloudHealth = () => {
   const features = {};
   for (const k of FEATURE_KEYS) features[k] = true;
-  for (const k of ['homeassistant', 'insecureTls', 'openDisplayAccess', 'passwordLogin', 'includeSecrets', 'setupWizard', 'news', 'gallery', 'apiTokens', 'webhooks', 'googleCalendar', 'googleLogin']) features[k] = false;
+  for (const k of ['homeassistant', 'insecureTls', 'openDisplayAccess', 'passwordLogin', 'includeSecrets', 'setupWizard', 'news', 'gallery', 'apiTokens', 'webhooks', 'googleCalendar', 'googleLogin', 'updates']) features[k] = false;
   return {
     ok: true,
     uptime: null,
@@ -50,15 +50,18 @@ test('caps: old servers and self-hosted keep every feature on', () => {
   const old = oldServer();
   assert.equal(old.edition, 'self-hosted');
   assert.equal(old.features, null);
-  for (const k of FEATURE_KEYS) assert.equal(hasFeature(old, k), k !== 'accountMenu' && k !== 'microsoftCalendar', k);
+  // accountMenu, microsoftCalendar and updates only exist on servers that say so
+  for (const k of FEATURE_KEYS) assert.equal(hasFeature(old, k), !['accountMenu', 'microsoftCalendar', 'updates'].includes(k), k);
   assert.equal(old.pairCodeLength, 6);
   assert.equal(old.displayOrigin, null);
 
   const sh = capsFrom({ ok: true, uptime: 1, version: '0.5.0', edition: 'self-hosted', features: { news: true } });
   assert.equal(hasFeature(sh, 'gallery'), true, 'a missing key is on in self-hosted');
   assert.equal(hasFeature(sh, 'accountMenu'), false, 'the account menu is never on by default');
-  assert.equal(hasFeature(sh, 'microsoftCalendar'), false, 'nor are Microsoft calendars (Marco Cloud only)');
+  assert.equal(hasFeature(sh, 'microsoftCalendar'), false, 'nor are Microsoft calendars unless the server says so');
   assert.equal(hasFeature(capsFrom({ ...cloudHealth(), features: { ...cloudHealth().features, microsoftCalendar: true } }), 'microsoftCalendar'), true);
+  assert.equal(hasFeature(sh, 'updates'), false, 'a self-hosted server that does not list updates has no update endpoints');
+  assert.equal(hasFeature(selfHosted(), 'updates'), true);
   const sh2 = capsFrom({ ok: true, uptime: 1, version: '0.5.0', edition: 'self-hosted', features: { news: false } });
   assert.equal(hasFeature(sh2, 'news'), false, 'an explicit false is off everywhere');
 });
@@ -117,11 +120,13 @@ test('navFilter: self-hosted defaults and old servers show everything', () => {
   assert.deepEqual(nav.filterNav(nav.NAV_ITEMS, selfHosted()).map((n) => n.id), all);
   assert.deepEqual(nav.filterNav(nav.NAV_ITEMS, oldServer()).map((n) => n.id), all);
   const routes = all;
-  // every entry except the account ones (features.accountMenu, multi-tenant servers only) and Microsoft calendars
-  // (features.microsoftCalendar, Marco Cloud only for now)
+  // every entry except the account ones (features.accountMenu, multi-tenant servers only), Microsoft calendars
+  // (features.microsoftCalendar) and updates (features.updates): an old server lists none of them
   const accountEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'accountMenu' || e.feature === 'microsoftCalendar').length;
   assert.equal(accountEntries, 3);
-  assert.equal(nav.filterSettings(search.SETTINGS_INDEX, oldServer(), routes).length, search.SETTINGS_INDEX.length - accountEntries);
+  const updateEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'updates').length;
+  assert.equal(updateEntries, 1);
+  assert.equal(nav.filterSettings(search.SETTINGS_INDEX, oldServer(), routes).length, search.SETTINGS_INDEX.length - accountEntries - updateEntries);
   // without Google credentials a self-hosted admin still lists the Google entries (with the setup hint)
   assert.equal(nav.filterSettings(search.SETTINGS_INDEX, selfHosted(), routes).length, search.SETTINGS_INDEX.length - accountEntries);
   const actions = Object.keys(nav.ACTION_FEATURES).map((id) => ({ id }));

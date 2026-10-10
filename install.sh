@@ -31,13 +31,19 @@
 #   <dir>/.env           settings (port, secrets), see .env.example
 #   /etc/marco.conf      what was installed and where (read by the `marco` command)
 #   /usr/local/bin/marco command line: marco status | logs | restart | update | url | version | uninstall
+#   /etc/systemd/system/marco-update.{path,service}   updates started from the admin (release installs)
 set -euo pipefail
 
 MARCO_REPO="${MARCO_REPO:-mr-reb00t/marco}"
 MARCO_REPO_URL="${MARCO_REPO_URL:-https://github.com/${MARCO_REPO}.git}"
+# Testing only: a server that answers like GitHub releases (<url>/latest redirects to <url>/tag/v<x.y.z>, packages at
+# <url>/download/v<x.y.z>/marco-<x.y.z>.tar.gz). Kept in /etc/marco.conf when set.
+MARCO_RELEASES_URL="${MARCO_RELEASES_URL:-}"
+RELEASES_URL="${MARCO_RELEASES_URL:-https://github.com/${MARCO_REPO}/releases}"
 NODE_MAJOR=22
 NODE_MIN=20
 SERVICE=marco
+UPDATE_UNIT=marco-update
 CONF=/etc/marco.conf
 CLI=/usr/local/bin/marco
 LIBDIR=/usr/local/lib/marco
@@ -449,8 +455,8 @@ NEED_GIT=0
 
 latest_version() {
   local loc
-  loc="$(curl -fsSI --connect-timeout 15 "https://github.com/${MARCO_REPO}/releases/latest" 2>/dev/null | tr -d '\r' | sed -n 's/^[Ll]ocation: *//p' | tail -n1 || true)"
-  case "$loc" in */releases/tag/v*) printf '%s' "${loc##*/tag/v}" ;; *) printf '' ;; esac
+  loc="$(curl -fsSI --connect-timeout 15 "$RELEASES_URL/latest" 2>/dev/null | tr -d '\r' | sed -n 's/^[Ll]ocation: *//p' | tail -n1 || true)"
+  case "$loc" in */tag/v*) printf '%s' "${loc##*/tag/v}" ;; *) printf '' ;; esac
 }
 
 choose_source() {
@@ -458,7 +464,7 @@ choose_source() {
   if [ -n "$TARBALL_URL" ]; then REL_SOURCE=tarball; REL_VERSION="${WANT_VERSION:-custom}"; return 0; fi
   if [ -n "$WANT_VERSION" ]; then
     WANT_VERSION="${WANT_VERSION#v}"
-    if curl -fsIL --connect-timeout 15 -o /dev/null "https://github.com/${MARCO_REPO}/releases/download/v${WANT_VERSION}/marco-${WANT_VERSION}.tar.gz" 2>/dev/null; then
+    if curl -fsIL --connect-timeout 15 -o /dev/null "$RELEASES_URL/download/v${WANT_VERSION}/marco-${WANT_VERSION}.tar.gz" 2>/dev/null; then
       REL_SOURCE=tarball; REL_VERSION="$WANT_VERSION"
     else
       REL_SOURCE=git; REL_VERSION="$WANT_VERSION"
@@ -469,7 +475,7 @@ choose_source() {
     elif [ "$EXISTING" = release ] && [ "$CUR_GIT" = 0 ]; then
       # An install from a release only ever moves to another release. No answer here usually means GitHub could
       # not be reached (or limited the request), not that releases are gone: building main would be a guess.
-      die "Could not reach GitHub to find the latest release (https://github.com/${MARCO_REPO}/releases/latest). Nothing was changed. Check the network and try again later, or pick a version with --version <x.y.z>."
+      die "Could not reach GitHub to find the latest release ($RELEASES_URL/latest). Nothing was changed. Check the network and try again later, or pick a version with --version <x.y.z>."
     else REL_SOURCE=git; fi
   fi
   # A kiosk only needs a few scripts: from git they are downloaded one by one (no git needed).
@@ -498,6 +504,23 @@ refuse_older() {
   die "Marco $EXISTING_VERSION is installed and the version found is older ($1). Nothing was changed. To install it anyway, add --force."
 }
 
+# The files that end up running as root (the marco command, the stored installer, the systemd units) are copied out of
+# the release while it is still private to the installer: once the release folder belongs to the service user, a
+# compromised server could change them before root installs them.
+TRUSTED=""
+keep_trusted() {
+  local f
+  TRUSTED="$(mktemp -d)"
+  for f in deploy/marco deploy/marco.service install.sh; do
+    if [ -f "$1/$f" ]; then cp "$1/$f" "$TRUSTED/$(basename "$f")"; fi
+  done
+}
+# trusted <release dir> <file>: the trusted copy of deploy/<file> or install.sh when there is one, else the release's own
+trusted() {
+  if [ -n "$TRUSTED" ] && [ -f "$TRUSTED/$(basename "$2")" ]; then printf '%s' "$TRUSTED/$(basename "$2")"
+  else printf '%s' "$1/$2"; fi
+}
+
 # Downloads and prepares a release into $DIR/releases/<id>; sets NEW_REL to its id.
 NEW_REL=""
 stage_release() {
@@ -505,7 +528,7 @@ stage_release() {
   run mkdir -p "$DIR/releases"
   if [ "$REL_SOURCE" = tarball ]; then
     if [ -n "$TARBALL_URL" ]; then url="$TARBALL_URL"
-    else url="https://github.com/${MARCO_REPO}/releases/download/v${REL_VERSION}/marco-${REL_VERSION}.tar.gz"
+    else url="$RELEASES_URL/download/v${REL_VERSION}/marco-${REL_VERSION}.tar.gz"
     fi
     sha="$url.sha256"
     info "Downloading $url"
@@ -531,6 +554,7 @@ stage_release() {
     [ -n "$id" ] || die "No version in $base"
     if older_than_installed "$id"; then rm -rf "$tmp"; refuse_older "$id"; fi
     REL_VERSION="$id"
+    keep_trusted "$tmp/x"
   else
     if [ "$DRY" = 1 ]; then
       plan "git clone --depth 1 ${WANT_VERSION:+--branch v$WANT_VERSION }$MARCO_REPO_URL"
@@ -559,6 +583,7 @@ stage_release() {
       esac
     fi
     rm -rf "$tmp/x/.git"
+    keep_trusted "$tmp/x"
   fi
   if [ -e "$DIR/releases/$id" ]; then
     if [ "$(readlink "$DIR/current" 2>/dev/null)" = "releases/$id" ]; then
@@ -621,6 +646,7 @@ ENV_FILE=""
 setup_env() {
   local example="$1" cur
   ENV_FILE="$DIR/.env"
+  if [ -L "$ENV_FILE" ]; then die "$ENV_FILE is a symbolic link. Replace it with the file itself and run the installer again."; fi
   if [ ! -f "$ENV_FILE" ]; then
     info "Creating $ENV_FILE"
     if [ "$DRY" = 1 ]; then
@@ -664,6 +690,59 @@ install_service() {
   fi
 }
 
+# Updates started from the admin (release installs). The server runs as an unprivileged user and cannot update itself:
+# it writes <data>/update/request, marco-update.path sees it and starts marco-update.service, which runs
+# `marco update --requested` as root (the same as `sudo marco update`). Nothing in the request is read except that it
+# exists, so all the server can ask for is "the latest release". The units are written from here, never from files in
+# the install folder (which belongs to the service user).
+install_update_units() {
+  if [ "$DRY" = 1 ]; then
+    plan "write /etc/systemd/system/$UPDATE_UNIT.path (watches $DIR/data/update/request) and $UPDATE_UNIT.service (runs marco update --requested as root)"
+    [ "$SYSTEMD" = 0 ] || plan "systemctl enable --now $UPDATE_UNIT.path"
+    return 0
+  fi
+  cat <<EOF | put_file "/etc/systemd/system/$UPDATE_UNIT.path" 644 root
+# Written by the Marco installer: updates started from the admin (Status > Updates).
+# The Marco server writes $DIR/data/update/request and this unit starts $UPDATE_UNIT.service.
+[Unit]
+Description=Marco: watch for an update requested from the admin
+
+[Path]
+PathExists=$DIR/data/update/request
+Unit=$UPDATE_UNIT.service
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  cat <<EOF | put_file "/etc/systemd/system/$UPDATE_UNIT.service" 644 root
+# Written by the Marco installer: runs an update requested from the admin, as "sudo marco update" would (download the
+# latest release, check its SHA-256, switch to it, roll back if it does not start). Progress: $DIR/data/update/.
+[Unit]
+Description=Marco: update requested from the admin
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=HOME=/root
+ExecStart=$CLI update --requested
+TimeoutStartSec=30min
+SyslogIdentifier=marco-update
+EOF
+  if [ "$SYSTEMD" = 1 ]; then
+    run systemctl daemon-reload
+    run systemctl enable --now "$UPDATE_UNIT.path" --quiet || warn "Could not start $UPDATE_UNIT.path: updates from the admin are off."
+  fi
+  ok "Updates from the admin: on ($UPDATE_UNIT.path)"
+}
+
+remove_update_units() {
+  [ -f "/etc/systemd/system/$UPDATE_UNIT.path" ] || [ -f "/etc/systemd/system/$UPDATE_UNIT.service" ] || return 0
+  if [ "$SYSTEMD" = 1 ]; then run systemctl disable --now "$UPDATE_UNIT.path" --quiet || true; fi
+  run rm -f "/etc/systemd/system/$UPDATE_UNIT.path" "/etc/systemd/system/$UPDATE_UNIT.service"
+  if [ "$SYSTEMD" = 1 ]; then run systemctl daemon-reload; fi
+}
+
 restart_service() {
   [ "$SYSTEMD" = 1 ] || return 0
   run systemctl restart "$SERVICE"
@@ -680,11 +759,17 @@ wait_healthy() {
 }
 
 install_cli() {
-  local src="$1"
+  local src="$1" cli inst
+  cli="$(trusted "$src" deploy/marco)"; inst="$(trusted "$src" install.sh)"
   info "Installing the 'marco' command and $CONF"
-  [ -f "$src/deploy/marco" ] || [ "$DRY" = 1 ] || { warn "deploy/marco missing in this version: command not installed"; return 0; }
-  run install -D -m 755 "$src/deploy/marco" "$CLI"
-  if [ -f "$src/install.sh" ] || [ "$DRY" = 1 ]; then run install -D -m 755 "$src/install.sh" "$LIBDIR/install.sh"; fi
+  [ -f "$cli" ] || [ "$DRY" = 1 ] || { warn "deploy/marco missing in this version: command not installed"; return 0; }
+  # Written next to the old file and renamed over it: a running `marco update` keeps reading the copy it started with.
+  run install -D -m 755 "$cli" "$CLI.new"
+  run mv -f "$CLI.new" "$CLI"
+  if [ -f "$inst" ] || [ "$DRY" = 1 ]; then
+    run install -D -m 755 "$inst" "$LIBDIR/install.sh.new"
+    run mv -f "$LIBDIR/install.sh.new" "$LIBDIR/install.sh"
+  fi
   {
     echo "# Written by the Marco installer. Read by /usr/local/bin/marco."
     echo "MARCO_MODE=$MODE"
@@ -693,6 +778,7 @@ install_cli() {
     echo "MARCO_USER=$(printf '%q' "$RUN_USER")"
     echo "MARCO_NODE=$(printf '%q' "${NODE_BIN:-}")"
     echo "MARCO_REPO=$MARCO_REPO"
+    if [ -n "$MARCO_RELEASES_URL" ]; then echo "MARCO_RELEASES_URL=$(printf '%q' "$MARCO_RELEASES_URL")"; fi
   } | put_file "$CONF" 644 root
 }
 
@@ -841,15 +927,23 @@ do_install_release() {
     return
   fi
   create_user
+  # The install folder belongs to the service user, and root works in it: links where folders are expected are refused.
+  if [ -L "$DIR/releases" ]; then die "$DIR/releases is a symbolic link: move it away and run the installer again."; fi
+  if [ -e "$DIR/current" ] && [ ! -L "$DIR/current" ]; then die "$DIR/current is not a symbolic link: move it away and run the installer again."; fi
   if [ "$DRY" = 1 ]; then plan "mkdir -p $DIR/data $DIR/releases (owner $RUN_USER)"
   else
     run mkdir -p "$DIR/data" "$DIR/releases"
-    run chown "$RUN_USER:$(run_group)" "$DIR" "$DIR/data" "$DIR/releases"
+    run chown -h "$RUN_USER:$(run_group)" "$DIR" "$DIR/data" "$DIR/releases"
   fi
   stage_release
   setup_env "$DIR/releases/$NEW_REL/.env.example"
   swap_current "$NEW_REL"
-  install_service "$DIR/current" "$DIR/current/deploy/marco.service"
+  # The unit that runs now, put back as it is if the new version has to be rolled back.
+  local old_unit=""
+  if [ "$DRY" = 0 ] && [ -f "/etc/systemd/system/$SERVICE.service" ]; then
+    old_unit="$(mktemp)"; cp "/etc/systemd/system/$SERVICE.service" "$old_unit"
+  fi
+  install_service "$DIR/current" "$(trusted "$DIR/current" deploy/marco.service)"
   # The marco command and the stored installer are replaced only once the new version runs: after a rollback the
   # next `marco update` must not go through files from the release that failed.
   if [ "$SYSTEMD" = 1 ]; then
@@ -862,7 +956,10 @@ do_install_release() {
         warn "The new version did not start. Rolling back to ${PREV_REL#releases/}..."
         run ln -sfn "$PREV_REL" "$DIR/.current.new"
         run mv -T "$DIR/.current.new" "$DIR/current"
-        install_service "$DIR/current" "$DIR/current/deploy/marco.service"
+        if [ -n "$old_unit" ]; then
+          put_file "/etc/systemd/system/$SERVICE.service" 644 root < "$old_unit"
+          run systemctl daemon-reload
+        fi
         restart_service
         if wait_healthy; then ok "Rolled back: the previous version is running."; else warn "The previous version does not answer either."; fi
         run rm -rf "$DIR/releases/$NEW_REL"
@@ -871,8 +968,11 @@ do_install_release() {
       warn "The server is not answering yet. Check: journalctl -u $SERVICE -n 50 --no-pager"
     fi
   fi
+  if [ -n "$old_unit" ]; then rm -f "$old_unit"; fi
   install_cli "$DIR/current"
+  install_update_units
   prune_releases
+  if [ -n "$TRUSTED" ]; then rm -rf "$TRUSTED"; TRUSTED=""; fi
   if [ "$MODE" = all ]; then
     run chmod +x "$DIR/current/deploy/kiosk.sh" "$DIR/current/deploy/screen-schedule.sh"
     setup_kiosk "$DIR/current/deploy/kiosk.sh"
@@ -898,7 +998,7 @@ stage_kiosk_scripts() {
   KIOSK_TMP="$(mktemp -d)"
   if [ "$REL_SOURCE" = checkout ]; then KIOSK_SRC="$SOURCE_DIR"
   elif [ "$REL_SOURCE" = tarball ]; then
-    local url="${TARBALL_URL:-https://github.com/${MARCO_REPO}/releases/download/v${REL_VERSION}/marco-${REL_VERSION}.tar.gz}" base
+    local url="${TARBALL_URL:-$RELEASES_URL/download/v${REL_VERSION}/marco-${REL_VERSION}.tar.gz}" base
     base="$(basename "${url%%\?*}")"
     fetch -o "$KIOSK_TMP/$base" "$url" || die "Download failed: $url"
     fetch -o "$KIOSK_TMP/$base.sha256" "$url.sha256" || die "Checksum file not found: $url.sha256"
@@ -948,6 +1048,8 @@ do_install_checkout() {
   setup_env "$app/.env.example"
   install_service "$app" "$app/deploy/marco.service"
   install_cli "$app"
+  # A checkout is updated with git pull, by its owner: no updates from the admin.
+  remove_update_units
   if [ "$SYSTEMD" = 1 ]; then
     restart_service
     if wait_healthy; then ok "The server is up"; else warn "The server is not answering yet. Check: journalctl -u $SERVICE -n 50 --no-pager"; fi
@@ -976,6 +1078,7 @@ do_uninstall() {
     if [ "$SYSTEMD" = 1 ]; then run systemctl daemon-reload; fi
     ok "Service removed"
   fi
+  remove_update_units
   remove_kiosk
   if [ "$LAYOUT" = release ] && [ "$MODE" != kiosk ]; then
     if [ -L "$DIR/current" ]; then run rm -f "$DIR/current"; fi
@@ -1132,6 +1235,10 @@ main() {
   if [ "$EXISTING" = release ] && [ "$REL_SOURCE" = tarball ] && [ -z "$TARBALL_URL" ] \
      && [ "$EXISTING_VERSION" = "$REL_VERSION" ] && [ "$CUR_GIT" = 0 ] && [ "$FORCE" = 0 ]; then
     ok "Marco $EXISTING_VERSION is installed and up to date."
+    # Installs updated by an installer older than the admin's update button get its units here.
+    if [ "$MODE" != kiosk ] && [ ! -f "/etc/systemd/system/$UPDATE_UNIT.path" ] && { [ "$(id -u)" -eq 0 ] || sudo -n true 2>/dev/null; }; then
+      install_update_units
+    fi
     [ "$DRY" = 1 ] || exit 0
   fi
   if [ "$EXISTING" = release ] && [ "$REL_SOURCE" = tarball ] && [ -z "$TARBALL_URL" ] && older_than_installed "$REL_VERSION"; then

@@ -20,6 +20,14 @@ You should get an answer within a week.
 - The installer writes `.env` and the kiosk's `kiosk.env` with mode 600 and never prints a private link in full.
 - The service runs as a normal user (yours, or a `marco` system user for a server-only install made as root), unless
   you pass `--user root` yourself.
+- Updates started from the admin (release installs): the server only creates `<data>/update/request`. A systemd path
+  unit written by the installer (`marco-update.path`) starts `marco-update.service`, which runs
+  `marco update --requested` as root. It reads nothing from the request except that it exists, writes its progress
+  into the data folder as the service user (so a link planted there cannot make root overwrite another file) and
+  always installs the latest release, checksum checked. The files that run as root (the `marco` command, the stored
+  installer, the systemd units) come from the verified package or the installer itself, never from the install
+  folder, which belongs to the service user.
+- The daily update check is a single `GET` to the GitHub API with no identifier; `MARCO_UPDATE_CHECK=0` turns it off.
 
 ## Deployment model (what is and is not protected)
 

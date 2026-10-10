@@ -7,6 +7,7 @@ import { has, runtime } from '../caps';
 import { formatDuration, relTime, t } from '../i18n';
 import type { SectionProps } from './common';
 import { fetchErrorText } from '../apiErrors';
+import { UpdatesCard } from '../components/Updates';
 
 export function StatusSection({ cfg }: SectionProps) {
   const newsOn = has('news');
@@ -172,6 +173,7 @@ export function StatusSection({ cfg }: SectionProps) {
           </Card>
         </>
       )}
+      <UpdatesCard />
     </>
   );
 }

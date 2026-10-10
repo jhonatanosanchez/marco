@@ -537,6 +537,8 @@ export interface Features {
   accountMenu: boolean;
   /** Outlook.com, Hotmail and Microsoft 365 calendars (read only, Microsoft Graph). Off unless the server says so. */
   microsoftCalendar: boolean;
+  /** Update banner, settings and the update button (self-hosted only; absent on older servers = off). */
+  updates: boolean;
 }
 
 export type FeatureName = keyof Features;
@@ -588,6 +590,64 @@ export interface HealthResponse {
   adminOrigin?: string;
   /** This server's LAN addresses; only sent to a client on the server itself (a kiosk on http://localhost). */
   lanAddresses?: string[];
+}
+
+// ---- Updates (self-hosted, features.updates) ----
+
+/** How the server was installed: what the admin offers to update it (server/updates.js detectInstall). */
+export interface UpdateInstall {
+  kind: 'release' | 'checkout' | 'docker' | 'manual';
+  /** The update button works (install.sh release install with the marco-update units). */
+  canApply: boolean;
+  /** The `marco` command manages this install. */
+  cli: boolean;
+}
+
+export interface UpdateRelease {
+  version: string;
+  name: string;
+  /** Markdown from the CHANGELOG section of that version */
+  notes: string;
+  url: string | null;
+  publishedAt: string | null;
+}
+
+export interface UpdateSettings {
+  /** Check for a new version once a day */
+  check: boolean;
+  /** Install it on its own inside the window (release installs) */
+  auto: boolean;
+  /** HH:MM, server time zone (Date & time) */
+  from: string;
+  to: string;
+}
+
+export interface UpdateStatus {
+  state: 'requested' | 'running' | 'done' | 'current' | 'failed';
+  from: string;
+  to: string;
+  target: string;
+  by: 'admin' | 'auto';
+  at: string | null;
+  rolledBack: boolean;
+  /** Requested, but no update service picked it up */
+  stalled: boolean;
+}
+
+/** GET /api/admin/update */
+export interface UpdateInfo {
+  current: string;
+  latest: UpdateRelease | null;
+  available: boolean;
+  checkedAt: string | null;
+  error: 'network' | 'http' | 'rate_limited' | 'bad_response' | null;
+  /** 'env-off' = MARCO_UPDATE_CHECK=0 on the server */
+  checks: 'on' | 'off' | 'env-off';
+  install: UpdateInstall;
+  settings: UpdateSettings;
+  status: UpdateStatus | null;
+  /** Last lines of the installer's output for the last update */
+  log: string[];
 }
 
 /** SSE /api/stream?screen=&client= event payloads (docs/ARCHITECTURE.md) */
@@ -1356,7 +1416,11 @@ export type ActivityType =
   | 'display.pair_failed'
   | 'display.device_updated'
   | 'display.device_revoked'
-  | 'activity.cleared';
+  | 'activity.cleared'
+  | 'update.requested'
+  | 'update.finished'
+  | 'update.failed'
+  | 'update.settings';
 
 export interface ActivityEntry {
   id: string; // sortable (time-based)

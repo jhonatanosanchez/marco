@@ -1053,6 +1053,102 @@
     },
     {
       "method": "GET",
+      "path": "/api/admin/update",
+      "query": [],
+      "feature": "updates",
+      "callers": [
+        "updateInfo"
+      ],
+      "request": null,
+      "response": "UpdateInfo",
+      "responseArray": false,
+      "responseKeys": [
+        "current",
+        "latest",
+        "available",
+        "checkedAt",
+        "error",
+        "checks",
+        "install",
+        "settings",
+        "status",
+        "log"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/update/apply",
+      "query": [],
+      "feature": "updates",
+      "callers": [
+        "updateApply"
+      ],
+      "request": null,
+      "response": "UpdateInfo",
+      "responseArray": false,
+      "responseKeys": [
+        "current",
+        "latest",
+        "available",
+        "checkedAt",
+        "error",
+        "checks",
+        "install",
+        "settings",
+        "status",
+        "log"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/update/check",
+      "query": [],
+      "feature": "updates",
+      "callers": [
+        "updateCheck"
+      ],
+      "request": null,
+      "response": "UpdateInfo",
+      "responseArray": false,
+      "responseKeys": [
+        "current",
+        "latest",
+        "available",
+        "checkedAt",
+        "error",
+        "checks",
+        "install",
+        "settings",
+        "status",
+        "log"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/update/settings",
+      "query": [],
+      "feature": "updates",
+      "callers": [
+        "updateSettings"
+      ],
+      "request": "Partial<UpdateSettings>",
+      "response": "UpdateInfo",
+      "responseArray": false,
+      "responseKeys": [
+        "current",
+        "latest",
+        "available",
+        "checkedAt",
+        "error",
+        "checks",
+        "install",
+        "settings",
+        "status",
+        "log"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/api/admin/weather/key",
       "query": [],
       "feature": null,

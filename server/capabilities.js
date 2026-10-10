@@ -10,10 +10,11 @@ export const FEATURE_KEYS = Object.freeze([
   'homeassistant', 'news', 'customCss', 'gallery', 'schedules', 'announcements', 'displayCommands',
   'openDisplayAccess', 'insecureTls', 'googleCalendar', 'googleLogin', 'passwordLogin', 'apiTokens',
   'webhooks', 'backups', 'importExport', 'includeSecrets', 'activity', 'setupWizard', 'status', 'accountMenu',
-  'microsoftCalendar',
+  'microsoftCalendar', 'updates',
 ]);
 
-/** Feature flags of a self-hosted server: all on, Google and Microsoft follow their credentials, no account menu. */
+/** Feature flags of a self-hosted server: all on (`updates` too: the update banner and settings), Google and
+ *  Microsoft follow their credentials, no account menu. */
 export function selfHostedFeatures() {
   const google = googleConfigured();
   const out = {};

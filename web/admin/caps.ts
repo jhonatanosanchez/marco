@@ -73,8 +73,9 @@ export function capsFrom(health: Partial<HealthResponse> | null | undefined): Ca
 
 /** Whether `caps` turns `feature` on (see the rules at the top of this file). */
 /** Features that only exist on servers that say so in `features`; off when the field or the key is missing.
- *  microsoftCalendar: Marco Cloud only for now, so a self-hosted server that does not know the key never shows it. */
-const OPT_IN: readonly FeatureName[] = ['accountMenu', 'microsoftCalendar'];
+ *  microsoftCalendar: Marco Cloud, or a self-hosted server with its own Entra app; updates: self-hosted servers
+ *  that have the update endpoints. */
+const OPT_IN: readonly FeatureName[] = ['accountMenu', 'microsoftCalendar', 'updates'];
 
 export function hasFeature(caps: Caps, feature: FeatureName): boolean {
   if (!caps.features) return !OPT_IN.includes(feature);

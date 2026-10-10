@@ -46,6 +46,8 @@ import type {
   WeatherKeyStatus,
   TestIcsResponse,
   TestRssResponse,
+  UpdateInfo,
+  UpdateSettings,
 } from '../shared/types';
 import { getLang } from './i18n';
 import { apiErrorCode, apiErrorMessage, type ApiErrorCode } from './apiErrors';
@@ -178,6 +180,11 @@ export const api = {
 
   // ---- v2 (docs/ARCHITECTURE.md) ----
   dashboard: () => request<DashboardResponse>('GET', '/api/admin/dashboard'),
+  // updates (self-hosted, features.updates)
+  updateInfo: () => request<UpdateInfo>('GET', '/api/admin/update'),
+  updateSettings: (patch: Partial<UpdateSettings>) => request<UpdateInfo>('PUT', '/api/admin/update/settings', patch),
+  updateCheck: () => request<UpdateInfo>('POST', '/api/admin/update/check'),
+  updateApply: () => request<UpdateInfo>('POST', '/api/admin/update/apply'),
   screenTemplate: (name: string) => request<ScreenProfile>('GET', `/api/admin/screens/template${q({ name })}`),
   displays: () => request<DisplaysResponse>('GET', '/api/admin/displays'),
   displayCommand: (body: DisplayCommandRequest) => request<{ ok: true; delivered: number }>('POST', '/api/admin/displays/command', body),
