@@ -1,5 +1,6 @@
-import type { DisplayStyle, LayoutPreset } from '../../shared/types';
-import { Card, Field, PageHeader, Segmented, Slider } from '../components/ui';
+import { GLASS_DEFAULTS, glassVars, normalizeGlass, type PhotoStats } from '../../shared/glass';
+import type { DisplayStyle, GlassConfig, LayoutPreset } from '../../shared/types';
+import { Button, Card, Field, PageHeader, Segmented, Slider, ToggleRow } from '../components/ui';
 import { t } from '../i18n';
 import type { SectionProps } from './common';
 
@@ -167,6 +168,109 @@ export function StyleThumb({ id }: { id: DisplayStyle }) {
   );
 }
 
+/** The two sample photos of the glass preview (a dark dusk and a bright beach), with their measured stats. */
+const GLASS_SCENES: { id: string; label: string; stats: PhotoStats }[] = [
+  { id: 'dark', label: 'Foto oscura', stats: { tone: 0.18, rgb: [92, 70, 128] } },
+  { id: 'bright', label: 'Foto clara', stats: { tone: 0.85, rgb: [70, 150, 190] } },
+];
+
+/** Live preview of the glass settings: the same maths as the screen, drawn over two sample photos. */
+export function GlassPreview({ glass }: { glass: GlassConfig }) {
+  return (
+    <div class="glass-pv" aria-hidden="true">
+      {GLASS_SCENES.map((sc) => {
+        const g = glassVars(glass, sc.stats, { lite: false, hasPhoto: true });
+        const v = g.vars;
+        const blur = normalizeGlass(glass).blur;
+        const style = {
+          '--pv-bg': `rgb(${v['--g-rgb']} / ${v['--g-a']})`,
+          '--pv-filter': blur > 0 ? `blur(${(blur * 0.45).toFixed(1)}px) saturate(${v['--g-filter'].match(/saturate\(([\d.]+)\)/)?.[1] ?? '1.8'})` : 'none',
+          '--g-edge': v['--g-edge'],
+        } as Record<string, string>;
+        return (
+          <div class={`glass-pv__scene glass-pv__scene--${sc.id}`}>
+            <div class="glass-pv__sun" />
+            <div class="glass-pv__hill" />
+            <div class={`glass-pv__card ${g.inkDark ? 'is-ink-dark' : ''} ${g.thin ? 'is-thin' : ''} ${g.edge ? 'has-edge' : ''}`} style={style}>
+              <div class="glass-pv__row">
+                <span class="glass-pv__loc">Lisboa</span>
+                <span class="glass-pv__temp">19°</span>
+              </div>
+              <div class="glass-pv__ev">
+                <i />
+                <span>17:30</span>
+              </div>
+            </div>
+            <span class="glass-pv__label">{t(sc.label)}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const opacityWord = (v: number) =>
+  v < 0.2 ? 'Muy transparente' : v < 0.42 ? 'Más transparente' : v <= 0.58 ? 'Equilibrado' : v <= 0.8 ? 'Más sólido' : 'Muy sólido';
+
+/** Glass options of the Modern style (like the iPhone's Liquid Glass settings). */
+export function GlassCard({ cfg, set }: Pick<SectionProps, 'cfg' | 'set'>) {
+  const g = normalizeGlass(cfg.screen.glass);
+  const put = <K extends keyof GlassConfig>(k: K, v: GlassConfig[K]) =>
+    set((d) => void (d.screen.glass = { ...normalizeGlass(d.screen.glass), [k]: v }));
+  const isDefault = (Object.keys(GLASS_DEFAULTS) as (keyof GlassConfig)[]).every((k) => g[k] === GLASS_DEFAULTS[k]);
+  return (
+    <Card
+      id="layout-glass"
+      scope="screen"
+      title={t('Cristal')}
+      icon="sparkles"
+      desc={t('Cómo se ven las tarjetas de cristal del estilo Moderno en esta pantalla.')}
+      actions={
+        <Button size="sm" variant="ghost" disabled={isDefault} onClick={() => set((d) => void (d.screen.glass = { ...GLASS_DEFAULTS }))}>
+          {t('Restablecer')}
+        </Button>
+      }
+    >
+      <div class="glass-set">
+        <GlassPreview glass={g} />
+        <div class="glass-set__controls">
+          <Field label={t('Apariencia')} hint={t('Automático se adapta a cada foto: más transparente sobre fotos oscuras, más tintado sobre fotos claras.')}>
+            <Segmented
+              value={g.appearance}
+              full
+              options={[
+                { value: 'clear', label: t('Transparente') },
+                { value: 'tinted', label: t('Tintado') },
+                { value: 'auto', label: t('Automático') },
+              ]}
+              onChange={(v) => put('appearance', v)}
+            />
+          </Field>
+          <Field label={t('Transparencia')}>
+            <Slider value={g.opacity} min={0} max={1} step={0.05} format={(v) => t(opacityWord(v))} onChange={(v) => put('opacity', v)} />
+          </Field>
+          <Field label={t('Desenfoque')} hint={t('En la Raspberry Pi (modo ligero) no hay desenfoque y las tarjetas son sólidas.')}>
+            <Slider value={g.blur} min={0} max={40} step={1} format={(v) => (v ? `${v}` : t('Sin desenfoque'))} onChange={(v) => put('blur', v)} />
+          </Field>
+          <Field label={t('Tono')} hint={t('Del fondo toma el color de la foto que se está mostrando, como en el iPhone.')}>
+            <Segmented
+              value={g.tint}
+              full
+              options={[
+                { value: 'light', label: t('Claro') },
+                { value: 'dark', label: t('Oscuro') },
+                { value: 'photo', label: t('Del fondo') },
+              ]}
+              onChange={(v) => put('tint', v)}
+            />
+          </Field>
+          <ToggleRow label={t('Borde de luz')} hint={t('Una línea fina y brillante en el borde de cada tarjeta.')} checked={g.edge} onChange={(v) => put('edge', v)} />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export function LayoutSection({ cfg, set }: SectionProps) {
   const l = cfg.layout;
   const hasSide = l.preset === 'bigCalendar' || l.preset === 'leftRight';
@@ -208,6 +312,7 @@ export function LayoutSection({ cfg, set }: SectionProps) {
           ))}
         </div>
       </Card>
+      {style === 'modern' && <GlassCard cfg={cfg} set={set} />}
       <div class="preset-grid" id="layout-presets">
         {PRESETS.map((p) => (
           <button

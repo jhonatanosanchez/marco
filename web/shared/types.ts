@@ -17,6 +17,20 @@ export interface NightMode {
 
 export type DisplayStyle = 'classic' | 'modern';
 
+/** Glass material of the Modern style (like iOS Liquid Glass): ignored by Classic. */
+export interface GlassConfig {
+  /** 'auto' follows the photo (clearer over dark photos, more tinted over bright ones); 'clear' or 'tinted' fix it. */
+  appearance: 'auto' | 'clear' | 'tinted';
+  /** 0 = most see-through, 1 = most solid (0.5 = the default Modern look). */
+  opacity: number;
+  /** Background blur, 0..40 (0 = none). */
+  blur: number;
+  /** Tint colour: dark, light, or taken from the current photo. */
+  tint: 'dark' | 'light' | 'photo';
+  /** Thin light ring along the card edge. */
+  edge: boolean;
+}
+
 export interface ScreenConfig {
   name: string;
   language: Lang;
@@ -24,6 +38,8 @@ export interface ScreenConfig {
   theme: 'dark' | 'light' | string;
   /** Display style, independent of the layout: 'classic' (default) or 'modern' (glass cards, Apple-like). */
   style?: DisplayStyle;
+  /** Glass options for the Modern style. Missing = defaults (GLASS_DEFAULTS). */
+  glass?: GlassConfig;
   accent: string;
   orientation: 'auto' | 'landscape' | 'portrait' | string;
   customCss: string;

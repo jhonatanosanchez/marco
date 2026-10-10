@@ -190,6 +190,8 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
 
   const sc = obj(ctx, `${p}.screen`, x.screen);
   const nm = obj(ctx, `${p}.screen.nightMode`, sc.nightMode);
+  const gl = obj(ctx, `${p}.screen.glass`, sc.glass);
+  const GD = D.screen.glass;
   const screen = {
     language: oneOf(ctx, `${p}.screen.language`, sc.language, D.screen.language, LANGS),
     fontScale: num(ctx, `${p}.screen.fontScale`, sc.fontScale, D.screen.fontScale, 0.5, 3),
@@ -204,6 +206,14 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
       from: hhmm(ctx, `${p}.screen.nightMode.from`, nm.from, D.screen.nightMode.from),
       to: hhmm(ctx, `${p}.screen.nightMode.to`, nm.to, D.screen.nightMode.to),
       dim: num(ctx, `${p}.screen.nightMode.dim`, nm.dim, D.screen.nightMode.dim, 0, 1),
+    },
+    // glass material of the Modern style: appearance, transparency (0 = see-through, 1 = solid), blur, tint, light edge
+    glass: {
+      appearance: oneOf(ctx, `${p}.screen.glass.appearance`, gl.appearance, GD.appearance, ['auto', 'clear', 'tinted']),
+      opacity: num(ctx, `${p}.screen.glass.opacity`, gl.opacity, GD.opacity, 0, 1),
+      blur: num(ctx, `${p}.screen.glass.blur`, gl.blur, GD.blur, 0, 40, true),
+      tint: oneOf(ctx, `${p}.screen.glass.tint`, gl.tint, GD.tint, ['dark', 'light', 'photo']),
+      edge: bool(ctx, `${p}.screen.glass.edge`, gl.edge, GD.edge),
     },
   };
 

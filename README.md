@@ -784,6 +784,7 @@ Back up the whole folder (or use *Export*) to keep everything.
 | `?demo=1` | Built-in sample data (no server data needed) |
 | `?lang=en\|es\|pt` | Override the language |
 | `?preset=…` `?view=month\|agenda\|week` `?theme=dark\|light` `?style=classic\|modern` `?side=left\|right` `?clock=analog` | Override layout options (handy for testing) |
+| `?glass=clear\|tinted\|auto` `?glassOpacity=0..1` `?glassBlur=0..40` `?glassTint=dark\|light\|photo` `?glassEdge=0\|1` | Override the glass options of the Modern style |
 | `?wxfx=off\|simple\|rich` | Override the weather effect; with `?demo=1`, `?wx=rain\|snow\|clear\|thunder` forces the weather |
 | `?client=<name>` | Name of this device in *Connected displays* (the kiosk script sets it) |
 

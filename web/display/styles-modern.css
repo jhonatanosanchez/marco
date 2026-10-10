@@ -19,8 +19,9 @@
   --m-r-sm: 1.2rem;
   --m-fill: rgb(255 255 255 / 0.07);
   --m-sep: rgb(255 255 255 / 0.12);
-  --m-glass: rgb(22 22 26 / min(0.9, calc((0.24 + var(--tone-bottom, 0.5) * 0.24) * var(--panel-shade, 1))));
-  --m-blur: blur(calc(var(--panel-blur, 18) * 0.17rem)) saturate(1.8);
+  /* glass material: --g-* come from screen.glass (web/shared/glass.ts); the fallbacks are the default look */
+  --m-glass: rgb(var(--g-rgb, 22 22 26) / var(--g-a, min(0.9, calc((0.24 + var(--tone-bottom, 0.5) * 0.24)))));
+  --m-blur: var(--g-filter, blur(3.06rem) saturate(1.8));
   --m-shadow: 0 0.8rem 3.2rem rgb(0 0 0 / 0.16);
   --m-ink: rgb(255 255 255 / 0.92);
   --m-ink-2: rgb(255 255 255 / 0.62);
@@ -64,7 +65,13 @@
   inset: 0;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(150deg, rgb(255 255 255 / 0.42), rgb(255 255 255 / 0.08) 32%, rgb(255 255 255 / 0.02) 60%, rgb(255 255 255 / 0.14));
+  background: linear-gradient(
+    150deg,
+    rgb(255 255 255 / calc(0.42 * var(--g-edge, 1))),
+    rgb(255 255 255 / calc(0.08 * var(--g-edge, 1))) 32%,
+    rgb(255 255 255 / calc(0.02 * var(--g-edge, 1))) 60%,
+    rgb(255 255 255 / calc(0.14 * var(--g-edge, 1)))
+  );
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
@@ -80,7 +87,7 @@
 .lite.style-modern .an {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  background: rgb(28 28 32 / min(0.94, calc(0.62 * var(--panel-shade, 1) + 0.12)));
+  background: rgb(var(--g-rgb, 28 28 32) / var(--g-a, 0.74));
 }
 .style-modern .no-photo .side { background: #000; }
 .style-modern .no-photo .side .side-bottom .weather,
@@ -89,7 +96,7 @@
 .style-modern .no-photo .side .card,
 .style-modern .no-photo .agenda.compact .ag-list,
 .style-modern .no-photo .hl-pill {
-  background: rgb(28 28 30);
+  background: rgb(var(--g-solid, 28 28 30));
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
@@ -206,7 +213,7 @@
   backdrop-filter: var(--m-blur);
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12);
 }
-.lite.style-modern #app.portrait .cd-card .cd { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgb(28 28 32 / 0.8); }
+.lite.style-modern #app.portrait .cd-card .cd { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgb(var(--g-rgb, 28 28 32) / max(var(--g-a, 0.8), 0.8)); }
 .style-modern #app.portrait .cd-card .cd::after { display: none; }
 .style-modern #app.portrait .cd-em { width: 3rem; height: 3rem; border-radius: 99rem; font-size: 1.7rem; }
 .style-modern .cd-strip .cd {
@@ -276,10 +283,10 @@
   margin: 0;
   padding: 2rem 2.4rem 1.8rem;
   border-radius: 2.8rem;
-  background: rgb(22 22 26 / min(0.9, calc((0.18 + var(--tone-bottom) * 0.2) * var(--panel-shade, 1))));
+  background: rgb(var(--g-rgb, 22 22 26) / var(--g-a-wx, min(0.9, calc(0.18 + var(--tone-bottom, 0.5) * 0.2))));
 }
-.lite.style-modern .side .side-bottom .weather { background: rgb(28 28 32 / min(0.94, calc((0.5 + var(--tone-bottom) * 0.2) * var(--panel-shade, 1)))); }
-.style-modern .no-photo .side .side-bottom .weather { background: rgb(28 28 30); }
+.lite.style-modern .side .side-bottom .weather { background: rgb(var(--g-rgb, 28 28 32) / var(--g-a-wx, 0.6)); }
+.style-modern .no-photo .side .side-bottom .weather { background: rgb(var(--g-solid, 28 28 30)); }
 .style-modern .weather { color: #fff; }
 .style-modern .wxm-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 2rem; }
 .style-modern .wxm-main { display: flex; flex-direction: column; min-width: 0; }
@@ -339,6 +346,67 @@
 .style-modern .preset-topBottom .weather .wx-meta { display: none; }
 .style-modern #app.portrait .wxm-temp,
 .style-modern .preset-topBottom .wxm-temp { font-size: 7.2rem; }
+
+/* ------------------------------------------------------------------------------- glass options (screen.glass) */
+/* no light edge: no ring and no top highlight */
+.style-modern.glass-no-edge .side .side-bottom .weather::before,
+.style-modern.glass-no-edge .cd-card::before,
+.style-modern.glass-no-edge .sched-wrap .sched::before,
+.style-modern.glass-no-edge .side .card::before,
+.style-modern.glass-no-edge .agenda.compact .ag-list::before,
+.style-modern.glass-no-edge .hl-pill::before,
+.style-modern.glass-no-edge .an::before { display: none; }
+.style-modern.glass-no-edge .side .side-bottom .weather,
+.style-modern.glass-no-edge .cd-card,
+.style-modern.glass-no-edge .sched-wrap .sched,
+.style-modern.glass-no-edge .side .card,
+.style-modern.glass-no-edge .agenda.compact .ag-list { box-shadow: var(--m-shadow); }
+.style-modern.glass-no-edge .hl-pill,
+.style-modern.glass-no-edge #app.portrait .cd-card .cd,
+.style-modern.glass-no-edge .preset-bigTime .main { box-shadow: none; }
+.style-modern.glass-no-edge .preset-leftRight .main { box-shadow: 0 2rem 6rem rgb(0 0 0 / 0.3); }
+
+/* very see-through glass: a soft shadow under the text keeps it readable over bright parts of the photo */
+.style-modern.glass-thin .side .side-bottom .weather,
+.style-modern.glass-thin .cd-card,
+.style-modern.glass-thin #app.portrait .cd-card .cd,
+.style-modern.glass-thin .sched-wrap .sched,
+.style-modern.glass-thin .side .card,
+.style-modern.glass-thin .agenda.compact .ag-list,
+.style-modern.glass-thin .hl-pill,
+.style-modern.glass-thin .preset-bigTime .main { text-shadow: 0 0.1rem 0.8rem rgb(0 0 0 / 0.5); }
+
+/* light glass (light tint, or a very see-through card over a bright photo): dark text inside the cards */
+.style-modern.glass-ink-dark .side .side-bottom .weather,
+.style-modern.glass-ink-dark .cd-card,
+.style-modern.glass-ink-dark #app.portrait .cd-card .cd,
+.style-modern.glass-ink-dark .sched-wrap .sched,
+.style-modern.glass-ink-dark .side .card,
+.style-modern.glass-ink-dark .agenda.compact .ag-list,
+.style-modern.glass-ink-dark .hl-pill,
+.style-modern.glass-ink-dark .preset-bigTime .main {
+  --m-ink: rgb(0 0 0 / 0.86);
+  --m-ink-2: rgb(60 60 67 / 0.72);
+  --m-sep: rgb(60 60 67 / 0.16);
+  color: rgb(0 0 0 / 0.86);
+  text-shadow: none;
+}
+.style-modern.glass-ink-dark .weather,
+.style-modern.glass-ink-dark .wxm-hl b,
+.style-modern.glass-ink-dark .agenda.compact .ag-ev,
+.style-modern.glass-ink-dark .preset-bigTime #news { color: rgb(0 0 0 / 0.86); }
+.style-modern.glass-ink-dark .weather .wx-meta b { color: rgb(0 0 0 / 0.78); }
+.style-modern.glass-ink-dark .weather .wind-arrow { color: rgb(60 60 67 / 0.8); }
+.style-modern.glass-ink-dark .preset-bigTime #news { --fg-2: rgb(60 60 67 / 0.72); --fg-3: rgb(60 60 67 / 0.45); }
+.style-modern.glass-ink-dark .sched-until { color: rgb(60 60 67 / 0.6); }
+.style-modern.glass-ink-dark .msg-em { background: rgb(0 0 0 / 0.06); }
+.style-modern.glass-ink-dark .weather svg { filter: drop-shadow(0 0 0.08rem rgb(0 0 0 / 0.45)); }
+/* the light pastel tints are made for dark glass: use the deeper shade of each colour */
+.style-modern.glass-ink-dark .hl-pill .hl-lead,
+.style-modern.glass-ink-dark .cd-card .cd.is-today .cd-when,
+.style-modern.glass-ink-dark .cd-card .cd.is-tomorrow .cd-when { color: var(--deep, var(--tint)); }
+.style-modern.glass-ink-dark .weather .wxm-day .p,
+.style-modern.glass-ink-dark .weather .wx-hourly .p { color: #0a6fd6; }
 
 /* ------------------------------------------------------------------------------- month / week grid */
 .style-modern .cal { --num-h: 5rem; }
@@ -524,15 +592,15 @@
   padding: 2.4rem 2.4rem 0 2.6rem;
   border-radius: 3.2rem;
   overflow: hidden;
-  background: rgb(18 18 22 / 0.46);
-  -webkit-backdrop-filter: blur(4rem) saturate(1.6);
-  backdrop-filter: blur(4rem) saturate(1.6);
+  background: rgb(var(--g-sheet-rgb, 18 18 22) / var(--g-sheet-a, 0.46));
+  -webkit-backdrop-filter: var(--g-sheet-filter, blur(4rem) saturate(1.6));
+  backdrop-filter: var(--g-sheet-filter, blur(4rem) saturate(1.6));
   box-shadow: 0 2rem 6rem rgb(0 0 0 / 0.3), inset 0 0 0 1px rgb(255 255 255 / 0.1), inset 0 1px 0 rgb(255 255 255 / 0.12);
 }
 .style-modern .preset-leftRight.side-right .main { margin: 2.4rem 0 2.4rem 2.4rem; }
 .style-modern .preset-leftRight.portrait .main { margin: 0 2.4rem 2.4rem; }
 .style-modern.theme-light .preset-leftRight .main { background: rgb(242 242 247 / 0.78); box-shadow: 0 2rem 6rem rgb(0 0 0 / 0.25), inset 0 0 0 1px rgb(255 255 255 / 0.5); }
-.lite.style-modern .preset-leftRight .main { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgb(18 18 22 / 0.86); }
+.lite.style-modern .preset-leftRight .main { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgb(var(--g-sheet-rgb, 18 18 22) / var(--g-sheet-a, 0.86)); }
 .lite.style-modern.theme-light .preset-leftRight .main { background: rgb(242 242 247 / 0.94); }
 .style-modern .preset-leftRight #news { margin-bottom: 1.6rem; }
 
@@ -547,9 +615,15 @@
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
 }
 .style-modern .preset-bigTime .main:has(#news[style*='none']) { display: none; }
-.lite.style-modern .preset-bigTime .main { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgb(28 28 32 / 0.8); }
+.lite.style-modern .preset-bigTime .main { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgb(var(--g-rgb, 28 28 32) / max(var(--g-a, 0.8), 0.8)); }
 .style-modern .preset-bigTime #news { margin: 0; background: none; color: #fff; --fg-2: var(--m-ink-2); --fg-3: rgb(255 255 255 / 0.4); }
 .style-modern .preset-bigTime .side-bottom { width: min(100%, 60rem); }
+.style-modern .preset-bigTime.portrait .side-bottom { width: auto; }
+/* the agenda shows whole rows only (fitMidRows in main.ts drops what does not fit) instead of fading out under the news */
+.style-modern .preset-bigTime .side-mid { -webkit-mask-image: none; mask-image: none; }
+.style-modern #side-agenda .fit-hide,
+.style-modern #side-agenda.fit-hide { display: none; }
+.style-modern .preset-bigTime .cd-card:not(:has(> .cd:not(.fit-hide))) { display: none; }
 
 /* top / bottom: the strip under the calendar */
 .style-modern .preset-topBottom .main-strip { gap: 0.8rem; }

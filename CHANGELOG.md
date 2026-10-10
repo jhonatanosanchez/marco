@@ -14,6 +14,19 @@ All notable changes to this project are documented here. The format is based on
   portrait and landscape, the light and dark themes, night mode, the weather effect and `?lite=1` (solid cards
   instead of blur). Modern uses the system font (SF on Apple devices) and falls back to the bundled Inter
   elsewhere. Preview it with `?style=modern` (or `?style=classic`).
+- **Glass options for the Modern style** (*Layout → Glass*, `screen.glass`, shown when a screen uses Modern), in the
+  spirit of the iPhone's glass settings: *Appearance* (*Clear*, *Tinted*, or *Automatic*, which follows each photo:
+  clearer over dark photos, more tinted over bright ones), *Transparency* (from see-through to solid), *Blur*, *Tint*
+  (*Dark*, *Light* with dark text, or *From the photo*, a deep version of the current photo's colour) and *Edge
+  highlight*. A live preview over a dark and a bright sample photo shows the result. The defaults are the Modern look
+  as it was. Everything is a few CSS variables, so it costs nothing extra on the Pi; with `?lite=1` there is still no
+  blur and the cards stay solid. Preview with `?glass=clear|tinted|auto`, `&glassOpacity=0..1`, `&glassBlur=0..40`,
+  `&glassTint=dark|light|photo`, `&glassEdge=0|1`.
+
+### Fixed
+- Modern style, *Big time* layout: the agenda card no longer runs under the news bar. It shows whole rows only and
+  drops the ones that do not fit (then the countdowns), instead of a faded, cut off last row. In portrait the weather
+  card spans the full width again.
 
 ## [0.4.0] - 2026-10-09
 

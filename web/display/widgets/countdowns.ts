@@ -67,7 +67,7 @@ export class Countdowns {
         return {
           key: `${variant}${item.id}|${item.date}`,
           className: cls,
-          style: `--c:${col.base};--tint:${col.tint};--on:${col.onSolid}`,
+          style: `--c:${col.base};--tint:${col.tint};--on:${col.onSolid};--deep:${col.shade}`,
           html: `<span class="cd-em">${esc(item.emoji || '⏳')}</span><span class="cd-tt">${esc(title(item))}</span><span class="cd-when">${whenHtml(days)}</span>`,
         };
       });

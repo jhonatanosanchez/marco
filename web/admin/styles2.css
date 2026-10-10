@@ -4496,3 +4496,115 @@ h1 .scope {
   margin-top: 14px;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
 }
+
+/* ---------------------------------------------------------------- glass options (Diseño page, Modern style) */
+.glass-set {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.glass-set__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.glass-pv {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.glass-pv__scene {
+  position: relative;
+  height: 140px;
+  border-radius: 14px;
+  overflow: hidden;
+  isolation: isolate;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter Variable', 'Inter', system-ui, sans-serif;
+}
+.glass-pv__scene--dark { background: linear-gradient(170deg, #1d1b3a 0%, #4a3566 45%, #a0587a 75%, #e08d5f 100%); }
+.glass-pv__scene--bright { background: linear-gradient(175deg, #8fd0f2 0%, #c4ecfb 48%, #f1e2c2 62%, #e7d2a4 100%); }
+.glass-pv__sun {
+  position: absolute;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  left: 54%;
+  top: 22px;
+  background: radial-gradient(circle, #fff6d8 0 38%, #ffcf6b 60%, transparent 72%);
+}
+.glass-pv__scene--dark .glass-pv__sun { background: radial-gradient(circle, #ffd9b0 0 30%, #ff8f6b 55%, transparent 72%); top: 60px; }
+.glass-pv__hill {
+  position: absolute;
+  inset: auto -10% -30px -10%;
+  height: 90px;
+  background: repeating-linear-gradient(100deg, #24324f 0 18px, #3d4f73 18px 30px);
+  clip-path: polygon(0 55%, 18% 20%, 38% 50%, 60% 8%, 82% 45%, 100% 25%, 100% 100%, 0 100%);
+}
+.glass-pv__scene--bright .glass-pv__hill { background: repeating-linear-gradient(100deg, #2a8fb0 0 16px, #63c3d8 16px 26px); }
+.glass-pv__card {
+  position: absolute;
+  left: 14px;
+  right: 46px;
+  bottom: 14px;
+  padding: 10px 14px;
+  border-radius: 18px;
+  color: #fff;
+  background: var(--pv-bg);
+  -webkit-backdrop-filter: var(--pv-filter);
+  backdrop-filter: var(--pv-filter);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.16);
+}
+.glass-pv__card.has-edge { box-shadow: 0 6px 20px rgb(0 0 0 / 0.16), inset 0 1px 0 rgb(255 255 255 / calc(0.18 * var(--g-edge, 1))); }
+.glass-pv__card.has-edge::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    150deg,
+    rgb(255 255 255 / calc(0.5 * var(--g-edge, 1))),
+    rgb(255 255 255 / calc(0.08 * var(--g-edge, 1))) 35%,
+    rgb(255 255 255 / 0.02) 60%,
+    rgb(255 255 255 / calc(0.16 * var(--g-edge, 1)))
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+.glass-pv__card.is-ink-dark { color: rgb(0 0 0 / 0.86); }
+.glass-pv__card.is-thin { text-shadow: 0 1px 6px rgb(0 0 0 / 0.5); }
+.glass-pv__row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.glass-pv__loc { font-size: 13px; font-weight: 600; }
+.glass-pv__temp { font-size: 28px; font-weight: 300; letter-spacing: -0.03em; line-height: 1; }
+.glass-pv__ev {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgb(255 255 255 / 0.16);
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.8;
+}
+.glass-pv__card.is-ink-dark .glass-pv__ev { border-top-color: rgb(60 60 67 / 0.18); }
+.glass-pv__ev i { width: 7px; height: 7px; border-radius: 50%; background: #4c8dff; }
+.glass-pv__label {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: rgb(0 0 0 / 0.35);
+}
+@media (max-width: 560px) {
+  .glass-pv__scene { height: 120px; }
+  .glass-pv__card { left: 10px; right: 10px; bottom: 10px; padding: 8px 11px; border-radius: 15px; }
+  .glass-pv__temp { font-size: 23px; }
+}

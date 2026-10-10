@@ -9,6 +9,7 @@ export interface SettingEntry {
 
 export const SETTINGS_INDEX: SettingEntry[] = [
   // Pantalla
+  { label: 'Cristal (estilo moderno)', route: 'layout', anchor: 'layout-glass', keywords: 'glass cristal vidro liquid transparente transparency transparência opacidad opacity blur desenfoque desfoque tint tono tom edge borde contorno iphone ios apple modern moderno' },
   { label: 'Estilo clásico / moderno', route: 'layout', anchor: 'layout-style', keywords: 'style estilo look aspecto moderno modern classic clásico clássico apple glass cristal vidro minimal' },
   { label: 'Plantilla de diseño', route: 'layout', anchor: 'layout-presets', keywords: 'layout preset agenda calendario grande reloj grande template' },
   { label: 'Panel lateral (izquierda/derecha, anchura)', route: 'layout', anchor: 'layout-side', keywords: 'side panel width columna lateral largura' },

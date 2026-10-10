@@ -88,6 +88,9 @@ The stored config has **global** sections shared by every screen and a list of *
   "screen":     { "language": "en", "fontScale": 1, "theme": "dark", "style": "classic", "accent": "#ff5a4e", "orientation": "auto",
                   "customCss": "", "nightMode": { "enabled": false, "from": "23:00", "to": "07:00", "dim": 0.35 } },
                   // style: classic | modern, independent of the layout. Missing (older configs) = classic.
+                  // glass (Modern only): { "appearance": "auto", "opacity": 0.5, "blur": 18, "tint": "dark", "edge": true }
+                  //   appearance auto | clear | tinted, opacity 0..1 (see-through to solid), blur 0..40, tint dark | light | photo.
+                  //   web/shared/glass.ts turns it (plus the current photo) into --g-* CSS variables on <html>.
   "layout":     { "preset": "bigCalendar", "sidePanel": "left", "sideWidth": 0.36 },   // bigCalendar | leftRight | topBottom | bigTime | agenda
   "background": { "enabled": true, "source": "stock", "stockTopic": "nature", "order": "random", "intervalSec": 120, "brightness": 0.85,
                   "showMeta": false, "cover": true, "transition": "webgl", "ambient": "aurora", "panelBlur": 18, "panelShade": 0.5, "weatherFx": "simple" },

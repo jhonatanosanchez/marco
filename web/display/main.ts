@@ -35,7 +35,8 @@ import { Clock } from './widgets/clock';
 import { renderMessage, renderTodo } from './widgets/extras';
 import { Highlights } from './widgets/highlights';
 import { News } from './widgets/news';
-import { Photos } from './widgets/photos';
+import { Photos, photoStats } from './widgets/photos';
+import { glassVars, normalizeGlass } from '../shared/glass';
 import { Weather } from './widgets/weather';
 import { checkSetup, showWelcome, waitForSetup } from './widgets/welcome';
 import { pairingLang, showPairing } from './widgets/pairing';
@@ -207,6 +208,27 @@ function applyLayout(): void {
   engine?.invalidate();
 }
 
+/**
+ * Modern style glass: settings + current photo → a few custom properties on <html> (no extra layers).
+ * Re-run on every new photo, since Auto and "from the photo" depend on it.
+ */
+const GLASS_VARS = ['--g-rgb', '--g-solid', '--g-a', '--g-a-wx', '--g-filter', '--g-sheet-rgb', '--g-sheet-a', '--g-sheet-filter', '--g-edge'];
+function applyGlass(): void {
+  const cfg = ctx.cfg;
+  const root = document.documentElement;
+  if (cfg.screen.style !== 'modern') {
+    for (const k of GLASS_VARS) root.style.removeProperty(k);
+    root.classList.remove('glass-ink-dark', 'glass-no-edge', 'glass-thin');
+    return;
+  }
+  const g = glassVars(cfg.screen.glass, cfg.background.enabled ? photoStats : null, { lite, hasPhoto: cfg.background.enabled });
+  for (const [k, v] of Object.entries(g.vars)) root.style.setProperty(k, v);
+  root.classList.toggle('glass-ink-dark', g.inkDark);
+  root.classList.toggle('glass-no-edge', !g.edge);
+  root.classList.toggle('glass-thin', g.thin);
+}
+window.addEventListener('marco:photo-tone', () => applyGlass());
+
 function applyConfig(raw: DisplayConfig): void {
   const cfg = normalizeConfig(raw);
   const v = params.get('view');
@@ -218,6 +240,17 @@ function applyConfig(raw: DisplayConfig): void {
   if (pt === 'light' || pt === 'dark') cfg.screen.theme = pt;
   const ps = params.get('style');
   if (ps === 'classic' || ps === 'modern') cfg.screen.style = ps;
+  // glass previews: ?glass=clear|tinted|auto &glassOpacity=0..1 &glassBlur=0..40 &glassTint=dark|light|photo &glassEdge=0|1
+  const gq = (k: string) => params.get(k);
+  if (gq('glass') || gq('glassOpacity') || gq('glassBlur') || gq('glassTint') || gq('glassEdge')) {
+    const g = { ...cfg.screen.glass } as Record<string, unknown>;
+    if (gq('glass')) g.appearance = gq('glass');
+    if (gq('glassOpacity')) g.opacity = gq('glassOpacity');
+    if (gq('glassBlur')) g.blur = gq('glassBlur');
+    if (gq('glassTint')) g.tint = gq('glassTint');
+    if (gq('glassEdge')) g.edge = gq('glassEdge') !== '0';
+    cfg.screen.glass = normalizeGlass(g);
+  }
   const pa = params.get('ambient');
   if (pa === 'aurora' || pa === 'particles' || pa === 'none') cfg.background.ambient = pa;
   const ptr = params.get('transition');
@@ -237,6 +270,7 @@ function applyConfig(raw: DisplayConfig): void {
   root.classList.toggle('theme-light', light);
   // Display style (independent of the layout): 'modern' scopes every rule in styles-modern.css; classic adds nothing.
   root.classList.toggle('style-modern', cfg.screen.style === 'modern');
+  applyGlass();
   root.style.setProperty('--accent', accent);
   root.style.setProperty('--accent-rgb', parseColor(accent).join(' '));
   root.style.setProperty('--fs', String(cfg.screen.fontScale));
@@ -366,6 +400,7 @@ function renderAll(): void {
 const FIT_STEPS = ['fit-1', 'fit-2', 'fit-3'];
 function fitSide(): void {
   fitSideContent();
+  fitMidRows();
   photos.reframe(); // what's left uncovered of the photo may have changed
 }
 function fitSideContent(): void {
@@ -387,6 +422,40 @@ function fitSideContent(): void {
   for (const step of FIT_STEPS.slice(1)) {
     app.classList.add(step);
     if (!overflowing()) break;
+  }
+}
+
+/**
+ * Modern big time (landscape; portrait shows a chip strip): no fade-out mask, so the side agenda shows whole rows only. Drop rows from the end (and days
+ * left empty), then countdowns, until the mid column fits. Classic keeps its masked fade and is not touched.
+ */
+function fitMidRows(): void {
+  const mid = sideEl.querySelector('.side-mid') as HTMLElement;
+  const rows = Array.from(document.querySelectorAll<HTMLElement>('#side-agenda .ag-ev, #side-agenda .ag-more, #side-agenda .ag-day'));
+  for (const r of rows) r.classList.remove('fit-hide');
+  const agendaEl = document.getElementById('side-agenda');
+  agendaEl?.classList.remove('fit-hide');
+  if (!document.documentElement.classList.contains('style-modern') || !app.classList.contains('preset-bigTime') || app.classList.contains('portrait') || !mid) return;
+  const over = () => mid.scrollHeight > mid.clientHeight + 1;
+  if (!over()) return;
+  const days = Array.from(document.querySelectorAll<HTMLElement>('#side-agenda .ag-day')).reverse();
+  for (const day of days) {
+    const items = Array.from(day.querySelectorAll<HTMLElement>('.ag-ev, .ag-more')).reverse();
+    for (const it of items) {
+      it.classList.add('fit-hide');
+      if (!over()) break;
+    }
+    // a day header with no rows left goes too
+    if (!day.querySelector('.ag-ev:not(.fit-hide)')) day.classList.add('fit-hide');
+    if (!over()) return;
+  }
+  agendaEl?.classList.add('fit-hide');
+  if (!over()) return;
+  // still too tall (message, to-do and banners take the room): countdowns from the furthest one
+  const cds = Array.from(document.querySelectorAll<HTMLElement>('#countdowns > .cd:not(.fit-hide)')).reverse();
+  for (const c of cds) {
+    c.classList.add('fit-hide');
+    if (!over()) return;
   }
 }
 

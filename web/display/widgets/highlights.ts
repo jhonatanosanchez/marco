@@ -22,7 +22,7 @@ export class Highlights {
       specs.push({
         key,
         className: `hl-pill${extra}`,
-        style: `--c:${col.base};--tint:${col.tint}`,
+        style: `--c:${col.base};--tint:${col.tint};--deep:${col.shade}`,
         html: `<span class="hl-lead">${esc(lead)}</span><span class="hl-em">${esc(e.emoji || '•')}</span><span class="hl-tt">${esc(text)}</span>`,
       });
     };
