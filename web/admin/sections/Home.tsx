@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import type { DashboardResponse, NightCommand } from '../../shared/types';
 import { actorLabel, describeActivity } from '../activityText';
 import { api, ApiError } from '../api';
+import { fetchErrorText } from '../apiErrors';
 import { AnnounceForm } from '../components/AnnounceForm';
 import { toast } from '../components/feedback';
 import { Icon } from '../components/icons';
@@ -353,7 +354,7 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
                       <StatusDot state={state} />
                       <span class="dot-color" style={{ background: color }} />
                       <span class="health-list__name">{s.name}</span>
-                      <span class={`small ${s.ok ? 'muted' : 'err-text'}`}>{s.ok ? t('{n} eventos', { n: s.count }) : s.enabled === false ? t('Desactivado') : s.error || t('Pendiente')}</span>
+                      <span class={`small ${s.ok ? 'muted' : 'err-text'}`}>{s.ok ? t('{n} eventos', { n: s.count }) : s.enabled === false ? t('Desactivado') : fetchErrorText(s.error) || t('Pendiente')}</span>
                     </li>
                   );
                 })}

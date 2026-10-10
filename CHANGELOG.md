@@ -32,6 +32,8 @@ All notable changes to this project are documented here. The format is based on
   and `/admin/index.html`) are never cached, and admin changes refuse a `Sec-Fetch-Site` other than `same-origin`.
 
 ### Fixed
+- Calendar errors in the Home source list and the Home Assistant *Test connection* result are shown in the admin's
+  language, like on the Status page, instead of the raw technical text.
 - Changing the time zone in *Date & time* now also rebuilds the calendar view from calendars without a time zone
   of their own (floating times), even when a screen asked for its events while the calendars were being reloaded.
 - A very long title in the next-event capsule under the clock no longer pushes it past the edge of the side panel.
