@@ -356,3 +356,11 @@ test('adminContract.json: shape, features and account endpoints', () => {
   assert.ok(get('GET /api/admin/activity').query.includes('before'));
   assert.ok(get('GET /api/auth/me').responseKeys.includes('account?'));
 });
+
+test('dashboard greeting: first name, none for an email address', () => {
+  assert.equal(util.greetingName('Ana María López'), 'Ana');
+  assert.equal(util.greetingName('  Admin '), 'Admin');
+  assert.equal(util.greetingName('ana@example.com'), '');
+  assert.equal(util.greetingName(''), '');
+  assert.equal(util.greetingName(undefined), '');
+});

@@ -447,7 +447,10 @@ export function CalendarsSection(props: SectionProps) {
 
   return (
     <>
-      <PageHeader title={t('Calendarios')} desc={t('Conecta calendarios iCal y Google, y decide cómo se muestran.')} />
+      <PageHeader
+        title={t('Calendarios')}
+        desc={offers('googleCalendar') ? t('Conecta calendarios iCal y Google, y decide cómo se muestran.') : t('Conecta calendarios iCal y decide cómo se muestran.')}
+      />
 
       <Card
         title={t('Calendarios conectados')}
@@ -463,7 +466,9 @@ export function CalendarsSection(props: SectionProps) {
       >
         {sources.length === 0 ? (
           <Empty icon="calendar" title={t('Aún no hay calendarios')}>
-            {t('Pega la URL .ics de tu calendario (Airbnb, Booking, Google, iCloud, Outlook…) o vincula una cuenta de Google.')}
+            {offers('googleCalendar')
+              ? t('Pega la URL .ics de tu calendario (Airbnb, Booking, Google, iCloud, Outlook…) o vincula una cuenta de Google.')
+              : t('Pega la URL .ics de tu calendario (Airbnb, Booking, Google, iCloud, Outlook…).')}
           </Empty>
         ) : (
           <div class="src-list">

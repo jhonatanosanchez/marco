@@ -11,6 +11,7 @@ import { has, runtime } from '../caps';
 import { screenHref, useDisplayLinks } from '../displayLinks';
 import { formatDuration, locale, nScreens, relTime, t } from '../i18n';
 import { withPollNote } from '../liveNote';
+import { greetingName } from '../util';
 import type { SectionProps } from './common';
 
 const WMO: Record<number, string> = {
@@ -80,7 +81,7 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
 
   const tz = cfg.datetime.timezone;
   const today = todayIn(tz);
-  const firstName = (me.user?.name || '').split(' ')[0];
+  const firstName = greetingName(me.user?.name);
   const d = dash;
   const screens = d?.screens ?? full.screens.map((s) => ({ id: s.id, slug: s.slug, name: s.name, isDefault: s.id === full.defaultScreen, displaysOnline: 0 }));
   const online = d?.displays.filter((x) => x.connected).length ?? 0;

@@ -913,7 +913,7 @@ export function App() {
                   <div class="menu">
                     <div class="menu__who">
                       <strong>{user.name || t('Administrador')}</strong>
-                      <span class="muted small">{user.email}</span>
+                      {user.email && user.email !== user.name && <span class="muted small">{user.email}</span>}
                       {household && (
                         <span class="menu__household muted small">
                           <Icon name="home" size={13} />

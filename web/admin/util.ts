@@ -370,3 +370,9 @@ export function allSourceOptions(c: Pick<StoredConfig, 'calendar' | 'localEvents
   out.push({ id: 'birthdays', name: c.birthdays.name || 'Cumpleaños', color: c.birthdays.color, emoji: c.birthdays.emoji || '🎂' });
   return out;
 }
+
+/** First name for the dashboard greeting; none when the account name is an email address (Marco Cloud accounts). */
+export function greetingName(name?: string | null): string {
+  const n = (name || '').trim();
+  return n && !n.includes('@') ? n.split(/\s+/)[0] : '';
+}
