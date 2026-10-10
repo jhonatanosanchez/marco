@@ -48,7 +48,7 @@ export function mockConfig(): DisplayConfig {
     screenId: 's_main',
     slug: 'living-room',
     screen: { name: L('Living room', 'Salón', 'Sala'), language: DEMO_LANG, style: 'modern' },
-    weather: { locationName: 'Lisbon, Portugal' },
+    weather: { locationName: L('Lisbon, Portugal', 'Lisboa, Portugal', 'Lisboa, Portugal') },
     // ?photos=0 → no background photo
     ...(q.get('photos') === '0' ? { background: { enabled: false } } : {}),
     datetime: { timezone: TZ },
@@ -256,7 +256,7 @@ function baseWeather(now: Date): WeatherResponse {
   ];
   return {
     updatedAt: now.toISOString(),
-    locationName: 'Lisbon, Portugal',
+    locationName: L('Lisbon, Portugal', 'Lisboa, Portugal', 'Lisboa, Portugal'),
     current: {
       temp: 19.4, feelsLike: 18.6, humidity: 68, windKmh: 14, windDir: 315, windDirLabel: L('NW', 'NO', 'NO'), code: 2,
       isDay: p.hour >= 8 && p.hour < 19, description: L('Partly cloudy', 'Parcialmente nublado', 'Parcialmente nublado'), pressure: 1017, uv: 4,
