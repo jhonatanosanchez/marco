@@ -1,6 +1,9 @@
 import type { ComponentChildren, HTMLAttributes } from 'preact';
-import { useEffect, useRef, useState } from 'preact/hooks';
-import { t } from '../i18n';
+import { createPortal } from 'preact/compat';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { EMOJI_CATEGORIES } from '../emoji-data';
+import { buildEmojiIndex, emojiName, looksLikeEmoji, searchEmoji, type EmojiEntry, type EmojiIndex } from '../emojiSearch';
+import { getLang, t } from '../i18n';
 import { EMOJI_GRID, HEX_RE, SWATCHES } from '../util';
 import { confirmDialog } from './feedback';
 import { Icon, type IconName } from './icons';
@@ -316,13 +319,15 @@ export function Textarea(props: { value: string; onValue: (v: string) => void; r
 
 /* ------------------------------------------------------------------ popovers */
 
-function usePopover() {
+/** `panel`: a popover body rendered elsewhere in the DOM (portal) that also counts as "inside". */
+function usePopover(panel?: { current: HTMLElement | null }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: Event) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const n = e.target as Node;
+      if (ref.current && !ref.current.contains(n) && !panel?.current?.contains(n)) setOpen(false);
     };
     // Capture phase + preventDefault: Escape closes the popover only, not the Modal around it.
     const onKey = (e: KeyboardEvent) => {
@@ -407,72 +412,310 @@ export function ColorPicker(props: { value: string | null; onChange: (v: string 
   );
 }
 
+let emojiIdx: EmojiIndex | null = null;
+const emojiIndex = () =>
+  (emojiIdx ??= buildEmojiIndex(EMOJI_CATEGORIES, { id: 'frequent', icon: '⭐', title: 'Frecuentes', emojis: EMOJI_GRID }));
+
+type PanelPos = { left: number; width: number; maxHeight: number; top?: number; bottom?: number; up: boolean };
+
+/** Fixed position next to the trigger: below it, or above when there is clearly more room there; always inside the viewport. */
+function placeEmojiPanel(anchor: DOMRect): PanelPos {
+  const M = 8;
+  const GAP = 6;
+  const vv = window.visualViewport;
+  const vw = document.documentElement.clientWidth || window.innerWidth;
+  const vTop = vv ? vv.offsetTop : 0;
+  const vBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+  const width = Math.min(340, vw - 2 * M);
+  let left = anchor.left;
+  if (left + width > vw - M) left = anchor.right - width;
+  left = Math.max(M, Math.min(left, vw - width - M));
+  const below = vBottom - anchor.bottom - GAP - M;
+  const above = anchor.top - vTop - GAP - M;
+  const WANT = 430;
+  const up = below < Math.min(WANT, 320) && above > below;
+  const room = Math.max(up ? above : below, 180);
+  const maxHeight = Math.min(WANT, room);
+  return up
+    ? { left, width, maxHeight, bottom: window.innerHeight - anchor.top + GAP, up }
+    : { left, width, maxHeight, top: anchor.bottom + GAP, up };
+}
+
+/** Arrow-key target among the grid buttons, by position on screen (rows differ between sections). */
+function emojiNeighbour(buttons: HTMLElement[], from: HTMLElement, key: string): HTMLElement | null {
+  const i = buttons.indexOf(from);
+  if (key === 'ArrowLeft') return buttons[i - 1] ?? null;
+  if (key === 'ArrowRight') return buttons[i + 1] ?? null;
+  if (key === 'Home') return buttons[0] ?? null;
+  if (key === 'End') return buttons[buttons.length - 1] ?? null;
+  const r = from.getBoundingClientRect();
+  const cx = r.left + r.width / 2;
+  const down = key === 'ArrowDown';
+  let rowTop: number | null = null;
+  let best: HTMLElement | null = null;
+  let bestDx = Infinity;
+  for (const b of buttons) {
+    const br = b.getBoundingClientRect();
+    if (down ? br.top <= r.top + 4 : br.top >= r.top - 4) continue;
+    if (rowTop === null || (down ? br.top < rowTop - 4 : br.top > rowTop + 4)) {
+      rowTop = br.top;
+      best = null;
+      bestDx = Infinity;
+    }
+    if (Math.abs(br.top - rowTop) > 4) continue;
+    const dx = Math.abs(br.left + br.width / 2 - cx);
+    if (dx < bestDx) {
+      bestDx = dx;
+      best = b;
+    }
+  }
+  return best;
+}
+
+const canHover = () => {
+  try {
+    return window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  } catch {
+    return false;
+  }
+};
+
 export function EmojiPicker(props: { value: string; onChange: (v: string) => void; allowNone?: boolean; error?: boolean; size?: 'lg' }) {
-  const { open, setOpen, ref } = usePopover();
-  const [custom, setCustom] = useState('');
+  const panelRef = useRef<HTMLDivElement>(null);
+  const { open, setOpen, ref } = usePopover(panelRef);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const pick = (v: string) => {
+    props.onChange(v);
+    setOpen(false);
+    btnRef.current?.focus({ preventScroll: true });
+  };
   return (
     <div class="pop" ref={ref}>
       <button
         type="button"
+        ref={btnRef}
         class={`emoji-btn ${props.size === 'lg' ? 'emoji-btn--lg' : ''} ${props.error ? 'is-invalid' : ''} ${props.value ? '' : 'is-empty'}`}
         onClick={() => setOpen(!open)}
         aria-label={t('Elegir emoji')}
+        aria-haspopup="dialog"
+        aria-expanded={open}
         title={t('Elegir emoji')}
       >
         {props.value || <Icon name="plus" size={14} />}
       </button>
-      {open && (
-        <div class="pop__panel pop__panel--emoji">
-          <div class="emoji-grid">
-            {EMOJI_GRID.map((e) => (
-              <button
-                type="button"
-                class={e === props.value ? 'is-active' : ''}
-                onClick={() => {
-                  props.onChange(e);
-                  setOpen(false);
-                }}
-              >
-                {e}
-              </button>
-            ))}
-          </div>
-          <form
-            class="emoji-custom"
-            onSubmit={(ev) => {
-              ev.preventDefault();
-              if (custom.trim()) {
-                props.onChange(custom.trim());
-                setCustom('');
-                setOpen(false);
-              }
+      {open && createPortal(<EmojiPanel panelRef={panelRef} anchor={btnRef} value={props.value} allowNone={props.allowNone} onPick={pick} />, document.body)}
+    </div>
+  );
+}
+
+function EmojiPanel(props: {
+  panelRef: { current: HTMLDivElement | null };
+  anchor: { current: HTMLElement | null };
+  value: string;
+  allowNone?: boolean;
+  onPick: (v: string) => void;
+}) {
+  const idx = emojiIndex();
+  const lang = getLang();
+  const [q, setQ] = useState('');
+  const [custom, setCustom] = useState('');
+  const [pos, setPos] = useState<PanelPos | null>(null);
+  const [cat, setCat] = useState(idx.sections[0].id);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const a = props.anchor.current;
+      if (a) setPos(placeEmojiPanel(a.getBoundingClientRect()));
+    };
+    const later = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener('scroll', later, true);
+    window.addEventListener('resize', later);
+    window.visualViewport?.addEventListener('resize', later);
+    window.visualViewport?.addEventListener('scroll', later);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', later, true);
+      window.removeEventListener('resize', later);
+      window.visualViewport?.removeEventListener('resize', later);
+      window.visualViewport?.removeEventListener('scroll', later);
+    };
+  }, []);
+
+  const placed = !!pos;
+  useEffect(() => {
+    // Desktop only: on phones and tablets the keyboard would cover half of the list.
+    if (placed && canHover()) searchRef.current?.focus({ preventScroll: true });
+  }, [placed]);
+
+  const query = q.trim();
+  const results = query ? searchEmoji(idx, query, lang) : null;
+  const name = (e: EmojiEntry) => emojiName(e, lang) || e.e;
+  const buttons = () => [...(bodyRef.current?.querySelectorAll<HTMLElement>('.emoji-grid button') ?? [])];
+
+  const onGridKey = (ev: KeyboardEvent) => {
+    const el = ev.target as HTMLElement;
+    if (!el.matches?.('.emoji-grid button')) return;
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(ev.key)) return;
+    ev.preventDefault();
+    const next = emojiNeighbour(buttons(), el, ev.key);
+    if (next) next.focus();
+    else if (ev.key === 'ArrowUp') searchRef.current?.focus();
+  };
+
+  const onSearchKey = (ev: KeyboardEvent) => {
+    if (ev.key === 'ArrowDown') {
+      ev.preventDefault();
+      buttons()[0]?.focus();
+    } else if (ev.key === 'Enter') {
+      ev.preventDefault();
+      if (results?.length) props.onPick(results[0].e);
+      else if (query && looksLikeEmoji(query)) props.onPick(query);
+    }
+  };
+
+  const onScroll = () => {
+    const body = bodyRef.current;
+    if (!body || results) return;
+    const top = body.getBoundingClientRect().top + 30;
+    let cur = idx.sections[0].id;
+    for (const sec of body.querySelectorAll<HTMLElement>('[data-cat]')) {
+      if (sec.getBoundingClientRect().top <= top) cur = sec.dataset.cat!;
+    }
+    if (cur !== cat) setCat(cur);
+  };
+
+  const jump = (id: string) => {
+    const body = bodyRef.current;
+    const sec = body?.querySelector<HTMLElement>(`[data-cat="${id}"]`);
+    if (!body || !sec) return;
+    body.scrollTop = sec.offsetTop - body.offsetTop;
+    setCat(id);
+  };
+
+  let firstTab = true;
+  const grid = (list: EmojiEntry[], key: string) => (
+    <div class="emoji-grid" role="group" key={key}>
+      {list.map((en) => {
+        const active = en.e === props.value;
+        const tab = firstTab;
+        firstTab = false;
+        return (
+          <button type="button" class={active ? 'is-active' : ''} tabIndex={tab ? 0 : -1} aria-label={name(en)} title={name(en)} onClick={() => props.onPick(en.e)}>
+            {en.e}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const style = pos
+    ? { left: `${pos.left}px`, width: `${pos.width}px`, height: `${pos.maxHeight}px`, top: pos.top != null ? `${pos.top}px` : 'auto', bottom: pos.bottom != null ? `${pos.bottom}px` : 'auto', right: 'auto' }
+    : { visibility: 'hidden' as const };
+
+  return (
+    <div
+      ref={props.panelRef}
+      class={`pop__panel pop__panel--emoji pop__panel--fixed ${pos?.up ? 'is-up' : ''}`}
+      style={style}
+      role="dialog"
+      aria-label={t('Elegir emoji')}
+    >
+      <div class="emoji-search search-input">
+        <Icon name="search" size={15} />
+        <input
+          ref={searchRef}
+          class="input input--sm"
+          value={q}
+          placeholder={t('Buscar emoji…')}
+          aria-label={t('Buscar emoji…')}
+          autocomplete="off"
+          spellcheck={false}
+          enterKeyHint="search"
+          onInput={(e) => setQ(e.currentTarget.value)}
+          onKeyDown={onSearchKey}
+        />
+        {q && (
+          <button
+            type="button"
+            class="icon-btn"
+            onClick={() => {
+              setQ('');
+              searchRef.current?.focus();
             }}
+            aria-label={t('Borrar')}
           >
-            <input
-              class="input input--sm"
-              placeholder={t('Otro: pega o escribe un emoji')}
-              value={custom}
-              maxLength={16}
-              onInput={(e) => setCustom(e.currentTarget.value)}
-            />
-            <button class="btn btn--sm" type="submit">
-              OK
+            <Icon name="x" size={13} />
+          </button>
+        )}
+      </div>
+      {!results && (
+        <div class="emoji-tabs" aria-label={t('Categorías de emoji')}>
+          {idx.sections.map((s) => (
+            <button type="button" tabIndex={-1} class={s.id === cat ? 'is-active' : ''} aria-label={t(s.title)} title={t(s.title)} onClick={() => jump(s.id)}>
+              {s.icon}
             </button>
-            {props.allowNone && (
-              <button
-                type="button"
-                class="btn btn--ghost btn--sm"
-                onClick={() => {
-                  props.onChange('');
-                  setOpen(false);
-                }}
-              >
-                {t('Ninguno')}
-              </button>
-            )}
-          </form>
+          ))}
         </div>
       )}
+      <div class="emoji-body" ref={bodyRef} onScroll={onScroll} onKeyDown={onGridKey}>
+        {results ? (
+          results.length ? (
+            grid(results, 'results')
+          ) : (
+            <div class="emoji-empty">
+              <p>{t('Sin resultados para “{q}”', { q: query })}</p>
+              {looksLikeEmoji(query) ? (
+                <button type="button" class="btn btn--sm" onClick={() => props.onPick(query)}>
+                  {t('Usar {emoji}', { emoji: query })}
+                </button>
+              ) : (
+                <p class="emoji-empty__hint">{t('Prueba con otra palabra, en español, inglés o portugués.')}</p>
+              )}
+            </div>
+          )
+        ) : (
+          idx.sections.map((s) => (
+            <section class="emoji-sec" data-cat={s.id} key={s.id}>
+              <h4 class="emoji-sec__title">{t(s.title)}</h4>
+              {grid(s.list, s.id)}
+            </section>
+          ))
+        )}
+      </div>
+      <form
+        class="emoji-custom"
+        onSubmit={(ev) => {
+          ev.preventDefault();
+          if (custom.trim()) {
+            props.onPick(custom.trim());
+            setCustom('');
+          }
+        }}
+      >
+        <input
+          class="input input--sm"
+          placeholder={t('Otro: pega o escribe un emoji')}
+          aria-label={t('Otro: pega o escribe un emoji')}
+          value={custom}
+          maxLength={16}
+          onInput={(e) => setCustom(e.currentTarget.value)}
+        />
+        <button class="btn btn--sm" type="submit">
+          OK
+        </button>
+        {props.allowNone && (
+          <button type="button" class="btn btn--ghost btn--sm" onClick={() => props.onPick('')}>
+            {t('Ninguno')}
+          </button>
+        )}
+      </form>
     </div>
   );
 }

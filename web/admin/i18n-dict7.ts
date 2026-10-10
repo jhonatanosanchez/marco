@@ -1,0 +1,21 @@
+// Emoji picker: search, categories and hints. Spanish key; [es, en, pt].
+export const ROWS7: [string, string, string][] = [
+  ['Buscar emoji…', 'Search emoji…', 'Procurar emoji…'],
+  ['Categorías de emoji', 'Emoji categories', 'Categorias de emoji'],
+  ['Frecuentes', 'Common', 'Frequentes'],
+  ['Fiestas y celebraciones', 'Parties and celebrations', 'Festas e celebrações'],
+  ['Caras y personas', 'Faces and people', 'Caras e pessoas'],
+  ['Viajes y lugares', 'Travel and places', 'Viagens e lugares'],
+  ['Deporte y ocio', 'Sport and leisure', 'Desporto e lazer'],
+  ['Comida y bebida', 'Food and drink', 'Comida e bebida'],
+  ['Casa y tareas', 'Home and chores', 'Casa e tarefas'],
+  ['Colegio y trabajo', 'School and work', 'Escola e trabalho'],
+  ['Salud y cuidado', 'Health and care', 'Saúde e cuidados'],
+  ['Animales y naturaleza', 'Animals and nature', 'Animais e natureza'],
+  ['Tiempo y cielo', 'Weather and sky', 'Tempo e céu'],
+  ['Objetos y símbolos', 'Objects and symbols', 'Objetos e símbolos'],
+  ['Banderas', 'Flags', 'Bandeiras'],
+  ['Prueba con otra palabra, en español, inglés o portugués.', 'Try another word, in English, Spanish or Portuguese.', 'Experimenta outra palavra, em português, inglês ou espanhol.'],
+  ['Usar {emoji}', 'Use {emoji}', 'Usar {emoji}'],
+  ['Emojis', 'Emojis', 'Emojis'],
+];
