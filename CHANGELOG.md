@@ -32,6 +32,8 @@ All notable changes to this project are documented here. The format is based on
   and `/admin/index.html`) are never cached, and admin changes refuse a `Sec-Fetch-Site` other than `same-origin`.
 
 ### Fixed
+- The activity log names the *Display access* change instead of showing the raw `security` key, and the search
+  finds *Download photos (.zip)*.
 - The demo in Portuguese (`?demo=1&lang=pt`) is now Portuguese everywhere: to-dos, the message, holidays, places,
   news and the wind direction no longer fall back to English.
 - A display that shows the pairing or invalid link screen before it ever loaded its settings no longer keeps asking

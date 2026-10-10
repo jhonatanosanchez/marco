@@ -76,6 +76,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { label: 'Exportar configuración', route: 'backups', anchor: 'bk-export', keywords: 'export backup descargar json', feature: 'importExport' },
   { label: 'Importar configuración', route: 'backups', anchor: 'bk-import', keywords: 'import restore subir json', feature: 'importExport' },
   { label: 'Copias automáticas', route: 'backups', anchor: 'bk-auto', keywords: 'backups automatic restore restaurar versiones', feature: 'backups' },
+  { label: 'Descargar fotos (.zip)', route: 'backups', anchor: 'bk-photos', keywords: 'photos gallery zip download export fotos galería descargar transferir', feature: ['importExport', 'gallery'] },
   { label: 'Registro de actividad', route: 'activity', keywords: 'activity log logins registro' },
   { label: 'Cambiar contraseña', route: 'security', anchor: 'sec-password', keywords: 'password contraseña palavra-passe', feature: 'passwordLogin' },
   { label: 'Emails de Google permitidos', route: 'security', anchor: 'sec-google', keywords: 'google login email permitir', feature: 'googleLogin' },
