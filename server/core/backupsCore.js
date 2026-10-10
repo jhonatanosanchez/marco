@@ -152,11 +152,13 @@ export const IMPORT_SECTIONS = ['screens', 'defaultScreen', 'calendar', 'datetim
   'birthdays', 'eventRules', 'countdowns', 'schedules', 'homeassistant', 'auth'];
 
 /** Short localized summary of what changes per section (ImportPreview.sections); `l` = es | en | pt. */
-export function sectionSummaries(cur, next, l = 'en') {
+export function sectionSummaries(cur, next, l = 'en', absent = new Set()) {
   const out = [];
   const modified = summaryWord('modified', l);
   for (const key of IMPORT_SECTIONS) {
-    const changed = !same(cur[key], next[key]);
+    // a section the file does not carry (e.g. a Marco Cloud export has no sign-in or Home Assistant settings) keeps
+    // the current value: it is never offered as a change
+    const changed = !absent.has(key) && !same(cur[key], next[key]);
     let summary = changed ? modified : summaryWord('unchanged', l);
     if (changed) {
       if (key === 'screens') summary = listSummary(diffById(cur.screens, next.screens), 'screen', l) || modified;
@@ -221,6 +223,13 @@ function secretsImpact(raw, cur, current, imported) {
   };
 }
 
+/** Import sections missing from a v2 file (a v1 file is migrated whole, so nothing counts as missing there). */
+export function absentSections(bundle) {
+  const u = unwrapBundle(bundle);
+  if (!u || !isObj(u.raw) || isV1(u.raw)) return new Set();
+  return new Set(IMPORT_SECTIONS.filter((k) => !(k in u.raw)));
+}
+
 /** ImportPreview (web/shared/types.ts) for `bundle` against the current config. */
 export function importPreview(bundle, current, l = 'en', currentSecrets = null) {
   const p = parseImport(bundle);
@@ -242,7 +251,7 @@ export function importPreview(bundle, current, l = 'en', currentSecrets = null) 
     exportedAt: p.exportedAt,
     hasSecrets: Boolean(p.secrets && Object.keys(sanitizeImportedSecrets(p.secrets)).length),
     secretsImpact: secretsImpact(p.secrets, currentSecrets, current, v),
-    sections: sectionSummaries(current, v, l),
+    sections: sectionSummaries(current, v, l, absentSections(bundle)),
     screens: diffById(current.screens, v.screens),
     sources: diffById(userSources(current), userSources(v)),
     orphanSchedules: orphanSchedules(current, v),
@@ -260,9 +269,11 @@ export function importPreview(bundle, current, l = 'en', currentSecrets = null) 
  * Merge an imported (validated) config into the current one. `sections` limits which top-level keys are
  * taken (others kept). `screens` and `defaultScreen` travel together (a default id must exist).
  */
-export function mergeImport(current, imported, sections) {
-  if (!Array.isArray(sections) || !sections.length) return { ...structuredClone(imported), revision: current.revision };
-  const take = new Set(sections.filter((s) => IMPORT_SECTIONS.includes(s)));
+export function mergeImport(current, imported, sections, absent = new Set()) {
+  // sections the file does not carry are never taken from it (they would come back as defaults)
+  const all = !Array.isArray(sections) || !sections.length;
+  if (all && !absent.size) return { ...structuredClone(imported), revision: current.revision };
+  const take = new Set((all ? IMPORT_SECTIONS : sections).filter((s) => IMPORT_SECTIONS.includes(s) && !absent.has(s)));
   if (take.has('screens')) take.add('defaultScreen');
   const out = structuredClone(current);
   for (const k of take) out[k] = structuredClone(imported[k]);

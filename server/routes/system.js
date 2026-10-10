@@ -11,7 +11,7 @@ import { requireAuth, rotateSessionEpoch } from '../auth.js';
 import { getConfig, getSecrets, saveConfig, updateSecrets } from '../store.js';
 import {
   listBackups, writeBackup, backupPath, readBackup, deleteBackup, makeBundle, importPreview, parseImport,
-  mergeImport, sanitizeImportedSecrets, repairConfig,
+  mergeImport, absentSections, sanitizeImportedSecrets, repairConfig,
 } from '../backups.js';
 import { logActivity, listActivity, clearActivity, recentActivity } from '../activity.js';
 import { syncDisplayKeys, revalidateStreams } from '../displayAccess.js';
@@ -125,7 +125,7 @@ export function systemRouter({ version = getServerVersion() } = {}) {
     if (b.sections !== undefined && !Array.isArray(b.sections)) return res.status(400).json({ error: 'sections must be an array' });
     const cur = getConfig();
     // Same as restore: an import never changes the display access mode (see keepSecurity).
-    const merged = { ...mergeImport(cur, parsed.value, b.sections), security: keepSecurity(cur, parsed.value) };
+    const merged = { ...mergeImport(cur, parsed.value, b.sections, absentSections(b.bundle)), security: keepSecurity(cur, parsed.value) };
     writeBackup(cur, 'import');
     const result = saveConfig(merged, { reason: 'import', req, backup: false });
     if (!result.ok) return res.status(400).json({ error: 'invalid', details: result.errors });
