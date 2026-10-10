@@ -925,6 +925,7 @@ async function boot(): Promise<void> {
     // Production without any data yet: defaults + keep retrying.
     set('config', normalizeConfig({}) as DisplayConfig);
     const retry = setInterval(async () => {
+      if (accessDenied) return clearInterval(retry);
       if (await fetchConfig()) {
         clearInterval(retry);
         void goLive();
