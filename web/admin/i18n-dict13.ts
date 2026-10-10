@@ -74,4 +74,7 @@ export const ROWS13: [string, string, string][] = [
   ['El servidor de origen respondió con un error.', 'The source server answered with an error.', 'O servidor de origem respondeu com um erro.'],
   ['No se pudo conectar con esa dirección.', 'Could not connect to that address.', 'Não foi possível ligar a esse endereço.'],
   ['No es un feed RSS ni Atom.', 'It is not an RSS or Atom feed.', 'Não é um feed RSS nem Atom.'],
+  ['mm/dd/aaaa', 'mm/dd/yyyy', 'mm/dd/aaaa'],
+  ['dd/mm/aaaa', 'dd/mm/yyyy', 'dd/mm/aaaa'],
+  ['ISO 8601', 'ISO 8601', 'ISO 8601'],
 ];

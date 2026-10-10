@@ -341,6 +341,14 @@ export function formatDateLine(lang: Lang, key: string, format: DateFormat = 'we
       return lang === 'en' ? `${W}, ${capitalize(mo)} ${day}` : `${W}, ${mo} ${day}`;
     case 'weekday_d_dot_month':
       return `${W} ${day}. ${lang === 'en' ? capitalize(mo) : mo}`;
+    case 'weekday_month_d_y':
+      return `${W}, ${lang === 'en' ? capitalize(mo) : mo} ${day}, ${d.getUTCFullYear()}`;
+    case 'weekday_mdy':
+      return `${W}, ${key.slice(5, 7)}/${key.slice(8, 10)}/${key.slice(0, 4)}`;
+    case 'weekday_dmy':
+      return `${W}, ${key.slice(8, 10)}/${key.slice(5, 7)}/${key.slice(0, 4)}`;
+    case 'weekday_iso':
+      return `${W}, ${key.slice(0, 10)}`;
     case 'weekday_d_month':
     default:
       if (lang === 'en') return `${W}, ${day} ${capitalize(mo)}`;

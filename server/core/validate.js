@@ -277,7 +277,7 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
     format24: bool(ctx, `${p}.datetime.format24`, dt.format24, D.datetime.format24),
     showSeconds: bool(ctx, `${p}.datetime.showSeconds`, dt.showSeconds, D.datetime.showSeconds),
     showAmPm: bool(ctx, `${p}.datetime.showAmPm`, dt.showAmPm, D.datetime.showAmPm),
-    dateFormat: oneOf(ctx, `${p}.datetime.dateFormat`, dt.dateFormat, D.datetime.dateFormat, ['weekday_month_d', 'weekday_d_month', 'weekday_d_dot_month']),
+    dateFormat: oneOf(ctx, `${p}.datetime.dateFormat`, dt.dateFormat, D.datetime.dateFormat, ['weekday_month_d', 'weekday_d_month', 'weekday_d_dot_month', 'weekday_month_d_y', 'weekday_mdy', 'weekday_dmy', 'weekday_iso']),
   };
 
   const we = obj(ctx, `${p}.weather`, x.weather);

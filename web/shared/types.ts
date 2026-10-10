@@ -10,7 +10,9 @@ export type LayoutPreset =
 export type FrameCorner = 'tl' | 'tr' | 'bl' | 'br';
 export type SourceKind = 'generic' | 'airbnb' | 'birthdays' | 'holidays';
 export type SourceType = 'ics' | 'google';
-export type DateFormat = 'weekday_month_d' | 'weekday_d_month' | 'weekday_d_dot_month';
+export type DateFormat = 'weekday_month_d' | 'weekday_d_month' | 'weekday_d_dot_month' | 'weekday_month_d_y' | 'weekday_mdy' | 'weekday_dmy' | 'weekday_iso';
+/** Every date format, in the order the admin offers them. */
+export const DATE_FORMATS: DateFormat[] = ['weekday_d_month', 'weekday_month_d', 'weekday_d_dot_month', 'weekday_month_d_y', 'weekday_mdy', 'weekday_dmy', 'weekday_iso'];
 
 export interface NightMode {
   enabled: boolean;
