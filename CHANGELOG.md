@@ -16,7 +16,8 @@ All notable changes to this project are documented here. The format is based on
 - A large font size (*Screen → Font size*) no longer pushes the clock's last digit onto a second line: the clock
   never wraps and shrinks to the width of its column.
 - With the Modern style the screen now fades in once the first photo is ready, so the glass cards never show a
-  plain dark background that turns into blur a second later.
+  plain dark background that turns into blur a second later, and the first photo's tone applies at once (the
+  glass and the chips no longer fade to a new opacity right after the screen appears).
 - Marco Cloud: sign-up goes straight to Inicio, with a welcome card to put Marco on a TV.
 
 ### Added

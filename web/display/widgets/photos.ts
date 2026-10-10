@@ -10,6 +10,9 @@ import type { PhotoLayer } from '../gl/photoLayer';
 
 const MAX_TEX = 2560;
 
+/** set once the first photo's tone has been applied (see measureTone) */
+let toneSeen = false;
+
 export class Photos {
   private list: Photo[] = [];
   private idx = -1;
@@ -290,6 +293,11 @@ function applyTone(img: HTMLImageElement): void {
       return Math.min(1, bright * 0.75 + busy * 0.35);
     };
     const root = document.documentElement.style;
+    // The first photo sets the tone at once: easing it in from the default made the glass cards and the chips
+    // visibly change a second after the screen appeared. Later photos still ease (with the photo crossfade).
+    const first = !toneSeen;
+    toneSeen = true;
+    if (first) document.documentElement.classList.add('tone-instant');
     root.setProperty('--tone-top', region(0, 0.4).toFixed(3));
     const toneBottom = region(0.5, 1);
     root.setProperty('--tone-bottom', toneBottom.toFixed(3));
@@ -303,6 +311,10 @@ function applyTone(img: HTMLImageElement): void {
     }
     photoStats = { tone: toneBottom, rgb: [wr / ws, wg / ws, wb / ws].map(Math.round) as [number, number, number] };
     window.dispatchEvent(new Event('marco:photo-tone'));
+    if (first) {
+      void getComputedStyle(document.documentElement).getPropertyValue('--tone-bottom');
+      requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove('tone-instant')));
+    }
   } catch {
     /* cross-origin without CORS: leave the defaults */
   }

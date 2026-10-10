@@ -996,6 +996,7 @@ body {
 @property --tone-top { syntax: '<number>'; inherits: true; initial-value: 0.5; }
 @property --tone-bottom { syntax: '<number>'; inherits: true; initial-value: 0.5; }
 :root { transition: --tone-top 1.8s ease, --tone-bottom 1.8s ease; }
+:root.tone-instant { transition: none; }
 .scrim::before, .scrim::after { content: ''; position: absolute; inset: 0; pointer-events: none; }
 /* extra darkening behind the clock, only as much as the photo needs */
 .scrim::before {
