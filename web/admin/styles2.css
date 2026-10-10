@@ -1799,16 +1799,18 @@ h1 .scope {
   border-color: var(--err);
 }
 .daymonth select {
+  appearance: none;
+  -webkit-appearance: none;
   border: 0;
-  background: transparent;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8f98' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;
   color: var(--text);
   font: inherit;
-  padding: 0 6px 0 10px;
+  padding: 0 30px 0 12px;
   cursor: pointer;
   outline: none;
 }
 .daymonth select:focus-visible {
-  background: var(--surface-3);
+  background-color: var(--surface-3);
 }
 .daymonth__d {
   border-right: 1px solid var(--border) !important;
