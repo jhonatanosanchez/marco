@@ -20,15 +20,17 @@ const TZ = (() => {
   }
 })();
 
-// Demo text follows ?lang= (en by default); pt falls back to English for the free-text samples.
+// Demo text follows ?lang=en|es|pt (English by default).
 const DEMO_LANG = (() => {
   const l = new URLSearchParams(location.search).get('lang');
   return l === 'es' || l === 'pt' ? l : 'en';
 })();
-/** Pick the demo string for the current language: L('English', 'Español', 'Português?'). */
 /** ?empty=1: no events, no countdowns, no to-dos (empty states). */
 const EMPTY = new URLSearchParams(location.search).get('empty') === '1';
-const L = (en: string, es: string, pt?: string) => (DEMO_LANG === 'es' ? es : DEMO_LANG === 'pt' ? (pt ?? en) : en);
+/** ?busy=1: a day with more events than fit, and long titles (to see the sliding titles and the busy-day pages). */
+const BUSY = new URLSearchParams(location.search).get('busy') === '1';
+/** Pick the demo string for the current language: L('English', 'Español', 'Português'). */
+const L = (en: string, es: string, pt: string) => (DEMO_LANG === 'es' ? es : DEMO_LANG === 'pt' ? pt : en);
 
 export const MOCK_SOURCES: PublicCalendarSource[] = [
   { id: 'c_fam', name: L('Family', 'Familia', 'Família'), color: '#4c8dff', emoji: '', kind: 'generic' },
@@ -46,7 +48,7 @@ export function mockConfig(): DisplayConfig {
     screenId: 's_main',
     slug: 'living-room',
     screen: { name: L('Living room', 'Salón', 'Sala'), language: DEMO_LANG, style: 'modern' },
-    weather: { locationName: 'Lisbon, Portugal' },
+    weather: { locationName: L('Lisbon, Portugal', 'Lisboa, Portugal', 'Lisboa, Portugal') },
     // ?photos=0 → no background photo
     ...(q.get('photos') === '0' ? { background: { enabled: false } } : {}),
     datetime: { timezone: TZ },
@@ -63,12 +65,12 @@ export function mockConfig(): DisplayConfig {
     todo: {
       enabled: q.get('todo') === '1',
       items: EMPTY ? [] : [
-        { id: 't1', text: L('Buy batteries for the remote', 'Comprar pilas para el mando'), done: false },
-        { id: 't2', text: L('Call the plumber', 'Llamar al fontanero'), done: true },
-        { id: 't3', text: L('Fresh sheets for the beach house', 'Sábanas limpias para la casa de la playa'), done: false },
+        { id: 't1', text: L('Buy batteries for the remote', 'Comprar pilas para el mando', 'Comprar pilhas para o comando'), done: false },
+        { id: 't2', text: L('Call the plumber', 'Llamar al fontanero', 'Ligar ao canalizador'), done: true },
+        { id: 't3', text: L('Fresh sheets for the beach house', 'Sábanas limpias para la casa de la playa', 'Lençóis lavados para a casa da praia'), done: false },
       ],
     },
-    message: { enabled: q.get('msg') === '1', text: L('Have a great weekend, everyone!', '¡Buen fin de semana, familia!'), emoji: '💛' },
+    message: { enabled: q.get('msg') === '1', text: L('Have a great weekend, everyone!', '¡Buen fin de semana, familia!', 'Bom fim de semana, família!'), emoji: '💛' },
   });
 }
 
@@ -129,14 +131,16 @@ export function mockEvents(now = new Date()): EventsResponse {
   const year = +T.slice(0, 4);
 
   // Public holidays in range (this year + next).
-  const hol: [string, string, string][] = [
-    ['10-05', 'Republic Day', 'Día de la República'], ['11-01', "All Saints' Day", 'Todos los Santos'],
-    ['12-01', 'Restoration of Independence', 'Restauración de la Independencia'],
-    ['12-08', 'Immaculate Conception', 'Inmaculada Concepción'], ['12-25', 'Christmas Day', 'Navidad'],
-    ['01-01', "New Year's Day", 'Año Nuevo'], ['04-25', 'Freedom Day', 'Día de la Libertad'],
-    ['06-10', 'Portugal Day', 'Día de Portugal'], ['08-15', 'Assumption Day', 'Asunción'],
+  const hol: [string, string, string, string][] = [
+    ['10-05', 'Republic Day', 'Día de la República', 'Implantação da República'],
+    ['11-01', "All Saints' Day", 'Todos los Santos', 'Dia de Todos os Santos'],
+    ['12-01', 'Restoration of Independence', 'Restauración de la Independencia', 'Restauração da Independência'],
+    ['12-08', 'Immaculate Conception', 'Inmaculada Concepción', 'Imaculada Conceição'],
+    ['12-25', 'Christmas Day', 'Navidad', 'Natal'], ['01-01', "New Year's Day", 'Año Nuevo', 'Ano Novo'],
+    ['04-25', 'Freedom Day', 'Día de la Libertad', 'Dia da Liberdade'],
+    ['06-10', 'Portugal Day', 'Día de Portugal', 'Dia de Portugal'], ['08-15', 'Assumption Day', 'Asunción', 'Assunção de Nossa Senhora'],
   ];
-  for (const y of [year, year + 1]) for (const [md, en, es] of hol) out.push(ev('c_hol', L(en, es), `${y}-${md}`));
+  for (const y of [year, year + 1]) for (const [md, en, es, pt] of hol) out.push(ev('c_hol', L(en, es, pt), `${y}-${md}`));
 
   // Birthdays (age shown as "🎂 Grandma Isabel (72)")
   out.push(ev('c_bday', 'Elena', T, { age: 39 }));
@@ -157,7 +161,7 @@ export function mockEvents(now = new Date()): EventsResponse {
   for (let i = -7; i < 42; i++) {
     const k = addDays(W, i);
     const wd = keyToUTC(k).getUTCDay();
-    if (wd === 2 || wd === 4) out.push(ev('c_kids', L('Football practice', 'Entreno de fútbol', 'Treino de futebol'), k, { at: [18, 0], dur: 75, location: L('Sports ground', 'Campo municipal') }));
+    if (wd === 2 || wd === 4) out.push(ev('c_kids', L('Football practice', 'Entreno de fútbol', 'Treino de futebol'), k, { at: [18, 0], dur: 75, location: L('Sports ground', 'Campo municipal', 'Campo municipal') }));
     if (wd === 3) out.push(ev('c_fam', L('Padel with Rui', 'Pádel con Rui', 'Padel com o Rui'), k, { at: [19, 30], dur: 90 }));
     if (wd === 6) out.push(ev('c_fam', L('Farmers market', 'Mercado del sábado', 'Mercado de sábado'), k, { at: [10, 0], dur: 120 }));
     if (wd === 1) out.push(ev('c_work', L('Weekly meeting', 'Reunión semanal', 'Reunião semanal'), k, { at: [9, 30], dur: 60 }));
@@ -165,9 +169,9 @@ export function mockEvents(now = new Date()): EventsResponse {
   }
 
   // One-offs
-  out.push(ev('c_fam', L('Dentist – Lucía', 'Dentista – Lucía', 'Dentista – Lucía'), T, { at: [17, 30], dur: 45, location: L('Smile Clinic', 'Clínica Sonrisa') }));
+  out.push(ev('c_fam', L('Dentist – Lucía', 'Dentista – Lucía', 'Dentista – Lucía'), T, { at: [17, 30], dur: 45, location: L('Smile Clinic', 'Clínica Sonrisa', 'Clínica Sorriso') }));
   out.push(ev('c_work', L('Client call', 'Llamada con cliente', 'Call com cliente'), T, { at: [11, 0], dur: 30 }));
-  out.push(ev('c_fam', L('Dinner with Ana & Pedro', 'Cena con Ana y Pedro', 'Jantar com Ana e Pedro'), D(1), { at: [21, 0], dur: 150, location: L('Seaside restaurant', 'Restaurante del puerto') }));
+  out.push(ev('c_fam', L('Dinner with Ana & Pedro', 'Cena con Ana y Pedro', 'Jantar com Ana e Pedro'), D(1), { at: [21, 0], dur: 150, location: L('Seaside restaurant', 'Restaurante del puerto', 'Restaurante do porto') }));
   out.push(ev('c_fam', L('Vet – Luna', 'Veterinario – Luna', 'Veterinário – Luna'), D(3), { at: [16, 15], dur: 30 }));
   out.push(ev('c_fam', L('Pay electricity bill', 'Pagar factura de la luz', 'Pagar fatura da luz'), D(4)));
   out.push(ev('c_fam', L('Car service', 'Revisión del coche', 'Revisão do carro'), D(6), { at: [8, 45], dur: 60 }));
@@ -180,6 +184,24 @@ export function mockEvents(now = new Date()): EventsResponse {
   out.push(ev('c_kids', L('Pediatrician – Mateo', 'Pediatra – Mateo', 'Pediatra – Mateo'), D(-1), { at: [10, 0], dur: 30 }));
   out.push(ev('c_kids', L('Swimming lesson', 'Clase de natación', 'Aula de natação'), D(2), { at: [17, 0], dur: 45 }));
   out.push(ev('c_kids', L('School play', 'Función del colegio', 'Teatro da escola'), D(10), { at: [18, 30], dur: 90 }));
+
+  if (BUSY) {
+    out.push(ev('c_fam', L('Grandparents visiting from Porto for the long weekend', 'Los abuelos vienen de Oporto a pasar el puente', 'Os avós vêm do Porto passar o fim de semana prolongado'), D(1), { endKey: D(4) }));
+    out.push(ev('c_kids', L('Bring the signed permission slip for the science museum trip', 'Llevar firmada la autorización para la excursión al museo de la ciencia', 'Levar assinada a autorização para a visita ao museu da ciência'), T));
+    out.push(ev('c_work', L('Quarterly planning workshop with the whole design and product team', 'Taller de planificación trimestral con todo el equipo de diseño y producto', 'Workshop de planeamento trimestral com toda a equipa de design e produto'), T, { at: [14, 0], dur: 90 }));
+    const busy: [string, string, string, number, number, string][] = [
+      ['Breakfast with Marta', 'Desayuno con Marta', 'Pequeno-almoço com a Marta', 8, 0, 'c_fam'],
+      ['Drop the kids at school', 'Llevar a los niños al colegio', 'Levar os miúdos à escola', 8, 45, 'c_kids'],
+      ['Budget review', 'Revisión del presupuesto', 'Revisão do orçamento', 10, 0, 'c_work'],
+      ['Haircut', 'Peluquería', 'Cabeleireiro', 12, 30, 'c_fam'],
+      ['Lunch with the new team', 'Comida con el equipo nuevo', 'Almoço com a equipa nova', 13, 30, 'c_work'],
+      ['Piano lesson', 'Clase de piano', 'Aula de piano', 16, 0, 'c_kids'],
+      ['Pick up the parcel', 'Recoger el paquete', 'Levantar a encomenda', 17, 15, 'c_fam'],
+      ['Parents association meeting', 'Reunión del AMPA', 'Reunião da associação de pais', 18, 30, 'c_kids'],
+      ['Call grandma', 'Llamar a la abuela', 'Ligar à avó', 20, 0, 'c_fam'],
+    ];
+    for (const [en, es, pt, h, m, src] of busy) out.push(ev(src, L(en, es, pt), D(2), { at: [h, m], dur: 45 }));
+  }
 
   // Sort: allDay first, then start
   out.sort((a, b) => (a.allDay === b.allDay ? sortKey(a).localeCompare(sortKey(b)) : a.allDay ? -1 : 1));
@@ -234,9 +256,9 @@ function baseWeather(now: Date): WeatherResponse {
   ];
   return {
     updatedAt: now.toISOString(),
-    locationName: 'Lisbon, Portugal',
+    locationName: L('Lisbon, Portugal', 'Lisboa, Portugal', 'Lisboa, Portugal'),
     current: {
-      temp: 19.4, feelsLike: 18.6, humidity: 68, windKmh: 14, windDir: 315, windDirLabel: L('NW', 'NO'), code: 2,
+      temp: 19.4, feelsLike: 18.6, humidity: 68, windKmh: 14, windDir: 315, windDirLabel: L('NW', 'NO', 'NO'), code: 2,
       isDay: p.hour >= 8 && p.hour < 19, description: L('Partly cloudy', 'Parcialmente nublado', 'Parcialmente nublado'), pressure: 1017, uv: 4,
     },
     today: { sunrise: isoAt(T, 7, 39), sunset: isoAt(T, 19, 7), min: 14, max: 22, precipChance: 10 },
@@ -256,6 +278,13 @@ export function mockNews(): NewsResponse {
     ['La fiesta de la vendimia cierra con 200.000 visitantes', 'Música, gastronomía y vino llenaron las calles del centro histórico durante cinco días.'],
     ['La biblioteca municipal abre también los domingos', 'El nuevo horario incluye talleres gratuitos para niños y un club de lectura en inglés.'],
     ['Previsión: llega la primera lluvia del otoño', 'Se esperan chubascos a partir del sábado, con un descenso notable de las temperaturas.'],
+  ] : DEMO_LANG === 'pt' ? [
+    ['Cidade alarga a rede de metro com quatro novas estações', 'As obras da linha circular avançam e os novos troços devem abrir no próximo ano.'],
+    ['Golfinhos voltam a ser avistados no estuário', 'Os biólogos registam mais avistamentos este outono e os passeios de barco celebram uma temporada recorde.'],
+    ['Renováveis batem recorde na produção de eletricidade', 'Em setembro, mais de 80 % da eletricidade consumida veio de fontes eólica, solar e hídrica.'],
+    ['Festa das vindimas fecha com 200 mil visitantes', 'Música, gastronomia e vinho encheram as ruas do centro histórico durante cinco dias.'],
+    ['Biblioteca municipal passa a abrir ao domingo', 'O novo horário inclui oficinas gratuitas para crianças e um clube de leitura em inglês.'],
+    ['Previsão: chegam as primeiras chuvas do outono', 'Esperam-se aguaceiros a partir de sábado, com uma descida acentuada das temperaturas.'],
   ] : [
     ['City expands metro network with four new stations', 'Work on the circular line is on schedule and the new sections are expected to open next year.'],
     ['Dolphins spotted again in the estuary', 'Biologists report more sightings this autumn as boat-tour operators celebrate a record season.'],

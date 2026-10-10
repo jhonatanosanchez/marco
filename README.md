@@ -141,13 +141,14 @@ transparency, blur and a light edge:
 
 - **Home dashboard:** connected screens, next events, calendar health, weather, active alerts, recent activity and
   quick actions (refresh, identify, night mode, send an alert).
-- **Calendars:** iCal/ICS URLs (including `webcal://` and self-signed HTTPS), **Google Calendar** through OAuth, public
-  holiday presets, per-calendar colour, emoji, type (general / vacation rental / birthdays / holidays) and refresh rate.
+- **Calendars:** iCal/ICS URLs (including `webcal://` and self-signed HTTPS), **Google Calendar** through OAuth,
+  **Outlook / Microsoft 365**, **Apple iCloud** (a guide to get the calendar's public link), public holiday presets, per-calendar colour, emoji, type (general / vacation rental / birthdays / holidays) and refresh rate.
 - **Local events** (one-off or repeating weekly / monthly / yearly, with exceptions) and **birthdays** (with CSV import).
 - **Filters and overrides:** hide ("Not available"), rename, or force emoji/colour for a series, with a live preview of
   the next 14 days. **Icon rules** with a tester. **Countdowns**.
 - **Photo gallery:** drag and drop, in-browser optimisation (EXIF rotation, resize, thumbnails), iPhone **HEIC**
   conversion, automatic focal point with a manual editor, duplicate-name handling.
+- **Custom CSS** per screen, for the changes the settings do not cover.
 - **Multiple screens** (living room, kitchen, hallway) each with its own layout, background, calendars and widgets,
   and a **Connected displays** page (resolution, browser, version, reload / identify / night mode per device).
 - **Private display links and pairing:** every screen has an unguessable link (`/d/<key>`, QR code, one-click
@@ -281,7 +282,7 @@ with a screen) or as a new `marco` system user (server only).
 
 ```
 ~/marco/                  (or /opt/marco)
-├── current -> releases/0.5.0   the running version, switched in one step on update
+├── current -> releases/0.5.1   the running version, switched in one step on update
 ├── releases/                   the current version and the previous one (for rollback)
 ├── data/                       config, secrets, photos, backups (kept on update and uninstall)
 └── .env                        port and other settings, see .env.example
@@ -460,10 +461,11 @@ Just want to see the display? Any running instance shows a built-in sample datas
 (add `&lang=es`, `&preset=agenda`, `&theme=light`, `&style=modern`, `&announce=success`, `&sched=1`, `&now=2026-10-09T10:42`,
 `&wx=rain|snow|clear` with `&wxfx=rich` to see the weather effect, `&pair=1` for the pairing screen).
 
-**Demo video.** A 48-second tour of the demo: the living room screen with photo transitions, an alert and a scheduled
-message, the kitchen and portrait screens, and pairing a new screen.
+**Demo video.** A one-minute tour in the Modern style: the month view, an alert sent from a phone, the Today and
+board layouts, the photo frame, Classic and glass styles, live weather effects, a portrait screen, the admin
+(layouts, calendars, gallery) and the dim bedside clock at night.
 
-[![Demo video: the living room screen at 20:00 with the "Take out the bins" scheduled message](docs/media/poster.webp)](https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4)
+[![Demo video: the living room screen in the Modern style with the month calendar, weather and upcoming events](docs/media/poster.webp)](https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4)
 
 ## Private display links & pairing
 
@@ -708,6 +710,21 @@ newest one is kept). *Unlink* deletes them; Microsoft has no way to revoke them 
 itself go to <https://account.live.com/consent/Manage> (personal) or <https://myapps.microsoft.com> (work or school).
 Client secrets expire (6 to 24 months): create a new one before that and update `.env`.
 
+## Adding an Apple iCloud calendar
+
+iCloud is not linked with an account like Google or Microsoft: Marco reads each calendar's public link.
+*Calendars → Linked accounts → Link account → Apple iCloud* opens a short guide to get it:
+
+- **iPhone or iPad:** Calendar app → *Calendars* → ⓘ next to the calendar → turn on *Public Calendar* → *Share Link*
+  → *Copy*.
+- **Mac:** Calendar app → the share icon next to the calendar (or Control-click → *Share Calendar*) → *Public
+  Calendar* → copy the `webcal://` address.
+- **iCloud.com:** icloud.com/calendar → the share icon next to the calendar → *Public Calendar* → *Copy*.
+
+Paste the link in the guide: Marco tests it and adds it as an iCal calendar (`webcal://` links work). Nothing to set
+up on the server. Anyone who has the link can see the calendar, but it is long and impossible to guess; to withdraw
+it, turn off *Public Calendar* in iCloud.
+
 ## Other integrations
 
 - **iCal / ICS feeds:** any `http(s)://` or `webcal://` URL: school, sports club, work, public holidays (presets for
@@ -914,6 +931,7 @@ Back up the whole folder (or use *Export*) to keep everything.
 | `?ambient=aurora\|particles\|none` | Override the ambient backdrop behind the calendar |
 | `?demo=1&pair=1` `?demo=1&pair=invalid` `&pairLen=6\|8` | Preview the pairing screen or the “link no longer valid” screen with a sample code (no server needed) |
 | `?empty=1` `?photos=0` | With `?demo=1`: no events, countdowns or to-dos, or no background photo (to check the empty states) |
+| `?marquee=0\|1` `?rotate=0\|1` | Turn off (or on) the long titles that slide and the busy days that take turns showing their events (*Calendars → Calendar view*); with `?demo=1`, `&busy=1` adds a busy day and long titles to try them |
 | `?client=<name>` | Name of this device in *Connected displays* (the kiosk script sets it) |
 
 ## Security

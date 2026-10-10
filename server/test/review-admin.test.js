@@ -171,3 +171,37 @@ test('google callback: unknown error codes are not logged verbatim and failures 
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('Google sign-in off: existing Google sessions end, and the OAuth purpose comes from the session, not the state', async () => {
+  const dir = setup();
+  const prev = { id: process.env.GOOGLE_CLIENT_ID, secret: process.env.GOOGLE_CLIENT_SECRET, login: process.env.MARCO_GOOGLE_LOGIN };
+  const restore = () => {
+    for (const [k, v] of [['GOOGLE_CLIENT_ID', prev.id], ['GOOGLE_CLIENT_SECRET', prev.secret], ['MARCO_GOOGLE_LOGIN', prev.login]]) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  };
+  process.env.GOOGLE_CLIENT_ID = 'id';
+  process.env.GOOGLE_CLIENT_SECRET = 'secret';
+  delete process.env.MARCO_GOOGLE_LOGIN;
+  try {
+    const { sessionValid } = await import('../auth.js');
+    store.updateSecrets((s) => { s.passwordHash = 'scrypt$c2FsdA==$aGFzaA=='; s.sessionEpoch = 'e1'; });
+    store.updateConfig((c) => { c.auth.allowedGoogleEmails = ['ana@example.com']; c.auth.passwordLoginEnabled = true; });
+    const req = { ip: '192.168.1.20', headers: {}, socket: { remoteAddress: '192.168.1.20' }, session: { epoch: 'e1', user: { email: 'ana@example.com', method: 'google' } } };
+    assert.equal(sessionValid(req), false, 'Google sign-in is off on this server');
+    process.env.MARCO_GOOGLE_LOGIN = '1';
+    assert.equal(sessionValid(req), true);
+    delete process.env.MARCO_GOOGLE_LOGIN;
+    // a "connect" round trip whose state was edited to say "login" is refused before any code exchange
+    const nonce = 'a'.repeat(32);
+    const state = Buffer.from(JSON.stringify({ p: 'login', n: nonce })).toString('base64url');
+    let to = '';
+    await googleCallbackHandler({ query: { state, code: 'c' }, session: { oauthNonce: nonce, oauthPurpose: 'connect' }, ip: '203.0.113.9', get: () => '' },
+      { redirect: (u) => { to = u; } });
+    assert.equal(to, '/admin/?error=invalid_state');
+  } finally {
+    restore();
+    _resetActivityThrottle();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

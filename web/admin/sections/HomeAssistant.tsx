@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import type { TestHomeAssistantResponse } from '../../shared/types';
 import { api, ApiError } from '../api';
+import { fetchErrorText } from '../apiErrors';
 import { toast } from '../components/feedback';
 import { HaEntityPicker, invalidateHaEntities } from '../components/HaEntityPicker';
 import { Icon } from '../components/icons';
@@ -86,7 +87,7 @@ export function HomeAssistantSection({ cfg, set, errors }: SectionProps) {
                 </span>
               ) : (
                 <span class="err-text">
-                  <Icon name="alert" size={15} /> {test.res.error || t('No se pudo conectar')}
+                  <Icon name="alert" size={15} /> {fetchErrorText(test.res.error) || t('No se pudo conectar')}
                 </span>
               ))}
           </div>

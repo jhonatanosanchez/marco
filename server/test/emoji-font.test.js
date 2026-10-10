@@ -70,6 +70,7 @@ test('both pages use the font; the display page has no inline script and no thir
   assert.match(read('web/display/main.ts').toString(), /import '\.\.\/shared\/emoji-font\.css';/);
   assert.match(read('web/admin/styles.css').toString(), /--font: [^;]*'Marco Emoji'/);
   assert.match(read('web/display/styles.css').toString(), /--font-emoji: [^;]*'Marco Emoji'/);
+  assert.match(read('web/display/styles-modern.css').toString(), /--font-ui: [^;]*'Marco Emoji'/);
   const html = read('web/index.html').toString();
   assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(html, /\son[a-z]+=/i, 'no inline event handlers');

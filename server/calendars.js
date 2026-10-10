@@ -512,5 +512,8 @@ export function invalidateIcsParsing() {
     if (!entry.vevents && !entry.pendingText) continue;
     entry.fetchedAt = 0;
     entry.version = (entry.version || 0) + 1;
+    // The re-parse must bump the version again even though the text is the same: an event list built in between
+    // from the old parse would otherwise stay cached.
+    entry.sig = null;
   }
 }

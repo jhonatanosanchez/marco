@@ -157,7 +157,8 @@ test('migration v1 → v2 keeps every value (global vs screens[0])', async () =>
   assert.deepEqual(s.background, { ...V1.background, order: 'random', panelBlur: 18, panelShade: 0.5, weatherFx: 'simple' }); // new keys back-filled with defaults
   assert.deepEqual(s.message, V1.message);
   const { sources, iconRules, ...calView } = V1.calendar;
-  assert.deepEqual(s.calendar, { ...calView, sourceIds: null });
+  // the motion options did not exist yet: both are back-filled on
+  assert.deepEqual(s.calendar, { ...calView, marquee: true, rotateBusyDays: true, sourceIds: null });
   assert.deepEqual(v.calendar, { sources, iconRules });
   const { timezone, ...dtView } = V1.datetime;
   // v1 had no custom date pattern: it is back-filled with the default

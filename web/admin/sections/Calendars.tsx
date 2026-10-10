@@ -714,6 +714,20 @@ export function CalendarsSection(props: SectionProps) {
             <ToggleRow icon="🔢" label={t('“Día X de Y” en eventos largos')} checked={c.showDayXofY} onChange={(v) => set((d) => void (d.calendar.showDayXofY = v))} />
             <ToggleRow icon="🏷️" label={t('Leyenda de calendarios')} checked={c.showLegend} onChange={(v) => set((d) => void (d.calendar.showLegend = v))} />
             <ToggleRow icon="⏭️" label={t('Solo eventos actuales y futuros')} checked={c.hidePast} onChange={(v) => set((d) => void (d.calendar.hidePast = v))} />
+            <ToggleRow
+              icon="↔️"
+              label={t('Desplazar los textos largos')}
+              hint={t('Los títulos que no caben se deslizan despacio para leerlos enteros.')}
+              checked={c.marquee !== false}
+              onChange={(v) => set((d) => void (d.calendar.marquee = v))}
+            />
+            <ToggleRow
+              icon="🔁"
+              label={t('Rotar los días con muchos eventos')}
+              hint={t('Si en un día no caben todos, se van mostrando por turnos.')}
+              checked={c.rotateBusyDays !== false}
+              onChange={(v) => set((d) => void (d.calendar.rotateBusyDays = v))}
+            />
           </div>
         </div>
       </Card>

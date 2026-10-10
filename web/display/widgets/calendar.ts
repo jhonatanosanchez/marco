@@ -4,6 +4,8 @@ import { chipColors } from '../color';
 import { ctx } from '../ctx';
 import { esc, reconcile, setHTML, type Spec } from '../dom';
 import { type NEvent, sortForDay, timeLabel } from '../eventModel';
+import { refreshMarquee } from '../marquee';
+import { PAGE_MS, pageAt, pageLabel, planPages } from '../motion';
 import type { Tick } from '../time';
 
 interface Placed {
@@ -18,6 +20,14 @@ interface Placed {
   span?: number;
   /** title still longer than the lines available → slightly smaller font */
   long?: boolean;
+  /** busy day paging: which page of `pages` this chip belongs to, on day `day` (yyyy-mm-dd) */
+  page?: number;
+  pages?: number;
+  day?: string;
+  /** a one-day piece of a bar spanning other days, shown on a busy day's pages (its own key) */
+  piece?: boolean;
+  /** the part of a bar after a busy day that took its lane (its own key) */
+  part?: string;
 }
 
 /** Text width measurement (canvas, cached context) used to decide which chips deserve a second line. */
@@ -116,6 +126,39 @@ export class MonthCalendar {
       if (!el) return;
       reconcile(el, this.weekSpecs(row.start, list, L, today, nowMs, t, tz, isWeek), { flip: true });
     });
+    this.applyPages();
+  }
+
+  /** Busy days: page turns so far (every day shows page step % its page count, so they all turn together). */
+  private pageStep = 0;
+  private pageTimer: ReturnType<typeof setInterval> | null = null;
+
+  /** Show the current page of every busy day (and its "1/2" label); runs the page timer only while one exists. */
+  private applyPages(): void {
+    let any = false;
+    for (const el of Array.from(this.weeks.querySelectorAll<HTMLElement>('[data-pgs]'))) {
+      const pages = Number(el.dataset.pgs) || 1;
+      if (pages > 1) any = true;
+      const cur = pageAt(this.pageStep, pages);
+      if (el.classList.contains('more')) {
+        const txt = pageLabel(cur, pages);
+        if (el.textContent !== txt) el.textContent = txt;
+      } else {
+        el.classList.toggle('pg-off', Number(el.dataset.pg) !== cur);
+      }
+    }
+    if (any && !this.pageTimer) {
+      this.pageTimer = setInterval(() => {
+        this.pageStep++;
+        this.applyPages();
+        // a bar that just came into view may need to slide; the ones fading out stop once they are gone
+        setTimeout(refreshMarquee, 750);
+      }, PAGE_MS);
+    } else if (!any && this.pageTimer) {
+      clearInterval(this.pageTimer);
+      this.pageTimer = null;
+      this.pageStep = 0;
+    }
   }
 
   private geom: { colW: number; rem: number; chipPx: number } | null = null;
@@ -241,6 +284,69 @@ export class MonthCalendar {
     }
   }
 
+  /** Page count of each busy day of the last rendered week (day key → pages). */
+  private busyPages = new Map<string, number>();
+
+  /**
+   * Busy days (more events than lanes): instead of "+N", the day pages through all its events. Bars that also cover
+   * other days keep their lanes so they stay lined up; the day's own events (and a one-day piece of any bar that did
+   * not fit) take turns in the lanes left free. Returns the extra pieces to draw; marks paged chips with their page.
+   */
+  private planBusyDays(ws: string, segs: Placed[], hidden: Set<Placed>, moreCount: number[], L: number): Placed[] {
+    const pieces: Placed[] = [];
+    for (let d = 0; d < 7; d++) this.busyPages.delete(addDays(ws, d));
+    for (let d = 0; d < 7; d++) {
+      if (!moreCount[d]) continue;
+      const key = addDays(ws, d);
+      const a = 2 * d, b = 2 * d + 2;
+      const inDay = (sg: Placed) => sg.s < b && a < sg.eSlot;
+      const local = (sg: Placed) => sg.s >= a && sg.eSlot <= b;
+      const fixed = segs.filter((sg) => inDay(sg) && !local(sg) && !hidden.has(sg));
+      const free: number[] = [];
+      for (let l = 0; l < L; l++) if (!fixed.some((f) => f.lane <= l && l < f.lane + (f.span ?? 1))) free.push(l);
+      const pool: Placed[] = segs.filter((sg) => local(sg));
+      const cut: Placed[] = [];
+      // Every lane is held by bars that cover other days too: the bar in the last lane gives this day up (it keeps
+      // its lane on the other days and shows a one-day piece among the pages), or the day's own events would never
+      // show at all.
+      const last = !free.length && L > 0 ? fixed.find((f) => f.lane === L - 1 && (f.span ?? 1) === 1) : undefined;
+      if (last) {
+        cut.push({
+          e: last.e, s: Math.max(last.s, a), eSlot: Math.min(last.eSlot, b), lane: -1,
+          contL: last.contL || last.s < a, contR: last.contR || last.eSlot > b, piece: true, day: key,
+        });
+        const after: Placed | null = last.eSlot > b ? { ...last, s: b, contL: true, part: `>${key}` } : null;
+        if (last.s < a) {
+          last.eSlot = a;
+          last.contR = true;
+          if (after) segs.push(after);
+        } else if (after) Object.assign(last, after);
+        free.push(L - 1);
+      }
+      for (const sg of segs) {
+        if (!hidden.has(sg) || !inDay(sg) || local(sg)) continue;
+        cut.push({
+          e: sg.e, s: Math.max(sg.s, a), eSlot: Math.min(sg.eSlot, b), lane: -1,
+          contL: sg.contL || sg.s < a, contR: sg.contR || sg.eSlot > b, piece: true, day: key,
+        });
+      }
+      pool.push(...cut);
+      pool.sort((x, y) => sortForDay(x.e, y.e));
+      const plan = planPages(pool, free);
+      if (!plan) continue;
+      for (const { item, page, lane } of plan.placed) {
+        item.lane = lane;
+        item.span = 1;
+        hidden.delete(item);
+        if (plan.pages > 1) Object.assign(item, { page, pages: plan.pages, day: key });
+      }
+      pieces.push(...cut);
+      if (plan.pages > 1) this.busyPages.set(key, plan.pages);
+      else moreCount[d] = 0; // everything fits once the long bars are cut to this day
+    }
+    return pieces;
+  }
+
   /** How many event lanes fit in a week row without squashing chips (measured, rem-based CSS vars). */
   private lanesThatFit(nWeeks: number): number {
     const h = this.weeks.clientHeight;
@@ -348,7 +454,11 @@ export class MonthCalendar {
       }
       this.planWrap(segs, hidden, L, labels);
     }
-    for (const sg of segs) {
+    // Rotation off (it can be turned off while the screen runs): forget the pages, or the "+N" cells would keep a
+    // stale page indicator.
+    if (c.rotateBusyDays === false) this.busyPages.clear();
+    const pieces = c.rotateBusyDays === false ? [] : this.planBusyDays(ws, segs, hidden, moreCount, L);
+    for (const sg of [...segs, ...pieces]) {
       if (hidden.has(sg)) continue;
       const e = sg.e;
       const col = chipColors(e.color);
@@ -361,6 +471,7 @@ export class MonthCalendar {
         e.halfStart && !sg.contL ? 'half-l' : '', e.halfEnd && !sg.contR ? 'half-r' : '',
         pastEv ? 'past' : '', ongoing ? 'ongoing' : '', (e.airbnb && !e.checkoutMarker) ? 'airbnb' : '',
         (sg.span ?? 1) > 1 ? 'wrap' : '', (sg.span ?? 1) > 1 && sg.long ? 'long' : '',
+        sg.pages ? 'pg' : '',
       ].filter(Boolean).join(' ');
       let html = e.emoji ? `<span class="em">${esc(e.emoji)}</span>` : '';
       if (e.timed) {
@@ -371,7 +482,7 @@ export class MonthCalendar {
       else html += `<span class="tt">${esc(e.title)}</span>`;
       if (c.showLocation && e.ev.location) html += `<span class="loc">${esc(e.ev.location)}</span>`;
       if (c.showDayXofY && e.bar && sg.contL && e.days > 1 && !short) {
-        const x = diffDays(e.spanFirst, ws) + 1;
+        const x = diffDays(e.spanFirst, addDays(ws, Math.floor(sg.s / 2))) + 1; // a part after a busy day starts later
         html += `<span class="dx">${esc(t('dayXofY', { x, y: (e.airbnb && !e.checkoutMarker) ? e.days + 1 : e.days }))}</span>`;
       }
       if ((e.airbnb && !e.checkoutMarker) && !sg.contR && !short && sg.eSlot - sg.s >= 3) html += `<span class="co">🚪</span>`;
@@ -388,20 +499,24 @@ export class MonthCalendar {
       }
       const row = span > 1 ? `${sg.lane + 2} / span ${span};--clamp:${span}` : `${sg.lane + 2}`;
       specs.push({
-        key: `e${e.id}@${ws}`,
+        key: sg.piece ? `e${e.id}@${sg.day}` : `e${e.id}@${ws}${sg.part ?? ''}`,
         className: cls,
         style: `grid-column:${sg.s + 1} / ${sg.eSlot + 1};grid-row:${row};--c:${col.base};--on:${col.onSolid};--tint:${col.tint};--shade:${col.shade}`,
         html,
+        data: sg.pages ? { day: sg.day!, pg: String(sg.page), pgs: String(sg.pages) } : undefined,
       });
     }
     for (let d = 0; d < 7; d++) {
       if (!moreCount[d]) continue;
       const key = addDays(ws, d);
+      const pages = this.busyPages.get(key);
       specs.push({
         key: `m${key}`,
-        className: `more${key < today ? ' past' : ''}`,
+        className: `more${key < today ? ' past' : ''}${pages ? ' pgi' : ''}`,
         style: `grid-column:${2 * d + 1} / span 2`,
-        html: esc(t('more', { n: moreCount[d] })),
+        // the page indicator's text is kept up to date by applyPages()
+        html: pages ? esc(pageLabel(0, pages)) : esc(t('more', { n: moreCount[d] })),
+        data: pages ? { day: key, pgs: String(pages) } : undefined,
       });
     }
     return specs;

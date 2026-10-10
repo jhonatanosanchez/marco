@@ -5,19 +5,57 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-10
+
 ### Added
 - **Apple iCloud calendars**: *Calendars → Linked accounts → Link account* now offers Apple iCloud. It opens a short
   guide (iPhone or iPad, Mac, iCloud.com) to get the calendar's public link, then tests the link and adds it as an
   iCal calendar. `webcal://` links are accepted. No server setup needed.
+- **Long titles slide**: an all-day or multi-day bar in the month or week grid, or a title in the Agenda, Today,
+  Per person and Board views, that does not fit slides slowly to show the rest, waits, and slides back. Titles that
+  fit never move, timed chips in month cells keep their "…", and nothing moves when the device asks for reduced
+  motion. With `?lite=1` at most six titles move at once.
+- **Busy days take turns**: a day in the month or Two weeks grid with more events than fit shows them in turns every
+  8 seconds, and the "+N more" label becomes a page count ("1/2"). Bars that cover several days stay where they are;
+  when they fill every row of a day, the bottom one leaves that day free so the day's own events still show.
+- Both are on by default and can be turned off per screen in *Calendars → Calendar view*; `?marquee=0` and
+  `?rotate=0` turn them off for a test, and `?demo=1&busy=1` adds a busy day and long titles to the demo.
 
 ### Changed
+- New demo video and README animation in the Modern style, with no flicker: layouts, an alert from a phone, weather
+  effects, a portrait screen, the admin and the night clock.
 - **Sign in with Google is off on self-hosted servers** by default: the admin uses the server's password, and Google
   is for calendars. `MARCO_GOOGLE_LOGIN=1` turns it on; servers that already sign in with Google only (password off,
   allowed emails set) keep it.
 - **Google Calendar** leaves out Google Workspace working-location entries ("Home", "Office").
 - The linked accounts chooser closes with an X instead of a Cancel button.
 
+### Security
+- Every response now sends `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN` and
+  `frame-ancestors 'self'`, so no other site can frame the admin. The display and admin pages (also as `/index.html`
+  and `/admin/index.html`) are never cached, and admin changes refuse a `Sec-Fetch-Site` other than `same-origin`.
+- With Google sign-in off, sessions made with Google before end too, and the Google callback refuses a sign-in.
+  The OAuth purpose (sign in or link calendars) is kept in the session instead of being read back from the state
+  the browser returns.
+
 ### Fixed
+- Turning *Rotate busy days* off now brings back the "+N more" label at once; before, a busy day kept its page
+  count ("1/2") and kept turning it until the screen reloaded.
+- With the Modern style, emoji in text fall back to the bundled emoji font, so an offline device without a color
+  emoji font no longer shows empty boxes.
+- The activity log names the *Display access* change instead of showing the raw `security` key, and the search
+  finds *Download photos (.zip)*.
+- The demo in Portuguese (`?demo=1&lang=pt`) is now Portuguese everywhere: to-dos, the message, holidays, places,
+  news and the wind direction no longer fall back to English.
+- A display that shows the pairing or invalid link screen before it ever loaded its settings no longer keeps asking
+  the server for them every 10 seconds.
+- Calendar errors in the Home source list and the Home Assistant *Test connection* result are shown in the admin's
+  language, like on the Status page, instead of the raw technical text.
+- Changing the time zone in *Date & time* now also rebuilds the calendar view from calendars without a time zone
+  of their own (floating times), even when a screen asked for its events while the calendars were being reloaded.
+- A very long title in the next-event capsule under the clock no longer pushes it past the edge of the side panel.
+- Today: when the all-day chips do not fit next to the title, the last ones are left out instead of the first one
+  losing the start of its title.
 - A large font size (*Screen → Font size*) no longer pushes the clock's last digit onto a second line: the clock
   never wraps and shrinks to the width of its column.
 - With the Modern style the screen now fades in once the first photo is ready, so the glass cards never show a

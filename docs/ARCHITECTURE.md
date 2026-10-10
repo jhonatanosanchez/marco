@@ -107,7 +107,10 @@ The stored config has **global** sections shared by every screen and a list of *
                   // source: stock | gallery | mixed · order: random | newest | name · transition: webgl | fade | none · ambient: aurora | particles | none · weatherFx: off | simple | rich
   "calendar":   { "enabled": true, "view": "month", "weeks": 5, "weekStart": 1, "showLocation": false, "showEndTime": false,
                   "showDayXofY": true, "showLegend": true, "hidePast": false, "maxEventsPerDay": 4,
+                  "marquee": true, "rotateBusyDays": true,
                   "sourceIds": null },               // null = every enabled source (incl. new ones); array = only these
+                  // marquee: titles cut short (all-day / multi-day bars, agenda-like lists) slide to show the rest
+                  // rotateBusyDays: a month-grid day with more events than fit pages through them every 8 s
   "datetime":   { "enabled": true, "clock": "digital", "format24": true, "showSeconds": true, "showAmPm": false, "dateFormat": "weekday_d_month" },
   "weather":    { "enabled": true, "forecastDays": 5, "showHourly": true, "showPrecipChance": true },
   "news":       { "enabled": true, "rotateSec": 15 },

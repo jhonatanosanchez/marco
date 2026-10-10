@@ -40,12 +40,15 @@ export interface Spec {
   className: string;
   style?: string;
   html: string;
+  /** data-* attributes (e.g. { day: '2026-10-14' } → data-day) */
+  data?: Record<string, string>;
 }
 
 interface Keyed extends HTMLElement {
   __key?: string;
   __sig?: string;
   __leaving?: boolean;
+  __data?: string[];
 }
 
 export const reducedMotion = () => document.documentElement.classList.contains('lite');
@@ -72,7 +75,7 @@ export function reconcile(parent: HTMLElement, specs: Spec[], opts: { flip?: boo
   let prev: Keyed | null = null;
   for (const s of specs) {
     let node = existing.get(s.key);
-    const sig = `${s.className}|${s.style ?? ''}|${s.html}`;
+    const sig = `${s.className}|${s.style ?? ''}|${s.html}${s.data ? `|${JSON.stringify(s.data)}` : ''}`;
     if (!node) {
       node = document.createElement(s.tag || 'div') as Keyed;
       node.__key = s.key;
@@ -85,6 +88,10 @@ export function reconcile(parent: HTMLElement, specs: Spec[], opts: { flip?: boo
         node.innerHTML = s.html;
         (node as any).__html = s.html;
       }
+      const keys = s.data ? Object.keys(s.data) : [];
+      for (const k of node.__data ?? []) if (!keys.includes(k)) node.removeAttribute(`data-${k}`);
+      for (const k of keys) if (node.getAttribute(`data-${k}`) !== s.data![k]) node.setAttribute(`data-${k}`, s.data![k]);
+      node.__data = keys;
       node.__sig = sig;
     }
     // keep DOM order == spec order (cheap check)

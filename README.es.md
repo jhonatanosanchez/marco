@@ -147,7 +147,8 @@ color de la foto, transparencia, desenfoque y borde de luz:
 - **Panel de inicio:** pantallas conectadas, próximos eventos, estado de los calendarios, tiempo, avisos activos,
   actividad reciente y acciones rápidas (recargar, identificar, modo noche, enviar un aviso).
 - **Calendarios:** URL iCal/ICS (incluidas `webcal://` y HTTPS con certificado autofirmado), **Google Calendar**
-  mediante OAuth, festivos predefinidos, y por calendario: color, emoji, tipo (general / alquiler vacacional /
+  mediante OAuth, **Outlook / Microsoft 365**, **Apple iCloud** (con una guía para sacar el enlace público del
+  calendario), festivos predefinidos, y por calendario: color, emoji, tipo (general / alquiler vacacional /
   cumpleaños / festivos) y frecuencia de actualización.
 - **Eventos locales** (puntuales o que se repiten cada semana / mes / año, con excepciones) y **cumpleaños** (con
   importación desde CSV).
@@ -155,6 +156,7 @@ color de la foto, transparencia, desenfoque y borde de luz:
   en directo de los próximos 14 días. **Reglas de iconos** con un probador. **Cuentas atrás**.
 - **Galería de fotos:** arrastrar y soltar, optimización en el navegador (rotación EXIF, redimensionado, miniaturas),
   conversión de **HEIC** del iPhone, punto focal automático con editor manual y gestión de nombres duplicados.
+- **CSS personalizado** por pantalla, para los cambios que no cubren los ajustes.
 - **Varias pantallas** (salón, cocina, pasillo), cada una con su propio diseño, fondo, calendarios y widgets, y una
   página de **Pantallas conectadas** (resolución, navegador, versión, recargar / identificar / modo noche por
   dispositivo).
@@ -297,7 +299,7 @@ inicio de sesión automático en el escritorio (modos con pantalla) o como un us
 
 ```
 ~/marco/                  (o /opt/marco)
-├── current -> releases/0.5.0   la versión en marcha, se cambia en un solo paso al actualizar
+├── current -> releases/0.5.1   la versión en marcha, se cambia en un solo paso al actualizar
 ├── releases/                   la versión actual y la anterior (para volver atrás)
 ├── data/                       configuración, secretos, fotos, copias (se conservan al actualizar y desinstalar)
 └── .env                        puerto y otros ajustes, consulta .env.example
@@ -484,10 +486,11 @@ carpeta `data/` real nunca se toca.
 `/?demo=1` (añade `&lang=es`, `&preset=agenda`, `&theme=light`, `&style=modern`, `&announce=success`, `&sched=1`,
 `&now=2026-10-09T10:42`, `&wx=rain|snow|clear` con `&wxfx=rich` para ver el efecto del tiempo, `&pair=1` para la pantalla de vinculación).
 
-**Vídeo de demostración.** Un recorrido de 48 segundos por la demo: la pantalla del salón con transiciones de fotos,
-un aviso y un mensaje programado, las pantallas de la cocina y vertical, y la vinculación de una pantalla nueva.
+**Vídeo de demostración.** Un recorrido de un minuto en el estilo Moderno: la vista de mes, un aviso enviado desde el
+móvil, los diseños Hoy y tablero, el marco de fotos, los estilos Clásico y cristal, los efectos del tiempo, una
+pantalla vertical, el panel (diseños, calendarios, galería) y el reloj tenue de noche para el dormitorio.
 
-[![Vídeo de demostración: la pantalla del salón a las 20:00 con el mensaje programado "Take out the bins"](docs/media/poster.webp)](https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4)
+[![Vídeo de demostración: la pantalla del salón en estilo Moderno con el calendario del mes, el tiempo y los próximos eventos](docs/media/poster.webp)](https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4)
 
 ## Enlaces privados y vinculación de pantallas
 
@@ -750,6 +753,21 @@ retirar el acceso entra en <https://account.live.com/consent/Manage> (cuenta per
 <https://myapps.microsoft.com> (cuenta del trabajo o del centro educativo). Los secretos de cliente caducan (de 6 a 24
 meses): crea uno nuevo antes y actualiza `.env`.
 
+## Añadir un calendario de Apple iCloud
+
+iCloud no se vincula con una cuenta como Google o Microsoft: Marco lee el enlace público de cada calendario.
+*Calendarios → Cuentas vinculadas → Vincular cuenta → Apple iCloud* abre una guía corta para sacarlo:
+
+- **iPhone o iPad:** app Calendario → *Calendarios* → ⓘ junto al calendario → activa *Calendario público* →
+  *Compartir enlace* → *Copiar*.
+- **Mac:** app Calendario → icono de compartir junto al calendario (o clic derecho → *Compartir calendario*) →
+  *Calendario público* → copia la dirección `webcal://`.
+- **iCloud.com:** icloud.com/calendar → icono de compartir junto al calendario → *Calendario público* → *Copiar*.
+
+Pega el enlace en la guía: Marco lo prueba y lo añade como calendario iCal (los enlaces `webcal://` valen). No hace
+falta configurar nada en el servidor. Cualquiera que tenga el enlace puede ver el calendario, aunque es largo e
+imposible de adivinar; para retirarlo, desactiva *Calendario público* en iCloud.
+
 ## Otras integraciones
 
 - **Fuentes iCal / ICS:** cualquier URL `http(s)://` o `webcal://`: colegio, club deportivo, trabajo, festivos
@@ -957,6 +975,7 @@ Haz copia de seguridad de toda la carpeta (o usa *Exportar*) para conservarlo to
 | `?ambient=aurora\|particles\|none` | Fuerza el fondo ambiental detrás del calendario |
 | `?demo=1&pair=1` `?demo=1&pair=invalid` `&pairLen=6\|8` | Muestra la pantalla de vinculación o la de “enlace ya no válido” con un código de ejemplo (sin servidor) |
 | `?empty=1` `?photos=0` | Con `?demo=1`: sin eventos, cuentas atrás ni tareas, o sin foto de fondo (para ver los estados vacíos) |
+| `?marquee=0\|1` `?rotate=0\|1` | Desactiva (o activa) los títulos largos que se deslizan y los días con muchos eventos que los muestran por turnos (*Calendarios → Vista del calendario*); con `?demo=1`, `&busy=1` añade un día lleno y títulos largos para probarlo |
 | `?client=<name>` | Nombre de este dispositivo en *Pantallas conectadas* (lo define el script del kiosco) |
 
 ## Seguridad

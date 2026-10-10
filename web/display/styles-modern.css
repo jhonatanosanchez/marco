@@ -7,7 +7,7 @@
    ============================================================================================= */
 
 .style-modern {
-  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter Variable', 'Inter', system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter Variable', 'Inter', system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Apple Color Emoji', 'Noto Color Emoji', 'Marco Emoji', sans-serif;
   --font-num: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter Variable', 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
   --fg-2: rgb(235 235 245 / 0.6);
   --fg-3: rgb(235 235 245 / 0.3);
