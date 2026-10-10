@@ -22,3 +22,17 @@ test('every date format renders and validates', () => {
     assert.equal(value.screens[0].datetime.dateFormat, fmt);
   }
 });
+
+test('custom date pattern', () => {
+  const f = (lang, pat) => i18n.formatDateLine(lang, '2026-03-07', 'custom', pat);
+  assert.equal(f('es', '{dddd} {d} de {mmmm} de {yyyy}'), 'Sábado 7 de marzo de 2026');
+  assert.equal(f('en', '{ddd} {mmm} {dd}, {yy}'), 'Sat Mar 07, 26');
+  assert.equal(f('pt', '{dd}.{mm}.{yyyy} · {m}/{d}'), '07.03.2026 · 3/7');
+  assert.equal(f('es', '   '), 'Sábado, 7 de marzo'); // empty pattern falls back to the default line
+  const c = defaultConfig();
+  c.screens[0].datetime.dateFormat = 'custom';
+  c.screens[0].datetime.dateCustom = '<b>{d}</b>';
+  const { ok, value } = validateConfig(c);
+  assert.equal(ok, true);
+  assert.equal(value.screens[0].datetime.dateCustom, 'b{d}/b');
+});

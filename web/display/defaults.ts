@@ -23,6 +23,7 @@ export const DEFAULT_CONFIG: DisplayConfig = {
   datetime: {
     enabled: true, timezone: 'Europe/Lisbon', clock: 'digital', format24: true, showSeconds: true, showAmPm: false,
     dateFormat: 'weekday_d_month',
+    dateCustom: '{dddd}, {d} {mmmm} {yyyy}',
   },
   weather: {
     enabled: true, provider: 'open-meteo', model: 'best_match', locationName: 'Lisbon, Portugal', lat: 38.7223, lon: -9.1393, units: 'metric',

@@ -139,7 +139,8 @@ test('migration v1 → v2 keeps every value (global vs screens[0])', async () =>
   assert.deepEqual(s.calendar, { ...calView, sourceIds: null });
   assert.deepEqual(v.calendar, { sources, iconRules });
   const { timezone, ...dtView } = V1.datetime;
-  assert.deepEqual(s.datetime, dtView);
+  // v1 had no custom date pattern: it is back-filled with the default
+  assert.deepEqual(s.datetime, { ...dtView, dateCustom: '{dddd}, {d} {mmmm} {yyyy}' });
   assert.deepEqual(v.datetime, { timezone });
   assert.deepEqual(s.weather, { enabled: false, forecastDays: 3, showHourly: false, showPrecipChance: false });
   assert.equal(v.weather.locationName, 'Madrid');

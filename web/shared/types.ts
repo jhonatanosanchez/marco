@@ -10,9 +10,9 @@ export type LayoutPreset =
 export type FrameCorner = 'tl' | 'tr' | 'bl' | 'br';
 export type SourceKind = 'generic' | 'airbnb' | 'birthdays' | 'holidays';
 export type SourceType = 'ics' | 'google';
-export type DateFormat = 'weekday_month_d' | 'weekday_d_month' | 'weekday_d_dot_month' | 'weekday_month_d_y' | 'weekday_mdy' | 'weekday_dmy' | 'weekday_iso';
+export type DateFormat = 'weekday_month_d' | 'weekday_d_month' | 'weekday_d_dot_month' | 'weekday_month_d_y' | 'weekday_mdy' | 'weekday_dmy' | 'weekday_iso' | 'custom';
 /** Every date format, in the order the admin offers them. */
-export const DATE_FORMATS: DateFormat[] = ['weekday_d_month', 'weekday_month_d', 'weekday_d_dot_month', 'weekday_month_d_y', 'weekday_mdy', 'weekday_dmy', 'weekday_iso'];
+export const DATE_FORMATS: DateFormat[] = ['weekday_d_month', 'weekday_month_d', 'weekday_d_dot_month', 'weekday_month_d_y', 'weekday_mdy', 'weekday_dmy', 'weekday_iso', 'custom'];
 
 export interface NightMode {
   enabled: boolean;
@@ -139,6 +139,8 @@ export interface DateTimeConfig {
   showSeconds: boolean;
   showAmPm: boolean;
   dateFormat: DateFormat;
+  /** pattern for dateFormat 'custom': {dddd} {ddd} {d} {dd} {mmmm} {mmm} {m} {mm} {yyyy} {yy} plus any text */
+  dateCustom?: string;
 }
 
 /** Weather data sources (server/core/weather.js). 'homeassistant' = Open-Meteo plus a Home Assistant entity (self-hosted). */

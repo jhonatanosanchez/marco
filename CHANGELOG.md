@@ -11,7 +11,7 @@ A Modern display style with glass options, six new layouts, a choice of free wea
 confirm step, place search through the server, and the shared logic moved into `server/core`.
 
 ### Added
-- **More date formats** (*Date & time > Date format*): US style with the year ("Saturday, October 10, 2026"), numeric month/day/year and day/month/year ("Saturday, 10/10/2026", tagged in the admin so the order is clear) and ISO 8601 ("Saturday, 2026-10-10"). The admin preview now uses the display's own renderer.
+- **More date formats** (*Date & time > Date format*): US style with the year ("Saturday, October 10, 2026"), numeric month/day/year and day/month/year ("Saturday, 10/10/2026", tagged in the admin so the order is clear) and ISO 8601 ("Saturday, 2026-10-10"). The admin preview now uses the display's own renderer. *Custom* takes your own pattern (`datetime.dateCustom`, up to 60 characters) with `{dddd}` `{ddd}` `{d}` `{dd}` `{mmmm}` `{mmm}` `{m}` `{mm}` `{yyyy}` `{yy}` and any text, with clickable variables and a live preview. Date formats are a compact grid.
 - **Weather sources** (*Weather → Data source*, `weather.provider`): besides Open-Meteo, the forecast can now come from
   [MET Norway](https://api.met.no/) (Locationforecast 2.0, worldwide, no key) or [Pirate Weather](https://pirateweather.net/)
   (your own free key, 10,000 calls a month; Marco uses about 3,000). With Open-Meteo you can also pick the forecast

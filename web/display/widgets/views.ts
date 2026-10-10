@@ -159,7 +159,7 @@ export class Views {
     const nowMs = tick.now.getTime();
     const p = tick.parts;
     // the date as the screen writes it everywhere else ("Miércoles, 14 de octubre", "Wednesday, 14 October")
-    setHTML(root.querySelector('.td-title')!, `<b>${esc(t('today'))}</b><span>${esc(formatDateLine(lang, key, ctx.cfg.datetime.dateFormat))}</span>`);
+    setHTML(root.querySelector('.td-title')!, `<b>${esc(t('today'))}</b><span>${esc(formatDateLine(lang, key, ctx.cfg.datetime.dateFormat, ctx.cfg.datetime.dateCustom))}</span>`);
 
     // all-day + multi-day things of today, as chips next to the title
     const chips = allDayOn(d.events, key).map((e) => {

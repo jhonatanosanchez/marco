@@ -4803,3 +4803,55 @@ h1 .scope {
 /* Import preview: what a server leaves out (Marco Cloud) */
 .import-prev__notes { margin: 6px 0 0; padding-left: 18px; }
 .import-prev__notes li { margin: 3px 0; }
+
+/* compact choices in a grid (date formats) */
+.radio-list--grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+}
+.radio-list--grid .radio-card {
+  padding: 9px 12px;
+  gap: 10px;
+  font-size: 13.5px;
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.date-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+.date-custom__preview {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.date-custom__tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.date-custom__tokens .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+}
+.date-custom__tokens .chip:hover {
+  border-color: var(--border-strong);
+}
+.date-custom__tokens code {
+  font-size: 12px;
+  color: var(--accent);
+}

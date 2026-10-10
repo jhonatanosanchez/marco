@@ -94,7 +94,7 @@ export class Clock {
       }
       setText(this.ampm, !dt.format24 && dt.showAmPm ? (hour < 12 ? 'AM' : 'PM') : '');
     }
-    setHTML(this.dateEl, esc(formatDateLine(ctx.lang, tick.dayKey, dt.dateFormat)));
+    setHTML(this.dateEl, esc(formatDateLine(ctx.lang, tick.dayKey, dt.dateFormat, dt.dateCustom)));
   }
 
   private setDigit(e: HTMLElement | undefined, ch: string, animate: boolean): void {

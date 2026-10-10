@@ -8,14 +8,14 @@ import type { SectionProps } from './common';
 
 
 /** The display's own date line for `d` in time zone `tz`, so the preview matches the screen. */
-export function formatDate(d: Date, fmt: DateFormat, lang: 'es' | 'en' | 'pt', tz: string) {
+export function formatDate(d: Date, fmt: DateFormat, lang: 'es' | 'en' | 'pt', tz: string, custom = '') {
   let key: string;
   try {
     key = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: tz }).format(d);
   } catch {
     key = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
   }
-  return formatDateLine(lang, key.slice(0, 10), fmt);
+  return formatDateLine(lang, key.slice(0, 10), fmt, custom);
 }
 
 /** Small tag next to the numeric formats, so day/month order is clear even on days like 10/10. */
@@ -97,7 +97,7 @@ export function DateTimeSection({ cfg, set, errors }: SectionProps) {
       <Card>
         <div class="clock-preview">
           {d.clock === 'analog' ? <Analog now={now} tz={d.timezone} /> : <div class="clock-preview__time">{time}</div>}
-          <div class="clock-preview__date">{formatDate(now, d.dateFormat, lang, d.timezone)}</div>
+          <div class="clock-preview__date">{formatDate(now, d.dateFormat, lang, d.timezone, d.dateCustom)}</div>
         </div>
         <ToggleRow label={t('Mostrar fecha y hora')} checked={d.enabled} onChange={(v) => set((c) => void (c.datetime.enabled = v))} />
       </Card>
@@ -140,17 +140,49 @@ export function DateTimeSection({ cfg, set, errors }: SectionProps) {
         </Field>
       </Card>
       <Card id="dt-format" scope="screen" title={t('Formato de fecha')} icon="calendar" muted={!d.enabled}>
-        <div class="radio-list">
+        <div class="radio-list radio-list--grid">
           {DATE_FORMATS.map((f) => (
             <label class={`radio-card ${d.dateFormat === f ? 'is-active' : ''}`}>
               <input type="radio" name="datefmt" checked={d.dateFormat === f} onChange={() => set((c) => void (c.datetime.dateFormat = f))} />
               <span class="radio-dot" />
-              <span>{formatDate(now, f, lang, d.timezone)}</span>
+              <span>{f === 'custom' ? t('Personalizado') : formatDate(now, f, lang, d.timezone)}</span>
               {FORMAT_TAG[f] && <span class="badge badge--soft mono small">{t(FORMAT_TAG[f]!)}</span>}
             </label>
           ))}
         </div>
+        {d.dateFormat === 'custom' && <CustomDate d={d} now={now} lang={lang} set={set} />}
       </Card>
     </>
+  );
+}
+
+const TOKENS: [string, string][] = [
+  ['dddd', 'día de la semana'], ['ddd', 'día abreviado'], ['d', 'día'], ['dd', 'día con cero'],
+  ['mmmm', 'mes'], ['mmm', 'mes abreviado'], ['m', 'mes en número'], ['mm', 'mes con cero'],
+  ['yyyy', 'año'], ['yy', 'año corto'],
+];
+
+/** Pattern input for the custom date line: clickable variables and a live preview. */
+function CustomDate({ d, now, lang, set }: { d: { dateCustom?: string; timezone: string }; now: Date; lang: 'es' | 'en' | 'pt'; set: SectionProps['set'] }) {
+  const value = d.dateCustom ?? '';
+  const insert = (tok: string) => set((c) => void (c.datetime.dateCustom = `${c.datetime.dateCustom ?? ''}{${tok}}`.slice(0, 60)));
+  return (
+    <div class="date-custom">
+      <Field label={t('Tu formato')} hint={t('Escribe el texto que quieras y añade variables entre llaves.')}>
+        <TextInput mono value={value} maxLength={60} placeholder="{dddd}, {d} {mmmm} {yyyy}" onValue={(v) => set((c) => void (c.datetime.dateCustom = v.replace(/[<>]/g, '')))} />
+      </Field>
+      <div class="date-custom__preview">
+        <span class="muted small">{t('Así se verá')}</span>
+        <strong>{value.trim() ? formatDate(now, 'custom', lang, d.timezone, value) : '·'}</strong>
+      </div>
+      <div class="date-custom__tokens">
+        {TOKENS.map(([tok, label]) => (
+          <button type="button" class="chip" onClick={() => insert(tok)} title={t(label)}>
+            <code>{`{${tok}}`}</code>
+            <span class="muted small">{formatDate(now, 'custom', lang, d.timezone, `{${tok}}`)}</span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
