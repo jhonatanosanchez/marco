@@ -1,4 +1,5 @@
-// Backups, export and import on a server that leaves some settings out (Marco Cloud), and the gallery as a .zip.
+// Backups, export and import on a server that leaves some settings out (Marco Cloud), the gallery as a .zip, and the
+// daily webhook limit of a server with a plan.
 // Spanish key; [es, en, pt].
 export const ROWS13: [string, string, string][] = [
   [
@@ -55,4 +56,5 @@ export const ROWS13: [string, string, string][] = [
   ['Fotos descargadas', 'Photos downloaded', 'Fotos descarregadas'],
   ['Fotos descargadas · {n} no se pudieron leer', 'Photos downloaded · {n} could not be read', 'Fotos descarregadas · {n} não puderam ser lidas'],
   ['No se pudieron descargar las fotos', 'Could not download the photos', 'Não foi possível descarregar as fotos'],
+  ['Como mucho {n} avisos y órdenes al día entre todos los tokens.', 'At most {n} alerts and commands a day across all tokens.', 'No máximo {n} avisos e ordens por dia entre todos os tokens.'],
 ];

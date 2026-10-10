@@ -730,6 +730,10 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 Limits: 30 requests/minute per token; errors `401` (bad token), `400` (invalid data), `415` (not JSON), `429`
 (rate limit). Full reference: [docs/API.md](docs/API.md).
 
+On Marco Cloud the same calls work against `https://app.marcohome.app/api/hooks/...` with a token made in its admin
+(*API & webhooks*), so the same scripts, automations and iPhone Shortcuts keep working after a move. There a household
+can also send at most 500 alerts and commands a day through its tokens.
+
 ### Backups and activity
 
 - Every save keeps the previous configuration in `data/backups/` (the 20 newest; quick successive saves count as one).

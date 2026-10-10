@@ -5,7 +5,7 @@ import { confirmDialog, toast } from '../components/feedback';
 import { Icon } from '../components/icons';
 import { Button, Callout, Card, Empty, Field, Modal, PageHeader, Segmented, TextInput } from '../components/ui';
 import { fmtDateTime } from '../dates';
-import { atLimit, has, runtime } from '../caps';
+import { atLimit, has, limit, runtime } from '../caps';
 import { LimitNote } from '../components/LimitNote';
 import { relTime, t } from '../i18n';
 import { takeIntent } from '../intent';
@@ -312,6 +312,7 @@ curl -X POST ${base}/api/hooks/night \\
             </ul>
             <p class="muted small">
               {t('Pantallas disponibles')}: {slugs.map((s) => <code class="slug-code">{s}</code>)} · {t('Límite: 30 peticiones por minuto y token.')}
+              {limit('hookCommandsPerDay') != null && <> {t('Como mucho {n} avisos y órdenes al día entre todos los tokens.', { n: limit('hookCommandsPerDay') ?? 0 })}</>}
             </p>
           </div>
         </Card>
