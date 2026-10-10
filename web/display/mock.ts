@@ -8,7 +8,17 @@ import { DEFAULT_ICON_RULES, resolveEventStyle } from '../shared/emoji';
 import { addDays, dateKeyInTz, keyToUTC, pad2, startOfWeek, zonedParts } from '../shared/i18n';
 import { DEFAULT_CONFIG, deepMerge } from './defaults';
 
-const TZ = 'Europe/Lisbon';
+// The demo runs in Lisbon unless ?tz= names another IANA zone (the website passes the visitor's own zone).
+const TZ = (() => {
+  const tz = new URLSearchParams(location.search).get('tz');
+  if (!tz) return 'Europe/Lisbon';
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: tz });
+    return tz;
+  } catch {
+    return 'Europe/Lisbon';
+  }
+})();
 
 // Demo text follows ?lang= (en by default); pt falls back to English for the free-text samples.
 const DEMO_LANG = (() => {
@@ -35,6 +45,7 @@ export function mockConfig(): DisplayConfig {
     slug: 'living-room',
     screen: { name: L('Living room', 'Salón', 'Sala'), language: DEMO_LANG },
     weather: { locationName: 'Lisbon, Portugal' },
+    datetime: { timezone: TZ },
     countdowns: { enabled: q.get('countdowns') !== '0', max: Number(q.get('cdmax')) || 4 },
     // ?sched=1 → a scheduled message whose window is open right now
     schedules: q.get('sched') === '1'
