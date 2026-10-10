@@ -5,7 +5,7 @@ import path from 'node:path';
 import express from 'express';
 import { paths, ROOT } from './store.js';
 import { sessionMiddleware, csrfGuard, loginHandler, logoutHandler, logoutAllHandler, meHandler,
-  googleLoginHandler, googleConnectHandler, googleCallbackHandler } from './auth.js';
+  googleLoginHandler, googleConnectHandler, googleCallbackHandler, microsoftConnectHandler, microsoftCallbackHandler } from './auth.js';
 import { publicRouter } from './routes/public.js';
 import { adminRouter } from './routes/admin.js';
 import { screensAdminRouter, displayPublicRouter } from './routes/screens.js';
@@ -57,6 +57,8 @@ export function createApp({ version, dist = path.join(ROOT, 'dist') }) {
   app.get('/auth/google/login', googleLoginHandler);
   app.get('/auth/google/connect', googleConnectHandler);
   app.get('/auth/google/callback', (req, res, next) => googleCallbackHandler(req, res).catch(next));
+  app.get('/auth/microsoft/connect', microsoftConnectHandler);
+  app.get('/auth/microsoft/callback', (req, res, next) => microsoftCallbackHandler(req, res).catch(next));
 
   // --- APIs ---
   // First-run setup wizard (open only while no admin password exists; server/setup.js).

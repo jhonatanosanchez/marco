@@ -2,6 +2,7 @@
 // actions and limits apply. Marco Cloud answers the same shape with its own values; a server that sends
 // no `features` field is treated as having every feature on.
 import { googleConfigured } from './google.js';
+import { microsoftConfigured } from './microsoft.js';
 import { CODE_LENGTH } from './pairing.js';
 
 /** Every feature key, in the order docs/API.md lists them. */
@@ -12,8 +13,7 @@ export const FEATURE_KEYS = Object.freeze([
   'microsoftCalendar',
 ]);
 
-/** Feature flags of a self-hosted server: all on, Google follows its credentials, no account menu, no Microsoft
- *  calendars (Marco Cloud only for now). */
+/** Feature flags of a self-hosted server: all on, Google and Microsoft follow their credentials, no account menu. */
 export function selfHostedFeatures() {
   const google = googleConfigured();
   const out = {};
@@ -21,7 +21,7 @@ export function selfHostedFeatures() {
   out.googleCalendar = google;
   out.googleLogin = google;
   out.accountMenu = false;
-  out.microsoftCalendar = false;
+  out.microsoftCalendar = microsoftConfigured();
   return out;
 }
 

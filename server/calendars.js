@@ -1,4 +1,4 @@
-// Calendar sources: fetching (ICS / Google), per-source cache (refreshMin, stale-on-error, disk cache),
+// Calendar sources: fetching (ICS / Google / Microsoft), per-source cache (refreshMin, stale-on-error, disk cache),
 // merging into CalEvent[] with icon rules, kind normalisation and a stable hash.
 // v2 (docs/ARCHITECTURE.md): built-in pseudo-sources `local` / `birthdays` (localEvents.js), event rules
 // hide → rename → style (eventRules.js), per-screen source selection, admin preview and source error logging.
@@ -13,6 +13,7 @@ import { matchRule, normalizeAirbnbTitle, tidyTitle, translateHoliday, KIND_EMOJ
 import { applyEventRules } from './eventRules.js';
 import { expandLocalEvents, expandBirthdays, localSource, birthdaysSource } from './localEvents.js';
 import * as google from './google.js';
+import * as microsoft from './microsoft.js';
 import { getConfig, paths } from './store.js';
 import { defaultScreen, screenSourceIds } from './core/screens.js';
 import { logActivity } from './activity.js';
@@ -33,6 +34,9 @@ const sourceKey = (s) =>
   s.type === 'google' ? `google|${s.googleAccount}|${s.googleCalendarId}`
     : s.type === 'microsoft' ? `microsoft|${s.microsoftAccount}|${s.microsoftCalendarId}`
       : `ics|${s.url}|${s.insecureTls ? 1 : 0}`;
+
+/** Change signature of a Google or Microsoft event list. */
+const itemsSig = (source, items) => (source.type === 'microsoft' ? hash(items) : hash(items.map((i) => [i.id, i.etag, i.updated])));
 
 const cacheFile = (id) => path.join(paths.cache, `src_${id.replace(/[^A-Za-z0-9_-]/g, '_')}.json`);
 
@@ -71,9 +75,6 @@ async function doRefresh(source, needWindow) {
   const entry = prev && prev.key === key ? { ...prev } : { key, version: 0, count: 0 };
   entry.fetchedAt = Date.now();
   try {
-    // Microsoft calendars (Microsoft Graph) are a Marco Cloud feature for now: the source stays in the config and
-    // shows this error until it is removed or the config goes back to Marco Cloud.
-    if (source.type === 'microsoft') throw new Error('Microsoft calendars are not available on a self-hosted server');
     if (source.type === 'ics') {
       const text = await fetchIcsText(source.url, source.insecureTls);
       const vevents = await parseIcsText(text);
@@ -93,10 +94,17 @@ async function doRefresh(source, needWindow) {
         if (needWindow.from < w.from) w.from = needWindow.from;
         if (needWindow.to > w.to) w.to = needWindow.to;
       }
-      const items = await google.listEvents(
-        source.googleAccount, source.googleCalendarId, zonedMidnight(w.from, tz), zonedMidnight(addDays(w.to, 1), tz),
-      );
-      const sig = hash(items.map((i) => [i.id, i.etag, i.updated]));
+      const from = zonedMidnight(w.from, tz);
+      const to = zonedMidnight(addDays(w.to, 1), tz);
+      let items;
+      if (source.type === 'microsoft') {
+        // Needs the server's own Entra app (MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET, server/microsoft.js).
+        if (!microsoft.microsoftConfigured()) throw new Error('Microsoft is not configured on this server (MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET)');
+        items = await microsoft.listEvents(source.microsoftAccount, source.microsoftCalendarId, from, to);
+      } else {
+        items = await google.listEvents(source.googleAccount, source.googleCalendarId, from, to);
+      }
+      const sig = itemsSig(source, items);
       if (sig !== entry.sig) entry.version = (entry.version || 0) + 1;
       Object.assign(entry, { items, sig, window: w, count: items.length });
       saveDiskCache(source, { fetchedAt: entry.fetchedAt, items, window: w });
@@ -136,7 +144,7 @@ function primeFromDisk(source) {
       // parse synchronously-ish: stash text, parsed lazily by refresh path below
       entry.pendingText = disk.text;
     } else {
-      Object.assign(entry, { items: disk.items, window: disk.window, count: disk.items.length, sig: hash(disk.items.map((i) => [i.id, i.etag, i.updated])) });
+      Object.assign(entry, { items: disk.items, window: disk.window, count: disk.items.length, sig: itemsSig(source, disk.items) });
     }
     cache.set(source.id, entry);
   } catch { /* ignore */ }
@@ -160,7 +168,7 @@ export function refreshSource(source, { force = false, window = null } = {}) {
     p.finally(() => inflight.delete(source.id));
   }
   if (inflight.has(source.id)) return inflight.get(source.id).then(() => cache.get(source.id));
-  if (!force && isFresh(source, entry) && (source.type !== 'google' || covers(entry, window))) return Promise.resolve(entry);
+  if (!force && isFresh(source, entry) && (source.type === 'ics' || covers(entry, window))) return Promise.resolve(entry);
   const p = doRefresh(source, window).finally(() => inflight.delete(source.id));
   inflight.set(source.id, p);
   return p;
@@ -307,7 +315,7 @@ export function eventsHash(events) {
 
 function rawForSource(source, entry, fromDate, toDate) {
   if (source.type === 'ics') return entry.vevents ? expandEvents(entry.vevents, fromDate, toDate) : [];
-  if (source.type !== 'google') return [];
+  if (source.type === 'microsoft') return (entry.items || []).map(microsoft.graphToRaw).filter(Boolean);
   return (entry.items || []).map(googleToRaw).filter(Boolean);
 }
 
@@ -333,7 +341,7 @@ async function ensureSources(sources, window) {
     const e = cache.get(s.id);
     const valid = e && e.key === sourceKey(s);
     const mustAwait = !valid || e.pendingText || (!hasData(e) && !e.error)
-      || (s.type === 'google' && hasData(e) && !covers(e, window));
+      || (s.type !== 'ics' && hasData(e) && !covers(e, window));
     if (mustAwait) await refreshSource(s, { window });
     else if (!isFresh(s, e)) refreshSource(s).catch(() => {});
   }));

@@ -654,6 +654,33 @@ birthdays → type *Birthdays* (🎂 and ages), a holiday calendar → *Holidays
 is empty, the first Google sign-in made while you are already logged in with the password adds itself). You can then
 disable password login if you want.
 
+## Connecting Outlook, Hotmail or Microsoft 365
+
+Optional, read only. With your own Microsoft Entra app, *Calendars → Linked accounts → Link account* also offers
+**Microsoft**: personal accounts (Outlook.com, Hotmail, Live) and work or school accounts (Microsoft 365). Without it
+the option is not shown, and the calendar's ICS address (*Outlook → Settings → Calendar → Shared calendars → Publish a
+calendar*) still works.
+
+1. Go to <https://entra.microsoft.com/> → **App registrations → New registration**:
+   - **Supported account types**: *Accounts in any organizational directory and personal Microsoft accounts*.
+   - **Redirect URI**: platform **Web**, `<PUBLIC_URL>/auth/microsoft/callback`, e.g.
+     `http://localhost:3000/auth/microsoft/callback` (Microsoft, like Google, accepts `http://` only for
+     `localhost`; see the redirect URI options above).
+2. **API permissions → Add a permission → Microsoft Graph → Delegated**: `Calendars.Read`, `Calendars.Read.Shared`,
+   `offline_access`, `openid`, `email`, `profile`. No admin consent is needed for personal accounts.
+3. **Certificates & secrets → New client secret**, copy its **Value**, and the **Application (client) ID** from
+   *Overview*. Put them in `.env` and restart:
+
+   ```ini
+   MICROSOFT_CLIENT_ID=<application-id>
+   MICROSOFT_CLIENT_SECRET=<secret-value>
+   ```
+
+Marco keeps each account's tokens in `data/secrets.json` (Microsoft hands out a new refresh token every hour and the
+newest one is kept). *Unlink* deletes them; Microsoft has no way to revoke them from here, so to remove the access
+itself go to <https://account.live.com/consent/Manage> (personal) or <https://myapps.microsoft.com> (work or school).
+Client secrets expire (6 to 24 months): create a new one before that and update `.env`.
+
 ## Other integrations
 
 - **iCal / ICS feeds:** any `http(s)://` or `webcal://` URL: school, sports club, work, public holidays (presets for
@@ -816,6 +843,7 @@ can also send at most 500 alerts and commands a day through its tokens.
 | `COOKIE_SECURE` | per request | `1` = always `Secure` cookie, `0` = never |
 | `TRUST_PROXY` | `loopback` | IP(s)/ranges of reverse proxies allowed to set `X-Forwarded-*`. Needed for a proxy on another host and for any proxy in front of Docker (`172.16.0.0/12`) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | none | Google OAuth client ([guide](#connecting-google-calendar)) |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | none | Microsoft Entra app for Outlook and Microsoft 365 calendars ([guide](#connecting-outlook-hotmail-or-microsoft-365)) |
 | `NODE_EXTRA_CA_CERTS` | none | Extra CA certificates for iCal feeds with a private CA |
 | `MARCO_LIVE` | `sse` | `poll` = displays get no `/api/stream` connection and poll `/api/display/poll` instead (every 30 s, every 5 s while *Connected screens* is open). Alerts and display commands (refresh, night mode, identify) still arrive, a little later than over the stream. Useful behind a proxy that buffers server-sent events |
 | `TZ` | the zone set in *Date & time* (follows changes live) | Process time zone (used for "floating" iCal times). Setting it here pins it |

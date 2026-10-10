@@ -692,6 +692,36 @@ festivos → *Festivos*. Puedes vincular varias cuentas de Google.
 permitidos** (si la lista está vacía, el primer inicio de sesión con Google que hagas mientras ya tienes la sesión
 iniciada con la contraseña se añade solo). Después, si quieres, puedes desactivar el inicio de sesión con contraseña.
 
+## Conectar Outlook, Hotmail o Microsoft 365
+
+Opcional y de solo lectura. Con tu propia app de Microsoft Entra, *Calendarios → Cuentas vinculadas → Vincular
+cuenta* ofrece también **Microsoft**: cuentas personales (Outlook.com, Hotmail, Live) y cuentas del trabajo o del
+centro educativo (Microsoft 365). Sin ella la opción no aparece, y la dirección ICS del calendario (*Outlook →
+Configuración → Calendario → Calendarios compartidos → Publicar un calendario*) sigue funcionando.
+
+1. Entra en <https://entra.microsoft.com/> → **Registros de aplicaciones → Nuevo registro**:
+   - **Tipos de cuenta compatibles**: *Cuentas en cualquier directorio organizativo y cuentas personales de
+     Microsoft*.
+   - **URI de redirección**: plataforma **Web**, `<PUBLIC_URL>/auth/microsoft/callback`, por ejemplo
+     `http://localhost:3000/auth/microsoft/callback` (Microsoft, como Google, solo acepta `http://` para
+     `localhost`; mira las opciones de la URI de redirección más arriba).
+2. **Permisos de API → Agregar un permiso → Microsoft Graph → Permisos delegados**: `Calendars.Read`,
+   `Calendars.Read.Shared`, `offline_access`, `openid`, `email`, `profile`. Las cuentas personales no necesitan
+   consentimiento de administrador.
+3. **Certificados y secretos → Nuevo secreto de cliente**, copia su **Valor**, y el **Id. de aplicación (cliente)**
+   de *Información general*. Ponlos en `.env` y reinicia:
+
+   ```ini
+   MICROSOFT_CLIENT_ID=<id-de-aplicacion>
+   MICROSOFT_CLIENT_SECRET=<valor-del-secreto>
+   ```
+
+Marco guarda los tokens de cada cuenta en `data/secrets.json` (Microsoft entrega un token de actualización nuevo cada
+hora y se guarda el último). *Desvincular* los borra; desde aquí no se pueden revocar en Microsoft, así que para
+retirar el acceso entra en <https://account.live.com/consent/Manage> (cuenta personal) o en
+<https://myapps.microsoft.com> (cuenta del trabajo o del centro educativo). Los secretos de cliente caducan (de 6 a 24
+meses): crea uno nuevo antes y actualiza `.env`.
+
 ## Otras integraciones
 
 - **Fuentes iCal / ICS:** cualquier URL `http(s)://` o `webcal://`: colegio, club deportivo, trabajo, festivos
@@ -855,6 +885,7 @@ JSON), `429` (límite de peticiones). Referencia completa: [docs/API.md](docs/AP
 | `COOKIE_SECURE` | según la petición | `1` = cookie siempre `Secure`, `0` = nunca |
 | `TRUST_PROXY` | `loopback` | IP o rangos de los proxies inversos que pueden definir `X-Forwarded-*`. Necesario para un proxy en otro host y para cualquier proxy delante de Docker (`172.16.0.0/12`) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | ninguno | Cliente OAuth de Google ([guía](#conectar-google-calendar)) |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | ninguno | App de Microsoft Entra para calendarios de Outlook y Microsoft 365 ([guía](#conectar-outlook-hotmail-o-microsoft-365)) |
 | `NODE_EXTRA_CA_CERTS` | ninguno | Certificados de CA adicionales para fuentes iCal con una CA privada |
 | `TZ` | la zona de *Fecha y hora* (sigue los cambios al momento) | Zona horaria del proceso (usada para las horas iCal "flotantes"). Definirla aquí la fija |
 

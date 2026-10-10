@@ -94,8 +94,9 @@ The admin and the display read these fields to decide which sections, actions an
   `announcements`, `displayCommands`, `openDisplayAccess`, `insecureTls`, `googleCalendar`, `googleLogin`,
   `passwordLogin`, `apiTokens`, `webhooks`, `backups`, `importExport`, `includeSecrets`, `activity`, `setupWizard`,
   `status`, `accountMenu`, `microsoftCalendar`. A self-hosted server turns all of them on, except `googleCalendar`
-  and `googleLogin` (on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set), `accountMenu` (always off) and
-  `microsoftCalendar` (Outlook and Microsoft 365 calendars, Marco Cloud only for now: always off).
+  and `googleLogin` (on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set), `microsoftCalendar` (Outlook and
+  Microsoft 365 calendars, on when `MICROSOFT_CLIENT_ID` and `MICROSOFT_CLIENT_SECRET` are set) and `accountMenu`
+  (always off).
 - `limits` (optional): plan limits such as `screens`, `sources` or `devices`. Absent means no limit beyond the
   config validator's own caps (12 screens, 50 calendars, 20 news feeds, 1000 local events, 500 birthdays,
   100 countdowns). The admin disables "add" at the limit and flags a config that goes over it.
@@ -198,12 +199,14 @@ a switch to private access takes its pollers off the list at once; their next po
 
 | Method & path | Notes |
 |---|---|
-| `GET /api/auth/me` | `{ user: { email, name, picture, method } \| null, needsSetup, googleConfigured, passwordLoginEnabled, mustChangePassword, passwordFromEnv }`. `method` is `'password'` or `'google'` here; Marco Cloud answers `'account'` and adds `account: { loginUrl, accountUrl, sessionsUrl, deleteUrl, household: { name, role } }` and `microsoftConfigured` (Microsoft calendars on for this account) |
+| `GET /api/auth/me` | `{ user: { email, name, picture, method } \| null, needsSetup, googleConfigured, passwordLoginEnabled, mustChangePassword, passwordFromEnv }`. `method` is `'password'` or `'google'` here; Marco Cloud answers `'account'` and adds `account: { loginUrl, accountUrl, sessionsUrl, deleteUrl, household: { name, role } }` and `microsoftConfigured` (Microsoft calendars on for this account; a self-hosted server sends it too, true when `MICROSOFT_CLIENT_ID` and `MICROSOFT_CLIENT_SECRET` are set) |
 | `POST /api/auth/login` | `{ password }`; `409 { needsSetup: true }` while the install has no password yet |
 | `POST /api/auth/logout`, `POST /api/auth/logout-all` | log out this session / every session |
 | `GET /auth/google/login` | "Sign in with Google" (email must be in `auth.allowedGoogleEmails`; if the list is empty, the first Google login made while already logged in with the password adds itself) |
 | `GET /auth/google/connect` | Link a Google account for calendars (scope `calendar.readonly`, offline access); requires a session |
 | `GET /auth/google/callback` | OAuth redirect URI: `${PUBLIC_URL}/auth/google/callback` |
+| `GET /auth/microsoft/connect` | Link a Microsoft account for calendars (`openid email profile offline_access Calendars.Read Calendars.Read.Shared`, PKCE); requires a session and `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` |
+| `GET /auth/microsoft/callback` | OAuth redirect URI: `${PUBLIC_URL}/auth/microsoft/callback`. Back to `/admin/?microsoft=<email>` or `/admin/?error=microsoft_<code>` |
 
 ## Setup (first run)
 
@@ -270,7 +273,7 @@ Rules for the mutating setup endpoints:
 |---|---|
 | `GET /api/admin/google/accounts` · `DELETE /api/admin/google/accounts/:email` | Linked Google accounts |
 | `GET /api/admin/google/calendars?account=` | Calendars of a linked account |
-| `GET /api/admin/microsoft/accounts` · `DELETE /api/admin/microsoft/accounts/:email` · `GET /api/admin/microsoft/calendars?account=` | Linked Microsoft accounts and their calendars (`MicrosoftAccount[]`, `MicrosoftCalendarListItem[]`). Only on servers with `features.microsoftCalendar` (Marco Cloud); a self-hosted server does not have them |
+| `GET /api/admin/microsoft/accounts` · `DELETE /api/admin/microsoft/accounts/:email` · `GET /api/admin/microsoft/calendars?account=` | Linked Microsoft accounts and their own and shared calendars (`MicrosoftAccount[]`, `MicrosoftCalendarListItem[]`). `404 feature_unavailable` without `features.microsoftCalendar`; the calendar list answers `409 microsoft_reconnect` when the account must be linked again. `DELETE` answers `{ ok, manageAccess }` (Microsoft has no revoke endpoint: the pages where the access is removed) |
 | `POST /api/admin/test/ics` | `{ url, insecureTls? }` → `{ ok, count, sample, error? }` |
 | `POST /api/admin/test/rss` | `{ url }` → `{ ok, title, count, error? }` |
 | `POST /api/admin/test/homeassistant` | `{ url, token? }` → `{ ok, version?, error? }` |

@@ -155,6 +155,8 @@ function loadSecrets() {
   const s = readJson(paths.secrets, { strict: true }) || {};
   s.google ??= {};
   s.google.accounts ??= {};
+  s.microsoft ??= {};
+  s.microsoft.accounts ??= {}; // Microsoft calendar accounts (server/microsoft.js)
   s.homeassistant ??= {};
   s.weather ??= {}; // { apiKey } of a weather source that needs one (server/weather.js)
   if (!Array.isArray(s.apiTokens)) s.apiTokens = []; // webhook tokens (hashed), see docs/ARCHITECTURE.md

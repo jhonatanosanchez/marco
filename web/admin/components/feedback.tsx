@@ -1,7 +1,7 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { t } from '../i18n';
-import { Icon } from './icons';
+import { Icon, type IconName } from './icons';
 
 /* ------------------------------------------------------------------ toasts */
 
@@ -68,7 +68,9 @@ interface ConfirmOpts {
 export interface DialogChoice<T extends string> {
   value: T;
   label: string;
-  kind?: 'primary' | 'danger' | 'ghost';
+  kind?: 'primary' | 'danger' | 'ghost' | 'default';
+  /** icon before the label (a provider logo in the linked accounts chooser) */
+  icon?: IconName;
 }
 
 interface Pending {
@@ -133,9 +135,10 @@ export function DialogHost() {
               type="button"
               key={c.value}
               ref={i === last ? okRef : undefined}
-              class={`btn ${c.kind === 'danger' ? 'btn--danger' : c.kind === 'ghost' ? 'btn--ghost' : 'btn--primary'}`}
+              class={`btn ${c.kind === 'danger' ? 'btn--danger' : c.kind === 'ghost' ? 'btn--ghost' : c.kind === 'default' ? 'btn--default' : 'btn--primary'}`}
               onClick={() => close(c.value)}
             >
+              {c.icon && <Icon name={c.icon} size={16} />}
               {c.label}
             </button>
           ))}

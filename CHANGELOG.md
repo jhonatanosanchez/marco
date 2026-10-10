@@ -6,11 +6,14 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
-- **Microsoft calendars** (Marco Cloud): a *Microsoft accounts* card next to the Google one in *Calendars* links an
-  Outlook.com, Hotmail or Microsoft 365 account (read only) and lets you pick its calendars. Calendar sources get a new
-  type `microsoft` (`microsoftAccount`, `microsoftCalendarId`) that validates in both editions, and `/api/health` a new
-  `features.microsoftCalendar`, off on a self-hosted server for now. A self-hosted server that receives such a source
-  (for example in a backup from Marco Cloud) keeps it and shows it as not available.
+- **Microsoft calendars**: link Outlook.com, Hotmail or Microsoft 365 accounts (read only) and pick their calendars,
+  including the ones other people shared with you. Optional on a self-hosted server: it needs your own Microsoft Entra
+  app (`MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, see *Connecting Outlook, Hotmail or Microsoft 365* in the
+  README); without it the option is not shown. Calendar sources get a new type `microsoft` (`microsoftAccount`,
+  `microsoftCalendarId`), `/api/health` a new `features.microsoftCalendar` and `/api/auth/me` a `microsoftConfigured`.
+  Tokens are kept in `data/secrets.json` and go into exports with secrets, like Google accounts.
+- **Linked accounts** (*Calendars*): one card for Google and Microsoft accounts. *Link account* asks which provider
+  when both are set up, and every linked account is listed one below the other with its calendars.
 
 ## [0.5.0] - 2026-10-10
 

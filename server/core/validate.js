@@ -120,8 +120,8 @@ function sanitizeSource(ctx, path, s, seen) {
     if (!EMAIL.test(acct)) ctx.err(`${path}.googleAccount`, 'Google account email required');
     out.googleAccount = acct;
   } else {
-    // Microsoft (Outlook.com, Hotmail, Microsoft 365) calendars, read through Microsoft Graph. Marco Cloud only for now:
-    // a self-hosted server keeps them in the config and reports them as not available.
+    // Microsoft (Outlook.com, Hotmail, Microsoft 365) calendars, read through Microsoft Graph (server/microsoft.js, or
+    // Marco Cloud). A server without a Microsoft app keeps them in the config and reports them as not available.
     const calId = str(ctx, `${path}.microsoftCalendarId`, s.microsoftCalendarId, '', 512).trim();
     if (!calId) ctx.err(`${path}.microsoftCalendarId`, 'Microsoft calendar id required');
     out.microsoftCalendarId = calId;

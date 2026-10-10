@@ -35,8 +35,8 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { label: 'Formato de fecha', route: 'datetime', anchor: 'dt-format', keywords: 'date format fecha data' },
   // Contenido
   { label: 'Añadir calendario iCal (URL .ics)', route: 'calendars', anchor: 'cal-sources', keywords: 'ics ical url airbnb booking icloud outlook fuente source' },
-  { label: 'Cuentas de Google Calendar', route: 'calendars', anchor: 'cal-google', keywords: 'google account cuenta oauth vincular', feature: 'googleCalendar' },
-  { label: 'Cuentas de Microsoft', route: 'calendars', anchor: 'cal-microsoft', keywords: 'microsoft outlook hotmail office 365 account cuenta oauth vincular', feature: 'microsoftCalendar' },
+  { label: 'Cuentas de Google Calendar', route: 'calendars', anchor: 'cal-accounts', keywords: 'google account cuenta oauth vincular cuentas vinculadas', feature: 'googleCalendar' },
+  { label: 'Cuentas de Microsoft', route: 'calendars', anchor: 'cal-accounts', keywords: 'microsoft outlook hotmail office 365 account cuenta oauth vincular', feature: 'microsoftCalendar' },
   { label: 'Calendarios visibles en esta pantalla', route: 'calendars', anchor: 'cal-screen-sources', keywords: 'sources filter screen mostrar ocultar fuentes por pantalla' },
   { label: 'Vista del calendario (mes, semana, agenda)', route: 'calendars', anchor: 'cal-view', keywords: 'view month week agenda semanas weeks start lunes' },
   { label: 'Eventos máximos por día', route: 'calendars', anchor: 'cal-view', keywords: 'max events per day más' },

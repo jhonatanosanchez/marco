@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { getConfig, saveConfig, updateSecrets } from '../store.js';
 import { requireAuth, changePasswordHandler } from '../auth.js';
 import * as google from '../google.js';
+import * as microsoft from '../microsoft.js';
 import * as ha from '../homeassistant.js';
 import { testIcs, sourceStatus } from '../calendars.js';
 import { testFeed, status as newsStatus } from '../news.js';
@@ -64,6 +65,28 @@ export function adminRouter({ onConfigSaved } = {}) {
       res.json(await google.listCalendars(account));
     } catch (err) {
       res.status(502).json({ error: err.message });
+    }
+  }));
+
+  // --- Microsoft accounts / calendars (only with MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET) ---
+  const msOn = (req, res, next) => (microsoft.microsoftConfigured() ? next() : res.status(404).json({ error: 'feature_unavailable' }));
+  r.get('/microsoft/accounts', msOn, (req, res) => res.json(microsoft.listAccounts()));
+  r.delete('/microsoft/accounts/:email', msOn, (req, res) => {
+    const email = String(req.params.email).toLowerCase();
+    if (!microsoft.removeAccount(email)) return res.status(404).json({ error: 'not found' });
+    // Its calendars leave the config when the admin saves (it drops them from its draft), as for Google accounts.
+    logActivity('microsoft.removed', { req, data: { email } });
+    res.json({ ok: true, manageAccess: microsoft.MANAGE_ACCESS_URLS });
+  });
+  r.get('/microsoft/calendars', msOn, wrap(async (req, res) => {
+    const account = String(req.query.account || '').toLowerCase();
+    if (!account) return res.status(400).json({ error: 'account required' });
+    if (!microsoft.listAccounts().some((a) => a.email === account)) return res.status(404).json({ error: 'not found' });
+    try {
+      res.json(await microsoft.listCalendars(account));
+    } catch (err) {
+      if (err.code === 'auth_failed') return res.status(409).json({ error: 'microsoft_reconnect' });
+      res.status(502).json({ error: 'microsoft_unavailable' });
     }
   }));
 

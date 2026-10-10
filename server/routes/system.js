@@ -47,6 +47,12 @@ export function dashboardWarnings({ secrets, sources, displays, cfg }) {
   if (googleSources.some((s) => !accounts[s.googleAccount] || authFail.test(sources.find((x) => x.id === s.id)?.error || ''))) {
     w.push('google_auth_failed');
   }
+  const msSources = cfg.calendar.sources.filter((s) => s.enabled && s.type === 'microsoft');
+  const msAccounts = secrets.microsoft?.accounts || {};
+  const msFail = /Microsoft account|refresh token|invalid_grant|interaction_required|HTTP 401|reconnect/i;
+  if (msSources.some((s) => !msAccounts[s.microsoftAccount] || msFail.test(sources.find((x) => x.id === s.id)?.error || ''))) {
+    w.push('microsoft_auth_failed');
+  }
   return w;
 }
 
@@ -137,6 +143,7 @@ export function systemRouter({ version = getServerVersion() } = {}) {
         if (s.haToken !== undefined) { x.homeassistant.token = s.haToken; applied.push('homeassistant'); }
         if (s.weatherKey !== undefined) { x.weather = { ...(x.weather || {}), apiKey: s.weatherKey }; applied.push('weather'); }
         if (s.googleAccounts) { x.google.accounts = s.googleAccounts; applied.push('google'); }
+        if (s.microsoftAccounts) { x.microsoft = { accounts: s.microsoftAccounts }; applied.push('microsoft'); }
         if (s.apiTokens) { x.apiTokens = s.apiTokens; applied.push('apiTokens'); }
         if (s.displayKeys) { x.displayKeys = { ...(x.displayKeys || {}), ...s.displayKeys }; applied.push('displayKeys'); }
         if (s.devices) { x.devices = s.devices; applied.push('devices'); }

@@ -91,4 +91,21 @@ export const ROWS14: [string, string, string][] = [
     'Microsoft calendars of accounts not connected here are not imported: {list}. Connect the account in Calendars and add them again.',
     'Calendários Microsoft de contas que não estão ligadas aqui não são importados: {list}. Liga a conta em Calendários e volta a adicioná-los.',
   ],
+  ['Cuentas vinculadas', 'Linked accounts', 'Contas ligadas'],
+  ['¿Qué cuenta quieres vincular?', 'Which account do you want to link?', 'Que conta queres ligar?'],
+  [
+    'Vincula cuentas de Google o de Microsoft (Outlook.com, Hotmail, Microsoft 365) y elige qué calendarios mostrar.',
+    'Link Google or Microsoft accounts (Outlook.com, Hotmail, Microsoft 365) and choose which calendars to show.',
+    'Liga contas Google ou Microsoft (Outlook.com, Hotmail, Microsoft 365) e escolhe que calendários mostrar.',
+  ],
+  [
+    'Pulsa “Vincular cuenta” para dar acceso de solo lectura a tu calendario de Google o de Outlook.',
+    'Press “Link account” to give read-only access to your Google or Outlook calendar.',
+    'Carrega em “Ligar conta” para dar acesso só de leitura ao teu calendário Google ou do Outlook.',
+  ],
+  [
+    'Para vincular cuentas, añade GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET (Google) o MICROSOFT_CLIENT_ID y MICROSOFT_CLIENT_SECRET (Microsoft) al archivo .env y reinicia. Mientras tanto puedes usar la URL iCal secreta de tu calendario.',
+    'To link accounts, add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET (Google) or MICROSOFT_CLIENT_ID and MICROSOFT_CLIENT_SECRET (Microsoft) to the .env file and restart. Meanwhile you can use your calendar’s secret iCal URL.',
+    'Para ligar contas, junta GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET (Google) ou MICROSOFT_CLIENT_ID e MICROSOFT_CLIENT_SECRET (Microsoft) ao ficheiro .env e reinicia. Entretanto podes usar o URL iCal secreto do teu calendário.',
+  ],
 ];

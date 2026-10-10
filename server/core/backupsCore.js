@@ -23,6 +23,7 @@ export function exportSecrets(sec) {
     // A weather source's own API key (Pirate Weather), only when one is stored.
     ...(sec.weather?.apiKey ? { weather: { apiKey: sec.weather.apiKey } } : {}),
     google: { accounts: sec.google?.accounts || {} },
+    ...(sec.microsoft?.accounts && Object.keys(sec.microsoft.accounts).length ? { microsoft: { accounts: sec.microsoft.accounts } } : {}),
     apiTokens: sec.apiTokens || [],
     // Private display links and paired devices (token hashes only): an import on a new server keeps every
     // screen's link and paired device working.
@@ -82,6 +83,13 @@ export function sanitizeImportedSecrets(s) {
       if (/^[^\s@]{1,64}@[^\s@]{1,255}$/.test(email) && isObj(a)) acc[email.toLowerCase()] = a;
     }
     out.googleAccounts = acc;
+  }
+  if (isObj(s.microsoft) && isObj(s.microsoft.accounts)) {
+    const acc = {};
+    for (const [email, a] of Object.entries(s.microsoft.accounts).slice(0, 20)) {
+      if (/^[^\s@]{1,64}@[^\s@]{1,255}$/.test(email) && isObj(a) && typeof a.refresh_token === 'string') acc[email.toLowerCase()] = a;
+    }
+    out.microsoftAccounts = acc;
   }
   if (Array.isArray(s.apiTokens)) {
     out.apiTokens = s.apiTokens.filter((t) => isObj(t) && typeof t.id === 'string' && /^[a-f0-9]{64}$/.test(t.hash || '')
