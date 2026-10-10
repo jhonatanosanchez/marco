@@ -27,4 +27,5 @@ export const ROWS11: [string, string, string][] = [
   ],
   ['Volver a iniciar sesión', 'Sign in again', 'Iniciar sessão de novo'],
   ['Dirección guardada (oculta)', 'Saved address (hidden)', 'Endereço guardado (oculto)'],
+  ['Cargando el enlace…', 'Loading the link…', 'A carregar a ligação…'],
 ];

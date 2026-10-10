@@ -1421,6 +1421,21 @@ h1 .scope {
   flex: 1;
   height: 34px;
 }
+.screen-card__link {
+  gap: 8px;
+}
+.screen-card__link .input {
+  flex: 1;
+  min-width: 0;
+  max-width: 460px;
+  height: 34px;
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  cursor: text;
+}
+.screen-card__link .btn {
+  flex: none;
+}
 .screen-card__meta {
   display: flex;
   flex-wrap: wrap;
