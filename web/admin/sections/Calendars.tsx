@@ -331,6 +331,7 @@ function LinkedAccounts({ cfg, set, dirty, save, me }: SectionProps) {
       title: t('Vincular cuenta'),
       body: t('¿Qué cuenta quieres vincular?'),
       choices: providers.map((p) => ({ value: p.id, label: p.label, kind: 'default' as const, icon: p.id })),
+      closeX: true,
     });
     if (choice) await go(byId(choice));
   };

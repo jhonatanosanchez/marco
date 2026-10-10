@@ -167,7 +167,8 @@ export async function listEvents(email, calendarId, timeMin, timeMax) {
       ...(pageToken && { pageToken }),
     });
     const j = await api(email, `${CAL_API}/calendars/${encodeURIComponent(calendarId)}/events?${q}`);
-    items.push(...(j.items || []));
+    // Google Workspace "working location" entries ("Home", "Office") are not events: leave them out
+    items.push(...(j.items || []).filter((it) => it?.eventType !== 'workingLocation'));
     if (!(pageToken = j.nextPageToken)) break;
   }
   return items;

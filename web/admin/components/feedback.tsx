@@ -79,16 +79,18 @@ interface Pending {
   /** Buttons left to right; the last one gets the focus. Escape, a click outside and `cancel` resolve null. */
   choices: DialogChoice<string>[];
   cancel: string;
+  closeX: boolean;
   resolve: (v: string | null) => void;
 }
 let pending: Pending | null = null;
 const dlgListeners = new Set<() => void>();
 
 /** A dialog with several actions besides "cancel". Resolves the chosen value, or null when cancelled. */
-export function choiceDialog<T extends string>(opts: { title: string; body?: ComponentChildren; choices: DialogChoice<T>[]; cancel?: string }): Promise<T | null> {
+/** `closeX`: a picker (no Cancel button; an X in the corner closes it, and the choices are stacked full width). */
+export function choiceDialog<T extends string>(opts: { title: string; body?: ComponentChildren; choices: DialogChoice<T>[]; cancel?: string; closeX?: boolean }): Promise<T | null> {
   return new Promise((resolve) => {
     pending?.resolve(null);
-    pending = { title: opts.title, body: opts.body, choices: opts.choices, cancel: opts.cancel ?? t('Cancelar'), resolve: resolve as (v: string | null) => void };
+    pending = { title: opts.title, body: opts.body, choices: opts.choices, cancel: opts.cancel ?? t('Cancelar'), closeX: !!opts.closeX, resolve: resolve as (v: string | null) => void };
     dlgListeners.forEach((l) => l());
   });
 }
@@ -123,13 +125,20 @@ export function DialogHost() {
   const last = p.choices.length - 1;
   return (
     <div class="modal-backdrop" onClick={(e) => e.target === e.currentTarget && close(null)} onKeyDown={(e) => e.key === 'Escape' && (e.preventDefault(), close(null))}>
-      <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="dlg-title">
+      <div class={`modal ${p.closeX ? 'modal--picker' : ''}`} role="alertdialog" aria-modal="true" aria-labelledby="dlg-title">
+        {p.closeX && (
+          <button type="button" class="icon-btn modal__x" onClick={() => close(null)} aria-label={t('Cerrar')} title={t('Cerrar')}>
+            <Icon name="x" size={16} />
+          </button>
+        )}
         <h3 id="dlg-title">{p.title}</h3>
         {p.body && <div class="modal__body">{p.body}</div>}
         <div class="modal__actions">
-          <button type="button" class="btn btn--ghost" onClick={() => close(null)}>
-            {p.cancel}
-          </button>
+          {!p.closeX && (
+            <button type="button" class="btn btn--ghost" onClick={() => close(null)}>
+              {p.cancel}
+            </button>
+          )}
           {p.choices.map((c, i) => (
             <button
               type="button"

@@ -3154,3 +3154,23 @@ input:checked + .check-box {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* picker dialogs: X in the corner, choices stacked full width */
+.modal--picker {
+  position: relative;
+}
+.modal__x {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+.modal--picker h3 {
+  padding-right: 36px;
+}
+.modal--picker .modal__actions {
+  flex-direction: column;
+  align-items: stretch;
+}
+.modal--picker .modal__actions .btn {
+  justify-content: center;
+}
