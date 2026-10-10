@@ -736,6 +736,12 @@ Limits: 30 requests/minute per token; errors `401` (bad token), `400` (invalid d
   *System → Backups* downloads, restores or deletes them and makes manual backups.
 - **Export** downloads everything as one JSON file, optionally with secrets (password hash, Home Assistant token,
   Google accounts, API tokens; keep it safe). **Import** shows what changes per section before applying.
+- **Download photos (.zip)** puts every gallery photo in one archive, made in your browser. Photos are not part of
+  the JSON export, so upload them again in *Photos* when you move to another installation.
+- Moving between Marco Cloud and a self-hosted Marco works both ways with the same file. Marco Cloud never exports
+  or imports secrets, and it leaves out what it does not offer (Home Assistant, the admin password, open display
+  access); the import preview lists what it left out. After a move, pair the screens again and reconnect Google
+  Calendar.
 - *System → Activity* records sign-ins (and failed attempts), saves, restores, alerts, API usage, displays connecting
   and calendar errors. Passwords, tokens and calendar URLs are never logged.
 

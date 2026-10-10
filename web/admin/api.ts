@@ -197,6 +197,8 @@ export const api = {
   backups: () => request<BackupInfo[]>('GET', '/api/admin/backups'),
   createBackup: () => request<BackupInfo>('POST', '/api/admin/backups', {}),
   backupUrl: (id: string) => `/api/admin/backups/${encodeURIComponent(id)}`,
+  /** A backup file's content (a 401 here, as for every call, sends the admin through sign in again first). */
+  backupFile: (id: string) => request<unknown>('GET', `/api/admin/backups/${encodeURIComponent(id)}`),
   restoreBackup: (id: string) => request<{ ok: true; config: StoredConfig; repaired?: string[] }>('POST', `/api/admin/backups/${encodeURIComponent(id)}/restore`, {}),
   deleteBackup: (id: string) => request<{ ok: true }>('DELETE', `/api/admin/backups/${encodeURIComponent(id)}`),
   exportConfig: (includeSecrets: boolean) => request<ExportBundle>('POST', '/api/admin/export', { includeSecrets }),

@@ -182,10 +182,11 @@
       "query": [],
       "feature": "backups",
       "callers": [
+        "backupFile",
         "backupUrl"
       ],
       "request": null,
-      "response": "download",
+      "response": null,
       "responseArray": false,
       "responseKeys": null
     },
@@ -655,7 +656,9 @@
         "screens",
         "sources",
         "orphanSchedules",
-        "counts"
+        "counts",
+        "notes?",
+        "overLimit?"
       ]
     },
     {

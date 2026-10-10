@@ -4777,3 +4777,7 @@ h1 .scope {
 .photo-quota.is-full .photo-quota__note {
   color: var(--err);
 }
+
+/* Import preview: what a server leaves out (Marco Cloud) */
+.import-prev__notes { margin: 6px 0 0; padding-left: 18px; }
+.import-prev__notes li { margin: 3px 0; }

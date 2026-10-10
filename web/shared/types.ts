@@ -1224,6 +1224,28 @@ export interface ImportPreview {
   /** enabled scheduled messages that a partial import would leave without target screens (they get disabled) */
   orphanSchedules: { screensOnly: string[]; schedulesOnly: string[] };
   counts: { localEvents: number; birthdays: number; eventRules: number; countdowns: number; schedules: number };
+  /** Marco Cloud: settings this server does not offer, left out of the import (absent on self-hosted servers). */
+  notes?: ImportNote[];
+  /** Marco Cloud: sections that go over a plan limit; importing one of them is refused (400 limit_exceeded). */
+  overLimit?: { section: string; path: string; max: number }[];
+}
+
+/**
+ * Something an import leaves out on this server, and why:
+ *   secrets            the file has secrets (they are not imported here)
+ *   homeassistant      Home Assistant (and its weather) cannot be reached
+ *   signIn             admin password and Google sign-in (the account signs in instead)
+ *   openDisplayAccess  open display access (screens use private links and pairing)
+ *   insecureTls        calendars imported with certificate checks on (items)
+ *   google             Google calendars of accounts not connected here (items)
+ *   blockedUrl         calendars and feeds on an address this server cannot fetch (items)
+ *   refreshMin         calendars refreshed every 30 minutes at most (items)
+ *   news               news feeds, while this server offers no news
+ *   photos             screens show the gallery: photos are not in the file
+ */
+export interface ImportNote {
+  code: 'secrets' | 'homeassistant' | 'signIn' | 'openDisplayAccess' | 'insecureTls' | 'google' | 'blockedUrl' | 'refreshMin' | 'news' | 'photos';
+  items?: string[];
 }
 
 export interface ImportApplyRequest {
