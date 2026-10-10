@@ -35,7 +35,7 @@ export class Highlights {
       pill(`on${e.id}`, e, t('happeningNow'), `${e.title} · ${t('untilTime', { t: formatTime(new Date(e.endMs), tz, f24, ampm) })}`, ' live');
     }
     if (next) {
-      pill(`nx${next.id}`, next, formatCountdown(lang, next.startMs - nowMs), `${next.title} · ${formatTime(new Date(next.startMs), tz, f24, ampm)}`);
+      pill(`nx${next.id}`, next, formatCountdown(lang, next.startMs - nowMs), `${next.title} · ${formatTime(new Date(next.startMs), tz, f24, ampm)}`, ' hl-next');
     }
     // Today's special all-day things: birthdays, check-in/out
     const seenStay = new Set<string>();

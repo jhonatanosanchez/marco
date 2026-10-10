@@ -43,6 +43,8 @@
 .style-modern .side .card,
 .style-modern .agenda.compact .ag-list,
 .style-modern .hl-pill,
+.style-modern .bd-card,
+.style-modern .pf-card,
 .style-modern .an {
   position: relative;
   border: 0;
@@ -59,6 +61,8 @@
 .style-modern .side .card::before,
 .style-modern .agenda.compact .ag-list::before,
 .style-modern .hl-pill::before,
+.style-modern .bd-card::before,
+.style-modern .pf-card::before,
 .style-modern .an::before {
   content: '';
   position: absolute;
@@ -84,6 +88,8 @@
 .lite.style-modern .side .card,
 .lite.style-modern .agenda.compact .ag-list,
 .lite.style-modern .hl-pill,
+.lite.style-modern .bd-card,
+.lite.style-modern .pf-card,
 .lite.style-modern .an {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -95,7 +101,9 @@
 .style-modern .no-photo .sched-wrap .sched,
 .style-modern .no-photo .side .card,
 .style-modern .no-photo .agenda.compact .ag-list,
-.style-modern .no-photo .hl-pill {
+.style-modern .no-photo .hl-pill,
+.style-modern .no-photo .bd-card,
+.style-modern .no-photo .pf-card {
   background: rgb(var(--g-solid, 28 28 30));
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -341,6 +349,24 @@
 .style-modern #app.portrait:not(.preset-topBottom) .weather > .wx-hourly,
 .style-modern #app.portrait:not(.preset-topBottom) .weather > .wx-meta { grid-column: 1 / -1; grid-row: auto; }
 .style-modern #app.portrait:not(.preset-topBottom) .weather .wxm-days { margin-top: 0; padding: 0 0 0 2.8rem; border-top: 0; border-left: 1px solid var(--m-sep); }
+/* the lower bands of Per person and Board: head on the left, the next days on the right */
+.style-modern .preset-people .side .side-bottom .weather,
+.style-modern .preset-board .side .side-bottom .weather {
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: 2.8rem;
+  align-items: center;
+  padding: 1.8rem 2.4rem;
+}
+.style-modern .preset-people .weather .wxm-days,
+.style-modern .preset-board .weather .wxm-days { grid-area: 1 / 2; margin-top: 0; padding: 0 0 0 2.8rem; border-top: 0; border-left: 1px solid var(--m-sep); gap: 1.6rem; }
+.style-modern .preset-people .weather .wxm-head,
+.style-modern .preset-board .weather .wxm-head { grid-area: 1 / 1; gap: 2.4rem; }
+/* portrait: the weather head only, next to the clock */
+.style-modern #app.portrait.preset-people .side .side-bottom .weather,
+.style-modern #app.portrait.preset-board .side .side-bottom .weather { display: block; padding: 1.8rem 2.4rem; }
+.style-modern #app.portrait.preset-people .wxm-temp,
+.style-modern #app.portrait.preset-board .wxm-temp { font-size: 6.4rem; }
 /* compact bands (portrait, top/bottom): head + days only */
 .style-modern #app.portrait .weather .wx-meta,
 .style-modern .preset-topBottom .weather .wx-meta { display: none; }
@@ -355,12 +381,16 @@
 .style-modern.glass-no-edge .side .card::before,
 .style-modern.glass-no-edge .agenda.compact .ag-list::before,
 .style-modern.glass-no-edge .hl-pill::before,
+.style-modern.glass-no-edge .bd-card::before,
+.style-modern.glass-no-edge .pf-card::before,
 .style-modern.glass-no-edge .an::before { display: none; }
 .style-modern.glass-no-edge .side .side-bottom .weather,
 .style-modern.glass-no-edge .cd-card,
 .style-modern.glass-no-edge .sched-wrap .sched,
 .style-modern.glass-no-edge .side .card,
-.style-modern.glass-no-edge .agenda.compact .ag-list { box-shadow: var(--m-shadow); }
+.style-modern.glass-no-edge .agenda.compact .ag-list,
+.style-modern.glass-no-edge .bd-card,
+.style-modern.glass-no-edge .pf-card { box-shadow: var(--m-shadow); }
 .style-modern.glass-no-edge .hl-pill,
 .style-modern.glass-no-edge #app.portrait .cd-card .cd,
 .style-modern.glass-no-edge .preset-bigTime .main { box-shadow: none; }
@@ -374,6 +404,8 @@
 .style-modern.glass-thin .side .card,
 .style-modern.glass-thin .agenda.compact .ag-list,
 .style-modern.glass-thin .hl-pill,
+.style-modern.glass-thin .bd-card,
+.style-modern.glass-thin .pf-card,
 .style-modern.glass-thin .preset-bigTime .main { text-shadow: 0 0.1rem 0.8rem rgb(0 0 0 / 0.5); }
 
 /* light glass (light tint, or a very see-through card over a bright photo): dark text inside the cards */
@@ -384,6 +416,8 @@
 .style-modern.glass-ink-dark .side .card,
 .style-modern.glass-ink-dark .agenda.compact .ag-list,
 .style-modern.glass-ink-dark .hl-pill,
+.style-modern.glass-ink-dark .bd-card,
+.style-modern.glass-ink-dark .pf-card,
 .style-modern.glass-ink-dark .preset-bigTime .main {
   --m-ink: rgb(0 0 0 / 0.86);
   --m-ink-2: rgb(60 60 67 / 0.72);
@@ -627,6 +661,134 @@
 
 /* top / bottom: the strip under the calendar */
 .style-modern .preset-topBottom .main-strip { gap: 0.8rem; }
+
+/* ------------------------------------------------------------------------------- layouts with their own view */
+/* today: the next event as a widget, then a day view like iOS Calendar */
+.style-modern .td-title { font-size: 3.6rem; font-weight: 700; letter-spacing: -0.02em; }
+.style-modern .td-title b { font-weight: 700; margin-right: 1rem; }
+.style-modern .td-title span { color: var(--fg-3); font-weight: 600; }
+.style-modern .td-chip,
+.style-modern .pp-chip { border-radius: 99rem; padding: 0.6rem 1.6rem 0.6rem 1.2rem; background: rgb(var(--c) / 0.3); color: #fff; font-weight: 600; }
+.style-modern.theme-light .td-chip,
+.style-modern.theme-light .pp-chip { background: rgb(var(--c) / 0.2); color: var(--shade); }
+.style-modern .pp-chip { background: var(--m-fill); color: var(--fg); }
+.style-modern.theme-light .pp-chip { background: var(--m-fill); color: var(--fg); box-shadow: 0 0.1rem 0.3rem rgb(0 0 0 / 0.05); }
+.style-modern .td-card { padding: 2.2rem 2.8rem; gap: 2.2rem; border-radius: var(--m-r-lg); background: var(--m-fill); }
+.style-modern .td-card::before { display: none; }
+.style-modern .td-card.is-now { background: rgb(var(--c) / 0.18); }
+.style-modern .td-card.is-empty { background: var(--m-fill); }
+.style-modern.theme-light .td-card { box-shadow: 0 0.1rem 0.3rem rgb(0 0 0 / 0.05); }
+.style-modern .td-em { display: grid; place-items: center; width: 9.6rem; height: 9.6rem; border-radius: 2.4rem; background: rgb(var(--c) / 0.3); font-size: 5.2rem; }
+.style-modern .td-em .td-dot { width: 2.4rem; height: 2.4rem; }
+.style-modern .td-k { font-size: 2rem; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.style-modern .td-tt { font-weight: 700; letter-spacing: -0.025em; }
+.style-modern .td-sub { font-weight: 500; }
+.style-modern .td-hr span { font-family: var(--font-num); font-size: 1.7rem; font-weight: 600; color: var(--fg-2); }
+.style-modern .td-hr.past span { color: var(--fg-3); opacity: 0.6; }
+.style-modern .td-ev { border-radius: 0.4rem 0.8rem 0.8rem 0.4rem; background: rgb(var(--c) / 0.22); color: var(--fg); }
+.style-modern .td-ev.ongoing { background: rgb(var(--c) / 0.34); box-shadow: none; }
+.style-modern .td-l1 { font-weight: 600; }
+.style-modern .td-l1 b { color: var(--fg-2); font-weight: 600; font-feature-settings: 'tnum'; }
+.style-modern.theme-light .td-ev { background: rgb(var(--c) / 0.16); color: #000; }
+.style-modern.theme-light .td-l1 b { color: var(--fg-2); }
+.style-modern .td-now span { font-weight: 600; }
+
+/* two weeks: the iOS month grid, a size up */
+.style-modern .preset-twoWeeks .cal { --num-h: 6rem; }
+.style-modern .preset-twoWeeks .num { font-size: 3.2rem; }
+.style-modern .preset-twoWeeks .cal-dow > div { font-size: 1.8rem; }
+
+/* per person: one rounded card per person, list rows inside */
+.style-modern .pp-who { font-size: 1.9rem; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--fg-2); }
+.style-modern .pp-cols { gap: 1.6rem; }
+.style-modern .pp-col,
+.style-modern .pp-col:first-child {
+  gap: 1.6rem;
+  padding: 2rem 2rem 1.6rem;
+  border: 0;
+  border-radius: var(--m-r-lg);
+  background: var(--m-fill);
+}
+.style-modern.theme-light .pp-col { box-shadow: 0 0.1rem 0.3rem rgb(0 0 0 / 0.05); }
+.style-modern #app.portrait .pp-many .pp-col:nth-child(odd) { padding-left: 2rem; }
+.style-modern #app.portrait .pp-many .pp-cols { gap: 1.6rem; }
+.style-modern .pp-head { padding-bottom: 0; border-bottom: 0; }
+.style-modern .pp-av { width: 5rem; height: 5rem; background: rgb(var(--c) / 0.3); color: var(--fg); font-family: var(--font-emoji), var(--font-ui); font-weight: 600; }
+.style-modern .pp-name { font-size: 2.8rem; font-weight: 700; letter-spacing: -0.02em; }
+.style-modern .pp-day { font-size: 2rem; font-weight: 700; letter-spacing: -0.01em; text-transform: none; color: var(--fg); }
+.style-modern .pp-sec.is-today .pp-day { color: var(--accent); }
+.style-modern .pp-list { gap: 0; margin-top: 0.4rem; }
+.style-modern .pp-ev {
+  padding: 1rem 0 1rem 2rem;
+  border-radius: 0;
+  background: none;
+  font-weight: 500;
+}
+.style-modern .pp-ev::before { left: 0.2rem; top: 50%; bottom: auto; width: 0.9rem; height: 0.9rem; border-radius: 50%; transform: translateY(-50%); }
+.style-modern .pp-ev + .pp-ev::after { content: ''; position: absolute; top: 0; left: 2rem; right: 0; height: 1px; background: var(--line); }
+.style-modern .pp-tm { color: var(--fg-2); font-weight: 600; font-feature-settings: 'tnum'; }
+.style-modern.theme-light .pp-tm { color: var(--fg-2); }
+.style-modern .pp-ev.allday { margin: 0.4rem 0; padding: 0.7rem 1.4rem; border-radius: 1.2rem; background: rgb(var(--c) / 0.3); color: var(--fg); font-weight: 600; }
+.style-modern.theme-light .pp-ev.allday { background: rgb(var(--c) / 0.18); color: var(--shade); }
+.style-modern .pp-ev.allday::after { display: none; }
+.style-modern .pp-ev.ongoing { background: none; box-shadow: none; }
+.style-modern .pp-ev.ongoing .pp-tm { color: var(--accent); }
+
+/* board: glass widgets over the photo */
+.style-modern .bd-cols, .style-modern .bd-col { gap: 2rem; }
+.style-modern .bd-card { padding: 2rem 2.4rem 1.6rem; border-radius: var(--m-r-lg); color: var(--m-ink); }
+.style-modern .bd-h { margin-bottom: 1rem; font-size: 2rem; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--m-ink-2); }
+.style-modern .bd-h span { font-size: 2rem; }
+.style-modern .bd-list { gap: 0; }
+.style-modern .bd-day { margin: 1.2rem 0 0.2rem; font-size: 2rem; font-weight: 700; color: var(--m-ink); }
+.style-modern .bd-day:first-child { margin-top: 0; color: var(--accent); }
+.style-modern .bd-row { position: relative; min-height: 5.6rem; padding: 0.6rem 0; font-weight: 500; }
+.style-modern .bd-row + .bd-row::after { content: ''; position: absolute; top: 0; left: 5.8rem; right: 0; height: 1px; background: var(--m-sep); }
+.style-modern .bd-task + .bd-task::after { left: 4.6rem; }
+.style-modern .bd-tile { width: 4.4rem; height: 4.4rem; border-radius: 1.1rem; background: rgb(var(--c) / 0.3); font-size: 2.4rem; }
+.style-modern .bd-meta { color: var(--m-ink-2); font-weight: 500; }
+.style-modern .bd-meta b { font-family: var(--font-num); color: var(--m-ink); font-feature-settings: 'tnum'; }
+.style-modern .bd-row.soon .bd-meta, .style-modern .bd-row.ongoing .bd-meta { color: var(--tint); font-weight: 600; }
+.style-modern.glass-ink-dark .bd-row.soon .bd-meta,
+.style-modern.glass-ink-dark .bd-row.ongoing .bd-meta { color: var(--shade); }
+.style-modern .bd-check { margin: 0 0.6rem 0 0.2rem; border-width: 0.2rem; border-color: var(--m-ink-2); }
+.style-modern .bd-task.done .bd-check { background: var(--accent); border-color: var(--accent); color: #fff; }
+.style-modern .bd-none, .style-modern .bd-more { color: var(--m-ink-2); }
+.style-modern .bd-msg { padding: 2.2rem 2.4rem; }
+.style-modern .bd-msg-em { display: grid; place-items: center; width: 6.4rem; height: 6.4rem; border-radius: 1.6rem; background: rgb(255 255 255 / 0.14); font-size: 3.6rem; }
+.style-modern .bd-msg p { font-size: 2.8rem; font-weight: 600; letter-spacing: -0.01em; }
+.style-modern.theme-light .bd-card { background: rgb(255 255 255 / 0.74); --m-ink: rgb(0 0 0 / 0.86); --m-ink-2: rgb(60 60 67 / 0.7); --m-sep: rgb(60 60 67 / 0.16); color: #000; text-shadow: none; }
+.lite.style-modern.theme-light .bd-card { background: rgb(255 255 255 / 0.94); }
+.style-modern.theme-light .bd-row.soon .bd-meta, .style-modern.theme-light .bd-row.ongoing .bd-meta { color: var(--shade); }
+.style-modern .preset-board .scrim { background: linear-gradient(to bottom, rgb(0 0 0 / 0.42), rgb(0 0 0 / 0.08) 28%, rgb(0 0 0 / 0.08) 70%, rgb(0 0 0 / 0.3)); }
+
+/* photo frame: one small glass widget in the corner */
+.style-modern .pf-card { gap: 1.4rem; padding: 2.6rem 3rem 2.8rem; border-radius: 3.2rem; color: var(--m-ink); text-shadow: none; }
+.style-modern .pf-card .clock.digital { font-size: 10rem; }
+.style-modern .pf-card .date { margin: 0 0 0.4rem; font-size: 2.6rem; color: var(--m-ink); }
+.style-modern .pf-card .clock .colon { color: inherit; }
+.style-modern .pf-wx { padding-top: 1.4rem; border-top: 1px solid var(--m-sep); align-self: stretch; }
+.style-modern .corner-tr .pf-wx, .style-modern .corner-br .pf-wx { justify-content: flex-end; }
+.style-modern .v-temp { font-weight: 300; }
+.style-modern .v-cond { font-weight: 600; }
+.style-modern .pf-card .v-hl { color: var(--m-ink-2); }
+.style-modern .pf-ev { padding: 0; border: 0; background: none; border-radius: 0; font-size: 2.1rem; color: var(--m-ink); }
+.style-modern .pf-em { display: grid; place-items: center; width: 3.6rem; height: 3.6rem; border-radius: 1rem; background: rgb(var(--c) / 0.3); font-size: 2rem; }
+.style-modern .pf-tt { font-weight: 600; }
+.style-modern .pf-when { color: var(--m-ink-2); font-weight: 500; }
+.style-modern.theme-light .pf-card { background: rgb(255 255 255 / 0.72); --m-ink: rgb(0 0 0 / 0.86); --m-ink-2: rgb(60 60 67 / 0.7); --m-sep: rgb(60 60 67 / 0.16); color: #000; }
+.lite.style-modern.theme-light .pf-card { background: rgb(255 255 255 / 0.94); }
+.style-modern.theme-light .pf-card .clock .sec { color: rgb(0 0 0 / 0.5); }
+.style-modern.glass-ink-dark .pf-card .clock .sec { color: rgb(0 0 0 / 0.5); }
+.style-modern.glass-ink-dark .pf-card svg { filter: drop-shadow(0 0 0.08rem rgb(0 0 0 / 0.45)); }
+.style-modern .preset-photoFrame .scrim { background: radial-gradient(60% 55% at var(--sx) var(--sy), rgb(0 0 0 / 0.26), transparent 75%); }
+
+/* bedside: StandBy-like, the big digits stay medium weight */
+.style-modern .bs .clock.digital { font-size: 32rem; font-weight: 500; letter-spacing: -0.04em; }
+.style-modern #app.portrait .bs .clock.digital { font-size: 28rem; }
+.style-modern .bs .date { margin: 0 0 1.6rem; font-size: 3.6rem; font-weight: 600; color: var(--bs-ink-2); }
+.style-modern .bs-info { font-weight: 500; }
+.style-modern .bs-wx .v-temp { font-weight: 400; }
 
 /* ------------------------------------------------------------------------------- announcements */
 .style-modern .an-dim { background: rgb(0 0 0 / 0.38); }

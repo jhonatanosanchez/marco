@@ -3,7 +3,11 @@
 import type { PhotoFrame } from './focus';
 
 export type Lang = 'es' | 'en' | 'pt';
-export type LayoutPreset = 'bigCalendar' | 'leftRight' | 'topBottom' | 'bigTime' | 'agenda';
+export type LayoutPreset =
+  | 'bigCalendar' | 'leftRight' | 'topBottom' | 'bigTime' | 'agenda'
+  | 'today' | 'people' | 'photoFrame' | 'twoWeeks' | 'board' | 'bedside';
+/** Corner of the clock card in the 'photoFrame' layout: top-left, top-right, bottom-left, bottom-right. */
+export type FrameCorner = 'tl' | 'tr' | 'bl' | 'br';
 export type SourceKind = 'generic' | 'airbnb' | 'birthdays' | 'holidays';
 export type SourceType = 'ics' | 'google';
 export type DateFormat = 'weekday_month_d' | 'weekday_d_month' | 'weekday_d_dot_month';
@@ -50,6 +54,10 @@ export interface LayoutConfig {
   preset: LayoutPreset;
   sidePanel: 'left' | 'right';
   sideWidth: number; // 0..1 fraction of the screen width
+  /** 'people' layout: calendar ids shown as columns (max 5); null / missing = automatic. */
+  people?: string[] | null;
+  /** 'photoFrame' layout: corner of the clock card (default 'br'). */
+  corner?: FrameCorner;
 }
 
 export interface BackgroundConfig {

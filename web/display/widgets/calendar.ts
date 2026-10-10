@@ -40,6 +40,8 @@ function textWidth(text: string, px: number, weight: number): number {
 
 export class MonthCalendar {
   readonly root: HTMLElement;
+  /** Two weeks layout: rows are tall, so chips of busy days may also wrap onto three lines. */
+  roomy = false;
   private head: HTMLElement;
   private dow: HTMLElement;
   private weeks: HTMLElement;
@@ -215,7 +217,7 @@ export class MonthCalendar {
       for (let l = 0; l < L; l++) if (!blocked[l][2 * d] && !blocked[l][2 * d + 1]) free.push(l);
       if (free.length < day.length) continue;
       day.sort((a, b) => a.lane - b.lane);
-      const maxSpan = day.length === 1 ? 3 : 2;
+      const maxSpan = day.length === 1 || this.roomy ? 3 : 2;
       let p = 0;
       day.forEach((sg, i) => {
         const lb = labels.get(sg);

@@ -46,7 +46,9 @@ export function defaultScreenProfile({ id = 's_main', slug = 'living-room', name
       // Modern style glass material (ignored by Classic). The defaults reproduce the original Modern look.
       glass: { appearance: 'auto', opacity: 0.5, blur: 18, tint: 'dark', edge: true },
     },
-    layout: { preset: 'bigCalendar', sidePanel: 'left', sideWidth: 0.36 },
+    // people: calendar ids shown as columns by the 'people' layout (null = automatic); corner: where the
+    // 'photoFrame' layout puts its small clock card (tl, tr, bl, br)
+    layout: { preset: 'bigCalendar', sidePanel: 'left', sideWidth: 0.36, people: null, corner: 'br' },
     background: {
       enabled: true, source: 'stock', stockTopic: 'nature', order: 'random', intervalSec: 120, brightness: 0.85, showMeta: false,
       cover: true, transition: 'webgl', ambient: 'aurora',

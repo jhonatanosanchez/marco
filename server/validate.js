@@ -9,6 +9,8 @@ const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
+/** Screen layouts (docs/ARCHITECTURE.md); the display, the admin and server/setup.js use the same ids. */
+export const LAYOUT_PRESETS = ['bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda', 'today', 'people', 'photoFrame', 'twoWeeks', 'board', 'bedside'];
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,255}$/;
 
 export function isHttpUrl(s, protocols = ['http:', 'https:']) {
@@ -219,9 +221,13 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
 
   const ly = obj(ctx, `${p}.layout`, x.layout);
   const layout = {
-    preset: oneOf(ctx, `${p}.layout.preset`, ly.preset, D.layout.preset, ['bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda']),
+    preset: oneOf(ctx, `${p}.layout.preset`, ly.preset, D.layout.preset, LAYOUT_PRESETS),
     sidePanel: oneOf(ctx, `${p}.layout.sidePanel`, ly.sidePanel, D.layout.sidePanel, ['left', 'right']),
     sideWidth: num(ctx, `${p}.layout.sideWidth`, ly.sideWidth, D.layout.sideWidth, 0.2, 0.6),
+    // 'people' layout: the calendars shown as columns (null = automatic, at most 5, no duplicates)
+    people: ly.people === null || ly.people === undefined ? null : [...new Set(idList(ctx, `${p}.layout.people`, ly.people, 5))],
+    // 'photoFrame' layout: corner of the clock card
+    corner: oneOf(ctx, `${p}.layout.corner`, ly.corner, D.layout.corner, ['tl', 'tr', 'bl', 'br']),
   };
 
   const bg = obj(ctx, `${p}.background`, x.background);

@@ -21,7 +21,7 @@ import { googleConfigured } from './google.js';
 import { logActivity, logActivityThrottled } from './activity.js';
 import { testIcs } from './calendars.js';
 import { passwordProblem, PASSWORD_MESSAGES } from './lib/password.js';
-import { isHttpUrl, slugify } from './validate.js';
+import { isHttpUrl, LAYOUT_PRESETS, slugify } from './validate.js';
 import { isValidTimeZone } from './lib/tz.js';
 import { LANGS, langFromHeader } from './lib/i18n.js';
 import { DEFAULT_SOURCES } from './defaults.js';
@@ -128,7 +128,7 @@ function openGate(res) {
 
 export const suggestedLanguage = langFromHeader;
 
-const LAYOUTS = ['bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda'];
+const LAYOUTS = LAYOUT_PRESETS;
 const PHOTO_SOURCES = ['stock', 'gallery', 'mixed'];
 const AMBIENTS = ['aurora', 'particles', 'none'];
 const HEX = /^#[0-9a-f]{6}$/i;

@@ -3,6 +3,7 @@
 import '@fontsource-variable/inter';
 import '@fontsource-variable/outfit';
 import './styles.css';
+import './styles-views.css';
 import './styles-modern.css';
 import type {
   Announcement, CountdownsResponse, DisplayConfig, EventsResponse, NewsResponse, NightCommand, WeatherResponse,
@@ -38,6 +39,7 @@ import { News } from './widgets/news';
 import { Photos, photoStats } from './widgets/photos';
 import { glassVars, normalizeGlass } from '../shared/glass';
 import { Weather } from './widgets/weather';
+import { VIEW_PRESETS, Views } from './widgets/views';
 import { checkSetup, showWelcome, waitForSetup } from './widgets/welcome';
 import { pairingLang, showPairing } from './widgets/pairing';
 
@@ -72,6 +74,7 @@ const countdowns = new Countdowns($('#countdowns'), $('#cd-strip'));
 const schedules = new ScheduleBanners($('#sched'), $('#sched-strip'));
 const announcements = new Announcements($('#alerts'));
 const identify = new IdentifyOverlay($('#identify'));
+const views = new Views($('#view'));
 const screenNote = $('#screen-note');
 const statusDot = $('#status');
 const night = $('#night');
@@ -180,9 +183,13 @@ function hueShift(hex: string, deg: number): string {
   return toHex([(r1 + m) * 255, (g1 + m) * 255, (b1 + m) * 255]);
 }
 
+const PRESETS = ['bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda', 'today', 'people', 'photoFrame', 'twoWeeks', 'board', 'bedside'];
+/** Newer layouts built on an older one's frame: they also get its class, so its rules (and the Modern ones) apply. */
+const PRESET_BASE: Record<string, string> = { today: 'bigCalendar', twoWeeks: 'bigCalendar', people: 'topBottom', board: 'topBottom' };
+
 function effectivePreset(cfg: DisplayConfig): string {
   const p = params.get('preset') || cfg.layout.preset;
-  return ['bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda'].includes(p) ? p : 'bigCalendar';
+  return PRESETS.includes(p) ? p : 'bigCalendar';
 }
 
 function isPortrait(cfg: DisplayConfig): boolean {
@@ -197,10 +204,15 @@ function applyLayout(): void {
   const preset = effectivePreset(cfg);
   const portrait = isPortrait(cfg);
   const side = params.get('side') || cfg.layout.sidePanel;
+  const corner = params.get('corner') || cfg.layout.corner || 'br';
   app.className = [
     `preset-${preset}`, `side-${side === 'right' ? 'right' : 'left'}`, portrait ? 'portrait' : 'landscape',
     cfg.background.enabled ? 'has-photo' : 'no-photo',
-  ].join(' ');
+    PRESET_BASE[preset] ? `preset-${PRESET_BASE[preset]}` : '',
+    preset === 'photoFrame' ? `corner-${['tl', 'tr', 'bl', 'br'].includes(corner) ? corner : 'br'}` : '',
+  ].filter(Boolean).join(' ');
+  app.classList.toggle('has-view', VIEW_PRESETS.includes(preset));
+  views.setPreset(preset);
   const view = params.get('view') || cfg.calendar.view;
   const showAgendaMain = preset === 'agenda' || view === 'agenda';
   app.classList.toggle('view-agenda', showAgendaMain);
@@ -259,8 +271,19 @@ function applyConfig(raw: DisplayConfig): void {
   if (pfx === 'off' || pfx === 'simple' || pfx === 'rich') cfg.background.weatherFx = pfx;
   // the top-bottom preset has a shorter calendar: cap the number of week rows so chips stay readable
   if (effectivePreset(cfg) === 'topBottom') cfg.calendar.weeks = Math.min(cfg.calendar.weeks, 4);
+  // Two weeks: the month grid with two roomy rows (more events per day)
+  if (effectivePreset(cfg) === 'twoWeeks') {
+    cfg.calendar.view = 'month';
+    cfg.calendar.weeks = 2;
+    cfg.calendar.maxEventsPerDay = Math.max(cfg.calendar.maxEventsPerDay, 8);
+  }
+  // Bedside: a dark room, no photo and no animated background
+  if (effectivePreset(cfg) === 'bedside') {
+    cfg.background.enabled = false;
+    cfg.background.ambient = 'none';
+  }
   // Small landscape screens (e.g. 1280×720 on the Pi): one week fewer so text can be bigger.
-  if (window.innerWidth > window.innerHeight && window.innerHeight <= 820) cfg.calendar.weeks = Math.min(cfg.calendar.weeks, 4);
+  if (window.innerWidth > window.innerHeight && window.innerHeight <= 820 && effectivePreset(cfg) !== 'twoWeeks') cfg.calendar.weeks = Math.min(cfg.calendar.weeks, 4);
   setCtxConfig(cfg);
   setTimezone(ctx.tz);
   const root = document.documentElement;
@@ -291,7 +314,7 @@ function applyConfig(raw: DisplayConfig): void {
 
   // WebGL needs
   const preset = effectivePreset(cfg);
-  const wantAmbient = !lite && cfg.background.ambient !== 'none' && (preset === 'bigCalendar' || preset === 'agenda' || preset === 'topBottom');
+  const wantAmbient = !lite && cfg.background.ambient !== 'none' && ['bigCalendar', 'agenda', 'topBottom', 'today', 'twoWeeks', 'people'].includes(preset);
   const wantGLPhoto = !lite && cfg.background.enabled && cfg.background.transition === 'webgl';
   if ((wantAmbient || wantGLPhoto) && !engine && !glFailed) {
     void initGL().then(() => {
@@ -353,11 +376,25 @@ function renderCalendar(tick: Tick): void {
   const evs = eventsNormalized();
   const cfg = ctx.cfg;
   const preset = effectivePreset(cfg);
+  renderView(tick);
   if (!cfg.calendar.enabled) return;
+  // layouts with their own view (today, people, …) do not show the month grid / agenda
+  if (VIEW_PRESETS.includes(preset)) {
+    if (preset === 'today') highlights.render(evs, tick);
+    return;
+  }
   if (app.classList.contains('view-agenda')) agenda.render(evs, tick);
-  else calendar.render(evs, tick);
+  else {
+    calendar.roomy = preset === 'twoWeeks';
+    calendar.render(evs, tick);
+  }
   if (preset === 'leftRight' || preset === 'bigTime') sideAgenda.render(evs, tick);
   highlights.render(evs, tick);
+}
+
+/** Content of the layouts with their own view (no-op for the others). */
+function renderView(tick: Tick): void {
+  views.render({ events: ctx.cfg.calendar.enabled ? eventsNormalized() : [], weather: state.weather, countdowns: state.countdowns }, tick);
 }
 
 function renderCountdowns(tick: Tick): void {
@@ -369,10 +406,13 @@ function renderCountdowns(tick: Tick): void {
       .map((e) => e.title),
   );
   countdowns.render(state.countdowns, today, shown);
+  if (effectivePreset(ctx.cfg) === 'board') renderView(tick);
 }
 
 function renderWeather(tick: Tick): void {
   weather.render(state.weather, tick.dayKey);
+  const p = effectivePreset(ctx.cfg);
+  if (p === 'photoFrame' || p === 'bedside') renderView(tick);
   const cur = ctx.cfg.weather.enabled ? state.weather?.current : undefined;
   const pm = cur ? precipOf(cur.code) : null;
   if (precip) precip.mode = pm;
@@ -401,6 +441,7 @@ const FIT_STEPS = ['fit-1', 'fit-2', 'fit-3'];
 function fitSide(): void {
   fitSideContent();
   fitMidRows();
+  views.fit();
   photos.reframe(); // what's left uncovered of the photo may have changed
 }
 function fitSideContent(): void {
@@ -416,6 +457,11 @@ function fitSideContent(): void {
   for (const c of cdChips) c.classList.remove('fit-hide');
   fitStrip();
   if (!overflowing()) return;
+  // Today: the forecast for the next hours matters more than the countdowns
+  if (app.classList.contains('preset-today')) {
+    for (let i = cdChips.length - 1; i >= 0 && overflowing(); i--) cdChips[i].classList.add('fit-hide');
+    if (!overflowing()) return;
+  }
   app.classList.add('fit-1');
   for (let i = cdChips.length - 1; i >= 1 && overflowing(); i--) cdChips[i].classList.add('fit-hide');
   if (!overflowing()) return;
@@ -701,6 +747,7 @@ function startPolling(): void {
 
 onTick((tick) => {
   clock.update(tick);
+  views.tick(tick);
   if (tick.minuteChanged) {
     renderCalendar(tick);
     renderWeather(tick);

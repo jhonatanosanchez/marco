@@ -7,6 +7,17 @@ export const LOCALES: Record<Lang, string> = { es: 'es-ES', en: 'en-GB', pt: 'pt
 type Dict = Record<string, string>;
 
 const es: Dict = {
+  // layouts with their own view (web/display/widgets/views.ts)
+  upNext: 'A continuación',
+  nothingMoreToday: 'Nada más por hoy',
+  firstTomorrow: 'Mañana',
+  everyone: 'Todos',
+  birthdays: 'Cumpleaños',
+  agenda: 'Agenda',
+  allDone: 'Todo hecho',
+  noPeople: 'Elige los calendarios de cada persona en Diseño',
+  nothingPlanned: 'Nada previsto',
+  daysWord: 'días',
   today: 'Hoy',
   tomorrow: 'Mañana',
   yesterday: 'Ayer',
@@ -56,6 +67,17 @@ const es: Dict = {
 };
 
 const en: Dict = {
+  // layouts with their own view (web/display/widgets/views.ts)
+  upNext: 'Up next',
+  nothingMoreToday: 'Nothing else today',
+  firstTomorrow: 'Tomorrow',
+  everyone: 'Everyone',
+  birthdays: 'Birthdays',
+  agenda: 'Agenda',
+  allDone: 'All done',
+  noPeople: 'Choose each person’s calendars in Layout',
+  nothingPlanned: 'Nothing planned',
+  daysWord: 'days',
   today: 'Today',
   tomorrow: 'Tomorrow',
   yesterday: 'Yesterday',
@@ -105,6 +127,17 @@ const en: Dict = {
 };
 
 const pt: Dict = {
+  // layouts with their own view (web/display/widgets/views.ts)
+  upNext: 'A seguir',
+  nothingMoreToday: 'Mais nada hoje',
+  firstTomorrow: 'Amanhã',
+  everyone: 'Todos',
+  birthdays: 'Aniversários',
+  agenda: 'Agenda',
+  allDone: 'Tudo feito',
+  noPeople: 'Escolha os calendários de cada pessoa em Disposição',
+  nothingPlanned: 'Nada previsto',
+  daysWord: 'dias',
   today: 'Hoje',
   tomorrow: 'Amanhã',
   yesterday: 'Ontem',
