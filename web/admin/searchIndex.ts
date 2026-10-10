@@ -82,4 +82,5 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { label: 'Nombre del hogar', route: 'security', anchor: 'acc-household', keywords: 'household hogar casa nombre name rename renombrar', feature: 'accountMenu' },
   { label: 'Sesiones abiertas', route: 'security', anchor: 'acc-links', keywords: 'sessions sesiones sessões logout dispositivos devices', feature: 'accountMenu' },
   { label: 'Estado de las fuentes', route: 'status', keywords: 'status health salud errores' },
+  { label: 'Actualizaciones', route: 'status', anchor: 'updates', keywords: 'update updates actualizar actualización atualizar atualização version versión versão upgrade nueva new nova automático automatic', feature: 'updates' },
 ];

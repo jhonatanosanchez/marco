@@ -9,6 +9,7 @@ import { saveWithRevision, type ConflictChoice } from './configMerge';
 import { Icon, type IconName } from './components/icons';
 import { ScreenSwitcher } from './components/ScreenSwitcher';
 import { openPairDialog, PairDialogHost } from './components/DisplayAccess';
+import { UpdateBanner, UpdateDialogHost, WhatsNewHost } from './components/Updates';
 import { Button, setScopeScreenName } from './components/ui';
 import { getLang, initialLang, setLang, nScreens, t } from './i18n';
 import { setIntent } from './intent';
@@ -974,6 +975,7 @@ export function App() {
           </div>
         </header>
 
+        <UpdateBanner />
         <div class="content-row">
           <main class={`content content--${route}`} ref={mainRef} key={`${route}`}>
             <Section {...sectionProps} />
@@ -1016,6 +1018,8 @@ export function App() {
       )}
       {palette && <CommandPalette items={paletteItems} onClose={() => setPalette(false)} />}
       <PairDialogHost saved={saved} defaultScreenId={screenId} onPaired={() => window.dispatchEvent(new Event('marco:paired'))} />
+      <UpdateDialogHost />
+      <WhatsNewHost />
       <ToastHost />
       <DialogHost />
     </div>

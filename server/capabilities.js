@@ -8,10 +8,11 @@ import { CODE_LENGTH } from './pairing.js';
 export const FEATURE_KEYS = Object.freeze([
   'homeassistant', 'news', 'customCss', 'gallery', 'schedules', 'announcements', 'displayCommands',
   'openDisplayAccess', 'insecureTls', 'googleCalendar', 'googleLogin', 'passwordLogin', 'apiTokens',
-  'webhooks', 'backups', 'importExport', 'includeSecrets', 'activity', 'setupWizard', 'status', 'accountMenu',
+  'webhooks', 'backups', 'importExport', 'includeSecrets', 'activity', 'setupWizard', 'status', 'accountMenu', 'updates',
 ]);
 
-/** Feature flags of a self-hosted server: all on, Google follows its credentials, no account menu. */
+/** Feature flags of a self-hosted server: all on (`updates` too: the update banner and settings), Google follows
+ *  its credentials, no account menu. */
 export function selfHostedFeatures() {
   const google = googleConfigured();
   const out = {};

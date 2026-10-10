@@ -72,8 +72,9 @@ export function capsFrom(health: Partial<HealthResponse> | null | undefined): Ca
 }
 
 /** Whether `caps` turns `feature` on (see the rules at the top of this file). */
-/** Features that only exist on servers that send `features`; off when the field is missing. */
-const OPT_IN: readonly FeatureName[] = ['accountMenu'];
+/** Features that only exist on servers that send `features`; off when the field is missing (and on an older
+ *  self-hosted server that does not list them). */
+const OPT_IN: readonly FeatureName[] = ['accountMenu', 'updates'];
 
 export function hasFeature(caps: Caps, feature: FeatureName): boolean {
   if (!caps.features) return !OPT_IN.includes(feature);

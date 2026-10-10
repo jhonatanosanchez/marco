@@ -15,6 +15,7 @@ import { pruneScreens } from './announce.js';
 import { flushTokenUsage } from './tokens.js';
 import { logSetupHint } from './setup.js';
 import { invalidateIcsParsing } from './calendars.js';
+import { serverUpdater } from './routes/updates.js';
 
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 
@@ -70,11 +71,14 @@ const server = app.listen(PORT, process.env.HOST || '0.0.0.0', (err) => {
   console.log(`[server] Marco v${pkg.version} on http://localhost:${PORT} (data: ${paths.data})`);
   logSetupHint(PORT);
   startRefresher();
+  // Daily check for a newer release (MARCO_UPDATE_CHECK=0 or the admin switch turn it off); server/updates.js
+  serverUpdater(pkg.version).start();
 });
 
 function shutdown(sig) {
   console.log(`[server] ${sig}, shutting down`);
   stopRefresher();
+  serverUpdater(pkg.version).stop();
   try { flushDisplays(); flushTokenUsage(); } catch { /* ignore */ }
   closeAll();
   server.close(() => process.exit(0));

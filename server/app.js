@@ -12,6 +12,7 @@ import { screensAdminRouter, displayPublicRouter } from './routes/screens.js';
 import { hooksRouter } from './routes/hooks.js';
 import { announceRouter } from './routes/announce.js';
 import { systemRouter } from './routes/system.js';
+import { updatesRouter } from './routes/updates.js';
 import { eventsAdminRouter, eventsPublicRouter } from './routes/localEvents.js';
 import { accessAdminRouter, pairPublicRouter } from './routes/access.js';
 import { setupRouter } from './setup.js';
@@ -24,9 +25,10 @@ import { displayAuth, mediaAuth } from './displayAccess.js';
 export const DISPLAY_API_PATHS = ['/api/display', '/api/events', '/api/weather', '/api/news', '/api/photos', '/api/countdowns'];
 
 /**
- * @param {{ version: string, dist?: string }} opts  dist = built frontend directory (default <repo>/dist)
+ * @param {{ version: string, dist?: string, updater?: object }} opts  dist = built frontend directory (default
+ *   <repo>/dist); updater = update checker (server/updates.js; default: the server's own, created on first use)
  */
-export function createApp({ version, dist = path.join(ROOT, 'dist') }) {
+export function createApp({ version, dist = path.join(ROOT, 'dist'), updater = null }) {
   const app = express();
   app.disable('x-powered-by');
   // TRUST_PROXY: Express "trust proxy" value (default loopback). Set it to the address the reverse proxy connects
@@ -67,6 +69,7 @@ export function createApp({ version, dist = path.join(ROOT, 'dist') }) {
   app.use('/api/admin', geocodeRouter());
   // Admin routers: each one applies requireAuth; unmatched paths fall through to the next one.
   app.use('/api/admin', adminRouter());
+  app.use('/api/admin', updatesRouter({ version, updater }));
   app.use('/api/admin', screensAdminRouter(), announceRouter(), systemRouter({ version }), eventsAdminRouter(), accessAdminRouter());
   // Display access (private links / paired devices / admin session; open mode = legacy LAN). displayAccess.js
   app.use(DISPLAY_API_PATHS, displayAuth());
