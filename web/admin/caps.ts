@@ -2,8 +2,9 @@
 // Plain TypeScript with type-only imports, so the server tests can load it.
 //
 // Rules:
-// - No `features` field at all (servers older than 0.5.0): every feature is on.
-// - A key missing from `features` is off only when the edition is not 'self-hosted'.
+// - No `features` field at all (servers older than 0.5.0): every feature is on, except the account menu,
+//   which no server before 0.5.0 had (OPT_IN).
+// - A key missing from `features` is off only when the edition is not 'self-hosted' (OPT_IN keys: always off).
 // - No `limits` field: the only limits are the config validator's own caps (BUILTIN_LIMITS).
 import type { FeatureName, Features, HealthResponse, Limits } from '../shared/types';
 
@@ -71,11 +72,14 @@ export function capsFrom(health: Partial<HealthResponse> | null | undefined): Ca
 }
 
 /** Whether `caps` turns `feature` on (see the rules at the top of this file). */
+/** Features that only exist on servers that send `features`; off when the field is missing. */
+const OPT_IN: readonly FeatureName[] = ['accountMenu'];
+
 export function hasFeature(caps: Caps, feature: FeatureName): boolean {
-  if (!caps.features) return true;
+  if (!caps.features) return !OPT_IN.includes(feature);
   const v = caps.features[feature];
   if (typeof v === 'boolean') return v;
-  return caps.edition === 'self-hosted';
+  return caps.edition === 'self-hosted' && !OPT_IN.includes(feature);
 }
 
 /** Features a self-hosted admin shows even when they are off, with a hint on how to set them up

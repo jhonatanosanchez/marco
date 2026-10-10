@@ -95,8 +95,25 @@ The admin and the display read these fields to decide which sections, actions an
   100 countdowns). The admin disables "add" at the limit and flags a config that goes over it.
 - `displayOrigin` (optional): absolute origin that serves `/d/<key>` and `/pair`. Absent means the same origin.
 
-Clients treat a response with no `features` field (servers older than 0.5.0) as having every feature on. A key
-missing from `features` counts as off only when `edition` is not `'self-hosted'`.
+Clients treat a response with no `features` field (servers older than 0.5.0) as having every feature on, except
+`accountMenu`. A key missing from `features` counts as off only when `edition` is not `'self-hosted'`, and a missing
+`accountMenu` is always off.
+
+### Account mode
+
+A multi-tenant server (`tenancy: 'multi'`) signs people in on its own account pages instead of the admin's login
+screen. `GET /api/auth/me` then returns `user.method: 'account'` and an `account` block:
+`{ loginUrl, accountUrl, sessionsUrl, deleteUrl, household: { name, role } }`. The admin:
+
+- sends the browser to `loginUrl?next=<path and hash>` when it is signed out or a call answers 401. `next` is
+  always a path under `/admin/`;
+- after `POST /api/auth/logout`, goes to the `next` path in the response, or to `loginUrl`;
+- shows the household and the account links in the header menu, and also sends `POST /api/account/lang {lang}`
+  when the language changes;
+- replaces the Security page with an Account page (same `#/security` route) that renames the household with
+  `PATCH /api/admin/household {name}` (60 characters at most).
+
+Links in the `account` block must be paths on the same site or `http(s)` URLs; the admin ignores anything else.
 
 Every call the admin makes is listed in `web/shared/adminContract.json` (method, path, query keys, gating feature,
 request type and top-level response keys), generated from `web/admin/api.ts` and `web/shared/types.ts` by

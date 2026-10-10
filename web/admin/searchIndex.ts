@@ -75,5 +75,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { label: 'Cambiar contraseña', route: 'security', anchor: 'sec-password', keywords: 'password contraseña palavra-passe', feature: 'passwordLogin' },
   { label: 'Emails de Google permitidos', route: 'security', anchor: 'sec-google', keywords: 'google login email permitir', feature: 'googleLogin' },
   { label: 'Cerrar sesión en todos los dispositivos', route: 'security', anchor: 'sec-sessions', keywords: 'logout sessions', feature: ['passwordLogin', 'googleLogin'] },
+  { label: 'Nombre del hogar', route: 'security', anchor: 'acc-household', keywords: 'household hogar casa nombre name rename renombrar', feature: 'accountMenu' },
+  { label: 'Sesiones abiertas', route: 'security', anchor: 'acc-links', keywords: 'sessions sesiones sessões logout dispositivos devices', feature: 'accountMenu' },
   { label: 'Estado de las fuentes', route: 'status', keywords: 'status health salud errores' },
 ];

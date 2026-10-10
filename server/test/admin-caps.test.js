@@ -48,12 +48,13 @@ test('caps: old servers and self-hosted keep every feature on', () => {
   const old = oldServer();
   assert.equal(old.edition, 'self-hosted');
   assert.equal(old.features, null);
-  for (const k of FEATURE_KEYS) assert.equal(hasFeature(old, k), true, k);
+  for (const k of FEATURE_KEYS) assert.equal(hasFeature(old, k), k !== 'accountMenu', k);
   assert.equal(old.pairCodeLength, 6);
   assert.equal(old.displayOrigin, null);
 
   const sh = capsFrom({ ok: true, uptime: 1, version: '0.5.0', edition: 'self-hosted', features: { news: true } });
   assert.equal(hasFeature(sh, 'gallery'), true, 'a missing key is on in self-hosted');
+  assert.equal(hasFeature(sh, 'accountMenu'), false, 'the account menu is never on by default');
   const sh2 = capsFrom({ ok: true, uptime: 1, version: '0.5.0', edition: 'self-hosted', features: { news: false } });
   assert.equal(hasFeature(sh2, 'news'), false, 'an explicit false is off everywhere');
 });
@@ -112,9 +113,12 @@ test('navFilter: self-hosted defaults and old servers show everything', () => {
   assert.deepEqual(nav.filterNav(nav.NAV_ITEMS, selfHosted()).map((n) => n.id), all);
   assert.deepEqual(nav.filterNav(nav.NAV_ITEMS, oldServer()).map((n) => n.id), all);
   const routes = all;
-  assert.equal(nav.filterSettings(search.SETTINGS_INDEX, oldServer(), routes).length, search.SETTINGS_INDEX.length);
+  // every entry except the account ones (features.accountMenu, multi-tenant servers only)
+  const accountEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'accountMenu').length;
+  assert.equal(accountEntries, 2);
+  assert.equal(nav.filterSettings(search.SETTINGS_INDEX, oldServer(), routes).length, search.SETTINGS_INDEX.length - accountEntries);
   // without Google credentials a self-hosted admin still lists the Google entries (with the setup hint)
-  assert.equal(nav.filterSettings(search.SETTINGS_INDEX, selfHosted(), routes).length, search.SETTINGS_INDEX.length);
+  assert.equal(nav.filterSettings(search.SETTINGS_INDEX, selfHosted(), routes).length, search.SETTINGS_INDEX.length - accountEntries);
   const actions = Object.keys(nav.ACTION_FEATURES).map((id) => ({ id }));
   assert.equal(nav.filterActions(actions, selfHosted()).length, actions.length);
 });
@@ -198,6 +202,86 @@ test('authRedirect: account mode goes to the login page with next', () => {
   assert.equal(auth.logoutRedirect(me, cloud(), { next: '/\\evil.example' }), '/login');
   assert.equal(auth.authRedirect(me, cloud(), '/admin/\t/x'), `/login?next=${encodeURIComponent('/admin/')}`);
   assert.equal(auth.logoutRedirect({ user: { email: '', name: '', method: 'password' }, googleConfigured: false, passwordLoginEnabled: true }, selfHosted(), {}), null);
+});
+
+const accountMe = (account = {}) => ({
+  user: { email: 'a@example.com', name: 'A', method: 'account' },
+  googleConfigured: false,
+  passwordLoginEnabled: false,
+  account: { loginUrl: '/login', accountUrl: '/account', sessionsUrl: '/account/sessions', deleteUrl: '/account/delete', household: { name: 'Home', role: 'owner' }, ...account },
+});
+
+test('authRedirect(me, caps): who is in account mode', () => {
+  const pw = { user: { email: '', name: 'Admin', method: 'password' }, googleConfigured: false, passwordLoginEnabled: true };
+  const google = { user: { email: 'g@example.com', name: 'G', method: 'google' }, googleConfigured: true, passwordLoginEnabled: true };
+  // self-hosted: password and Google logins keep the admin's own login screen, before and after a 401
+  for (const caps of [selfHosted(), oldServer()]) {
+    assert.equal(auth.accountMode(pw, caps), false);
+    assert.equal(auth.authRedirect(pw, caps, '/admin/#/home'), null);
+    assert.equal(auth.authRedirect(google, caps, '/admin/'), null);
+    assert.equal(auth.authRedirect({ ...pw, user: null }, caps, '/admin/'), null);
+    assert.equal(auth.authRedirect(null, caps, '/admin/'), null);
+    assert.equal(auth.logoutRedirect(google, caps, { ok: true, next: '/elsewhere' }), null);
+  }
+  // an account login is account mode even when caps could not be read
+  assert.equal(auth.accountMode(accountMe(), oldServer()), true);
+  // a cloud server is account mode before /me knows the user (signed out, or /me failed)
+  assert.equal(auth.authRedirect(null, cloud(), '/admin/#/displays'), `/login?next=${encodeURIComponent('/admin/#/displays')}`);
+  // a single-tenant cloud-style server without an account login keeps its own login screen
+  assert.equal(auth.authRedirect({ ...pw, user: null }, capsFrom({ ...cloudHealth(), tenancy: 'single' }), '/admin/'), null);
+});
+
+test('authRedirect(me, caps): the server login page, kept safe', () => {
+  const caps = cloud();
+  const next = encodeURIComponent('/admin/#pair=ABCD2345');
+  assert.equal(auth.authRedirect(accountMe({ loginUrl: '/signin' }), caps, '/admin/#pair=ABCD2345'), `/signin?next=${next}`);
+  assert.equal(auth.authRedirect(accountMe({ loginUrl: '/signin?lang=pt' }), caps, '/admin/#pair=ABCD2345'), `/signin?lang=pt&next=${next}`);
+  assert.equal(auth.authRedirect(accountMe({ loginUrl: 'https://account.example.com/login' }), caps, '/admin/'), `https://account.example.com/login?next=${encodeURIComponent('/admin/')}`);
+  // a login URL that is not http(s) or a local path falls back to /login
+  for (const bad of ['javascript:alert(1)', 'data:text/html,x', '//evil.example', '/\t/evil.example', '', 42]) {
+    assert.equal(auth.authRedirect(accountMe({ loginUrl: bad }), caps, '/admin/'), `/login?next=${encodeURIComponent('/admin/')}`, String(bad));
+    assert.equal(auth.logoutRedirect(accountMe({ loginUrl: bad }), caps, {}), '/login', String(bad));
+  }
+  // `next` only ever points into the admin
+  for (const p of ['/', '/account', '/admin', 'admin/', '/admin/\\x', '/admin/\u0000']) assert.equal(auth.safeNext(p), '/admin/', JSON.stringify(p));
+  assert.equal(auth.safeNext('/admin/#/security'), '/admin/#/security');
+  // logout: the server's next, else the login page, also when the logout call failed
+  assert.equal(auth.logoutRedirect(accountMe(), caps, { ok: true, next: '/login?bye=1' }), '/login?bye=1');
+  assert.equal(auth.logoutRedirect(accountMe({ loginUrl: '/signin' }), caps, null), '/signin');
+  assert.equal(auth.logoutRedirect(accountMe(), caps, { next: 'https://evil.example/' }), '/login');
+});
+
+test('account menu links and household names', () => {
+  assert.deepEqual(auth.accountLinks(accountMe()), { account: '/account', sessions: '/account/sessions', remove: '/account/delete' });
+  assert.deepEqual(auth.accountLinks(accountMe({ deleteUrl: 'javascript:void(0)', sessionsUrl: 'https://account.example.com/sessions' })), {
+    account: '/account',
+    sessions: 'https://account.example.com/sessions',
+    remove: null,
+  });
+  // only account logins get the menu
+  assert.equal(auth.accountLinks({ ...accountMe(), user: { email: '', name: '', method: 'password' } }), null);
+  assert.equal(auth.accountLinks({ user: { email: '', name: '', method: 'account' }, googleConfigured: false, passwordLoginEnabled: false }), null);
+  assert.equal(auth.accountLinks(null), null);
+  assert.equal(auth.cleanHouseholdName('  Casa\u0007 de la playa \n'), 'Casa de la playa');
+  assert.equal(auth.cleanHouseholdName('x'.repeat(80)).length, auth.HOUSEHOLD_NAME_MAX);
+  assert.equal(auth.cleanHouseholdName('   '), '');
+});
+
+test('accountNav: multi-tenant servers turn Security into Account', () => {
+  const cl = nav.accountNav(nav.filterNav(nav.NAV_ITEMS, cloud()), cloud());
+  const sec = cl.find((n) => n.id === 'security');
+  assert.equal(sec.label, 'Cuenta');
+  assert.equal(sec.icon, 'user');
+  assert.equal(cl.filter((n) => n.label === 'Seguridad').length, 0);
+  for (const caps of [selfHosted(), oldServer()]) {
+    const sh = nav.accountNav(nav.filterNav(nav.NAV_ITEMS, caps), caps);
+    assert.equal(sh.find((n) => n.id === 'security').label, 'Seguridad');
+  }
+  // the account entries in the settings search follow accountMenu
+  const visible = cl.map((n) => n.id);
+  const labels = (caps) => nav.filterSettings(search.SETTINGS_INDEX, caps, visible).filter((s) => s.route === 'security').map((s) => s.label);
+  assert.deepEqual(labels(cloud()), ['Nombre del hogar', 'Sesiones abiertas']);
+  assert.ok(!labels(selfHosted()).includes('Nombre del hogar'));
 });
 
 test('screenUrl: private links, display origin and open mode', () => {

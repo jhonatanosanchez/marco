@@ -138,7 +138,7 @@ export function SecuritySection({ cfg, set, errors, me, saved, go }: SectionProp
             <div>
               <strong>{me.user.name || me.user.email}</strong>
               <div class="muted small">
-                {me.user.email} · {me.user.method === 'google' ? t('sesión con Google') : t('sesión con contraseña')}
+                {me.user.email} · {me.user.method === 'google' ? t('sesión con Google') : me.user.method === 'account' ? t('sesión con tu cuenta') : t('sesión con contraseña')}
               </div>
             </div>
           </div>

@@ -16,7 +16,8 @@ import { SetupWizard, takeSetupToken } from './Setup';
 import { Preview } from './Preview';
 import { SETTINGS_INDEX } from './searchIndex';
 import { caps as currentCaps, has, hasFeature, loadCaps, type Caps } from './caps';
-import { filterActions, filterNav, filterSettings, NAV_ITEMS, type NavMeta } from './navFilter';
+import { accountNav, filterActions, filterNav, filterSettings, NAV_ITEMS, type NavMeta } from './navFilter';
+import { accountLinks, accountMode, authRedirect, logoutRedirect } from './authRedirect';
 import { ActivitySection } from './sections/Activity';
 import { AlertsSection } from './sections/Alerts';
 import { ApiSection } from './sections/Api';
@@ -76,6 +77,43 @@ const SECTIONS: Record<string, (p: SectionProps) => any> = {
 };
 
 const NAV: NavItem[] = NAV_ITEMS.map((n) => ({ ...n, comp: SECTIONS[n.id] }));
+
+/** The Account page (multi-tenant servers only) is its own chunk, so self-hosted installs never load it. */
+type SectionComp = (p: SectionProps) => any;
+let accountChunk: Promise<SectionComp> | null = null;
+function AccountPage(p: SectionProps) {
+  const [Comp, setComp] = useState<SectionComp | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    accountChunk ??= import('./sections/Account').then((m) => m.AccountSection);
+    accountChunk.then(
+      (c) => alive && setComp(() => c),
+      () => {
+        accountChunk = null;
+        if (alive) setFailed(true);
+      }
+    );
+    return () => {
+      alive = false;
+    };
+  }, []);
+  if (Comp) return <Comp {...p} />;
+  if (failed)
+    return (
+      <div class="boot__err">
+        <Icon name="alert" size={28} />
+        <h2>{t('No se puede conectar con el servidor')}</h2>
+        <Button variant="primary" icon="refresh" onClick={() => location.reload()}>
+          {t('Reintentar')}
+        </Button>
+      </div>
+    );
+  return <span class="spinner spinner--lg" />;
+}
+
+/** Path and hash of this page, the `next` the account login comes back to. */
+const herePath = () => location.pathname + location.hash;
 
 const parseHash = () => {
   const raw = location.hash.replace(/^#\/?/, '');
@@ -184,6 +222,8 @@ export function App() {
   const changeLang = (l: Lang) => {
     setLang(l);
     setLangState(l);
+    // Account logins keep the language on the account too (emails and account pages follow it).
+    if (me?.user?.method === 'account' && has('accountMenu')) api.accountLang(l).catch(() => {});
   };
 
   useEffect(() => {
@@ -242,8 +282,28 @@ export function App() {
     });
   }, []);
 
+  const meRef = useRef(me);
+  meRef.current = me;
+  /** Set right before the page leaves on purpose (logout, account login), so "unsaved changes" does not ask again. */
+  const leavingRef = useRef(false);
+
+  /* ---------- account mode (Marco Cloud): signing in happens on the account pages */
+  useEffect(() => {
+    if (!me || me.user || setup) return;
+    const url = authRedirect(me, caps, herePath());
+    if (url) {
+      leavingRef.current = true;
+      location.assign(url);
+    }
+  }, [me, caps, setup]);
+
   useEffect(() => {
     const on = () => {
+      const url = authRedirect(meRef.current, currentCaps(), herePath());
+      if (url) {
+        location.assign(url);
+        return;
+      }
       setMe((m) => (m ? { ...m, user: null } : m));
       setLoginErr(t('La sesión ha caducado. Vuelve a entrar.'));
       loadMe();
@@ -440,7 +500,7 @@ export function App() {
       }
     };
     const onUnload = (e: BeforeUnloadEvent) => {
-      if (dirty) {
+      if (dirty && !leavingRef.current) {
         e.preventDefault();
         e.returnValue = '';
       }
@@ -478,10 +538,18 @@ export function App() {
       const ok = await confirmDialog({ title: t('¿Salir sin guardar?'), body: t('Tienes cambios sin guardar.'), confirm: t('Salir'), danger: true });
       if (!ok) return;
     }
+    let res: unknown = null;
     try {
-      await api.logout();
+      res = await api.logout();
     } catch {
       /* ignore */
+    }
+    const dest = logoutRedirect(me, caps, res);
+    if (dest) {
+      setMenuOpen(false);
+      leavingRef.current = true;
+      location.assign(dest);
+      return;
     }
     setSaved(null);
     setDraft(null);
@@ -491,7 +559,10 @@ export function App() {
   };
 
   /* ---------- pages the server offers (features in /api/health) */
-  const nav = useMemo(() => filterNav(NAV, caps), [caps]);
+  const nav = useMemo(
+    () => accountNav(filterNav(NAV, caps), caps).map((n) => (n.id === 'security' && caps.tenancy === 'multi' ? { ...n, comp: AccountPage } : n)),
+    [caps]
+  );
 
   /* ---------- command palette items */
   const paletteItems = useMemo<PaletteItem[]>(() => {
@@ -591,6 +662,16 @@ export function App() {
     );
   }
 
+  if (!me.user && accountMode(me, caps)) {
+    // the effect above is sending the browser to the account login
+    return (
+      <div class="boot" style={rootStyle}>
+        <span class="spinner spinner--lg" />
+        <ToastHost />
+      </div>
+    );
+  }
+
   if (!me.user) {
     return (
       <div style={rootStyle}>
@@ -633,6 +714,9 @@ export function App() {
   const errCountBySection: Record<string, number> = {};
   if (showErrors || dirty) for (const k of errorKeys) errCountBySection[sectionForError(k)] = (errCountBySection[sectionForError(k)] ?? 0) + 1;
   const user = me.user;
+  const household = me.account?.household ?? null;
+  const links = has('accountMenu') ? accountLinks(me) : null;
+  const accountPage = caps.tenancy === 'multi';
   const portrait = view.screen.orientation === 'portrait';
   const previewSide = wide && showPreview;
   const online: Record<string, number> = {};
@@ -656,6 +740,7 @@ export function App() {
     setScreenId,
     go,
     reloadPreview: () => setPreviewKey((k) => k + 1),
+    updateMe: setMe,
   };
 
   return (
@@ -791,6 +876,14 @@ export function App() {
                     <div class="menu__who">
                       <strong>{user.name || t('Administrador')}</strong>
                       <span class="muted small">{user.email}</span>
+                      {household && (
+                        <span class="menu__household muted small">
+                          <Icon name="home" size={13} />
+                          <span>
+                            {household.name} · {household.role === 'owner' ? t('Propietario') : t('Miembro')}
+                          </span>
+                        </span>
+                      )}
                     </div>
                     <a class="menu__item show-lg" href={viewUrl} target="_blank" rel="noopener" onClick={() => setMenuOpen(false)}>
                       <Icon name="external" size={16} /> {t('Ver pantalla')} · {curScreen.name}
@@ -810,9 +903,29 @@ export function App() {
                     <a class="menu__item" href="#/displays" onClick={() => setMenuOpen(false)}>
                       <Icon name="wifi" size={16} /> {t('Pantallas conectadas')}
                     </a>
-                    <a class="menu__item" href="#/security" onClick={() => setMenuOpen(false)}>
-                      <Icon name="shield" size={16} /> {t('Seguridad')}
-                    </a>
+                    {links ? (
+                      <>
+                        {(accountPage || links.account) && (
+                          <a class="menu__item" href={accountPage ? '#/security' : links.account!} onClick={() => setMenuOpen(false)}>
+                            <Icon name="user" size={16} /> {t('Cuenta')}
+                          </a>
+                        )}
+                        {links.sessions && (
+                          <a class="menu__item" href={links.sessions} onClick={() => setMenuOpen(false)}>
+                            <Icon name="shield" size={16} /> {t('Sesiones abiertas')}
+                          </a>
+                        )}
+                        {links.remove && (
+                          <a class="menu__item menu__item--danger" href={links.remove} onClick={() => setMenuOpen(false)}>
+                            <Icon name="trash" size={16} /> {t('Eliminar cuenta')}
+                          </a>
+                        )}
+                      </>
+                    ) : (
+                      <a class="menu__item" href="#/security" onClick={() => setMenuOpen(false)}>
+                        <Icon name={accountPage ? 'user' : 'shield'} size={16} /> {t(accountPage ? 'Cuenta' : 'Seguridad')}
+                      </a>
+                    )}
                     <button type="button" class="menu__item menu__item--danger" onClick={logout}>
                       <Icon name="logout" size={16} /> {t('Cerrar sesión')}
                     </button>

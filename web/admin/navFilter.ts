@@ -85,3 +85,10 @@ export function filterSettings<T extends { route: string; feature?: Gate }>(entr
 export function routeFor(id: string, visible: readonly { id: string }[]): string {
   return visible.some((n) => n.id === id) ? id : 'home';
 }
+
+/** Multi-tenant servers (Marco Cloud) replace the Security page with the Account page: same id, so links to
+ *  #/security keep working. Single-tenant servers keep Security as it is. */
+export function accountNav<T extends NavMeta>(items: readonly T[], caps: Caps): T[] {
+  if (caps.tenancy !== 'multi') return [...items];
+  return items.map((n) => (n.id === 'security' ? { ...n, label: 'Cuenta', icon: 'user' as IconName, keywords: 'account cuenta conta hogar household casa sesiones sessions' } : n));
+}

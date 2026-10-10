@@ -404,7 +404,7 @@ export interface PhotosResponse {
 
 /** Feature flags in GET /api/health. A self-hosted server turns them all on except googleCalendar and googleLogin
  *  (on when Google credentials are set) and accountMenu. No `features` field at all (older servers) means every
- *  feature is on; a missing key counts as off only when `edition` is not 'self-hosted'. */
+ *  feature is on except accountMenu; a missing key counts as off only when `edition` is not 'self-hosted'. */
 export interface Features {
   homeassistant: boolean;
   news: boolean;

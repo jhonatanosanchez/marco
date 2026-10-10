@@ -26,4 +26,6 @@ export interface SectionProps {
   go: (route: string) => void;
   /** Bump the preview iframe. */
   reloadPreview: () => void;
+  /** Replace the signed-in user's /api/auth/me data (account page after renaming the household). */
+  updateMe?: (m: AuthMeResponse) => void;
 }

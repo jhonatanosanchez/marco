@@ -29,7 +29,7 @@ export function safeNext(pathAndHash: string): string {
 /** Login URL with `next`, or null when the admin shows its own login screen. */
 export function authRedirect(me: AuthMeResponse | null, caps: Caps, pathAndHash: string): string | null {
   if (!accountMode(me, caps)) return null;
-  const login = me?.account?.loginUrl || DEFAULT_LOGIN;
+  const login = loginUrlOf(me);
   const sep = login.includes('?') ? '&' : '?';
   return `${login}${sep}next=${encodeURIComponent(safeNext(pathAndHash))}`;
 }
@@ -39,5 +39,45 @@ export function logoutRedirect(me: AuthMeResponse | null, caps: Caps, res: unkno
   if (!accountMode(me, caps)) return null;
   const next = res && typeof res === 'object' ? (res as { next?: unknown }).next : undefined;
   if (typeof next === 'string' && isLocalPath(next)) return next;
-  return me?.account?.loginUrl || DEFAULT_LOGIN;
+  return loginUrlOf(me);
+}
+
+/** The server's login page when it is a safe link, else "/login". */
+function loginUrlOf(me: AuthMeResponse | null): string {
+  return safeAccountUrl(me?.account?.loginUrl) || DEFAULT_LOGIN;
+}
+
+/** Account page links from /api/auth/me: a path on this site or an http(s) URL; anything else is dropped. */
+export function safeAccountUrl(v: unknown): string | null {
+  if (typeof v !== 'string' || !v) return null;
+  if (isLocalPath(v)) return v;
+  if (/[\s\u0000-\u001f\u007f\\]/.test(v)) return null;
+  try {
+    const u = new URL(v);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : null;
+  } catch {
+    return null;
+  }
+}
+
+export interface AccountLinks {
+  account: string | null;
+  sessions: string | null;
+  remove: string | null;
+}
+
+/** The account menu links, or null when this is not an account login (self-hosted). */
+export function accountLinks(me: AuthMeResponse | null): AccountLinks | null {
+  const a = me?.account;
+  if (!a || me?.user?.method !== 'account') return null;
+  return { account: safeAccountUrl(a.accountUrl), sessions: safeAccountUrl(a.sessionsUrl), remove: safeAccountUrl(a.deleteUrl) };
+}
+
+/** Household names: trimmed, control characters dropped, at most 60 characters (the cloud's cap). */
+export const HOUSEHOLD_NAME_MAX = 60;
+export function cleanHouseholdName(v: string): string {
+  return String(v ?? '')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .trim()
+    .slice(0, HOUSEHOLD_NAME_MAX);
 }
