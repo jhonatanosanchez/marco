@@ -28,8 +28,6 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY server ./server
-# Icon rule defaults are shared by the server and the web UI
-COPY web/shared/iconRules.json ./web/shared/iconRules.json
 COPY --from=build /app/dist ./dist
 RUN mkdir -p /data && chown node:node /data
 USER node

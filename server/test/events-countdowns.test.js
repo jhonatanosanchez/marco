@@ -7,8 +7,8 @@ import path from 'node:path';
 import { computeCountdowns, nextCountdownDate } from '../countdowns.js';
 import { buildSourceEvents } from '../calendars.js';
 import { expandLocalEvents, expandBirthdays, localSource, birthdaysSource } from '../localEvents.js';
-import { defaultConfig } from '../defaults.js';
-import { addDays, localDate } from '../lib/tz.js';
+import { defaultConfig } from '../core/defaults.js';
+import { addDays, localDate } from '../core/lib/tz.js';
 
 const TZ = 'Europe/Lisbon';
 const TODAY = '2026-10-09';

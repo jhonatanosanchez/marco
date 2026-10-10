@@ -17,7 +17,7 @@ import { getConfig, getSecrets, updateSecrets, flushSecrets } from './store.js';
 import { sessionValid, isLanClient, authEvents, SESSION_MAX_AGE } from './auth.js';
 import { listClients, dropClient } from './sse.js';
 import { logActivity } from './activity.js';
-import { resolveScreen } from './screens.js';
+import { resolveScreen } from './core/screens.js';
 
 export const KEY_HEADER = 'x-marco-key';
 /** Display key: a random UUIDv4 (122 random bits), lower-case. Upper-case input is accepted. */

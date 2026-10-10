@@ -21,10 +21,10 @@ import { googleConfigured } from './google.js';
 import { logActivity, logActivityThrottled } from './activity.js';
 import { testIcs } from './calendars.js';
 import { passwordProblem, PASSWORD_MESSAGES } from './lib/password.js';
-import { isHttpUrl, slugify } from './validate.js';
-import { isValidTimeZone } from './lib/tz.js';
-import { LANGS, langFromHeader } from './lib/i18n.js';
-import { DEFAULT_SOURCES } from './defaults.js';
+import { isHttpUrl, slugify } from './core/validate.js';
+import { isValidTimeZone } from './core/lib/tz.js';
+import { LANGS, langFromHeader } from './core/lib/i18n.js';
+import { DEFAULT_SOURCES } from './core/defaults.js';
 import { displayAccessMode, displayKeyFor } from './displayAccess.js';
 
 let generatedToken = null;

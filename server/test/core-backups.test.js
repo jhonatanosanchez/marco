@@ -10,7 +10,7 @@ import {
   makeBundle, importPreview, parseImport, mergeImport, sanitizeImportedSecrets, PREMIGRATION_ID,
 } from '../backups.js';
 import { logActivity, listActivity, clearActivity, changedSections, recentActivity } from '../activity.js';
-import { defaultConfig, defaultScreenProfile } from '../defaults.js';
+import { defaultConfig, defaultScreenProfile } from '../core/defaults.js';
 
 function setup() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cs-core-bak-'));

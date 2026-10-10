@@ -3,12 +3,13 @@
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { paths, writeFileAtomic } from './store.js';
-import { fold, stableStringify } from './lib/text.js';
-import { redactSecrets, hasSecrets } from './lib/redact.js';
+import { fold } from './lib/text.js';
+import { capData } from './core/activityCore.js';
+
+export { changedSections } from './core/activityCore.js';
 
 const MAX_ENTRIES = 5000; // kept after compaction
 const COMPACT_AT = 6000; // lines in file before rewriting it
-const MAX_DATA_CHARS = 2048; // serialised `data` above this is truncated (entries come from unauthenticated requests too)
 let entries = null; // oldest → newest
 let fileLines = 0;
 let loadedFrom = null; // paths.activity the ring was loaded from (initStore may switch data dirs, e.g. tests)
@@ -47,19 +48,6 @@ export function actorFrom(req) {
   const u = req.session?.user;
   const actor = req.apiToken ? `token:${req.apiToken.name}` : u ? (u.email || u.method || 'admin') : 'anonymous';
   return { actor, ip: req.ip || null };
-}
-
-/** Keep `data` small: oversized payloads are replaced by a truncated preview. */
-function capData(data) {
-  let s;
-  try { s = JSON.stringify(data); } catch { return { truncated: true }; }
-  // Safety net: display keys / device tokens never land in the log, whatever a caller passes.
-  if (s !== undefined && hasSecrets(s)) {
-    s = redactSecrets(s);
-    try { data = JSON.parse(s); } catch { return { redacted: true }; }
-  }
-  if (s === undefined || s.length <= MAX_DATA_CHARS) return data;
-  return { truncated: true, preview: s.slice(0, 300) };
 }
 
 // Throttled logging for events any unauthenticated client can trigger (display connects, OAuth callbacks):
@@ -160,35 +148,4 @@ export function clearActivity() {
   entries = [];
   fileLines = 0;
   writeFileAtomic(paths.activity, '');
-}
-
-/**
- * Changed sections between two stored configs, for `config.saved`: top-level keys plus
- * `screens:<slug>.<section>` per screen (`screens:+<slug>` added, `screens:-<slug>` removed). Pure.
- */
-export function changedSections(prev, next) {
-  if (!prev) return ['*'];
-  const same = (a, b) => stableStringify(a) === stableStringify(b);
-  const out = [];
-  const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
-  for (const k of keys) {
-    if (k === 'revision' || k === 'screens' || k === 'version') continue;
-    if (!same(prev[k], next[k])) out.push(k);
-  }
-  const before = new Map((prev.screens || []).map((s) => [s.id, s]));
-  const after = new Map((next.screens || []).map((s) => [s.id, s]));
-  for (const [sid, s] of after) {
-    const p = before.get(sid);
-    if (!p) { out.push(`screens:+${s.slug}`); continue; }
-    if (p.name !== s.name || p.slug !== s.slug) out.push(`screens:${s.slug}.name`);
-    for (const sec of Object.keys(s)) {
-      if (['id', 'slug', 'name'].includes(sec)) continue;
-      if (!same(p[sec], s[sec])) out.push(`screens:${s.slug}.${sec}`);
-    }
-  }
-  for (const [sid, p] of before) if (!after.has(sid)) out.push(`screens:-${p.slug}`);
-  const order = (prev.screens || []).map((s) => s.id).filter((x) => after.has(x));
-  const order2 = (next.screens || []).map((s) => s.id).filter((x) => before.has(x));
-  if (!same(order, order2)) out.push('screens:order');
-  return out;
 }

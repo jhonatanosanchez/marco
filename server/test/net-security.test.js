@@ -8,7 +8,7 @@ import path from 'node:path';
 import http from 'node:http';
 import express from 'express';
 import * as store from '../store.js';
-import { defaultConfig } from '../defaults.js';
+import { defaultConfig } from '../core/defaults.js';
 import { sessionMiddleware, csrfGuard, ensurePassword, loginHandler, meHandler, lanOrSession } from '../auth.js';
 import { setupRouter, setupToken, _resetSetup, logSetupHint } from '../setup.js';
 import { hostGuard, hostAllowed, hostnameOf, isLanClient, ipBucket, blockedFetchHost, blockedFetchAddress, _setContainerGateway } from '../lib/net.js';

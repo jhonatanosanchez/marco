@@ -84,7 +84,7 @@ export const EMOJI_GRID = [
   '🎬', '🎵', '🎮', '📺', '🎨', '📸', '⭐', '📌', '⏰', '🔔', '💬', '✅',
 ];
 
-/** Mirror of server/defaults.js DEFAULT_ICON_RULES (used by "restore defaults"). */
+/** Mirror of server/core/defaults.js DEFAULT_ICON_RULES (used by "restore defaults"). */
 export const DEFAULT_ICON_RULES: IconRule[] = [
   { id: 'r_birthday', match: ['cumple', 'birthday', 'aniversário', 'aniversario', 'faz anos'], emoji: '🎂', color: null },
   { id: 'r_checkout', match: ['check-out', 'checkout', 'check out', 'salida huésped'], emoji: '🧳', color: null },

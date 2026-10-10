@@ -1,8 +1,8 @@
 // built-in "Local" calendar (admin-managed events) and birthdays → raw instances that go through the same
 // pipeline as ICS/Google events (calendars.js buildSourceEvents). Pure functions; unit-tested in
 // events-local.test.js. See docs/API.md and docs/ARCHITECTURE.md.
-import { addDays, daysBetween, tzOffsetMinutes } from './lib/tz.js';
-import { LOCAL_SOURCE_ID, BIRTHDAYS_SOURCE_ID } from './defaults.js';
+import { addDays, daysBetween, tzOffsetMinutes } from './core/lib/tz.js';
+import { LOCAL_SOURCE_ID, BIRTHDAYS_SOURCE_ID } from './core/defaults.js';
 
 export const MAX_OCCURRENCES = 1000;
 

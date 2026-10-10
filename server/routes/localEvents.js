@@ -8,13 +8,13 @@
 import { Router } from 'express';
 import { requireAuth } from '../auth.js';
 import { getConfig } from '../store.js';
-import { resolveScreen } from '../screens.js';
+import { resolveScreen } from '../core/screens.js';
 import { requestScreen } from '../displayAccess.js';
-import { validateConfig, isValidDate } from '../validate.js';
+import { validateConfig, isValidDate } from '../core/validate.js';
 import { previewEvents } from '../calendars.js';
 import { getCountdowns } from '../countdowns.js';
-import { parseBirthdayCsv, MAX_CSV_BYTES } from '../csv.js';
-import { addDays, localDate } from '../lib/tz.js';
+import { parseBirthdayCsv, MAX_CSV_BYTES } from '../core/csv.js';
+import { addDays, localDate } from '../core/lib/tz.js';
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 

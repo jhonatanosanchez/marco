@@ -1,4 +1,4 @@
-// Default display config (mirrors server/defaults.js) + a defensive deep merge so a partial / older
+// Default display config (mirrors server/core/defaults.js) + a defensive deep merge so a partial / older
 // config from the server never breaks the screen.
 import type { DisplayConfig } from '../shared/types';
 import { DEFAULT_ICON_RULES } from '../shared/emoji';

@@ -1,12 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { wmoDescription, windDirLabel } from '../lib/i18n.js';
-import { isoWithOffset, zonedMidnight, localDate, addDays } from '../lib/tz.js';
+import { wmoDescription, windDirLabel } from '../core/lib/i18n.js';
+import { isoWithOffset, zonedMidnight, localDate, addDays } from '../core/lib/tz.js';
 import { mapOpenMeteo } from '../weather.js';
 import { sanitizeFilename, isGalleryFile } from '../photos.js';
 import { hashPassword, verifyPassword } from '../auth.js';
 import { displayConfig } from '../routes/public.js';
-import { defaultConfig } from '../defaults.js';
+import { defaultConfig } from '../core/defaults.js';
 
 test('weather i18n', () => {
   assert.equal(wmoDescription(0, 'es'), 'Despejado');

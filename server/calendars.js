@@ -5,18 +5,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { request } from './lib/http.js';
-import { addDays, isoWithOffset, localDate, zonedMidnight, daysBetween } from './lib/tz.js';
+import { addDays, isoWithOffset, localDate, zonedMidnight, daysBetween } from './core/lib/tz.js';
 import { hash } from './lib/text.js';
-import { t } from './lib/i18n.js';
+import { t } from './core/lib/i18n.js';
 import { parseIcsText, expandEvents } from './ics.js';
 import { matchRule, normalizeAirbnbTitle, tidyTitle, translateHoliday, KIND_EMOJI } from './rules.js';
 import { applyEventRules } from './eventRules.js';
 import { expandLocalEvents, expandBirthdays, localSource, birthdaysSource } from './localEvents.js';
 import * as google from './google.js';
 import { getConfig, paths } from './store.js';
-import { defaultScreen, screenSourceIds } from './screens.js';
+import { defaultScreen, screenSourceIds } from './core/screens.js';
 import { logActivity } from './activity.js';
-import { LOCAL_SOURCE_ID, BIRTHDAYS_SOURCE_ID } from './defaults.js';
+import { LOCAL_SOURCE_ID, BIRTHDAYS_SOURCE_ID } from './core/defaults.js';
 
 const DAY = 86_400_000;
 const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;

@@ -13,7 +13,7 @@ import {
 } from '../photos.js';
 import fs from 'node:fs';
 import { broadcast, clientCount } from '../sse.js';
-import { isHttpUrl } from '../validate.js';
+import { isHttpUrl } from '../core/validate.js';
 import { logActivity } from '../activity.js';
 import { resolveScreenList } from '../displays.js';
 

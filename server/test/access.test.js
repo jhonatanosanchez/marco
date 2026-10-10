@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import * as store from '../store.js';
-import { defaultConfig, defaultScreenProfile } from '../defaults.js';
+import { defaultConfig, defaultScreenProfile } from '../core/defaults.js';
 import { ensurePassword, hashPassword } from '../auth.js';
 import { createApp } from '../app.js';
 import { closeAll, broadcast, listClients } from '../sse.js';
@@ -22,7 +22,7 @@ import {
   startPairing, pairingStatus, claimPairing, normalizeCode, _resetPairing, _pendingCount, CODE_ALPHABET, CODE_LENGTH,
   PAIR_TTL_MS, WAITING_GRACE_MS, CLAIM_FAIL_LIMIT, CLAIM_FAIL_GLOBAL, START_LIMIT,
 } from '../pairing.js';
-import { redactSecrets } from '../lib/redact.js';
+import { redactSecrets } from '../core/activityCore.js';
 
 const realFetch = globalThis.fetch;
 // No network in tests: Open-Meteo / picsum calls fail fast (the display endpoints then answer 502 / fall back).

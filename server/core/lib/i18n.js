@@ -77,7 +77,7 @@ export const requestLang = (req) => {
   return LANGS.includes(explicit) ? explicit : langFromHeader(req?.get?.('accept-language'));
 };
 
-// Import-preview summaries (server/backups.js). Nouns: [one, many, grammatical gender ('f'|'m')].
+// Import-preview summaries (server/core/backupsCore.js). Nouns: [one, many, grammatical gender ('f'|'m')].
 const NOUNS = {
   screen: { es: ['pantalla', 'pantallas', 'f'], en: ['screen', 'screens'], pt: ['ecrã', 'ecrãs', 'm'] },
   source: { es: ['fuente', 'fuentes', 'f'], en: ['source', 'sources'], pt: ['fonte', 'fontes', 'f'] },

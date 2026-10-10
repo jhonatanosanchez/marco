@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { validateConfig, mergeDefaults } from '../validate.js';
-import { defaultConfig } from '../defaults.js';
+import { validateConfig, mergeDefaults } from '../core/validate.js';
+import { defaultConfig } from '../core/defaults.js';
 
 test('defaults are valid, ship no personal sources, only a public example + rules', () => {
   const { ok, errors, value } = validateConfig(defaultConfig());
@@ -117,7 +117,7 @@ const V1 = {
 };
 
 test('migration v1 → v2 keeps every value (global vs screens[0])', async () => {
-  const { migrateConfig, isV1 } = await import('../validate.js');
+  const { migrateConfig, isV1 } = await import('../core/validate.js');
   assert.equal(isV1(V1), true);
   const { ok, errors, value: v } = validateConfig(mergeDefaults(migrateConfig(structuredClone(V1))));
   assert.equal(ok, true, JSON.stringify(errors));
@@ -168,7 +168,7 @@ test('store migrates a v1 file on load and keeps a pre-migration copy', async ()
 });
 
 test('screens: ids/slugs unique, unknown sourceIds dropped, defaultScreen fixed, flat view', async () => {
-  const { flatView, resolveScreen, displayConfig } = await import('../screens.js');
+  const { flatView, resolveScreen, displayConfig } = await import('../core/screens.js');
   const c = defaultConfig();
   c.screens.push({ ...structuredClone(c.screens[0]), name: 'Living room 2' }); // same id + slug
   c.screens[1].calendar.sourceIds = ['c_holidays', 'nope', 'birthdays'];

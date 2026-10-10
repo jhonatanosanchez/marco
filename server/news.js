@@ -1,108 +1,11 @@
-// RSS 2.0 / Atom / RDF news feeds via fast-xml-parser.
-import { XMLParser } from 'fast-xml-parser';
+// RSS 2.0 / Atom / RDF news feeds: fetching and caching. Parsing is in server/core/newsParse.js.
 import { request, BROWSER_UA } from './lib/http.js';
-import { stripHtml, truncate, hash, decodeEntities } from './lib/text.js';
 import { getConfig } from './store.js';
+import { parseFeed } from './core/newsParse.js';
+
+export { parseFeed } from './core/newsParse.js';
 
 const TTL = 15 * 60_000;
-const parser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: '@_',
-  textNodeName: '#text',
-  cdataPropName: false,
-  processEntities: false, // we decode entities ourselves (handles HTML named entities too)
-  htmlEntities: false,
-  parseTagValue: false,
-  trimValues: true,
-});
-
-const arr = (v) => (v == null ? [] : Array.isArray(v) ? v : [v]);
-const text = (v) => {
-  if (v == null) return '';
-  if (typeof v === 'string' || typeof v === 'number') return String(v);
-  if (Array.isArray(v)) return text(v[0]);
-  if (typeof v === 'object') return text(v['#text'] ?? '');
-  return '';
-};
-const attr = (v, name) => (v && typeof v === 'object' ? v[`@_${name}`] : undefined);
-
-function firstImage(it) {
-  for (const enc of arr(it.enclosure)) {
-    const url = attr(enc, 'url');
-    const type = attr(enc, 'type') || '';
-    if (url && (type.startsWith('image') || /\.(jpe?g|png|webp|gif)(\?|$)/i.test(url))) return url;
-  }
-  for (const key of ['media:content', 'media:thumbnail']) {
-    for (const m of arr(it[key])) {
-      const url = attr(m, 'url');
-      const medium = attr(m, 'medium');
-      if (url && (!medium || medium === 'image')) return url;
-    }
-  }
-  for (const g of arr(it['media:group'])) {
-    const u = attr(arr(g['media:content'])[0], 'url') || attr(arr(g['media:thumbnail'])[0], 'url');
-    if (u) return u;
-  }
-  const html = text(it['content:encoded']) || text(it.description) || text(it.content) || text(it.summary);
-  const m = /<img[^>]+src=["']([^"']+)["']/i.exec(decodeEntities(html));
-  if (m && /^https?:/i.test(m[1])) return m[1];
-  return undefined;
-}
-
-function toIso(s) {
-  const d = new Date(String(s || '').trim());
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
-}
-
-/** Parse feed XML → { title, items:[{id,title,summary,source,date,image?,link}] } (pure; tested). */
-export function parseFeed(xml, sourceName = '') {
-  if (!/<(rss|feed|rdf:RDF)[\s>]/i.test(xml)) throw new Error('Not an RSS/Atom feed');
-  const doc = parser.parse(xml);
-  let title = '';
-  let rawItems = [];
-  let atom = false;
-  if (doc.rss) {
-    const ch = arr(doc.rss.channel)[0] || {};
-    title = text(ch.title);
-    rawItems = arr(ch.item);
-  } else if (doc.feed) {
-    atom = true;
-    title = text(doc.feed.title);
-    rawItems = arr(doc.feed.entry);
-  } else if (doc['rdf:RDF']) {
-    const rdf = doc['rdf:RDF'];
-    title = text(arr(rdf.channel)[0]?.title);
-    rawItems = arr(rdf.item);
-  }
-  title = stripHtml(title);
-  const source = sourceName || title;
-  const items = rawItems.map((it) => {
-    const t = stripHtml(text(it.title));
-    let link = '';
-    if (atom) {
-      const links = arr(it.link);
-      const alt = links.find((l) => !attr(l, 'rel') || attr(l, 'rel') === 'alternate') || links[0];
-      link = attr(alt, 'href') || text(alt);
-    } else {
-      link = text(it.link) || text(it.guid);
-    }
-    const body = text(it.description) || text(it.summary) || text(it['content:encoded']) || text(it.content);
-    const summary = truncate(stripHtml(body), 200);
-    const date = toIso(text(it.pubDate) || text(it.published) || text(it.updated) || text(it['dc:date']));
-    const out = {
-      id: hash(`${text(it.guid) || text(it.id) || link || t}`, 12),
-      title: t,
-      summary: summary === t ? '' : summary,
-      source,
-      date,
-      link: link.trim(),
-    };
-    const image = firstImage(it);
-    if (image) out.image = decodeEntities(image);
-    return out;
-  }).filter((i) => i.title);
-  return { title, items };
-}
 
 export async function fetchFeed(url) {
   const res = await request(url, {

@@ -7,15 +7,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import * as store from '../store.js';
-import { defaultConfig, defaultScreenProfile } from '../defaults.js';
-import { validateConfig } from '../validate.js';
+import { defaultConfig, defaultScreenProfile } from '../core/defaults.js';
+import { validateConfig } from '../core/validate.js';
 import { repairConfig, orphanSchedules, parseImport, mergeImport } from '../backups.js';
 import { sseHandler, closeAll, MAX_STREAMS_PER_IP } from '../sse.js';
 import { streamInit, streamHello, onStreamOpen, onStreamClose, _resetDisplays, setServerVersion } from '../displays.js';
 import { createAnnouncement, clearAnnouncements, _resetAnnouncements } from '../announce.js';
 import { logActivity, listActivity, clearActivity, _resetActivityThrottle } from '../activity.js';
 import { googleCallbackHandler } from '../auth.js';
-import { screenSchedules } from '../screens.js';
+import { screenSchedules } from '../core/screens.js';
 
 function baseConfig() {
   const c = defaultConfig();

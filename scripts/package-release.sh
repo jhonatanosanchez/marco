@@ -4,7 +4,7 @@
 # Also copies install.sh with install.sh.sha256, so people can check the installer before they run it.
 #
 # Contents: the server, the built web interface (dist/), package.json + package-lock.json (the installer runs
-# `npm ci --omit=dev`), deploy/ scripts, install.sh, the shared icon rules and the docs needed to run it.
+# `npm ci --omit=dev`), deploy/ scripts, install.sh and the docs needed to run it.
 # No node_modules and no web sources.
 set -euo pipefail
 
@@ -20,11 +20,10 @@ fi
 
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
-mkdir -p "$STAGE/$NAME/web/shared"
+mkdir -p "$STAGE/$NAME"
 cd "$ROOT"
 cp -R server dist deploy "$STAGE/$NAME/"
 cp package.json package-lock.json install.sh .env.example LICENSE README.md CHANGELOG.md THIRD_PARTY_NOTICES.md "$STAGE/$NAME/"
-cp web/shared/iconRules.json "$STAGE/$NAME/web/shared/"
 rm -rf "$STAGE/$NAME/server/test"
 chmod 755 "$STAGE/$NAME/install.sh" "$STAGE/$NAME/deploy/"*.sh "$STAGE/$NAME/deploy/marco"
 

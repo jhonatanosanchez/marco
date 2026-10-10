@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseIcsText, expandEvents } from '../ics.js';
 import { buildSourceEvents, sortEvents, eventsHash } from '../calendars.js';
-import { zonedMidnight, addDays } from '../lib/tz.js';
+import { zonedMidnight, addDays } from '../core/lib/tz.js';
 import { fixture, RULES } from './helpers.js';
 
 const TZ = 'Europe/Lisbon';

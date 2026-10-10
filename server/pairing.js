@@ -16,9 +16,10 @@ import { ipBucket } from './lib/net.js';
 import { createDevice } from './displayAccess.js';
 import { getConfig } from './store.js';
 import { logActivityThrottled } from './activity.js';
+import { CODE_LENGTH, randomCode, normalizeCode } from './core/pairCore.js';
 
-export const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
-export const CODE_LENGTH = 6;
+export { CODE_ALPHABET, CODE_LENGTH, normalizeCode } from './core/pairCore.js';
+
 export const PAIR_TTL_MS = 10 * 60_000;
 export const POLL_MS = 2000;
 /** A claim only succeeds while the display polled within this window (it is really there, waiting). */
@@ -38,25 +39,6 @@ const sessions = new Map(); // sha256(sessionId) hex → PairingSession
 const startHits = new Map(); // ip bucket → number[] (ms)
 const claimFails = new Map(); // `${session}|${ip bucket}` → number[] (ms)
 let globalFails = []; // ms
-
-function randomCode() {
-  // Rejection sampling: unbiased over the 31-symbol alphabet.
-  let out = '';
-  while (out.length < CODE_LENGTH) {
-    for (const b of crypto.randomBytes(16)) {
-      if (b < 248 && out.length < CODE_LENGTH) out += CODE_ALPHABET[b % 31];
-    }
-  }
-  return out;
-}
-
-/** "abc-234" / "ABC 234" → "ABC234"; null when it cannot be a code. */
-export function normalizeCode(v) {
-  const s = typeof v === 'string' ? v.toUpperCase().replace(/[\s-]+/g, '') : '';
-  if (s.length !== CODE_LENGTH) return null;
-  for (const ch of s) if (!CODE_ALPHABET.includes(ch)) return null;
-  return s;
-}
 
 function prune(now = Date.now()) {
   for (const [k, s] of sessions) {
@@ -79,7 +61,7 @@ export function startPairing(req, now = Date.now()) {
   startHits.set(bucket, hits);
   const live = new Set([...sessions.values()].map((s) => s.code));
   let code;
-  do code = randomCode(); while (live.has(code));
+  do code = randomCode(CODE_LENGTH); while (live.has(code));
   const sessionId = crypto.randomBytes(32).toString('base64url');
   sessions.set(shaHex(sessionId), {
     code, codeHash: sha(code), createdAt: now, expiresAt: now + PAIR_TTL_MS, lastPollAt: now, state: 'waiting',

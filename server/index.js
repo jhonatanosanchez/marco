@@ -9,7 +9,7 @@ import { syncDisplayKeys, onDisplayAccessConfig, revalidateStreams } from './dis
 import { broadcast, closeAll, reresolveClients, setStreamValidator } from './sse.js';
 import { startRefresher, stopRefresher, runRefresh } from './refresher.js';
 import { logActivity, changedSections } from './activity.js';
-import { resolveScreen } from './screens.js';
+import { resolveScreen } from './core/screens.js';
 import { setServerVersion, flushDisplays, reresolveDisplays } from './displays.js';
 import { pruneScreens } from './announce.js';
 import { flushTokenUsage } from './tokens.js';

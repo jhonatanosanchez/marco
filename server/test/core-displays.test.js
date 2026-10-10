@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import * as store from '../store.js';
-import { defaultConfig, defaultScreenProfile } from '../defaults.js';
+import { defaultConfig, defaultScreenProfile } from '../core/defaults.js';
 import { sseHandler, broadcast, closeAll, clientCount } from '../sse.js';
 import {
   streamInit, streamHello, onStreamOpen, onStreamClose, recordHeartbeat, sanitizeHeartbeat, listDisplays,

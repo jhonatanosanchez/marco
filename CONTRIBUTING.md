@@ -29,10 +29,12 @@ Publishing a fork? Point the repository URLs (READMEs, `web/shared/project.ts`, 
 - Keep the server plain ESM JavaScript (no build step) and avoid new runtime dependencies: it has to run well on a
   Raspberry Pi. Every JSON data file is written atomically (`writeFileAtomic`).
 - New server logic should come with a `node --test` test in `server/test/`.
+- Logic that needs no files, network or SSE goes in `server/core/`, which Marco Cloud also runs: no Node built-ins
+  (`node:*`, `Buffer`, `process`) and no imports from outside the folder. `server/test/core-lint.test.js` checks it.
 - The display must never visibly reload for routine updates; animate with CSS transforms/opacity only and keep the
   WebGL layers capped (see `docs/ARCHITECTURE.md`).
 - UI text: the admin uses the Spanish string as the translation key (`t('…')`) with English/Portuguese entries in
-  `web/admin/i18n-dict*.ts`; the display uses `web/shared/i18n.ts`; server-generated text uses `server/lib/i18n.js`.
+  `web/admin/i18n-dict*.ts`; the display uses `web/shared/i18n.ts`; server-generated text uses `server/core/lib/i18n.js`.
   Please add all three languages when you add a string (ask for help in the PR if you only speak one or two).
 - Writing style (docs, UI strings in every language, commit messages, script output): plain and direct. No em
   dashes (use a comma, colon, parentheses or a new sentence) and no marketing words. Say what a feature does.

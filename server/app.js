@@ -16,7 +16,7 @@ import { eventsAdminRouter, eventsPublicRouter } from './routes/localEvents.js';
 import { accessAdminRouter, pairPublicRouter } from './routes/access.js';
 import { setupRouter } from './setup.js';
 import { hostGuard } from './lib/net.js';
-import { redactSecrets } from './lib/redact.js';
+import { redactSecrets } from './core/activityCore.js';
 import { displayAuth, mediaAuth } from './displayAccess.js';
 
 /** Display-facing JSON endpoints: private mode requires a display key, a device token or an admin session. */

@@ -1,11 +1,8 @@
-import fs from 'node:fs';
+import ICON_RULES from './iconRules.js';
 
 // Default configuration (created on first run, and used to back-fill missing keys on load).
-// Icon rules are shared with the admin and display (web/shared/iconRules.json): keywords in English, Spanish and
-// Portuguese, matched against event titles and descriptions. More specific categories come first.
-export const DEFAULT_ICON_RULES = JSON.parse(
-  fs.readFileSync(new URL('../web/shared/iconRules.json', import.meta.url), 'utf8'),
-).map((r) => ({ id: r.id, match: r.match, emoji: r.emoji, color: null }));
+// Icon rules are shared with the admin and display (server/core/iconRules.js).
+export const DEFAULT_ICON_RULES = ICON_RULES.map((r) => ({ id: r.id, match: [...r.match], emoji: r.emoji, color: null }));
 
 export const DEFAULT_SOURCES = [
   // A public example feed only. Add your own calendars (Google, iCal, vacation-rental feeds…) in the admin panel.

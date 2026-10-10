@@ -8,9 +8,9 @@ import { getNews } from '../news.js';
 import { getPhotos } from '../photos.js';
 import { sseHandler } from '../sse.js';
 import { streamInit, streamHello, onStreamOpen, onStreamClose } from '../displays.js';
-import { resolveScreen, displayConfig as projectDisplayConfig } from '../screens.js';
+import { resolveScreen, displayConfig as projectDisplayConfig } from '../core/screens.js';
 import { requestScreen } from '../displayAccess.js';
-import { addDays, localDate, isDateStr, daysBetween } from '../lib/tz.js';
+import { addDays, localDate, isDateStr, daysBetween } from '../core/lib/tz.js';
 import { healthBody } from '../capabilities.js';
 
 /** GET /api/display/config payload for `screenKey` (slug or id; empty → default screen). */

@@ -4,12 +4,16 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import multer from 'multer';
 import { requestJson } from './lib/http.js';
-import { defaultScreen } from './screens.js';
+import { defaultScreen } from './core/screens.js';
 import { getConfig, paths, writeFileAtomic } from './store.js';
+import {
+  ALLOWED_EXT, ALLOWED_MIME, imageInfo as imageInfoOf, isJpeg, isGalleryFile, uploadName as coreUploadName,
+} from './core/imageInfo.js';
+
+// Header parsing and the file name rules are pure (server/core/imageInfo.js); this file handles disk and multer.
+export { exifOrientation, sanitizeFilename, isGalleryFile, sniffImage } from './core/imageInfo.js';
 
 const LIST_TTL = 24 * 3600_000;
-const ALLOWED_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp']);
-const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
 /** Per-file upload limit (the admin optimizes photos in the browser first, so real uploads are far smaller). */
 export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 /** Longest side the admin downscales to; larger gallery photos are offered for optimization. */
@@ -58,15 +62,6 @@ export async function stockPhotos(count, { width = 1920, height = 1080 } = {}) {
   }));
 }
 
-export function sanitizeFilename(name) {
-  const base = path.basename(String(name || '')).normalize('NFD').replace(/\p{M}+/gu, '');
-  let ext = path.extname(base).toLowerCase();
-  if (ext === '.jpeg') ext = '.jpg';
-  const stem = path.basename(base, path.extname(base)).toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, '-').replace(/^[.-]+|[.-]+$/g, '').replace(/-{2,}/g, '-').slice(0, 80) || 'foto';
-  return `${stem}${ext}`;
-}
-
 // busboy decodes multipart filenames as latin1; recover UTF-8 names ("Fotó" instead of "FotÃ³").
 export function fixLatin1(name) {
   const s = String(name || '');
@@ -75,18 +70,9 @@ export function fixLatin1(name) {
   return utf8.includes('\ufffd') ? s : utf8;
 }
 
-export function isGalleryFile(name) {
-  return typeof name === 'string' && name === path.basename(name) && !name.startsWith('.') && ALLOWED_EXT.has(path.extname(name).toLowerCase());
-}
-
 /** Name an upload will get on disk: sanitized, `.jpeg` → `.jpg`, extension added from the MIME type when missing. */
 export function uploadName(original, mimetype = 'image/jpeg', { multipart = false } = {}) {
-  let name = sanitizeFilename(multipart ? fixLatin1(original) : original);
-  if (!ALLOWED_EXT.has(path.extname(name))) {
-    name = name.replace(/\.[^.]*$/, '') || 'foto';
-    name += mimetype === 'image/png' ? '.png' : mimetype === 'image/webp' ? '.webp' : '.jpg';
-  }
-  return name;
+  return coreUploadName(multipart ? fixLatin1(original) : original, mimetype);
 }
 
 const photoPath = (file) => path.join(paths.photos, file);
@@ -107,7 +93,6 @@ export function storeThumb(file, src) {
 export function removeThumb(file) {
   try { fs.rmSync(thumbPath(file), { force: true }); } catch { /* ignore */ }
 }
-const isJpeg = (buf) => buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
 /** Cheap sanity check for an uploaded thumbnail (JPEG magic bytes, size cap). */
 export function validThumb(src) {
   try {
@@ -157,48 +142,23 @@ export function updateMeta(fn) {
 export const isUnit = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1;
 const round4 = (v) => Math.round(v * 10000) / 10000;
 
+// Header bytes read before giving up on finding the image size (EXIF and ICC segments can be large).
+const HEADER_READS = [64 * 1024, 1024 * 1024, 16 * 1024 * 1024];
+
 /**
- * Pixel size of a JPEG / PNG / WebP from its header (no decoding). For JPEGs the EXIF orientation is read and
- * w/h are swapped for rotated (5–8) images, so they describe the photo as displayed. Returns null if unknown.
+ * Pixel size of a JPEG / PNG / WebP file from its header (see imageInfo in server/core/imageInfo.js): reads 64 KB
+ * first and more only when the size comes later in the file. Returns { w, h, orientation } or null.
  */
 export function imageInfo(file) {
   let fd;
   try {
     fd = fs.openSync(file, 'r');
-    const head = Buffer.alloc(32);
-    if (fs.readSync(fd, head, 0, 32, 0) < 4) return null;
-    if (head.readUInt32BE(0) === 0x89504e47) return { w: head.readUInt32BE(16), h: head.readUInt32BE(20), orientation: 1 };
-    if (head.toString('latin1', 0, 4) === 'RIFF' && head.toString('latin1', 8, 12) === 'WEBP') {
-      const chunk = head.toString('latin1', 12, 16);
-      if (chunk === 'VP8X') return { w: 1 + head.readUIntLE(24, 3), h: 1 + head.readUIntLE(27, 3), orientation: 1 };
-      if (chunk === 'VP8 ') return { w: head.readUInt16LE(26) & 0x3fff, h: head.readUInt16LE(28) & 0x3fff, orientation: 1 };
-      if (chunk === 'VP8L') {
-        const b = head.readUInt32LE(21);
-        return { w: (b & 0x3fff) + 1, h: ((b >>> 14) & 0x3fff) + 1, orientation: 1 };
-      }
-      return null;
-    }
-    if (head[0] !== 0xff || head[1] !== 0xd8) return null;
-    let pos = 2;
-    let orientation = 1;
-    const m = Buffer.alloc(9);
-    for (let guard = 0; guard < 500; guard++) {
-      if (fs.readSync(fd, m, 0, 4, pos) < 4 || m[0] !== 0xff) return null;
-      const marker = m[1];
-      if (marker === 0xff) { pos++; continue; } // fill byte
-      if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) { pos += 2; continue; }
-      if (marker === 0xda || marker === 0xd9) return null; // scan data before any SOF: give up
-      const len = m.readUInt16BE(2);
-      if (marker === 0xe1 && len > 16 && len < 65536) {
-        const seg = Buffer.alloc(len - 2);
-        fs.readSync(fd, seg, 0, seg.length, pos + 4);
-        orientation = exifOrientation(seg) || orientation;
-      } else if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
-        if (fs.readSync(fd, m, 0, 5, pos + 4) < 5) return null;
-        const h = m.readUInt16BE(1), w = m.readUInt16BE(3);
-        return orientation >= 5 && orientation <= 8 ? { w: h, h: w, orientation } : { w, h, orientation };
-      }
-      pos += 2 + len;
+    const size = fs.fstatSync(fd).size;
+    for (const want of HEADER_READS) {
+      const buf = Buffer.alloc(Math.min(want, size));
+      const n = fs.readSync(fd, buf, 0, buf.length, 0);
+      const info = imageInfoOf(buf.subarray(0, n));
+      if (info || n >= size || n < buf.length) return info;
     }
     return null;
   } catch {
@@ -206,27 +166,6 @@ export function imageInfo(file) {
   } finally {
     if (fd !== undefined) fs.closeSync(fd);
   }
-}
-
-/** Orientation tag (0x0112) from an APP1 segment body ("Exif\0\0" + TIFF), or 0. */
-export function exifOrientation(seg) {
-  if (seg.length < 14 || seg.toString('latin1', 0, 4) !== 'Exif') return 0;
-  const t = 6;
-  const le = seg.toString('latin1', t, t + 2) === 'II';
-  const u16 = (o) => (le ? seg.readUInt16LE(o) : seg.readUInt16BE(o));
-  const u32 = (o) => (le ? seg.readUInt32LE(o) : seg.readUInt32BE(o));
-  try {
-    const ifd = t + u32(t + 4);
-    const n = u16(ifd);
-    for (let i = 0; i < n; i++) {
-      const e = ifd + 2 + i * 12;
-      if (u16(e) === 0x0112) {
-        const v = u16(e + 8);
-        return v >= 1 && v <= 8 ? v : 0;
-      }
-    }
-  } catch { /* truncated */ }
-  return 0;
 }
 
 /** Fresh metadata for a file on disk (keeps the focal point unless `resetFocus`). */

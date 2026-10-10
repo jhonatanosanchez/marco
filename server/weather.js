@@ -1,7 +1,7 @@
 // Weather: Open-Meteo (no key) with optional Home Assistant override/augment (current conditions + indoor sensors).
 import { requestJson } from './lib/http.js';
-import { wmoDescription, windDirLabel } from './lib/i18n.js';
-import { defaultScreen } from './screens.js';
+import { wmoDescription, windDirLabel } from './core/lib/i18n.js';
+import { defaultScreen } from './core/screens.js';
 import { getConfig } from './store.js';
 import * as ha from './homeassistant.js';
 

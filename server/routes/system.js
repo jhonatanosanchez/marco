@@ -6,7 +6,7 @@
 //   GET /dashboard
 import fs from 'node:fs';
 import { Router } from 'express';
-import { requestLang } from '../lib/i18n.js';
+import { requestLang } from '../core/lib/i18n.js';
 import { requireAuth, rotateSessionEpoch } from '../auth.js';
 import { getConfig, getSecrets, saveConfig, updateSecrets } from '../store.js';
 import {
@@ -17,10 +17,10 @@ import { logActivity, listActivity, clearActivity, recentActivity } from '../act
 import { syncDisplayKeys, revalidateStreams } from '../displayAccess.js';
 import { listDisplays, getServerVersion } from '../displays.js';
 import { listAnnouncements } from '../announce.js';
-import { schedulesNow } from '../schedules.js';
+import { schedulesNow } from '../core/schedules.js';
 import { getEvents, sourceStatus } from '../calendars.js';
 import { cachedWeather } from '../weather.js';
-import { localDate, addDays } from '../lib/tz.js';
+import { localDate, addDays } from '../core/lib/tz.js';
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const LEVELS = ['info', 'warn', 'error'];

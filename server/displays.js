@@ -2,7 +2,7 @@
 // See docs/API.md and docs/ARCHITECTURE.md.
 import fs from 'node:fs';
 import { getConfig, paths, writeFileAtomic } from './store.js';
-import { resolveScreen } from './screens.js';
+import { resolveScreen } from './core/screens.js';
 import { listClients, broadcast, send, matches } from './sse.js';
 import { logActivityThrottled } from './activity.js';
 import { activeFor } from './announce.js';

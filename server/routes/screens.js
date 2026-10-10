@@ -10,8 +10,8 @@ import crypto from 'node:crypto';
 import { Router } from 'express';
 import { requireAuth } from '../auth.js';
 import { getConfig } from '../store.js';
-import { defaultScreenProfile } from '../defaults.js';
-import { slugify } from '../validate.js';
+import { defaultScreenProfile } from '../core/defaults.js';
+import { slugify } from '../core/validate.js';
 import { listDisplays, runCommand, forgetDisplay, recordHeartbeat, getServerVersion } from '../displays.js';
 import { logActivity } from '../activity.js';
 

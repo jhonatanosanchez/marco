@@ -4,8 +4,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { fileURLToPath } from 'node:url';
-import { defaultConfig, DEFAULT_ICON_RULES } from './defaults.js';
-import { validateConfig, mergeDefaults, migrateConfig, isV1 } from './validate.js';
+import { defaultConfig, DEFAULT_ICON_RULES } from './core/defaults.js';
+import { validateConfig, mergeDefaults, migrateConfig, isV1 } from './core/validate.js';
 import { backupBeforeSave } from './backups.js';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

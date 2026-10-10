@@ -1,5 +1,5 @@
 // Shared JSON contracts, see docs/API.md and docs/ARCHITECTURE.md. Imported by both the display and the admin panel.
-// Keep in sync with the server (server/validate.js, server/defaults.js).
+// Keep in sync with the server (server/core/validate.js, server/core/defaults.js).
 import type { PhotoFrame } from './focus';
 
 export type Lang = 'es' | 'en' | 'pt';

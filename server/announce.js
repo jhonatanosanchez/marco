@@ -3,11 +3,12 @@
 import fs from 'node:fs';
 import { getConfig, paths, writeFileAtomic } from './store.js';
 import { broadcast } from './sse.js';
-import { randomId } from './lib/text.js';
-import { ALERT_STYLES } from './validate.js';
+import {
+  ACTIVE_MAX, HISTORY_MAX, makeAnnouncement, splitExpired, activeFor as activeIn, alertsFilter as alertsFilterFor,
+} from './core/announceCore.js';
 
-export const HISTORY_MAX = 50;
-export const ACTIVE_MAX = 50;
+export { ACTIVE_MAX, HISTORY_MAX, sanitizeAnnounce } from './core/announceCore.js';
+
 let state = null; // { active: Announcement[], history: Announcement[] }, history newest first
 let loadedFrom = null;
 let timer = null;
@@ -30,11 +31,9 @@ function save() {
 
 /** Move expired announcements to the history. Returns true when something changed. */
 function expire(now = Date.now()) {
-  const keep = [];
-  let changed = false;
-  for (const a of state.active) {
-    if (Date.parse(a.expiresAt) <= now) { state.history.unshift(a); changed = true; } else keep.push(a);
-  }
+  const { keep, expired } = splitExpired(state.active, now);
+  for (const a of expired) state.history.unshift(a);
+  const changed = expired.length > 0;
   if (changed) {
     state.active = keep;
     state.history = state.history.slice(0, HISTORY_MAX);
@@ -54,53 +53,7 @@ function scheduleExpiry() {
 }
 
 /** Clients of screens with alerts disabled never get `announce`. */
-function alertsEnabled(screenId) {
-  const s = getConfig().screens.find((x) => x.id === screenId);
-  return s ? s.alerts.enabled !== false : true;
-}
-export const alertsFilter = (client) => alertsEnabled(client.screenId);
-
-/**
- * Validate an AnnounceRequest. `resolveScreens(keys)` → { ids } | { error, unknown }.
- * Returns { ok: true, value } or { ok: false, error, details }.
- */
-export function sanitizeAnnounce(body, resolveScreens) {
-  if (!body || typeof body !== 'object' || Array.isArray(body)) return { ok: false, error: 'invalid body' };
-  const details = [];
-  const s = (k, max) => {
-    const v = body[k];
-    if (v === undefined || v === null) return '';
-    if (typeof v !== 'string') { details.push({ path: k, message: 'expected string' }); return ''; }
-    // eslint-disable-next-line no-control-regex
-    const t = v.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').trim();
-    if (t.length > max) { details.push({ path: k, message: `too long (max ${max})` }); return t.slice(0, max); }
-    return t;
-  };
-  const title = s('title', 120);
-  const text = s('body', 500);
-  const emoji = s('emoji', 16);
-  if (!title && !text) details.push({ path: 'title', message: 'title or body required' });
-  let style = 'info';
-  if (body.style !== undefined) {
-    if (ALERT_STYLES.includes(body.style)) style = body.style;
-    else details.push({ path: 'style', message: `must be one of ${ALERT_STYLES.join(', ')}` });
-  }
-  let durationSec = 30;
-  if (body.durationSec !== undefined && body.durationSec !== null) {
-    const n = Number(body.durationSec);
-    if (!Number.isFinite(n) || n < 5 || n > 86400) details.push({ path: 'durationSec', message: 'must be between 5 and 86400' });
-    else durationSec = Math.round(n);
-  }
-  let sound = false;
-  if (body.sound !== undefined) {
-    if (typeof body.sound === 'boolean') sound = body.sound;
-    else details.push({ path: 'sound', message: 'expected boolean' });
-  }
-  const scr = resolveScreens(body.screens);
-  if (scr.error) details.push({ path: 'screens', message: scr.unknown?.length ? `unknown screen: ${scr.unknown.join(', ')}` : scr.error });
-  if (details.length) return { ok: false, error: 'invalid', details };
-  return { ok: true, value: { title, body: text, emoji, style, durationSec, sound, screenIds: scr.ids } };
-}
+export const alertsFilter = (client) => alertsFilterFor(getConfig())(client);
 
 /**
  * Create + broadcast an announcement. `value` = sanitised request. Returns { announcement, delivered }.
@@ -110,15 +63,7 @@ export function sanitizeAnnounce(body, resolveScreens) {
 export function createAnnouncement(value, { via, by, now = new Date() }) {
   load();
   expire(now.getTime());
-  const a = {
-    id: randomId('a_', 6),
-    ...value,
-    createdAt: now.toISOString(),
-    expiresAt: new Date(now.getTime() + value.durationSec * 1000).toISOString(),
-    via,
-    by: String(by || '').slice(0, 120),
-    clearedAt: null,
-  };
+  const a = makeAnnouncement(value, { via, by, now });
   state.active.push(a);
   // Hard cap: the oldest active ones are retired.
   while (state.active.length > ACTIVE_MAX) {
@@ -137,8 +82,7 @@ export function createAnnouncement(value, { via, by, now = new Date() }) {
 /** Active (not expired) announcements that target `screenId` (for SSE replay on connect). */
 export function activeFor(screenId) {
   load();
-  const now = Date.now();
-  return state.active.filter((a) => Date.parse(a.expiresAt) > now && (!a.screenIds.length || a.screenIds.includes(screenId)));
+  return activeIn(state.active, screenId);
 }
 
 /** AnnouncementsResponse. */

@@ -69,6 +69,12 @@ function emoji(ctx, path, v, d) {
   const s = str(ctx, path, v, d, 16).trim();
   return s;
 }
+/** The emoji field rule on its own (announcements): `{ value, errors }`, errors as { path, message }. */
+export function validateEmoji(v, path = 'emoji', d = '') {
+  const ctx = new Ctx();
+  const value = emoji(ctx, path, v, d);
+  return { value, errors: ctx.errors };
+}
 function id(ctx, path, v, prefix, seen) {
   let s = typeof v === 'string' && ID.test(v) ? v : randomId(prefix);
   while (seen.has(s)) s = randomId(prefix);
