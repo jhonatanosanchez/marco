@@ -32,6 +32,8 @@ All notable changes to this project are documented here. The format is based on
   and `/admin/index.html`) are never cached, and admin changes refuse a `Sec-Fetch-Site` other than `same-origin`.
 
 ### Fixed
+- With the Modern style, emoji in text fall back to the bundled emoji font, so an offline device without a color
+  emoji font no longer shows empty boxes.
 - The activity log names the *Display access* change instead of showing the raw `security` key, and the search
   finds *Download photos (.zip)*.
 - The demo in Portuguese (`?demo=1&lang=pt`) is now Portuguese everywhere: to-dos, the message, holidays, places,
