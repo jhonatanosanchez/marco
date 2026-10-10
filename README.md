@@ -640,7 +640,7 @@ ssh -L 3000:localhost:3000 user@<server-ip>
 ```
 
 The refresh token is stored on the server and renewed automatically, so the rest of the time you use the admin
-normally at `http://<server-ip>:3000/admin/` (only "Sign in with Google" needs the localhost URL).
+normally at `http://<server-ip>:3000/admin/` (only linking a Google account needs the localhost URL).
 
 **Option B: your own domain with HTTPS.** Put a reverse proxy with a valid certificate in front, set
 `PUBLIC_URL=https://calendar.example.com` and register `https://calendar.example.com/auth/google/callback`.
@@ -676,9 +676,10 @@ calendar, so treat it like a password.
 Each one becomes a source you can rename and give an emoji, colour and **type**: e.g. a calendar that only contains
 birthdays → type *Birthdays* (🎂 and ages), a holiday calendar → *Holidays*. You can link several Google accounts.
 
-**Sign in with Google** for the admin: add the allowed addresses in **Security → Allowed Google emails** (if the list
-is empty, the first Google sign-in made while you are already logged in with the password adds itself). You can then
-disable password login if you want.
+**Signing in to the admin** uses the server's password. Google is for calendars only: "Sign in with Google" is off
+on a home server. If you really want it (for example to turn the password off), set `MARCO_GOOGLE_LOGIN=1` in `.env`,
+then add the allowed addresses in **Security → Allowed Google emails**. Servers that already sign in with Google only
+(password off, allowed emails set) keep it.
 
 ## Connecting Outlook, Hotmail or Microsoft 365
 

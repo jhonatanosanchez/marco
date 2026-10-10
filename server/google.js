@@ -173,3 +173,15 @@ export async function listEvents(email, calendarId, timeMin, timeMax) {
   }
   return items;
 }
+
+/**
+ * "Sign in with Google" on a self-hosted server. Off by default: people sign in to their home server with its
+ * password, and Google is for calendars. It stays on for servers that already rely on it (password sign-in turned
+ * off and allowed Google emails set), and MARCO_GOOGLE_LOGIN=1 turns it on explicitly.
+ */
+export function googleLoginEnabled(cfg, env = process.env) {
+  if (!googleConfigured()) return false;
+  if (String(env.MARCO_GOOGLE_LOGIN || '').trim() === '1') return true;
+  const a = cfg?.auth ?? {};
+  return a.passwordLoginEnabled === false && Array.isArray(a.allowedGoogleEmails) && a.allowedGoogleEmails.length > 0;
+}

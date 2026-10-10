@@ -243,6 +243,8 @@ export function meHandler(req, res) {
     // Initial password came from ADMIN_PASSWORD (headless/Docker install): the panel offers to change it.
     passwordFromEnv: Boolean(valid && sec.passwordFromEnv),
     googleConfigured: google.googleConfigured(),
+    // Sign in with Google (off by default on self-hosted, see google.googleLoginEnabled)
+    googleLoginEnabled: google.googleLoginEnabled(getConfig()),
     // Microsoft calendars with the server's own Entra app (MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET).
     microsoftConfigured: microsoft.microsoftConfigured(),
     passwordLoginEnabled: getConfig().auth.passwordLoginEnabled,
@@ -274,7 +276,8 @@ function oauthRedirect(req, res, purpose) {
   res.redirect(google.authUrl(req, purpose, nonce));
 }
 
-export const googleLoginHandler = (req, res) => oauthRedirect(req, res, 'login');
+export const googleLoginHandler = (req, res) =>
+  google.googleLoginEnabled(getConfig()) ? oauthRedirect(req, res, 'login') : res.redirect('/admin/?error=google_login_off');
 export const googleConnectHandler = (req, res) => oauthRedirect(req, res, 'connect');
 
 /** OAuth error codes Google may send back (RFC 6749 §4.1.2.1 + Google's own); anything else → google_error. */

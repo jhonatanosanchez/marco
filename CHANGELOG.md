@@ -5,6 +5,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **Sign in with Google is off on self-hosted servers** by default: the admin uses the server's password, and Google
+  is for calendars. `MARCO_GOOGLE_LOGIN=1` turns it on; servers that already sign in with Google only (password off,
+  allowed emails set) keep it.
+- **Google Calendar** leaves out Google Workspace working-location entries ("Home", "Office").
+- The linked accounts chooser closes with an X instead of a Cancel button.
+- Marco Cloud: sign-up goes straight to Inicio, with a welcome card to put Marco on a TV.
+
 ### Added
 - **Microsoft calendars**: link Outlook.com, Hotmail or Microsoft 365 accounts (read only) and pick their calendars,
   including the ones other people shared with you. Optional on a self-hosted server: it needs your own Microsoft Entra

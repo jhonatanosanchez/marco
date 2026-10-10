@@ -6,6 +6,8 @@ import { GoogleG, Icon } from './components/icons';
 import { t } from './i18n';
 
 export function Login({ me, onDone, initialError }: { me: AuthMeResponse; onDone: () => void; initialError?: string }) {
+  // older servers do not send googleLoginEnabled: they offered Google whenever it was configured
+  const googleLogin = me.googleLoginEnabled ?? me.googleConfigured;
   const [pw, setPw] = useState('');
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -69,18 +71,18 @@ export function Login({ me, onDone, initialError }: { me: AuthMeResponse; onDone
             </button>
           </form>
         )}
-        {me.passwordLoginEnabled && me.googleConfigured && (
+        {me.passwordLoginEnabled && googleLogin && (
           <div class="divider">
             <span>{t('o')}</span>
           </div>
         )}
-        {me.googleConfigured && (
+        {googleLogin && (
           <a class="btn btn--google btn--block btn--lg" href="/auth/google/login">
             <GoogleG size={18} />
             <span>{t('Entrar con Google')}</span>
           </a>
         )}
-        {!me.passwordLoginEnabled && !me.googleConfigured && <div class="callout callout--warn">{t('No hay ningún método de acceso habilitado. Revisa la configuración del servidor.')}</div>}
+        {!me.passwordLoginEnabled && !googleLogin && <div class="callout callout--warn">{t('No hay ningún método de acceso habilitado. Revisa la configuración del servidor.')}</div>}
         {err && (
           <div class="login__err" role="alert">
             <Icon name="alert" size={14} /> {err}

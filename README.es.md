@@ -676,7 +676,7 @@ ssh -L 3000:localhost:3000 user@<server-ip>
 ```
 
 El token de actualización se guarda en el servidor y se renueva automáticamente, así que el resto del tiempo usas la
-administración con normalidad en `http://<server-ip>:3000/admin/` (solo "Iniciar sesión con Google" necesita la URL de
+administración con normalidad en `http://<server-ip>:3000/admin/` (solo vincular una cuenta de Google necesita la URL de
 localhost).
 
 **Opción B: tu propio dominio con HTTPS.** Pon delante un proxy inverso con un certificado válido, define
@@ -715,9 +715,10 @@ quieres mostrar. Cada uno se convierte en una fuente a la que puedes cambiar el 
 **tipo**: p. ej., un calendario que solo contiene cumpleaños → tipo *Cumpleaños* (🎂 y edades), un calendario de
 festivos → *Festivos*. Puedes vincular varias cuentas de Google.
 
-**Iniciar sesión con Google** en la administración: añade las direcciones permitidas en **Seguridad → Emails de Google
-permitidos** (si la lista está vacía, el primer inicio de sesión con Google que hagas mientras ya tienes la sesión
-iniciada con la contraseña se añade solo). Después, si quieres, puedes desactivar el inicio de sesión con contraseña.
+**Para entrar en la administración** se usa la contraseña del servidor. Google es solo para los calendarios: "Iniciar
+sesión con Google" está desactivado en un servidor de casa. Si de verdad lo quieres (por ejemplo para quitar la
+contraseña), pon `MARCO_GOOGLE_LOGIN=1` en `.env` y añade las direcciones en **Seguridad → Emails de Google
+permitidos**. Los servidores que ya entran solo con Google (contraseña desactivada y emails permitidos) lo conservan.
 
 ## Conectar Outlook, Hotmail o Microsoft 365
 

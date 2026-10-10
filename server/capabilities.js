@@ -1,7 +1,8 @@
 // Capability block for GET /api/health. The admin and the display read it to decide which sections,
 // actions and limits apply. Marco Cloud answers the same shape with its own values; a server that sends
 // no `features` field is treated as having every feature on.
-import { googleConfigured } from './google.js';
+import { googleConfigured, googleLoginEnabled } from './google.js';
+import { getConfig } from './store.js';
 import { microsoftConfigured } from './microsoft.js';
 import { CODE_LENGTH } from './pairing.js';
 
@@ -20,7 +21,7 @@ export function selfHostedFeatures() {
   const out = {};
   for (const k of FEATURE_KEYS) out[k] = true;
   out.googleCalendar = google;
-  out.googleLogin = google;
+  out.googleLogin = googleLoginEnabled(getConfig());
   out.accountMenu = false;
   out.microsoftCalendar = microsoftConfigured();
   return out;

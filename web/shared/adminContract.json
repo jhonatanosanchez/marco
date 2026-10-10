@@ -1234,6 +1234,7 @@
       "responseKeys": [
         "user",
         "googleConfigured",
+        "googleLoginEnabled?",
         "passwordLoginEnabled",
         "mustChangePassword?",
         "needsSetup?",

@@ -688,6 +688,8 @@ export interface HouseholdInfo {
 export interface AuthMeResponse {
   user: AuthUser | null;
   googleConfigured: boolean;
+  /** Sign in with Google is offered (self-hosted: off unless the server relies on it or MARCO_GOOGLE_LOGIN=1). */
+  googleLoginEnabled?: boolean;
   passwordLoginEnabled: boolean;
   /** Logged in with the initial/default password: it must be changed (only accepted from the LAN until then). */
   mustChangePassword?: boolean;

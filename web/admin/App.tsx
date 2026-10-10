@@ -170,6 +170,7 @@ function oauthErrorMessage(code: string): string {
   const map: Record<string, string> = {
     email_not_allowed: 'Esta cuenta de Google no tiene permiso para entrar.',
     google_not_configured: 'Google no está configurado en el servidor.',
+    google_login_off: 'En este servidor se entra con la contraseña. Google se usa para los calendarios.',
     login_required: 'Inicia sesión primero.',
     invalid_state: 'La sesión de Google caducó. Inténtalo de nuevo.',
     missing_code: 'Google no devolvió autorización. Inténtalo de nuevo.',

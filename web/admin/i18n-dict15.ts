@@ -89,4 +89,5 @@ export const ROWS15: [string, string, string][] = [
     'On the TV, open {url}. It shows a code with {n} characters. Type it here.',
     'Na televisão, abre {url}: vai mostrar um código de {n} caracteres. Escreve-o aqui.',
   ],
+  ['En este servidor se entra con la contraseña. Google se usa para los calendarios.', 'This server uses its password to sign in. Google is used for calendars.', 'Neste servidor entra-se com a palavra-passe. O Google é usado para os calendários.'],
 ];

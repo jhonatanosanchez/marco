@@ -62,9 +62,21 @@ test('self-hosted features default to on, except Google without credentials, the
   await withEnv({ GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: 'secret' }, () => {
     const f = selfHostedFeatures();
     assert.equal(f.googleCalendar, true);
-    assert.equal(f.googleLogin, true);
+    assert.equal(f.googleLogin, false, 'sign in with Google is off by default: home servers use their password');
     assert.equal(f.accountMenu, false);
-    assert.equal(f.microsoftCalendar, false, 'Microsoft calendars are Marco Cloud only for now');
+    assert.equal(f.microsoftCalendar, false, 'Microsoft calendars need an Entra app of the server');
+  });
+  await withEnv({ GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: 'secret', MARCO_GOOGLE_LOGIN: '1' }, () => {
+    assert.equal(selfHostedFeatures().googleLogin, true, 'MARCO_GOOGLE_LOGIN=1 turns it on');
+  });
+});
+
+test('sign in with Google stays on for a server that relies on it', async () => {
+  const { googleLoginEnabled } = await import('../google.js');
+  await withEnv({ GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: 'secret', MARCO_GOOGLE_LOGIN: undefined }, () => {
+    assert.equal(googleLoginEnabled({ auth: { passwordLoginEnabled: true, allowedGoogleEmails: ['a@example.com'] } }), false);
+    assert.equal(googleLoginEnabled({ auth: { passwordLoginEnabled: false, allowedGoogleEmails: ['a@example.com'] } }), true);
+    assert.equal(googleLoginEnabled({ auth: { passwordLoginEnabled: false, allowedGoogleEmails: [] } }), false);
   });
 });
 
