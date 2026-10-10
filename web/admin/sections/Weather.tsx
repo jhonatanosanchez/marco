@@ -46,7 +46,7 @@ export function WeatherSection({ cfg, set, errors }: SectionProps) {
       <Card id="wx-main" title={t('Tiempo')} icon="cloud">
         <ToggleRow label={<>{t('Mostrar el tiempo')} <ScopeBadge scope="screen" /></>} checked={w.enabled} onChange={(v) => set((d) => void (d.weather.enabled = v))} />
         <div class={`stack ${w.enabled ? '' : 'is-disabled'}`}>
-          {haOffered && (
+          {(haOffered || w.provider === 'homeassistant') && (
             <>
               <Field label={<>{t('Fuente de datos')} <ScopeBadge scope="global" /></>}>
                 <Segmented
@@ -59,7 +59,8 @@ export function WeatherSection({ cfg, set, errors }: SectionProps) {
                   onChange={(v) => set((d) => void (d.weather.provider = v))}
                 />
               </Field>
-              {w.provider === 'homeassistant' && !haOn && (
+              {w.provider === 'homeassistant' && !haOffered && <Callout kind="warn">{t('{name} no está disponible aquí. Elige otra opción.', { name: 'Home Assistant' })}</Callout>}
+              {w.provider === 'homeassistant' && haOffered && !haOn && (
                 <Callout kind="warn">
                   {t('Activa y configura Home Assistant en')} <a href="#/homeassistant">Home Assistant</a>.
                 </Callout>

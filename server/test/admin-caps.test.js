@@ -192,6 +192,11 @@ test('authRedirect: account mode goes to the login page with next', () => {
   assert.equal(auth.authRedirect({ user: null, googleConfigured: false, passwordLoginEnabled: true }, selfHosted(), '/admin/'), null);
   assert.equal(auth.logoutRedirect(me, cloud(), { ok: true, next: '/goodbye' }), '/goodbye');
   assert.equal(auth.logoutRedirect(me, cloud(), { next: '//evil.example' }), '/login');
+  // browsers drop tabs and newlines in URLs, so these would become "//evil.example"
+  assert.equal(auth.logoutRedirect(me, cloud(), { next: '/\t/evil.example' }), '/login');
+  assert.equal(auth.logoutRedirect(me, cloud(), { next: '/\n/evil.example' }), '/login');
+  assert.equal(auth.logoutRedirect(me, cloud(), { next: '/\\evil.example' }), '/login');
+  assert.equal(auth.authRedirect(me, cloud(), '/admin/\t/x'), `/login?next=${encodeURIComponent('/admin/')}`);
   assert.equal(auth.logoutRedirect({ user: { email: '', name: '', method: 'password' }, googleConfigured: false, passwordLoginEnabled: true }, selfHosted(), {}), null);
 });
 

@@ -334,7 +334,7 @@ export function App() {
 
   /* ---------- draft state */
   const dirty = useMemo(() => !!draft && !!saved && JSON.stringify(draft) !== JSON.stringify(saved), [draft, saved]);
-  const allErrors = useMemo(() => (draft ? validateAll(draft) : { global: {}, screens: {}, total: 0 }), [draft]);
+  const allErrors = useMemo(() => (draft ? validateAll(draft, caps) : { global: {}, screens: {}, total: 0 }), [draft, caps]);
   const errors: Errors = useMemo(() => ({ ...allErrors.global, ...(allErrors.screens[screenId] ?? {}) }), [allErrors, screenId]);
   const errorKeys = Object.keys(errors);
   const visibleErrors = showErrors || dirty ? errors : {};

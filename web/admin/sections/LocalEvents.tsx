@@ -5,7 +5,7 @@ import { Icon } from '../components/icons';
 import { Button, Card, ColorPicker, EmojiPicker, Empty, Field, Modal, NumberInput, PageHeader, SearchInput, Segmented, Textarea, TextInput, Toggle, ToggleRow, WeekdayPicker } from '../components/ui';
 import { addDays, daysBetween, fmtDay, relDays, todayIn, weekdayNames, weekdayOf } from '../dates';
 import { t } from '../i18n';
-import { atLimit } from '../caps';
+import { atLimit, limit } from '../caps';
 import { LimitNote } from '../components/LimitNote';
 import { takeIntent } from '../intent';
 import { clone, HEX_RE, isValidDate, normalize, TIME_RE, uid } from '../util';
@@ -351,6 +351,11 @@ export function LocalEventsSection({ full, setFull, errors, cfg }: SectionProps)
   }, [le.items, q, today]);
 
   const saveEv = (ev: LocalEvent) => {
+    const isNew = !le.items.some((x) => x.id === ev.id);
+    if (isNew && atLimit('localEvents', le.items.length)) {
+      toast(t('Has llegado al máximo ({max}).', { max: limit('localEvents') ?? le.items.length }), 'error');
+      return;
+    }
     setFull((d) => {
       const i = d.localEvents.items.findIndex((x) => x.id === ev.id);
       if (i >= 0) d.localEvents.items[i] = ev;

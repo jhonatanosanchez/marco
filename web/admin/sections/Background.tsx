@@ -32,7 +32,7 @@ export function BackgroundSection({ cfg, set, errors }: SectionProps) {
       <Card id="bg-photos" scope="screen" title={t('Fotos de fondo')} icon="image">
         <ToggleRow label={t('Mostrar fotos de fondo')} checked={b.enabled} onChange={(v) => set((d) => void (d.background.enabled = v))} />
         <div class={`stack ${b.enabled ? '' : 'is-disabled'}`}>
-          {galleryOn && (
+          {(galleryOn || b.source !== 'stock') && (
             <Field label={t('Origen')}>
               <Segmented
                 full
@@ -44,6 +44,7 @@ export function BackgroundSection({ cfg, set, errors }: SectionProps) {
                 ]}
                 onChange={(v) => set((d) => void (d.background.source = v))}
               />
+              {!galleryOn && <Callout kind="warn">{t('{name} no está disponible aquí. Elige otra opción.', { name: t('Galería') })}</Callout>}
             </Field>
           )}
           {(!galleryOn || b.source !== 'gallery') && (

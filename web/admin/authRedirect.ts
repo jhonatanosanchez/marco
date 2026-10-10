@@ -15,10 +15,14 @@ export function accountMode(me: AuthMeResponse | null, caps: Caps): boolean {
   return caps.edition === 'cloud' && caps.tenancy === 'multi';
 }
 
+/** A path on this site: starts with one "/", no backslash, no whitespace or control characters (browsers drop
+ *  tabs and newlines, so "/\t/evil.example" would turn into "//evil.example"). */
+const isLocalPath = (v: string) => v.startsWith('/') && !v.startsWith('//') && !/[\\\s\u0000-\u001f\u007f]/.test(v);
+
 /** Keep only a same-site admin path for `next`; anything else falls back to "/admin/". */
 export function safeNext(pathAndHash: string): string {
   const v = String(pathAndHash || '');
-  if (!v.startsWith('/admin/') || v.includes('//') || v.includes('\\') || /^[a-z][a-z0-9+.-]*:/i.test(v)) return '/admin/';
+  if (!v.startsWith('/admin/') || v.includes('//') || !isLocalPath(v)) return '/admin/';
   return v;
 }
 
@@ -34,6 +38,6 @@ export function authRedirect(me: AuthMeResponse | null, caps: Caps, pathAndHash:
 export function logoutRedirect(me: AuthMeResponse | null, caps: Caps, res: unknown): string | null {
   if (!accountMode(me, caps)) return null;
   const next = res && typeof res === 'object' ? (res as { next?: unknown }).next : undefined;
-  if (typeof next === 'string' && next.startsWith('/') && !next.startsWith('//') && !next.includes('\\')) return next;
+  if (typeof next === 'string' && isLocalPath(next)) return next;
   return me?.account?.loginUrl || DEFAULT_LOGIN;
 }
