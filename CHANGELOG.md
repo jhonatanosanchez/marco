@@ -14,7 +14,8 @@ All notable changes to this project are documented here. The format is based on
   fit never move, timed chips in month cells keep their "…", and nothing moves when the device asks for reduced
   motion. With `?lite=1` at most six titles move at once.
 - **Busy days take turns**: a day in the month or Two weeks grid with more events than fit shows them in turns every
-  8 seconds, and the "+N more" label becomes a page count ("1/2"). Bars that cover several days stay where they are.
+  8 seconds, and the "+N more" label becomes a page count ("1/2"). Bars that cover several days stay where they are;
+  when they fill every row of a day, the bottom one leaves that day free so the day's own events still show.
 - Both are on by default and can be turned off per screen in *Calendars → Calendar view*; `?marquee=0` and
   `?rotate=0` turn them off for a test, and `?demo=1&busy=1` adds a busy day and long titles to the demo.
 

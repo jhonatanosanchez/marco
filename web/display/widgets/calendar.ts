@@ -26,6 +26,8 @@ interface Placed {
   day?: string;
   /** a one-day piece of a bar spanning other days, shown on a busy day's pages (its own key) */
   piece?: boolean;
+  /** the part of a bar after a busy day that took its lane (its own key) */
+  part?: string;
 }
 
 /** Text width measurement (canvas, cached context) used to decide which chips deserve a second line. */
@@ -149,7 +151,8 @@ export class MonthCalendar {
       this.pageTimer = setInterval(() => {
         this.pageStep++;
         this.applyPages();
-        refreshMarquee(); // a bar that just came into view may need to slide
+        // a bar that just came into view may need to slide; the ones fading out stop once they are gone
+        setTimeout(refreshMarquee, 750);
       }, PAGE_MS);
     } else if (!any && this.pageTimer) {
       clearInterval(this.pageTimer);
@@ -303,6 +306,23 @@ export class MonthCalendar {
       for (let l = 0; l < L; l++) if (!fixed.some((f) => f.lane <= l && l < f.lane + (f.span ?? 1))) free.push(l);
       const pool: Placed[] = segs.filter((sg) => local(sg));
       const cut: Placed[] = [];
+      // Every lane is held by bars that cover other days too: the bar in the last lane gives this day up (it keeps
+      // its lane on the other days and shows a one-day piece among the pages), or the day's own events would never
+      // show at all.
+      const last = !free.length && L > 0 ? fixed.find((f) => f.lane === L - 1 && (f.span ?? 1) === 1) : undefined;
+      if (last) {
+        cut.push({
+          e: last.e, s: Math.max(last.s, a), eSlot: Math.min(last.eSlot, b), lane: -1,
+          contL: last.contL || last.s < a, contR: last.contR || last.eSlot > b, piece: true, day: key,
+        });
+        const after: Placed | null = last.eSlot > b ? { ...last, s: b, contL: true, part: `>${key}` } : null;
+        if (last.s < a) {
+          last.eSlot = a;
+          last.contR = true;
+          if (after) segs.push(after);
+        } else if (after) Object.assign(last, after);
+        free.push(L - 1);
+      }
       for (const sg of segs) {
         if (!hidden.has(sg) || !inDay(sg) || local(sg)) continue;
         cut.push({
@@ -459,7 +479,7 @@ export class MonthCalendar {
       else html += `<span class="tt">${esc(e.title)}</span>`;
       if (c.showLocation && e.ev.location) html += `<span class="loc">${esc(e.ev.location)}</span>`;
       if (c.showDayXofY && e.bar && sg.contL && e.days > 1 && !short) {
-        const x = diffDays(e.spanFirst, ws) + 1;
+        const x = diffDays(e.spanFirst, addDays(ws, Math.floor(sg.s / 2))) + 1; // a part after a busy day starts later
         html += `<span class="dx">${esc(t('dayXofY', { x, y: (e.airbnb && !e.checkoutMarker) ? e.days + 1 : e.days }))}</span>`;
       }
       if ((e.airbnb && !e.checkoutMarker) && !sg.contR && !short && sg.eSlot - sg.s >= 3) html += `<span class="co">🚪</span>`;
@@ -476,7 +496,7 @@ export class MonthCalendar {
       }
       const row = span > 1 ? `${sg.lane + 2} / span ${span};--clamp:${span}` : `${sg.lane + 2}`;
       specs.push({
-        key: sg.piece ? `e${e.id}@${sg.day}` : `e${e.id}@${ws}`,
+        key: sg.piece ? `e${e.id}@${sg.day}` : `e${e.id}@${ws}${sg.part ?? ''}`,
         className: cls,
         style: `grid-column:${sg.s + 1} / ${sg.eSlot + 1};grid-row:${row};--c:${col.base};--on:${col.onSolid};--tint:${col.tint};--shade:${col.shade}`,
         html,

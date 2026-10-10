@@ -62,9 +62,14 @@ function scan(): void {
   const els = Array.from(document.querySelectorAll<MqEl>(TARGETS));
   const on = enabled();
   const unit = parseFloat(getComputedStyle(document.documentElement).fontSize) || 10;
+  const vw = window.innerWidth, vh = window.innerHeight;
   // read every size first, then write (one layout pass)
   const over = els.map((el) => {
-    if (!on || !el.isConnected) return 0;
+    // a chip on a busy day's page that is not showing does not move (nor count against the budget)
+    if (!on || !el.isConnected || el.closest('.pg-off')) return 0;
+    // clipped off the screen (the Agenda's extra columns, rows below the fold): no motion nobody sees
+    const r = el.getBoundingClientRect();
+    if (r.right <= 0 || r.bottom <= 0 || r.left >= vw || r.top >= vh) return 0;
     const box = el.clientWidth;
     // a box squeezed to a few letters would only show a blur of moving text: keep the ellipsis there
     if (box < MIN_BOX_U * unit) return 0;
