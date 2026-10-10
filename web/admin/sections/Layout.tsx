@@ -1,4 +1,4 @@
-import type { LayoutPreset } from '../../shared/types';
+import type { DisplayStyle, LayoutPreset } from '../../shared/types';
 import { Card, Field, PageHeader, Segmented, Slider } from '../components/ui';
 import { t } from '../i18n';
 import type { SectionProps } from './common';
@@ -92,12 +92,122 @@ export function Schematic({ id, side }: { id: LayoutPreset; side: 'left' | 'righ
   );
 }
 
+export const STYLES: { id: DisplayStyle; name: string; desc: string }[] = [
+  { id: 'classic', name: 'Clásico', desc: 'El aspecto de siempre: reloj fino, tarjetas con borde y la cuadrícula completa.' },
+  { id: 'modern', name: 'Moderno', desc: 'Más minimalista, al estilo de Apple: tarjetas de cristal sobre la foto, reloj de pantalla de bloqueo y menos líneas.' },
+];
+
+/** Tiny drawing of each display style (same scene: photo with clock + widgets, calendar on the right). */
+export function StyleThumb({ id }: { id: DisplayStyle }) {
+  const modern = id === 'modern';
+  const accent = 'var(--accent)';
+  const rows = [0, 1, 2, 3];
+  const cols = [0, 1, 2, 3, 4, 5, 6];
+  return (
+    <svg viewBox="0 0 160 90" class="schematic" aria-hidden="true">
+      <defs>
+        <linearGradient id={`st-ph-${id}`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#2b3d63" />
+          <stop offset="0.55" stop-color="#7a4b63" />
+          <stop offset="1" stop-color="#d0875e" />
+        </linearGradient>
+      </defs>
+      <rect width="160" height="90" rx="6" fill="#0d0e12" />
+      <path d="M6 0 H58 V90 H6 a6 6 0 0 1 -6 -6 V6 a6 6 0 0 1 6 -6z" fill={`url(#st-ph-${id})`} />
+      <text x={modern ? 8 : 9} y="22" fill="#fff" font-size="15" font-weight={modern ? 600 : 200} letter-spacing={modern ? -0.6 : 0} font-family="system-ui, sans-serif">
+        9:41
+      </text>
+      {modern ? (
+        <g>
+          <rect x="6" y="40" width="46" height="18" rx="5" fill="#fff" fill-opacity=".2" stroke="#fff" stroke-opacity=".45" stroke-width=".6" />
+          <rect x="10" y="45" width="5" height="5" rx="1.4" fill={accent} opacity=".85" />
+          <rect x="18" y="46" width="22" height="3" rx="1.5" fill="#fff" opacity=".85" />
+          <rect x="6" y="62" width="46" height="22" rx="6" fill="#fff" fill-opacity=".2" stroke="#fff" stroke-opacity=".45" stroke-width=".6" />
+          <text x="10" y="76" fill="#fff" font-size="9" font-weight="300" font-family="system-ui, sans-serif">19°</text>
+        </g>
+      ) : (
+        <g>
+          <rect x="6" y="40" width="46" height="9" rx="4.5" fill="#000" fill-opacity=".45" stroke={accent} stroke-width=".7" />
+          <rect x="6" y="51" width="46" height="9" rx="4.5" fill="#000" fill-opacity=".45" stroke="#2ec4b6" stroke-width=".7" />
+          <rect x="6" y="64" width="46" height="20" rx="4" fill="#000" fill-opacity=".5" stroke="#fff" stroke-opacity=".25" stroke-width=".6" />
+          <text x="10" y="78" fill="#fff" font-size="10" font-weight="200" font-family="system-ui, sans-serif">19°</text>
+        </g>
+      )}
+      <rect x="64" y="7" width={modern ? 30 : 26} height="5" rx="1.5" fill="#fff" opacity={modern ? 0.95 : 0.75} />
+      {rows.map((r) => (
+        <g>
+          <rect x="64" y={18 + r * 17.5} width="90" height=".5" fill="#fff" opacity={modern ? 0.18 : 0.14} />
+          {cols.map((c) => (
+            <g>
+              {!modern && c > 0 && <rect x={64 + c * 12.9} y={18 + r * 17.5} width=".5" height="17.5" fill="#fff" opacity=".14" />}
+              {modern && r === 1 && c === 3 ? (
+                <circle cx={64 + c * 12.9 + 4.5} cy={18 + r * 17.5 + 4.5} r="3.2" fill={accent} />
+              ) : (
+                <rect x={64 + c * 12.9 + 2} y={18 + r * 17.5 + 2.5} width="5" height="2.4" rx=".8" fill="#fff" opacity={modern ? 0.7 : 0.45} />
+              )}
+              {!modern && r === 1 && c === 3 && (
+                <rect x={64 + c * 12.9 + 0.6} y={18 + r * 17.5 + 0.6} width="11.7" height="16.3" rx="1.5" fill="none" stroke={accent} stroke-width=".8" />
+              )}
+            </g>
+          ))}
+          {r !== 2 && (
+            <rect
+              x={64 + (r % 2) * 25 + 1}
+              y={18 + r * 17.5 + 9}
+              width={modern ? 36 : 50}
+              height="4"
+              rx={modern ? 1.6 : 1}
+              fill={['#4c8dff', '#2ec4b6', '', '#f15bb5'][r]}
+              opacity={modern ? 0.45 : 0.95}
+            />
+          )}
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 export function LayoutSection({ cfg, set }: SectionProps) {
   const l = cfg.layout;
   const hasSide = l.preset === 'bigCalendar' || l.preset === 'leftRight';
+  const style: DisplayStyle = cfg.screen.style === 'modern' ? 'modern' : 'classic';
   return (
     <>
       <PageHeader title={t('Diseño')} scope="screen" desc={t('Elige cómo se distribuyen los elementos en la pantalla.')} />
+      <Card
+        id="layout-style"
+        scope="screen"
+        title={t('Estilo de la pantalla')}
+        icon="palette"
+        desc={t('Independiente de la plantilla: cada pantalla puede tener su propio estilo.')}
+      >
+        <Field label={t('Estilo')}>
+          <Segmented
+            value={style}
+            options={STYLES.map((o) => ({ value: o.id, label: t(o.name) }))}
+            onChange={(v) => set((d) => void (d.screen.style = v))}
+          />
+        </Field>
+        <div class="preset-grid style-grid">
+          {STYLES.map((o) => (
+            <button
+              type="button"
+              class={`preset ${style === o.id ? 'is-active' : ''}`}
+              onClick={() => set((d) => void (d.screen.style = o.id))}
+              aria-pressed={style === o.id}
+            >
+              <StyleThumb id={o.id} />
+              <div class="preset__text">
+                <div class="preset__name">
+                  <span class="radio-dot" />
+                  {t(o.name)}
+                </div>
+                <p>{t(o.desc)}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </Card>
       <div class="preset-grid" id="layout-presets">
         {PRESETS.map((p) => (
           <button

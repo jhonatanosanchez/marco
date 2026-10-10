@@ -62,6 +62,9 @@ El único tráfico saliente va a los calendarios, al tiempo y a las fuentes de n
 - **Calendario:** vistas de mes (con número de semanas configurable), agenda y semana; cinco diseños (*calendario
   grande*, *izquierda/derecha*, *arriba/abajo*, *hora grande*, *agenda*), en horizontal o vertical, y cada calendario
   con su propio color.
+- **Dos estilos por pantalla:** *Clásico* o *Moderno*, un aspecto más minimalista al estilo de Apple, con tarjetas de
+  cristal sobre la foto, reloj de pantalla de bloqueo y una cuadrícula de mes como la de iOS. El estilo es
+  independiente del diseño.
 - **Emojis automáticos:** 🎂 cumpleaños, ✈️ vuelos, 🩺 médico, 🎒 colegio, ⚽ deporte, 🍽️ cenas, 💼 reuniones, 🏖️
   vacaciones, 🚗 coche, 🐾 veterinario y más, a partir de reglas de palabras clave editables (35 categorías con unas
   400 palabras clave en inglés, español y portugués de serie).
@@ -406,7 +409,7 @@ carpeta `data/` real nunca se toca.
 ![La pantalla de la cocina de la demo: tema claro, agenda, lista de tareas y tiempo en directo](docs/screenshots/display-kitchen-live.webp)
 
 ¿Solo quieres ver la pantalla? Cualquier instancia en marcha muestra un conjunto de datos de ejemplo integrado en
-`/?demo=1` (añade `&lang=es`, `&preset=agenda`, `&theme=light`, `&announce=success`, `&sched=1`,
+`/?demo=1` (añade `&lang=es`, `&preset=agenda`, `&theme=light`, `&style=modern`, `&announce=success`, `&sched=1`,
 `&now=2026-10-09T10:42`).
 
 **Vídeo de demostración.** Un recorrido de 48 segundos por la demo: la pantalla del salón con transiciones de fotos,
@@ -828,7 +831,7 @@ Haz copia de seguridad de toda la carpeta (o usa *Exportar*) para conservarlo to
 | `?lite=1` | Sin efectos WebGL (dispositivos lentos) |
 | `?demo=1` | Datos de ejemplo integrados (no necesita datos del servidor) |
 | `?lang=en\|es\|pt` | Fuerza el idioma |
-| `?preset=…` `?view=month\|agenda\|week` `?theme=dark\|light` `?side=left\|right` `?clock=analog` | Fuerza opciones de diseño (útil para hacer pruebas) |
+| `?preset=…` `?view=month\|agenda\|week` `?theme=dark\|light` `?style=classic\|modern` `?side=left\|right` `?clock=analog` | Fuerza opciones de diseño (útil para hacer pruebas) |
 | `?client=<name>` | Nombre de este dispositivo en *Pantallas conectadas* (lo define el script del kiosco) |
 
 ## Seguridad

@@ -194,6 +194,8 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
     language: oneOf(ctx, `${p}.screen.language`, sc.language, D.screen.language, LANGS),
     fontScale: num(ctx, `${p}.screen.fontScale`, sc.fontScale, D.screen.fontScale, 0.5, 3),
     theme: oneOf(ctx, `${p}.screen.theme`, sc.theme, D.screen.theme, ['dark', 'light', 'auto']),
+    // display style: 'classic' (the original look) or 'modern' (glass cards, Apple-like); independent of the layout
+    style: oneOf(ctx, `${p}.screen.style`, sc.style, D.screen.style, ['classic', 'modern']),
     accent: color(ctx, `${p}.screen.accent`, sc.accent, D.screen.accent),
     orientation: oneOf(ctx, `${p}.screen.orientation`, sc.orientation, D.screen.orientation, ['auto', 'landscape', 'portrait']),
     customCss: str(ctx, `${p}.screen.customCss`, sc.customCss, '', 20000).replace(/<\/style/gi, ''),

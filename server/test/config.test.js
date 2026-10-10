@@ -129,7 +129,7 @@ test('migration v1 → v2 keeps every value (global vs screens[0])', async () =>
   assert.equal(s.name, 'Cocina');
   assert.equal(s.slug, 'cocina');
   const { name, ...scr } = V1.screen;
-  assert.deepEqual(s.screen, scr);
+  assert.deepEqual(s.screen, { ...scr, style: 'classic' }); // the display style is back-filled as classic
   assert.deepEqual(s.layout, V1.layout);
   assert.deepEqual(s.background, { ...V1.background, order: 'random', panelBlur: 18, panelShade: 0.5, weatherFx: 'simple' }); // new keys back-filled with defaults
   assert.deepEqual(s.message, V1.message);

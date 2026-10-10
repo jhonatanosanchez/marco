@@ -5,6 +5,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Display style** (*Layout → Display style*, `screen.style`): every screen can now be *Classic* (the look so far,
+  still the default, so existing screens do not change) or *Modern*, a more minimal, Apple-like look: glass widget
+  cards over the photo with a light edge, a Lock Screen clock with the date on top, the month grid in the iOS
+  Calendar idiom (no column lines, today as a filled circle, colour dots for timed events), agenda days as list
+  cards, a Weather-widget layout, notification-style alerts and scheduled messages. It works with every layout,
+  portrait and landscape, the light and dark themes, night mode, the weather effect and `?lite=1` (solid cards
+  instead of blur). Modern uses the system font (SF on Apple devices) and falls back to the bundled Inter
+  elsewhere. Preview it with `?style=modern` (or `?style=classic`).
+
 ## [0.4.0] - 2026-10-09
 
 A realistic weather effect over the photo, a polling mode for hosts without a live stream, and a language fix for

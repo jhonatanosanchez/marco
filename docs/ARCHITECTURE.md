@@ -85,8 +85,9 @@ The stored config has **global** sections shared by every screen and a list of *
 
 ```jsonc
 { "id": "s_main", "slug": "living-room", "name": "Living room",
-  "screen":     { "language": "en", "fontScale": 1, "theme": "dark", "accent": "#ff5a4e", "orientation": "auto",
+  "screen":     { "language": "en", "fontScale": 1, "theme": "dark", "style": "classic", "accent": "#ff5a4e", "orientation": "auto",
                   "customCss": "", "nightMode": { "enabled": false, "from": "23:00", "to": "07:00", "dim": 0.35 } },
+                  // style: classic | modern, independent of the layout. Missing (older configs) = classic.
   "layout":     { "preset": "bigCalendar", "sidePanel": "left", "sideWidth": 0.36 },   // bigCalendar | leftRight | topBottom | bigTime | agenda
   "background": { "enabled": true, "source": "stock", "stockTopic": "nature", "order": "random", "intervalSec": 120, "brightness": 0.85,
                   "showMeta": false, "cover": true, "transition": "webgl", "ambient": "aurora", "panelBlur": 18, "panelShade": 0.5, "weatherFx": "simple" },

@@ -61,6 +61,8 @@ calendars, weather and news feeds *you* connect.
 
 - **Calendar:** month (configurable number of weeks), agenda and week views; five layouts (*big calendar*,
   *left/right*, *top/bottom*, *big time*, *agenda*), landscape or portrait, each calendar with its own colour.
+- **Two styles per screen:** *Classic* or *Modern*, a more minimal Apple-like look with glass cards over the photo,
+  a Lock Screen clock and an iOS-style month grid. The style is independent of the layout.
 - **Automatic emoji:** 🎂 birthdays, ✈️ flights, 🩺 doctor, 🎒 school, ⚽ sports, 🍽️ dinners, 💼 meetings, 🏖️
   holidays, 🚗 car, 🐾 vet and more, from editable keyword rules (35 categories with about 400 keywords in English,
   Spanish and Portuguese out of the box).
@@ -384,7 +386,7 @@ token and some activity history. Your real `data/` folder is never touched.
 ![The kitchen screen of the demo: light theme, agenda, to-do list and live weather](docs/screenshots/display-kitchen-live.webp)
 
 Just want to see the display? Any running instance shows a built-in sample dataset at `/?demo=1`
-(add `&lang=es`, `&preset=agenda`, `&theme=light`, `&announce=success`, `&sched=1`, `&now=2026-10-09T10:42`,
+(add `&lang=es`, `&preset=agenda`, `&theme=light`, `&style=modern`, `&announce=success`, `&sched=1`, `&now=2026-10-09T10:42`,
 `&wx=rain|snow|clear` with `&wxfx=rich` to see the weather effect).
 
 **Demo video.** A 48-second tour of the demo: the living room screen with photo transitions, an alert and a scheduled
@@ -781,7 +783,7 @@ Back up the whole folder (or use *Export*) to keep everything.
 | `?lite=1` | No WebGL effects (slow devices) |
 | `?demo=1` | Built-in sample data (no server data needed) |
 | `?lang=en\|es\|pt` | Override the language |
-| `?preset=…` `?view=month\|agenda\|week` `?theme=dark\|light` `?side=left\|right` `?clock=analog` | Override layout options (handy for testing) |
+| `?preset=…` `?view=month\|agenda\|week` `?theme=dark\|light` `?style=classic\|modern` `?side=left\|right` `?clock=analog` | Override layout options (handy for testing) |
 | `?wxfx=off\|simple\|rich` | Override the weather effect; with `?demo=1`, `?wx=rain\|snow\|clear\|thunder` forces the weather |
 | `?client=<name>` | Name of this device in *Connected displays* (the kiosk script sets it) |
 

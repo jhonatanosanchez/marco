@@ -15,11 +15,15 @@ export interface NightMode {
   dim: number; // 0..1 (brightness multiplier applied at night)
 }
 
+export type DisplayStyle = 'classic' | 'modern';
+
 export interface ScreenConfig {
   name: string;
   language: Lang;
   fontScale: number;
   theme: 'dark' | 'light' | string;
+  /** Display style, independent of the layout: 'classic' (default) or 'modern' (glass cards, Apple-like). */
+  style?: DisplayStyle;
   accent: string;
   orientation: 'auto' | 'landscape' | 'portrait' | string;
   customCss: string;

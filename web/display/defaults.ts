@@ -6,7 +6,7 @@ import { DEFAULT_ICON_RULES } from '../shared/emoji';
 export const DEFAULT_CONFIG: DisplayConfig = {
   revision: 0,
   screen: {
-    name: 'Living room', language: 'en', fontScale: 1, theme: 'dark', accent: '#ff5a4e', orientation: 'auto', customCss: '',
+    name: 'Living room', language: 'en', fontScale: 1, theme: 'dark', style: 'classic', accent: '#ff5a4e', orientation: 'auto', customCss: '',
     nightMode: { enabled: false, from: '23:00', to: '07:00', dim: 0.35 },
   },
   layout: { preset: 'bigCalendar', sidePanel: 'left', sideWidth: 0.36 },
@@ -67,6 +67,7 @@ export function normalizeConfig(raw: unknown): DisplayConfig {
   c.background.brightness = Math.min(1.2, Math.max(0.1, Number(c.background.brightness) || 0.85));
   c.news.rotateSec = Math.max(5, Number(c.news.rotateSec) || 15);
   c.weather.forecastDays = clampInt(c.weather.forecastDays, 1, 7, 5);
+  if (c.screen.style !== 'modern') c.screen.style = 'classic';
   if (!/^#[0-9a-f]{3,8}$/i.test(c.screen.accent)) c.screen.accent = '#ff5a4e';
   if (c.countdowns) c.countdowns.max = clampInt(c.countdowns.max, 1, 12, 4);
   if (c.alerts) c.alerts.volume = Math.min(1, Math.max(0, Number(c.alerts.volume) || 0));

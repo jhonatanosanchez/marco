@@ -18,4 +18,12 @@ export const ROWS7: [string, string, string][] = [
   ['Prueba con otra palabra, en español, inglés o portugués.', 'Try another word, in English, Spanish or Portuguese.', 'Experimenta outra palavra, em português, inglês ou espanhol.'],
   ['Usar {emoji}', 'Use {emoji}', 'Usar {emoji}'],
   ['Emojis', 'Emojis', 'Emojis'],
+  // Display style (classic / modern), Diseño page
+  ['Estilo de la pantalla', 'Display style', 'Estilo do ecrã'],
+  ['Independiente de la plantilla: cada pantalla puede tener su propio estilo.', 'Independent of the layout: each screen can have its own style.', 'Independente do modelo: cada ecrã pode ter o seu próprio estilo.'],
+  ['Clásico', 'Classic', 'Clássico'],
+  ['Moderno', 'Modern', 'Moderno'],
+  ['El aspecto de siempre: reloj fino, tarjetas con borde y la cuadrícula completa.', 'The original look: thin clock, outlined cards and the full grid.', 'O aspeto de sempre: relógio fino, cartões com contorno e a grelha completa.'],
+  ['Más minimalista, al estilo de Apple: tarjetas de cristal sobre la foto, reloj de pantalla de bloqueo y menos líneas.', 'More minimal, Apple-like: glass cards over the photo, a Lock Screen clock and fewer lines.', 'Mais minimalista, ao estilo da Apple: cartões de vidro sobre a foto, relógio de ecrã de bloqueio e menos linhas.'],
+  ['Estilo clásico / moderno', 'Classic / modern style', 'Estilo clássico / moderno'],
 ];

@@ -4490,3 +4490,9 @@ h1 .scope {
     justify-content: flex-end;
   }
 }
+
+/* ---------------------------------------------------------------- display style (Diseño page) */
+.style-grid {
+  margin-top: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}

@@ -3,6 +3,7 @@
 import '@fontsource-variable/inter';
 import '@fontsource-variable/outfit';
 import './styles.css';
+import './styles-modern.css';
 import type {
   Announcement, CountdownsResponse, DisplayConfig, EventsResponse, NewsResponse, NightCommand, WeatherResponse,
 } from '../shared/types';
@@ -215,6 +216,8 @@ function applyConfig(raw: DisplayConfig): void {
   if (pc === 'analog' || pc === 'digital') cfg.datetime.clock = pc;
   const pt = params.get('theme');
   if (pt === 'light' || pt === 'dark') cfg.screen.theme = pt;
+  const ps = params.get('style');
+  if (ps === 'classic' || ps === 'modern') cfg.screen.style = ps;
   const pa = params.get('ambient');
   if (pa === 'aurora' || pa === 'particles' || pa === 'none') cfg.background.ambient = pa;
   const ptr = params.get('transition');
@@ -232,6 +235,8 @@ function applyConfig(raw: DisplayConfig): void {
   const accent = cfg.screen.accent;
   const light = cfg.screen.theme === 'light';
   root.classList.toggle('theme-light', light);
+  // Display style (independent of the layout): 'modern' scopes every rule in styles-modern.css; classic adds nothing.
+  root.classList.toggle('style-modern', cfg.screen.style === 'modern');
   root.style.setProperty('--accent', accent);
   root.style.setProperty('--accent-rgb', parseColor(accent).join(' '));
   root.style.setProperty('--fs', String(cfg.screen.fontScale));
@@ -283,7 +288,7 @@ function applyGL(wantAmbient: boolean, accent: string, light: boolean): void {
   const cfg = ctx.cfg;
   const root = document.documentElement;
   if (engine) {
-    const bg = light ? '#f4f2ee' : '#000000';
+    const bg = light ? (cfg.screen.style === 'modern' ? '#f2f2f7' : '#f4f2ee') : '#000000';
     engine.setClearColor(bg);
     if (ambient) {
       ambient.mode = wantAmbient ? cfg.background.ambient : 'none';
