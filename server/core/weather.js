@@ -431,6 +431,8 @@ const header = (res, name) => (typeof res.headers?.get === 'function' ? res.head
  * identifies the app (MET Norway refuses requests without one), `deps.prev` is the caller's cached entry for the
  * same key (MET Norway gets If-Modified-Since and may answer 304). Returns the entry to cache:
  * { base, fetchedAt, expiresAt, lastModified }. Throws WeatherError.
+ * @param {ReturnType<typeof weatherRequest>} r
+ * @param {{ fetch: (url: string, init?: any) => Promise<any>, userAgent?: string, prev?: any, now?: () => Date }} deps
  */
 export async function fetchWeather(r, { fetch, userAgent = 'Marco (+https://github.com/mr-reb00t/marco)', prev = null, now = () => new Date() }) {
   const headers = { Accept: 'application/json', 'User-Agent': userAgent };
@@ -463,7 +465,15 @@ export async function fetchWeather(r, { fetch, userAgent = 'Marco (+https://gith
     throw new WeatherError(r.provider === 'pirate-weather' ? 'key_invalid' : 'http', `${PROVIDER_INFO[r.provider].name}: HTTP ${res.status}`, res.status);
   }
   if (res.status === 429) throw new WeatherError('rate_limited', `${PROVIDER_INFO[r.provider].name}: too many requests`, 429);
-  if (!res.ok) throw new WeatherError('http', `${PROVIDER_INFO[r.provider].name}: HTTP ${res.status}`, res.status);
+  if (!res.ok) {
+    // Open-Meteo explains a refused request ({ error: true, reason }); keep that for the admin status.
+    let reason = '';
+    try {
+      const j = await res.json();
+      if (typeof j?.reason === 'string') reason = `: ${j.reason.slice(0, 200)}`;
+    } catch { /* no JSON body */ }
+    throw new WeatherError('http', `${PROVIDER_INFO[r.provider].name}: HTTP ${res.status}${reason}`, res.status);
+  }
   let j;
   try {
     j = await res.json();
@@ -564,6 +574,10 @@ export function weatherKeyStatus(key) {
 /**
  * Tries an API key once (PUT /api/admin/weather/key): true when the provider accepts it, false when it refuses it,
  * null when that could not be told (network error, rate limit). `r` is a weatherRequest for the key's provider.
+ */
+/**
+ * @param {ReturnType<typeof weatherRequest>} r
+ * @param {Parameters<typeof fetchWeather>[1]} deps
  */
 export async function tryWeatherKey(r, deps) {
   try {
