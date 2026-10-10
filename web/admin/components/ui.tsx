@@ -902,6 +902,8 @@ export function Modal(props: {
   icon?: IconName;
   /** the form differs from what it was opened with */
   dirty?: boolean;
+  /** false: do not focus the first field on open (a guide to read first; on a phone the keyboard would cover it) */
+  autoFocus?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const live = useRef(props);
@@ -925,8 +927,7 @@ export function Modal(props: {
       }
     };
     document.addEventListener('keydown', onKey);
-    const first = ref.current?.querySelector<HTMLElement>('input:not([type=checkbox]):not([type=radio]), textarea, select');
-    first?.focus();
+    if (props.autoFocus !== false) ref.current?.querySelector<HTMLElement>('input:not([type=checkbox]):not([type=radio]), textarea, select')?.focus();
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {

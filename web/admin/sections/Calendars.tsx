@@ -28,6 +28,7 @@ import { LimitNote } from '../components/LimitNote';
 import { t } from '../i18n';
 import { allSourceOptions, guessKind, HOLIDAY_PRESETS, isHttpUrl, KIND_EMOJI, moveItem, SWATCHES, uid } from '../util';
 import type { SectionProps } from './common';
+import { ICloudGuide, icloudUrl } from './ICloudGuide';
 
 /** `insecureTls` is an optional extension (self-signed HTTPS feeds on the LAN); see docs/ARCHITECTURE.md. */
 type Source = CalendarSource & { insecureTls?: boolean };
@@ -43,6 +44,22 @@ const KINDS: { value: SourceKind; label: string }[] = [
 function nextColor(sources: CalendarSource[]) {
   const used = new Set(sources.map((s) => s.color.toLowerCase()));
   return SWATCHES.find((c) => !used.has(c)) ?? SWATCHES[sources.length % SWATCHES.length];
+}
+
+/** Adds an iCal source to a config draft ("Añadir URL iCal", the quick-add pills and the iCloud guide). */
+function pushIcs(d: { calendar: { sources: CalendarSource[] } }, name = '', url = '', kind: SourceKind = 'generic') {
+  if (atLimit('sources', d.calendar.sources.length)) return;
+  d.calendar.sources.push({
+    id: uid('c'),
+    type: 'ics',
+    name: name || t('Calendario {n}', { n: d.calendar.sources.length + 1 }),
+    url,
+    color: nextColor(d.calendar.sources),
+    emoji: '',
+    kind,
+    enabled: true,
+    refreshMin: kind === 'holidays' ? 720 : 5,
+  });
 }
 
 function SourceRow({
@@ -281,8 +298,9 @@ interface Linked extends LinkedAccount {
 const linkKey = (a: { provider: ProviderId; email: string }) => `${a.provider}:${a.email}`;
 
 /**
- * Linked accounts (Google and Microsoft) in one card: "Link account" asks which provider when the server offers more
- * than one, and every linked account is listed one below the other with its calendars to pick from.
+ * Linked accounts (Google and Microsoft) in one card: "Link account" asks which provider, and every linked account is
+ * listed one below the other with its calendars to pick from. Apple iCloud is always in the chooser: it opens a guide
+ * to add the calendar's public link as an iCal source (no account to link, no server credentials).
  */
 function LinkedAccounts({ cfg, set, dirty, save, me }: SectionProps) {
   const all = [googleProvider(me), microsoftProvider(me)];
@@ -292,6 +310,7 @@ function LinkedAccounts({ cfg, set, dirty, save, me }: SectionProps) {
   const [accounts, setAccounts] = useState<Linked[] | null>(null);
   const [cals, setCals] = useState<Record<string, LinkedCalendar[] | 'error' | undefined>>({});
   const [err, setErr] = useState('');
+  const [icloud, setIcloud] = useState(false);
 
   const load = async () => {
     const lists = await Promise.allSettled(providers.map(async (p) => (await p.accounts()).map((a) => ({ ...a, provider: p.id }) as Linked)));
@@ -324,16 +343,20 @@ function LinkedAccounts({ cfg, set, dirty, save, me }: SectionProps) {
     window.location.href = p.connectPath;
   };
 
-  /** One provider: straight there. Several: ask which one. */
+  /** Ask which provider (Apple iCloud is always there); with no account provider set up, straight to the iCloud guide. */
   const connect = async () => {
-    if (providers.length === 1) return go(providers[0]);
-    const choice = await choiceDialog<ProviderId>({
+    if (!providers.length) return setIcloud(true);
+    const choice = await choiceDialog<ProviderId | 'apple'>({
       title: t('Vincular cuenta'),
       body: t('¿Qué cuenta quieres vincular?'),
-      choices: providers.map((p) => ({ value: p.id, label: p.label, kind: 'default' as const, icon: p.id })),
+      choices: [
+        ...providers.map((p) => ({ value: p.id, label: p.label, kind: 'default' as const, icon: p.id })),
+        { value: 'apple' as const, label: 'Apple iCloud', kind: 'default' as const, icon: 'apple' as const },
+      ],
       closeX: true,
     });
-    if (choice) await go(byId(choice));
+    if (choice === 'apple') setIcloud(true);
+    else if (choice) await go(byId(choice));
   };
 
   const ofAccount = (s: CalendarSource, a: Linked) => byId(a.provider).accountOf(s) === a.email;
@@ -386,7 +409,9 @@ function LinkedAccounts({ cfg, set, dirty, save, me }: SectionProps) {
       ? t('Vincula cuentas de Google o de Microsoft (Outlook.com, Hotmail, Microsoft 365) y elige qué calendarios mostrar.')
       : providers[0]?.id === 'microsoft'
         ? t('Vincula una cuenta de Outlook.com, Hotmail o Microsoft 365 y elige qué calendarios mostrar.')
-        : t('Vincula una cuenta de Google y elige qué calendarios mostrar.');
+        : providers[0]?.id === 'google'
+          ? t('Vincula una cuenta de Google y elige qué calendarios mostrar.')
+          : t('Añade un calendario de Apple iCloud con su enlace público.');
   const hasMicrosoft = !!accounts?.some((a) => a.provider === 'microsoft');
 
   return (
@@ -397,17 +422,26 @@ function LinkedAccounts({ cfg, set, dirty, save, me }: SectionProps) {
       icon="link"
       desc={desc}
       actions={
-        providers.length > 0 && (
-          <Button icon="plus" variant="primary" size="sm" onClick={connect}>
-            {t('Vincular cuenta')}
-          </Button>
-        )
+        <Button icon="plus" variant="primary" size="sm" onClick={connect}>
+          {providers.length ? t('Vincular cuenta') : t('Añadir iCloud')}
+        </Button>
       }
     >
+      {icloud && (
+        <ICloudGuide
+          onClose={() => setIcloud(false)}
+          onAdd={(name, url) => set((d) => pushIcs(d, name, url, 'generic'))}
+          exists={(url) => cfg.calendar.sources.some((s) => s.type === 'ics' && !!s.url && icloudUrl(s.url) === url)}
+          disabled={atLimit('sources', cfg.calendar.sources.length)}
+          note={<LimitNote name="sources" count={cfg.calendar.sources.length} />}
+        />
+      )}
       {providers.length === 0 ? (
-        <Callout kind="warn">
-          {t('Para vincular cuentas, añade GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET (Google) o MICROSOFT_CLIENT_ID y MICROSOFT_CLIENT_SECRET (Microsoft) al archivo .env y reinicia. Mientras tanto puedes usar la URL iCal secreta de tu calendario.')}
-        </Callout>
+        (offers('googleCalendar') || offers('microsoftCalendar')) && (
+          <Callout kind="warn">
+            {t('Para vincular cuentas, añade GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET (Google) o MICROSOFT_CLIENT_ID y MICROSOFT_CLIENT_SECRET (Microsoft) al archivo .env y reinicia. Mientras tanto puedes usar la URL iCal secreta de tu calendario.')}
+          </Callout>
+        )
       ) : accounts === null ? (
         <div class="skeleton-list">
           <div class="skeleton" />
@@ -556,21 +590,7 @@ export function CalendarsSection(props: SectionProps) {
   const reorder = useReorder(move);
 
   const atMax = atLimit('sources', sources.length);
-  const addIcs = (name = '', url = '', kind: SourceKind = 'generic') =>
-    set((d) => {
-      if (atLimit('sources', d.calendar.sources.length)) return;
-      d.calendar.sources.push({
-        id: uid('c'),
-        type: 'ics',
-        name: name || t('Calendario {n}', { n: d.calendar.sources.length + 1 }),
-        url,
-        color: nextColor(d.calendar.sources),
-        emoji: '',
-        kind,
-        enabled: true,
-        refreshMin: kind === 'holidays' ? 720 : 5,
-      });
-    });
+  const addIcs = (name = '', url = '', kind: SourceKind = 'generic') => set((d) => pushIcs(d, name, url, kind));
 
   const removeSource = async (s: Source) => {
     const ok = await confirmDialog({ title: t('Eliminar “{name}”', { name: s.name || 'calendario' }), body: t('Sus eventos dejarán de mostrarse.'), confirm: t('Eliminar'), danger: true });
@@ -650,7 +670,7 @@ export function CalendarsSection(props: SectionProps) {
         </div>
       </Card>
 
-      {(offers('googleCalendar') || offers('microsoftCalendar')) && <LinkedAccounts {...props} />}
+      <LinkedAccounts {...props} />
 
       <ScreenSourcesCard {...props} />
 
