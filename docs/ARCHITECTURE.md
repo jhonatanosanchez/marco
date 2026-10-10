@@ -45,7 +45,7 @@ failing source never breaks the others.
 
 | Path | Content |
 |---|---|
-| `config.json` | The whole configuration (schema v2 below). Bumped `revision` on every save. |
+| `config.json` | The whole configuration (schema v2 below). Bumped `revision` on every save. The admin sends the revision it loaded (`baseRevision`) and a stale one gets `409 conflict`, so only real saves may bump it: background work (calendar refresh, pairing, display links, commands) never writes `config.json`. |
 | `secrets.json` | Password hash (scrypt; absent on a fresh install → setup wizard, `server/setup.js`), `setupCompletedAt`, session secret/epoch, Google refresh tokens per account, Home Assistant token, API tokens (SHA-256 hashes), `displayKeys` (one private-link key per screen id), `devices` (paired devices: name, screen, SHA-256 of the token, last seen). Mode 600. Never sent to displays. |
 | `photos/` | Gallery images; `photos/.thumbs/` thumbnails (480 px); `photos/.meta.json` size + focal point per file |
 | `cache/` | Source and feed caches |

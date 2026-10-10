@@ -166,12 +166,17 @@ export const getConfig = () => config;
 export const getSecrets = () => secrets;
 
 /**
- * Validate + save a full config. Returns { ok, errors, config }. Bumps revision.
+ * Validate + save a full config. Returns { ok, errors, config, conflict? }. Bumps revision.
  * Before overwriting, the current file is copied to data/backups/ (rotating, docs/ARCHITECTURE.md).
+ * `baseRevision` (the revision the caller's copy was loaded at) turns on the revision guard: when the config was
+ * saved since then, nothing is written and the result has `conflict: true`. Without it the last write wins.
  * @param {unknown} input
- * @param {{ reason?: string, req?: any, backup?: boolean }} [opts] reason/req are passed to 'config' listeners
+ * @param {{ reason?: string, req?: any, backup?: boolean, baseRevision?: number | null }} [opts] reason/req are passed to 'config' listeners
  */
-export function saveConfig(input, { reason = 'server', req = null, backup = true } = {}) {
+export function saveConfig(input, { reason = 'server', req = null, backup = true, baseRevision = null } = {}) {
+  if (baseRevision !== null && baseRevision !== undefined && baseRevision !== (config?.revision || 0)) {
+    return { ok: false, conflict: true, errors: [], config };
+  }
   // A config without `security` (old admin build, backup or export from before 0.3) keeps the current display
   // access mode: restoring an old backup must neither open private displays nor lock out open-mode kiosks.
   if (input && typeof input === 'object' && !Array.isArray(input) && input.security === undefined && config?.security) {

@@ -33,6 +33,8 @@ import type {
   SetupRequest,
   SetupStatus,
   StoredConfig,
+  SaveConfigRequest,
+  CountdownsResponse,
   GoogleAccount,
   HealthResponse,
   HouseholdInfo,
@@ -43,14 +45,18 @@ import type {
   TestRssResponse,
 } from '../shared/types';
 import { getLang } from './i18n';
+import { apiErrorCode, apiErrorMessage, type ApiErrorCode } from './apiErrors';
 
 export class ApiError extends Error {
   status: number;
   body: unknown;
+  /** Known error code from the body (apiErrors.ts), '' when there is none. */
+  code: ApiErrorCode | '';
   constructor(status: number, message: string, body?: unknown) {
     super(message);
     this.status = status;
     this.body = body;
+    this.code = apiErrorCode(body);
   }
 }
 
@@ -82,18 +88,7 @@ async function request<T>(method: string, url: string, body?: unknown, opts: { s
   }
   if (!res.ok) {
     if (res.status === 401 && !opts.silent401) window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
-    const details = data && typeof data === 'object' && Array.isArray((data as any).details) ? (data as any).details : null;
-    const detailText = details?.length
-      ? `: ${details
-          .slice(0, 3)
-          .map((d: any) => (d && typeof d === 'object' ? `${d.path ?? ''}: ${d.message ?? ''}` : String(d)))
-          .join('; ')}`
-      : '';
-    const msg =
-      (data && typeof data === 'object' && ((data as any).error || (data as any).message) && `${(data as any).error || (data as any).message}${detailText}`) ||
-      (typeof data === 'string' && data.length < 200 ? data : '') ||
-      `HTTP ${res.status}`;
-    throw new ApiError(res.status, String(msg), data);
+    throw new ApiError(res.status, apiErrorMessage(res.status, data), data);
   }
   return data as T;
 }
@@ -129,9 +124,10 @@ export const api = {
     request<SetupCompleteResponse>('POST', '/api/setup/complete', body, { silent401: true, headers: body.token ? { 'x-setup-token': body.token } : {} }),
 
   getConfig: () => request<StoredConfig>('GET', '/api/admin/config'),
-  /** PUT the whole (v2) config. Returns the saved config (refetches if the server does not echo it). */
-  async saveConfig(cfg: StoredConfig): Promise<StoredConfig> {
-    const res = await request<any>('PUT', '/api/admin/config', cfg);
+  /** PUT the whole (v2) config. Returns the saved config (refetches if the server does not echo it).
+   *  With `baseRevision` the server answers 409 conflict when the config was saved since that revision. */
+  async saveConfig(body: SaveConfigRequest): Promise<StoredConfig> {
+    const res = await request<any>('PUT', '/api/admin/config', body);
     if (isConfig(res)) return res;
     if (res && isConfig(res.config)) return res.config;
     return api.getConfig();
@@ -187,6 +183,7 @@ export const api = {
 
   eventsPreview: (body: EventsPreviewRequest) => request<EventsPreviewResponse>('POST', '/api/admin/events/preview', body),
   parseBirthdaysCsv: (text: string) => request<BirthdayCsvResult>('POST', '/api/admin/birthdays/parse-csv', { text }),
+  countdowns: (screen: string) => request<CountdownsResponse>('GET', `/api/admin/countdowns${q({ screen })}`),
 
   announce: (body: AnnounceRequest) => request<AnnounceResponse>('POST', '/api/admin/announce', body),
   announcements: () => request<AnnouncementsResponse>('GET', '/api/admin/announcements'),
@@ -246,7 +243,7 @@ function xhrUpload<T>(method: string, url: string, fd: FormData, onProgress?: (f
         resolve(data as T);
       } else {
         if (xhr.status === 401) window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
-        reject(new ApiError(xhr.status, (data && (data.error || data.message)) || `HTTP ${xhr.status}`, data));
+        reject(new ApiError(xhr.status, apiErrorMessage(xhr.status, data), data));
       }
     };
     xhr.onerror = () => reject(new ApiError(0, 'network'));

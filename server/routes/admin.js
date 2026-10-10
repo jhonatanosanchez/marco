@@ -27,8 +27,19 @@ export function adminRouter({ onConfigSaved } = {}) {
   r.get('/config', (req, res) => res.json(getConfig()));
 
   r.put('/config', (req, res) => {
-    // Body = full StoredConfig (v1 bodies from an old admin build are migrated by validateConfig).
-    const result = saveConfig(req.body, { reason: 'admin', req });
+    // Body = full StoredConfig (v1 bodies from an old admin build are migrated by validateConfig), plus an
+    // optional `baseRevision`: the revision the admin loaded. A stale one gets 409 conflict; without it the last
+    // write wins, as with admin builds from before 0.5.
+    let body = req.body;
+    let baseRevision = null;
+    if (body && typeof body === 'object' && !Array.isArray(body) && Object.hasOwn(body, 'baseRevision')) {
+      ({ baseRevision = null, ...body } = body);
+      if (baseRevision !== null && !(Number.isSafeInteger(baseRevision) && baseRevision >= 0)) {
+        return res.status(400).json({ error: 'invalid config', details: [{ path: 'baseRevision', message: 'expected a revision number' }] });
+      }
+    }
+    const result = saveConfig(body, { reason: 'admin', req, baseRevision });
+    if (result.conflict) return res.status(409).json({ error: 'conflict', revision: result.config.revision });
     if (!result.ok) return res.status(400).json({ error: 'invalid config', details: result.errors });
     onConfigSaved?.(result.config);
     res.json(result.config);

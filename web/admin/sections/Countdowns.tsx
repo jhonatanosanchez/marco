@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { Countdown, CountdownsResponse } from '../../shared/types';
+import { api } from '../api';
 import { confirmDialog } from '../components/feedback';
 import { Icon } from '../components/icons';
 import { Button, Card, ColorPicker, EmojiPicker, Empty, Field, NumberInput, PageHeader, Slider, TextInput, Toggle, ToggleRow } from '../components/ui';
@@ -52,9 +53,9 @@ export function CountdownsSection({ full, setFull, cfg, set, errors }: SectionPr
   const [focusAdd] = useState(() => takeIntent('countdowns', 'add'));
 
   useEffect(() => {
-    fetch(`/api/countdowns?screen=${encodeURIComponent(cfg.slug)}`, { headers: { Accept: 'application/json' } })
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((j: CountdownsResponse) => setLive(j))
+    api
+      .countdowns(cfg.slug)
+      .then((j) => setLive(j))
       .catch(() => setLive('na'));
   }, [cfg.slug, full.revision]);
 

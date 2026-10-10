@@ -4,7 +4,8 @@ import type { AppConfig, AuthMeResponse, DisplayInfo, Lang, SetupStatus, StoredC
 import { api, ApiError } from './api';
 import { BrandMark } from './components/BrandMark';
 import { CommandPalette, type PaletteItem } from './components/CommandPalette';
-import { confirmDialog, DialogHost, toast, ToastHost } from './components/feedback';
+import { choiceDialog, confirmDialog, DialogHost, toast, ToastHost } from './components/feedback';
+import { saveWithRevision, type ConflictChoice } from './configMerge';
 import { Icon, type IconName } from './components/icons';
 import { ScreenSwitcher } from './components/ScreenSwitcher';
 import { openPairDialog, PairDialogHost } from './components/DisplayAccess';
@@ -415,6 +416,8 @@ export function App() {
 
   const draftRef = useRef(draft);
   draftRef.current = draft;
+  const savedRef = useRef(saved);
+  savedRef.current = saved;
 
   /** Jump to the first error: switch screen if needed, then route + anchor. */
   const revealError = useCallback((all: ReturnType<typeof validateAll>) => {
@@ -436,6 +439,23 @@ export function App() {
     }
   }, []);
 
+  /** After a 409: the config was saved elsewhere (another tab or device, or the server itself after a Google sign-in). */
+  const askConflict = (): Promise<ConflictChoice> =>
+    choiceDialog<'reload' | 'overwrite'>({
+      title: t('La configuración ha cambiado mientras editabas'),
+      body: (
+        <>
+          <p>{t('Se ha guardado desde otra pestaña u otro dispositivo.')}</p>
+          <p>{t('Puedes cargar la versión guardada (pierdes lo que has cambiado aquí) o guardar tus cambios encima. Lo que no hayas tocado se queda como está en la versión guardada.')}</p>
+        </>
+      ),
+      cancel: t('Seguir editando'),
+      choices: [
+        { value: 'reload', label: t('Cargar la versión guardada'), kind: 'ghost' },
+        { value: 'overwrite', label: t('Guardar mis cambios'), kind: 'primary' },
+      ],
+    });
+
   const save = useCallback(async (): Promise<boolean> => {
     const d = draftRef.current;
     if (!d) return false;
@@ -447,21 +467,35 @@ export function App() {
       return false;
     }
     setSaving(true);
+    let cur = d;
     try {
-      const c = await api.saveConfig(d);
-      setSaved(c);
-      setDraft(c);
+      const out = await saveWithRevision({
+        draft: d,
+        base: savedRef.current ?? d,
+        put: (body) => api.saveConfig(body),
+        get: () => api.getConfig(),
+        choose: askConflict,
+        isConflict: (e) => e instanceof ApiError && e.status === 409 && e.code === 'conflict',
+        merged: (m, theirs) => {
+          cur = m;
+          setSaved(theirs);
+          setDraft(m);
+        },
+      });
+      if (out.status === 'cancelled') return false;
+      setSaved(out.config);
+      setDraft(out.config);
       setShowErrors(false);
       setPreviewKey((k) => k + 1);
-      toast(t('Cambios guardados · la pantalla se actualizará sola'));
-      return true;
+      toast(out.status === 'saved' ? t('Cambios guardados · la pantalla se actualizará sola') : t('Se ha cargado la versión guardada'), out.status === 'saved' ? 'ok' : 'info');
+      return out.status === 'saved';
     } catch (e) {
       const ae = e as ApiError;
       const details = (ae.body as any)?.details as { path: string; message: string }[] | undefined;
       if (ae.status === 400 && details?.length) {
         const first = sectionForServerPath(details[0].path);
         if (first.screenIndex != null) {
-          const scr = d.screens[first.screenIndex];
+          const scr = cur.screens[first.screenIndex];
           if (scr && scr.id !== screenIdRef.current) {
             setScreenId(scr.id);
             toast(t('Error en la pantalla {name}', { name: scr.name }), 'error');

@@ -55,7 +55,7 @@ export function ToastHost() {
   );
 }
 
-/* ------------------------------------------------------------------ confirm dialog */
+/* ------------------------------------------------------------------ confirm / choice dialog */
 
 interface ConfirmOpts {
   title: string;
@@ -64,15 +64,40 @@ interface ConfirmOpts {
   cancel?: string;
   danger?: boolean;
 }
-let pending: (ConfirmOpts & { resolve: (v: boolean) => void }) | null = null;
+
+export interface DialogChoice<T extends string> {
+  value: T;
+  label: string;
+  kind?: 'primary' | 'danger' | 'ghost';
+}
+
+interface Pending {
+  title: string;
+  body?: ComponentChildren;
+  /** Buttons left to right; the last one gets the focus. Escape, a click outside and `cancel` resolve null. */
+  choices: DialogChoice<string>[];
+  cancel: string;
+  resolve: (v: string | null) => void;
+}
+let pending: Pending | null = null;
 const dlgListeners = new Set<() => void>();
 
-export function confirmDialog(opts: ConfirmOpts): Promise<boolean> {
+/** A dialog with several actions besides "cancel". Resolves the chosen value, or null when cancelled. */
+export function choiceDialog<T extends string>(opts: { title: string; body?: ComponentChildren; choices: DialogChoice<T>[]; cancel?: string }): Promise<T | null> {
   return new Promise((resolve) => {
-    pending?.resolve(false);
-    pending = { ...opts, resolve };
+    pending?.resolve(null);
+    pending = { title: opts.title, body: opts.body, choices: opts.choices, cancel: opts.cancel ?? t('Cancelar'), resolve: resolve as (v: string | null) => void };
     dlgListeners.forEach((l) => l());
   });
+}
+
+export function confirmDialog(opts: ConfirmOpts): Promise<boolean> {
+  return choiceDialog({
+    title: opts.title,
+    body: opts.body,
+    cancel: opts.cancel,
+    choices: [{ value: 'ok', label: opts.confirm ?? t('Aceptar'), kind: opts.danger ? 'danger' : 'primary' }],
+  }).then((v) => v === 'ok');
 }
 
 export function DialogHost() {
@@ -88,23 +113,32 @@ export function DialogHost() {
   });
   if (!pending) return null;
   const p = pending;
-  const close = (v: boolean) => {
+  const close = (v: string | null) => {
     pending = null;
     p.resolve(v);
     force((n) => n + 1);
   };
+  const last = p.choices.length - 1;
   return (
-    <div class="modal-backdrop" onClick={(e) => e.target === e.currentTarget && close(false)} onKeyDown={(e) => e.key === 'Escape' && (e.preventDefault(), close(false))}>
+    <div class="modal-backdrop" onClick={(e) => e.target === e.currentTarget && close(null)} onKeyDown={(e) => e.key === 'Escape' && (e.preventDefault(), close(null))}>
       <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="dlg-title">
         <h3 id="dlg-title">{p.title}</h3>
         {p.body && <div class="modal__body">{p.body}</div>}
         <div class="modal__actions">
-          <button type="button" class="btn btn--ghost" onClick={() => close(false)}>
-            {p.cancel ?? t('Cancelar')}
+          <button type="button" class="btn btn--ghost" onClick={() => close(null)}>
+            {p.cancel}
           </button>
-          <button type="button" ref={okRef} class={`btn ${p.danger ? 'btn--danger' : 'btn--primary'}`} onClick={() => close(true)}>
-            {p.confirm ?? t('Aceptar')}
-          </button>
+          {p.choices.map((c, i) => (
+            <button
+              type="button"
+              key={c.value}
+              ref={i === last ? okRef : undefined}
+              class={`btn ${c.kind === 'danger' ? 'btn--danger' : c.kind === 'ghost' ? 'btn--ghost' : 'btn--primary'}`}
+              onClick={() => close(c.value)}
+            >
+              {c.label}
+            </button>
+          ))}
         </div>
       </div>
     </div>

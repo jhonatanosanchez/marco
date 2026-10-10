@@ -891,6 +891,10 @@ export interface StoredConfig {
   security: SecurityConfig;
 }
 
+/** PUT /api/admin/config body: the whole config plus the revision the admin loaded it at. A stale `baseRevision`
+ *  gets 409 {error:'conflict', revision}; without it the last write wins. */
+export type SaveConfigRequest = StoredConfig & { baseRevision?: number };
+
 export interface ValidationError {
   path: string;
   message: string;

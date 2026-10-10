@@ -262,7 +262,7 @@
       "callers": [
         "saveConfig"
       ],
-      "request": "StoredConfig",
+      "request": "SaveConfigRequest",
       "response": "StoredConfig",
       "responseArray": false,
       "responseKeys": [
@@ -283,6 +283,26 @@
         "homeassistant",
         "auth",
         "security"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/countdowns",
+      "query": [
+        "screen"
+      ],
+      "feature": null,
+      "callers": [
+        "countdowns"
+      ],
+      "request": null,
+      "response": "CountdownsResponse",
+      "responseArray": false,
+      "responseKeys": [
+        "generatedAt",
+        "today",
+        "hash",
+        "items"
       ]
     },
     {

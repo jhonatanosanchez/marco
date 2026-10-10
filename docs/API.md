@@ -78,7 +78,7 @@ saved without `security` (old admin builds, backups or exports from before 0.3) 
 | `GET /api/weather?screen=` | `{ updatedAt, locationName, current, today, daily[], hourly[], indoor }` (localized descriptions, cache 10 min) |
 | `GET /api/news` | `{ updatedAt, items: [{ id, title, summary, source, date, image? }] }` (cache 15 min) |
 | `GET /api/photos?screen=&count=20&after=` | `{ photos: [{ url, author?, title?, source: "stock"\|"gallery", file?, focusX?, focusY? }] }`. Gallery photos follow the screen's `background.order` (`random` \| `newest` \| `name`); hidden photos are never returned. `after` = gallery `file` the display showed last: sequential orders continue right after it (wrapping around), `random` avoids starting with it. Without `after`, the server remembers where the previous batch for that screen ended. Falls back to stock when no gallery photo is in rotation |
-| `GET /api/countdowns?screen=` | `{ generatedAt, today, hash, items: [{ id, title, emoji, color, date, days, origin, age? }] }` |
+| `GET /api/countdowns?screen=` | `{ generatedAt, today, hash, items: [{ id, title, emoji, color, date, days, origin, age? }] }`. An admin session is still accepted here in 0.5 for admin pages loaded before the update; the admin itself uses `GET /api/admin/countdowns` |
 | `POST /api/display/heartbeat` | Body `DisplayHeartbeat` (≤ 4 kB: clientId, screen, version, resolution, dpr, webgl, night state, photo frame…) → `HeartbeatResponse` |
 | `GET /api/stream?screen=&client=&k=` | Server-Sent Events, see below |
 | `GET /api/display/poll?screen=&client=&cursor=&rev=&hidden=&preview=` | `PollResponse`: the same events as commands, for displays without a stream. See below |
@@ -133,6 +133,10 @@ Every call the admin makes is listed in `web/shared/adminContract.json` (method,
 request type and top-level response keys), generated from `web/admin/api.ts` and `web/shared/types.ts` by
 `npm run contract`. A server that turns a feature off answers that feature's routes with
 `404 {"error":"feature_unavailable"}`.
+
+Error codes the admin translates (`web/admin/apiErrors.ts`), read from `code` first and then `error`:
+`rate_limited`, `screen_limit`, `limit_exceeded`, `feature_unavailable`, `conflict`, `photo_quota`, `readonly`. A
+`details[].message` with one of these codes is translated too. Any other error shows the server's own text.
 
 `CalEvent`: `{ id, sourceId, title, start, end, allDay, location, color, emoji, kind, multiDay, age? }`. `start`/`end`
 are ISO strings with offset, or `YYYY-MM-DD` for all-day events (`end` exclusive).
@@ -249,11 +253,12 @@ Rules for the mutating setup endpoints:
 | Method & path | Notes |
 |---|---|
 | `GET /api/admin/config` | Full `StoredConfig` |
-| `PUT /api/admin/config` | Validate + save (revision + 1, backup first, SSE `config`). `400 { error, details: [{ path, message }] }` when invalid |
+| `PUT /api/admin/config` | Validate + save (revision + 1, backup first, SSE `config`). Body = `StoredConfig` plus an optional `baseRevision`: the revision the admin loaded. When the config was saved since then (another tab or device, or the server itself, for example the first Google sign-in adding the allowed email) the answer is `409 { error: "conflict", revision }` and nothing is written; the admin then offers to load the saved version or to save its changes on top of it (parts it did not change keep the saved value) with the new `baseRevision`. Without `baseRevision` (or `null`) the last write wins, as before 0.5. `400 { error, details: [{ path, message }] }` when invalid |
 | `PUT /api/admin/password` | `{ current, next }`: same password rules as the setup wizard (`400 { code: too_short \| too_common \| too_long }`); also logs out other sessions |
 | `GET /api/admin/screens/template?name=` | New `ScreenProfile` with defaults and a free slug |
 | `GET /api/admin/geocode?q=&lang=` | Place search for the weather location, through this server (Open-Meteo geocoding) so the browser only talks to Marco → `{ results: [{ name, admin1, country, countryCode, lat, lon, timezone }] }` (at most 8; `q` shorter than 2 characters gives `[]`). Also open to the setup wizard while no password exists, with the same token rules as `/api/setup/*` (`x-setup-token`). `429 { error: "rate_limited" }` after 60 searches per address in 10 minutes (600 overall); answers are cached for a day; `502 { error: "geocode_unavailable" }` when Open-Meteo cannot be reached |
 | `POST /api/admin/events/preview` | Body `{ from?, days? (1..60), screen?, eventRules?, iconRules?, localEvents?, birthdays? }` (draft values) → every event incl. hidden ones with `applied[]` rules and `ruleHits` |
+| `GET /api/admin/countdowns?screen=` | Same answer as `GET /api/countdowns` for the screen with that id or slug (unknown → default screen); used by the Countdowns page |
 | `POST /api/admin/birthdays/parse-csv` | `{ text }`: one `name;dd/mm[/yyyy]` per line (`;`, `,` or tab) → parsed rows, duplicates, errors with line numbers |
 | `GET /api/admin/dashboard` | Next events, weather now, active schedules, recent activity, warnings |
 | `GET /api/admin/status` | Per-source last fetch / errors, weather and news status, display count, uptime |

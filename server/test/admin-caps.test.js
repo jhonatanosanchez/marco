@@ -311,7 +311,9 @@ test('adminContract.json: shape, features and account endpoints', () => {
   }
   const get = (id) => c.endpoints.find((e) => `${e.method} ${e.path}` === id);
   assert.equal(get('GET /api/admin/config').request, null);
-  assert.equal(get('PUT /api/admin/config').request, 'StoredConfig');
+  assert.equal(get('PUT /api/admin/config').request, 'SaveConfigRequest');
+  assert.deepEqual(get('GET /api/admin/countdowns').query, ['screen']);
+  assert.equal(get('GET /api/admin/countdowns').feature, null);
   assert.ok(get('GET /api/admin/config').responseKeys.includes('screens'));
   assert.ok(get('GET /api/health').responseKeys.includes('features?'));
   assert.equal(get('GET /api/admin/photos').feature, 'gallery');
