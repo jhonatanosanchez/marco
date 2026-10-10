@@ -149,7 +149,7 @@ test('display pairing: code length from health, where to open the admin, the pag
 
 test('display preview (?preview=1) neither reads nor writes the stored key, device token or client id', async () => {
   const TOKEN = `md_${'A'.repeat(43)}`;
-  const storage = { 'marco.deviceToken': TOKEN, 'cs.clientId': 'd_realdisplay', 'cs.cache._device.config': '{}' };
+  const storage = { 'marco.deviceToken': TOKEN, 'cs.clientId': 'd_realdisplay', 'cs.cache._device.config': '{}', [`cs.cache.k_${KEY.slice(0, 6)}.config`]: '{"stale":true}' };
 
   // control: a real display reads the stored token and keeps its client id
   await withBrowser({ url: 'http://192.168.1.20:3000/', storage }, async ({ writes }) => {
@@ -172,6 +172,7 @@ test('display preview (?preview=1) neither reads nor writes the stored key, devi
     id.clearDeviceToken();
     id.clearCaches();
     store.saveCache('config', { x: 1 });
+    assert.equal(store.loadCache('config'), null, 'no cached data read');
     assert.deepEqual(writes, [], 'nothing written or removed');
     assert.equal(data.get('marco.deviceToken'), TOKEN);
     assert.equal(data.get('cs.clientId'), 'd_realdisplay');

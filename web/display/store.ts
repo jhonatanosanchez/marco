@@ -54,6 +54,7 @@ export function saveCache(k: Topic, v: unknown): void {
   } catch { /* quota / private mode */ }
 }
 export function loadCache<T>(k: Topic): T | null {
+  if (isPreview) return null; // the preview shows what the server sends now, not another display's cached data
   try {
     let s = localStorage.getItem(LS_PREFIX + k);
     // v1 builds cached the (single) screen under `cs.cache.<topic>` → reuse it for the default screen once.
