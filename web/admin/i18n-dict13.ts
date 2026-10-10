@@ -1,5 +1,5 @@
 // Backups, export and import on a server that leaves some settings out (Marco Cloud), the gallery as a .zip, and the
-// daily webhook limit of a server with a plan.
+// daily webhook limit of a server with a plan, and the reasons a calendar or feed could not be fetched.
 // Spanish key; [es, en, pt].
 export const ROWS13: [string, string, string][] = [
   [
@@ -57,4 +57,21 @@ export const ROWS13: [string, string, string][] = [
   ['Fotos descargadas · {n} no se pudieron leer', 'Photos downloaded · {n} could not be read', 'Fotos descarregadas · {n} não puderam ser lidas'],
   ['No se pudieron descargar las fotos', 'Could not download the photos', 'Não foi possível descarregar as fotos'],
   ['Como mucho {n} avisos y órdenes al día entre todos los tokens.', 'At most {n} alerts and commands a day across all tokens.', 'No máximo {n} avisos e ordens por dia entre todos os tokens.'],
+  [
+    'Esa dirección no se puede consultar desde el servidor (red local, nombre interno o puerto no permitido).',
+    'The server cannot fetch that address (local network, internal name or a port that is not allowed).',
+    'O servidor não pode consultar esse endereço (rede local, nome interno ou porta não permitida).',
+  ],
+  ['El archivo es demasiado grande (máx. 2 MB).', 'The file is too large (2 MB max).', 'O ficheiro é demasiado grande (máx. 2 MB).'],
+  ['Tardó demasiado en responder.', 'It took too long to answer.', 'Demorou demasiado a responder.'],
+  ['Demasiadas redirecciones.', 'Too many redirects.', 'Demasiados redirecionamentos.'],
+  [
+    'Acceso denegado: comprueba que el enlace sea público o que incluya su clave.',
+    'Access denied: check that the link is public or includes its key.',
+    'Acesso negado: confirma que o link é público ou que inclui a sua chave.',
+  ],
+  ['No encontrado (404): comprueba la dirección.', 'Not found (404): check the address.', 'Não encontrado (404): confirma o endereço.'],
+  ['El servidor de origen respondió con un error.', 'The source server answered with an error.', 'O servidor de origem respondeu com um erro.'],
+  ['No se pudo conectar con esa dirección.', 'Could not connect to that address.', 'Não foi possível ligar a esse endereço.'],
+  ['No es un feed RSS ni Atom.', 'It is not an RSS or Atom feed.', 'Não é um feed RSS nem Atom.'],
 ];

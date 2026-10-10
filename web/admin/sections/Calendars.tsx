@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { CalendarSource, GoogleAccount, GoogleCalendarListItem, SourceKind, TestIcsResponse } from '../../shared/types';
 import { api, ApiError, UNAUTHORIZED_EVENT } from '../api';
+import { fetchErrorText } from '../apiErrors';
 import { confirmDialog, toast } from '../components/feedback';
 import { GoogleG, Icon } from '../components/icons';
 import {
@@ -185,7 +186,7 @@ function SourceRow({
               </>
             ) : (
               <span>
-                <Icon name="alert" size={14} /> {test.res.error || t('No se pudo leer el calendario')}
+                <Icon name="alert" size={14} /> {fetchErrorText(test.res.error) || t('No se pudo leer el calendario')}
               </span>
             )}
           </div>

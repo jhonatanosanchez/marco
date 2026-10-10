@@ -6,6 +6,7 @@ import { Button, Card, Empty, PageHeader, StatusDot } from '../components/ui';
 import { has, runtime } from '../caps';
 import { formatDuration, relTime, t } from '../i18n';
 import type { SectionProps } from './common';
+import { fetchErrorText } from '../apiErrors';
 
 export function StatusSection({ cfg }: SectionProps) {
   const newsOn = has('news');
@@ -116,7 +117,7 @@ export function StatusSection({ cfg }: SectionProps) {
           </div>
           {newsOn && st?.news.error && (
             <div class="test-result is-err">
-              <Icon name="alert" size={14} /> {t('Noticias')}: {st.news.error}
+              <Icon name="alert" size={14} /> {t('Noticias')}: {fetchErrorText(st.news.error)}
             </div>
           )}
           <Card title={t('Fuentes de calendario')} icon="calendar">
@@ -153,7 +154,7 @@ export function StatusSection({ cfg }: SectionProps) {
                               </span>
                             ) : (
                               <span class="err-text" title={s.error ?? ''}>
-                                <StatusDot state={s.lastFetch ? 'error' : 'idle'} /> {s.error || t('Pendiente')}
+                                <StatusDot state={s.lastFetch ? 'error' : 'idle'} /> {fetchErrorText(s.error) || t('Pendiente')}
                               </span>
                             )}
                           </td>

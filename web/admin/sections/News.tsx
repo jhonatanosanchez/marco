@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import type { NewsFeed, TestRssResponse } from '../../shared/types';
 import { api, ApiError } from '../api';
+import { fetchErrorText } from '../apiErrors';
 import { Icon } from '../components/icons';
 import { Button, Card, EmojiPicker, Empty, Field, NumberInput, PageHeader, ReorderButtons, Slider, Textarea, TextInput, Toggle, ToggleRow } from '../components/ui';
 import { ScopeBadge } from '../components/ui';
@@ -60,7 +61,7 @@ function FeedRow({ f, i, n, errors, upd, remove, move }: { f: NewsFeed; i: numbe
             </span>
           ) : (
             <span>
-              <Icon name="alert" size={14} /> {test.res.error || t('Feed no válido')}
+              <Icon name="alert" size={14} /> {fetchErrorText(test.res.error) || t('Feed no válido')}
             </span>
           )}
         </div>
