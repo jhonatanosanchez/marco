@@ -29,6 +29,8 @@ export function importNoteText(n: ImportNote): string {
       return t('Se importan con la comprobación de certificados activada: {list}.', { list });
     case 'google':
       return t('Calendarios de Google de cuentas que no están conectadas aquí, no se importan: {list}. Conecta la cuenta en Calendarios y vuelve a añadirlos.', { list });
+    case 'microsoft':
+      return t('Calendarios de Microsoft de cuentas que no están conectadas aquí, no se importan: {list}. Conecta la cuenta en Calendarios y vuelve a añadirlos.', { list });
     case 'blockedUrl':
       return t('No se importan porque su dirección no es accesible desde Internet (red local o nombre interno): {list}.', { list });
     case 'refreshMin':

@@ -9,9 +9,11 @@ export const FEATURE_KEYS = Object.freeze([
   'homeassistant', 'news', 'customCss', 'gallery', 'schedules', 'announcements', 'displayCommands',
   'openDisplayAccess', 'insecureTls', 'googleCalendar', 'googleLogin', 'passwordLogin', 'apiTokens',
   'webhooks', 'backups', 'importExport', 'includeSecrets', 'activity', 'setupWizard', 'status', 'accountMenu',
+  'microsoftCalendar',
 ]);
 
-/** Feature flags of a self-hosted server: all on, Google follows its credentials, no account menu. */
+/** Feature flags of a self-hosted server: all on, Google follows its credentials, no account menu, no Microsoft
+ *  calendars (Marco Cloud only for now). */
 export function selfHostedFeatures() {
   const google = googleConfigured();
   const out = {};
@@ -19,6 +21,7 @@ export function selfHostedFeatures() {
   out.googleCalendar = google;
   out.googleLogin = google;
   out.accountMenu = false;
+  out.microsoftCalendar = false;
   return out;
 }
 

@@ -41,6 +41,7 @@ const P: Record<string, string> = {
   menu: 'M4 6h16 M4 12h16 M4 18h16',
   tag: 'M3 12V4h8l10 10-8 8z M7.5 8.5h.01',
   google: '',
+  microsoft: '',
   palette: 'M12 21a9 9 0 1 1 9-9c0 2-1.5 3-3.5 3H16a2 2 0 0 0-1.5 3.3c.4.5.5 1 .5 1.4 0 .8-1 1.3-3 1.3z M7.5 11h.01 M10 7h.01 M14.5 7h.01 M17 11h.01',
   globe: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M3 12h18 M12 3c2.5 2.5 3.8 5.5 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.5-3.8-9S9.5 5.5 12 3z',
   wand: 'M4 20L16 8 M14 6l4 4 M19 3v3 M17.5 4.5h3 M8 3v2 M7 4h2 M20 13v2 M19 14h2',
@@ -75,6 +76,7 @@ export type IconName = keyof typeof P;
 
 export function Icon({ name, size = 18, class: cls, ...rest }: { name: IconName; size?: number; class?: string } & SVGAttributes<SVGSVGElement>) {
   if (name === 'google') return <GoogleG size={size} />;
+  if (name === 'microsoft') return <MicrosoftLogo size={size} />;
   return (
     <svg
       class={`ico ${cls ?? ''}`}
@@ -101,6 +103,18 @@ export function GoogleG({ size = 18 }: { size?: number }) {
       <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
       <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z" />
       <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" />
+    </svg>
+  );
+}
+
+/** The four squares of the Microsoft logo, for the Microsoft accounts card and Microsoft calendars. */
+export function MicrosoftLogo({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 23 23" aria-hidden="true">
+      <path fill="#F25022" d="M1 1h10v10H1z" />
+      <path fill="#7FBA00" d="M12 1h10v10H12z" />
+      <path fill="#00A4EF" d="M1 12h10v10H1z" />
+      <path fill="#FFB900" d="M12 12h10v10H12z" />
     </svg>
   );
 }

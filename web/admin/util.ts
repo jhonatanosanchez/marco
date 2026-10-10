@@ -159,6 +159,8 @@ export function validateConfig(c: AppConfig, caps: Caps = currentCaps()): Errors
       // A hidden URL (see CalendarSource.urlHidden) is still stored on the server: an empty field keeps it.
       const kept = src.urlHidden && !src.url;
       if (!kept && (!src.url || !isHttpUrl(src.url, true))) e[`${p}.url`] = 'URL no válida (http, https o webcal)';
+    } else if (src.type === 'microsoft') {
+      if (!src.microsoftAccount || !src.microsoftCalendarId) e[`${p}.url`] = 'Falta la cuenta o el calendario de Microsoft';
     } else {
       if (!src.googleAccount || !src.googleCalendarId) e[`${p}.url`] = 'Falta la cuenta o el calendario de Google';
     }

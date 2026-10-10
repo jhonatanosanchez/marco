@@ -64,6 +64,27 @@ test('sanitisation: unknown keys dropped, ids generated & deduped, colors lowerc
   assert.equal(value.weather.lat, 38.5);
 });
 
+test('microsoft sources: account and calendar id required, nothing else kept', () => {
+  const c = defaultConfig();
+  c.calendar.sources = [
+    { type: 'microsoft', name: 'Outlook', microsoftAccount: ' Ana@Outlook.com ', microsoftCalendarId: 'AQMkADAwATM0MDAAMS1iZ', googleAccount: 'x@y.z', url: 'https://x', color: '#111111' },
+  ];
+  const { ok, errors, value } = validateConfig(c);
+  assert.equal(ok, true, JSON.stringify(errors));
+  const [m] = value.calendar.sources;
+  assert.equal(m.type, 'microsoft');
+  assert.equal(m.microsoftAccount, 'ana@outlook.com');
+  assert.equal(m.microsoftCalendarId, 'AQMkADAwATM0MDAAMS1iZ');
+  assert.equal(m.googleAccount, undefined);
+  assert.equal(m.url, undefined);
+  c.calendar.sources = [{ type: 'microsoft', name: 'Outlook', microsoftAccount: 'not-an-email', color: '#111111' }];
+  const bad = validateConfig(c);
+  assert.equal(bad.ok, false);
+  const paths = bad.errors.map((e) => e.path);
+  assert.ok(paths.includes('calendar.sources[0].microsoftAccount'), paths.join());
+  assert.ok(paths.includes('calendar.sources[0].microsoftCalendarId'), paths.join());
+});
+
 test('mergeDefaults back-fills new keys but keeps stored arrays', () => {
   const stored = { revision: 7, screen: { name: 'Cocina' }, calendar: { sources: [] } };
   const m = mergeDefaults(stored);

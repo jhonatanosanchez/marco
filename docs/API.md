@@ -93,8 +93,9 @@ The admin and the display read these fields to decide which sections, actions an
 - `features`: one boolean per feature: `homeassistant`, `news`, `customCss`, `gallery`, `schedules`,
   `announcements`, `displayCommands`, `openDisplayAccess`, `insecureTls`, `googleCalendar`, `googleLogin`,
   `passwordLogin`, `apiTokens`, `webhooks`, `backups`, `importExport`, `includeSecrets`, `activity`, `setupWizard`,
-  `status`, `accountMenu`. A self-hosted server turns all of them on, except `googleCalendar` and `googleLogin`
-  (on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set) and `accountMenu` (always off).
+  `status`, `accountMenu`, `microsoftCalendar`. A self-hosted server turns all of them on, except `googleCalendar`
+  and `googleLogin` (on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set), `accountMenu` (always off) and
+  `microsoftCalendar` (Outlook and Microsoft 365 calendars, Marco Cloud only for now: always off).
 - `limits` (optional): plan limits such as `screens`, `sources` or `devices`. Absent means no limit beyond the
   config validator's own caps (12 screens, 50 calendars, 20 news feeds, 1000 local events, 500 birthdays,
   100 countdowns). The admin disables "add" at the limit and flags a config that goes over it.
@@ -110,8 +111,8 @@ The admin and the display read these fields to decide which sections, actions an
   `http://localhost` can say where other devices reach the admin.
 
 Clients treat a response with no `features` field (servers older than 0.5.0) as having every feature on, except
-`accountMenu`. A key missing from `features` counts as off only when `edition` is not `'self-hosted'`, and a missing
-`accountMenu` is always off.
+`accountMenu` and `microsoftCalendar`. A key missing from `features` counts as off only when `edition` is not
+`'self-hosted'`, and a missing `accountMenu` or `microsoftCalendar` is always off.
 
 ### Account mode
 
@@ -197,7 +198,7 @@ a switch to private access takes its pollers off the list at once; their next po
 
 | Method & path | Notes |
 |---|---|
-| `GET /api/auth/me` | `{ user: { email, name, picture, method } \| null, needsSetup, googleConfigured, passwordLoginEnabled, mustChangePassword, passwordFromEnv }`. `method` is `'password'` or `'google'` here; Marco Cloud answers `'account'` and adds `account: { loginUrl, accountUrl, sessionsUrl, deleteUrl, household: { name, role } }` |
+| `GET /api/auth/me` | `{ user: { email, name, picture, method } \| null, needsSetup, googleConfigured, passwordLoginEnabled, mustChangePassword, passwordFromEnv }`. `method` is `'password'` or `'google'` here; Marco Cloud answers `'account'` and adds `account: { loginUrl, accountUrl, sessionsUrl, deleteUrl, household: { name, role } }` and `microsoftConfigured` (Microsoft calendars on for this account) |
 | `POST /api/auth/login` | `{ password }`; `409 { needsSetup: true }` while the install has no password yet |
 | `POST /api/auth/logout`, `POST /api/auth/logout-all` | log out this session / every session |
 | `GET /auth/google/login` | "Sign in with Google" (email must be in `auth.allowedGoogleEmails`; if the list is empty, the first Google login made while already logged in with the password adds itself) |
@@ -269,6 +270,7 @@ Rules for the mutating setup endpoints:
 |---|---|
 | `GET /api/admin/google/accounts` · `DELETE /api/admin/google/accounts/:email` | Linked Google accounts |
 | `GET /api/admin/google/calendars?account=` | Calendars of a linked account |
+| `GET /api/admin/microsoft/accounts` · `DELETE /api/admin/microsoft/accounts/:email` · `GET /api/admin/microsoft/calendars?account=` | Linked Microsoft accounts and their calendars (`MicrosoftAccount[]`, `MicrosoftCalendarListItem[]`). Only on servers with `features.microsoftCalendar` (Marco Cloud); a self-hosted server does not have them |
 | `POST /api/admin/test/ics` | `{ url, insecureTls? }` → `{ ok, count, sample, error? }` |
 | `POST /api/admin/test/rss` | `{ url }` → `{ ok, title, count, error? }` |
 | `POST /api/admin/test/homeassistant` | `{ url, token? }` → `{ ok, version?, error? }` |

@@ -177,7 +177,26 @@ function oauthErrorMessage(code: string): string {
     google_exchange_failed: 'Error al comunicar con Google. Inténtalo de nuevo.',
     google_access_denied: 'Has cancelado el acceso con Google.',
   };
+  if (code.startsWith('microsoft_')) return microsoftErrorMessage(code);
   return map[code] ? t(map[code]) : `${t('Error de Google')}: ${code}`;
+}
+
+/** Codes the Microsoft calendar connect (Marco Cloud, /auth/microsoft/callback) sends back, all prefixed microsoft_. */
+function microsoftErrorMessage(code: string): string {
+  const map: Record<string, string> = {
+    microsoft_not_configured: 'Los calendarios de Microsoft no están disponibles para esta cuenta.',
+    microsoft_invalid_state: 'La sesión con Microsoft caducó. Inténtalo de nuevo.',
+    microsoft_missing_code: 'Microsoft no devolvió autorización. Inténtalo de nuevo.',
+    microsoft_no_refresh_token: 'Microsoft no concedió acceso permanente. Vuelve a vincular la cuenta.',
+    microsoft_scope_denied: 'No se concedió permiso para leer el calendario.',
+    microsoft_no_email: 'No se pudo saber el email de la cuenta de Microsoft.',
+    microsoft_too_many_accounts: 'Has llegado al máximo de cuentas de Microsoft vinculadas.',
+    microsoft_exchange_failed: 'Error al comunicar con Microsoft. Inténtalo de nuevo.',
+    microsoft_temporarily_unavailable: 'Microsoft no responde ahora mismo. Inténtalo de nuevo en unos minutos.',
+    microsoft_access_denied: 'Has cancelado el acceso con Microsoft.',
+    microsoft_consent_required: 'Tu organización tiene que aprobar Marco antes de que puedas vincular esta cuenta.',
+  };
+  return map[code] ? t(map[code]) : `${t('Error de Microsoft')}: ${code.slice('microsoft_'.length)}`;
 }
 
 /** Scroll to an element id and flash it (palette / deep links). */
@@ -274,9 +293,11 @@ export function App() {
     const qs = new URLSearchParams(location.search);
     const err = qs.get('error');
     const g = qs.get('connected') || qs.get('google');
+    const ms = qs.get('microsoft');
     const errMsg = err ? oauthErrorMessage(err) : '';
     if (g) setTimeout(() => toast(`${t('Cuenta de Google vinculada')}: ${g}`, 'ok'), 400);
-    if (err || g) history.replaceState(null, '', location.pathname + location.hash);
+    if (ms) setTimeout(() => toast(`${t('Cuenta de Microsoft vinculada')}: ${ms}`, 'ok'), 400);
+    if (err || g || ms) history.replaceState(null, '', location.pathname + location.hash);
     loadMe().then((m) => {
       if (m?.user) {
         loadConfig();

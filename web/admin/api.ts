@@ -39,6 +39,8 @@ import type {
   HealthResponse,
   HouseholdInfo,
   GoogleCalendarListItem,
+  MicrosoftAccount,
+  MicrosoftCalendarListItem,
   HaEntity,
   TestHomeAssistantResponse,
   WeatherKeyStatus,
@@ -142,6 +144,13 @@ export const api = {
     request<unknown>('DELETE', `/api/admin/google/accounts/${encodeURIComponent(email)}`),
   googleCalendars: (account: string) =>
     request<GoogleCalendarListItem[]>('GET', `/api/admin/google/calendars?account=${encodeURIComponent(account)}`),
+
+  // Marco Cloud only (features.microsoftCalendar): Outlook.com, Hotmail and Microsoft 365 calendars.
+  microsoftAccounts: () => request<MicrosoftAccount[]>('GET', '/api/admin/microsoft/accounts'),
+  removeMicrosoftAccount: (email: string) =>
+    request<unknown>('DELETE', `/api/admin/microsoft/accounts/${encodeURIComponent(email)}`),
+  microsoftCalendars: (account: string) =>
+    request<MicrosoftCalendarListItem[]>('GET', `/api/admin/microsoft/calendars?account=${encodeURIComponent(account)}`),
 
   testIcs: (url: string, insecureTls?: boolean) =>
     request<TestIcsResponse>('POST', '/api/admin/test/ics', insecureTls ? { url, insecureTls: true } : { url }),

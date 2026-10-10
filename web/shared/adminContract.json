@@ -662,6 +662,55 @@
       ]
     },
     {
+      "method": "GET",
+      "path": "/api/admin/microsoft/accounts",
+      "query": [],
+      "feature": "microsoftCalendar",
+      "callers": [
+        "microsoftAccounts"
+      ],
+      "request": null,
+      "response": "MicrosoftAccount[]",
+      "responseArray": true,
+      "responseKeys": [
+        "email"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/microsoft/accounts/:email",
+      "query": [],
+      "feature": "microsoftCalendar",
+      "callers": [
+        "removeMicrosoftAccount"
+      ],
+      "request": null,
+      "response": null,
+      "responseArray": false,
+      "responseKeys": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/microsoft/calendars",
+      "query": [
+        "account"
+      ],
+      "feature": "microsoftCalendar",
+      "callers": [
+        "microsoftCalendars"
+      ],
+      "request": null,
+      "response": "MicrosoftCalendarListItem[]",
+      "responseArray": true,
+      "responseKeys": [
+        "id",
+        "name",
+        "color?",
+        "isDefault?",
+        "owner?"
+      ]
+    },
+    {
       "method": "POST",
       "path": "/api/admin/pair/claim",
       "query": [],
@@ -1093,7 +1142,8 @@
         "mustChangePassword?",
         "needsSetup?",
         "passwordFromEnv?",
-        "account?"
+        "account?",
+        "microsoftConfigured?"
       ]
     },
     {

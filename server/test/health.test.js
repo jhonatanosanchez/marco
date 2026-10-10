@@ -51,11 +51,11 @@ test('health has the capability block', async () => {
   for (const k of FEATURE_KEYS) assert.equal(typeof j.features[k], 'boolean', k);
 });
 
-test('self-hosted features default to on, except Google without credentials and the account menu', async () => {
+test('self-hosted features default to on, except Google without credentials, the account menu and Microsoft calendars', async () => {
   await withEnv({ GOOGLE_CLIENT_ID: undefined, GOOGLE_CLIENT_SECRET: undefined }, async () => {
     const { features } = await getHealth();
     for (const k of FEATURE_KEYS) {
-      const expected = !['googleCalendar', 'googleLogin', 'accountMenu'].includes(k);
+      const expected = !['googleCalendar', 'googleLogin', 'accountMenu', 'microsoftCalendar'].includes(k);
       assert.equal(features[k], expected, k);
     }
   });
@@ -64,6 +64,7 @@ test('self-hosted features default to on, except Google without credentials and 
     assert.equal(f.googleCalendar, true);
     assert.equal(f.googleLogin, true);
     assert.equal(f.accountMenu, false);
+    assert.equal(f.microsoftCalendar, false, 'Microsoft calendars are Marco Cloud only for now');
   });
 });
 

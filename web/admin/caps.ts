@@ -3,7 +3,7 @@
 //
 // Rules:
 // - No `features` field at all (servers older than 0.5.0): every feature is on, except the account menu,
-//   which no server before 0.5.0 had (OPT_IN).
+//   which no server before 0.5.0 had, and Microsoft calendars, which only Marco Cloud has (OPT_IN).
 // - A key missing from `features` is off only when the edition is not 'self-hosted' (OPT_IN keys: always off).
 // - No `limits` field: the only limits are the config validator's own caps (BUILTIN_LIMITS).
 import type { FeatureName, Features, HealthResponse, Limits } from '../shared/types';
@@ -72,8 +72,9 @@ export function capsFrom(health: Partial<HealthResponse> | null | undefined): Ca
 }
 
 /** Whether `caps` turns `feature` on (see the rules at the top of this file). */
-/** Features that only exist on servers that send `features`; off when the field is missing. */
-const OPT_IN: readonly FeatureName[] = ['accountMenu'];
+/** Features that only exist on servers that say so in `features`; off when the field or the key is missing.
+ *  microsoftCalendar: Marco Cloud only for now, so a self-hosted server that does not know the key never shows it. */
+const OPT_IN: readonly FeatureName[] = ['accountMenu', 'microsoftCalendar'];
 
 export function hasFeature(caps: Caps, feature: FeatureName): boolean {
   if (!caps.features) return !OPT_IN.includes(feature);

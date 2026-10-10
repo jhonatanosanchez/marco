@@ -34,6 +34,7 @@ const WARN_TEXT: Record<string, { text: string; route: string; kind: 'warn' | 'e
   no_displays: { text: 'Ninguna pantalla conectada ahora mismo.', route: 'displays', kind: 'info' },
   outdated_displays: { text: 'Alguna pantalla ejecuta una versión antigua: recárgala.', route: 'displays', kind: 'warn' },
   google_auth_failed: { text: 'Una cuenta de Google ha perdido el acceso. Vuelve a vincularla.', route: 'calendars', kind: 'error' },
+  microsoft_auth_failed: { text: 'Una cuenta de Microsoft ha perdido el acceso. Vuelve a vincularla.', route: 'calendars', kind: 'error' },
 };
 
 export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionProps) {

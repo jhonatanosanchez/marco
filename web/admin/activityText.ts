@@ -53,6 +53,10 @@ export function describeActivity(e: ActivityEntry): { icon: IconName; text: stri
       return { icon: 'google', text: t('Cuenta de Google vinculada: {email}', { email: str(d.email ?? d.account) }) };
     case 'google.removed':
       return { icon: 'google', text: t('Cuenta de Google desvinculada: {email}', { email: str(d.email ?? d.account) }) };
+    case 'microsoft.connected':
+      return { icon: 'microsoft', text: t('Cuenta de Microsoft vinculada: {email}', { email: str(d.email ?? d.account) }) };
+    case 'microsoft.removed':
+      return { icon: 'microsoft', text: t('Cuenta de Microsoft desvinculada: {email}', { email: str(d.email ?? d.account) }) };
     case 'config.saved': {
       const secs: string[] = Array.isArray(d.sections) ? d.sections : [];
       const list = secs.slice(0, 4).map(sectionLabel).join(', ') + (secs.length > 4 ? ` +${secs.length - 4}` : '');

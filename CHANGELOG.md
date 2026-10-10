@@ -5,6 +5,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Microsoft calendars** (Marco Cloud): a *Microsoft accounts* card next to the Google one in *Calendars* links an
+  Outlook.com, Hotmail or Microsoft 365 account (read only) and lets you pick its calendars. Calendar sources get a new
+  type `microsoft` (`microsoftAccount`, `microsoftCalendarId`) that validates in both editions, and `/api/health` a new
+  `features.microsoftCalendar`, off on a self-hosted server for now. A self-hosted server that receives such a source
+  (for example in a backup from Marco Cloud) keeps it and shows it as not available.
+
 ## [0.5.0] - 2026-10-10
 
 A Modern display style with glass options, six new layouts, a choice of free weather sources, alerts and display commands in poll mode, a capability block in `/api/health` that the admin follows, a pairing

@@ -98,7 +98,7 @@ function obj(ctx, path, v) {
 
 function sanitizeSource(ctx, path, s, seen) {
   if (!isObj(s)) { ctx.err(path, 'expected object'); return null; }
-  const type = oneOf(ctx, `${path}.type`, s.type, 'ics', ['ics', 'google']);
+  const type = oneOf(ctx, `${path}.type`, s.type, 'ics', ['ics', 'google', 'microsoft']);
   const out = {
     id: id(ctx, `${path}.id`, s.id, 'c_', seen),
     type,
@@ -114,11 +114,20 @@ function sanitizeSource(ctx, path, s, seen) {
     if (!isHttpUrl(url, ['http:', 'https:', 'webcal:', 'webcals:'])) ctx.err(`${path}.url`, 'invalid URL');
     out.url = url;
     out.insecureTls = bool(ctx, `${path}.insecureTls`, s.insecureTls, false);
-  } else {
+  } else if (type === 'google') {
     out.googleCalendarId = str(ctx, `${path}.googleCalendarId`, s.googleCalendarId, 'primary', 512).trim() || 'primary';
     const acct = str(ctx, `${path}.googleAccount`, s.googleAccount, '', 320).trim().toLowerCase();
     if (!EMAIL.test(acct)) ctx.err(`${path}.googleAccount`, 'Google account email required');
     out.googleAccount = acct;
+  } else {
+    // Microsoft (Outlook.com, Hotmail, Microsoft 365) calendars, read through Microsoft Graph. Marco Cloud only for now:
+    // a self-hosted server keeps them in the config and reports them as not available.
+    const calId = str(ctx, `${path}.microsoftCalendarId`, s.microsoftCalendarId, '', 512).trim();
+    if (!calId) ctx.err(`${path}.microsoftCalendarId`, 'Microsoft calendar id required');
+    out.microsoftCalendarId = calId;
+    const acct = str(ctx, `${path}.microsoftAccount`, s.microsoftAccount, '', 320).trim().toLowerCase();
+    if (!EMAIL.test(acct)) ctx.err(`${path}.microsoftAccount`, 'Microsoft account email required');
+    out.microsoftAccount = acct;
   }
   return out;
 }

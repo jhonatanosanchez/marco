@@ -9,7 +9,7 @@ export type LayoutPreset =
 /** Corner of the clock card in the 'photoFrame' layout: top-left, top-right, bottom-left, bottom-right. */
 export type FrameCorner = 'tl' | 'tr' | 'bl' | 'br';
 export type SourceKind = 'generic' | 'airbnb' | 'birthdays' | 'holidays';
-export type SourceType = 'ics' | 'google';
+export type SourceType = 'ics' | 'google' | 'microsoft';
 export type DateFormat = 'weekday_month_d' | 'weekday_d_month' | 'weekday_d_dot_month' | 'weekday_month_d_y' | 'weekday_mdy' | 'weekday_dmy' | 'weekday_iso' | 'custom';
 /** Every date format, in the order the admin offers them. */
 export const DATE_FORMATS: DateFormat[] = ['weekday_d_month', 'weekday_month_d', 'weekday_d_dot_month', 'weekday_month_d_y', 'weekday_mdy', 'weekday_dmy', 'weekday_iso', 'custom'];
@@ -91,6 +91,9 @@ export interface CalendarSource {
   urlHidden?: boolean;
   googleCalendarId?: string; // google only
   googleAccount?: string; // google only
+  /** Microsoft Graph calendar id (Outlook.com, Hotmail, Microsoft 365). Marco Cloud only for now. */
+  microsoftCalendarId?: string; // microsoft only
+  microsoftAccount?: string; // microsoft only
   color: string;
   emoji?: string;
   kind: SourceKind;
@@ -508,7 +511,7 @@ export interface PhotosResponse {
 }
 
 /** Feature flags in GET /api/health. A self-hosted server turns them all on except googleCalendar and googleLogin
- *  (on when Google credentials are set) and accountMenu. No `features` field at all (older servers) means every
+ *  (on when Google credentials are set), accountMenu and microsoftCalendar. No `features` field at all (older servers) means every
  *  feature is on except accountMenu; a missing key counts as off only when `edition` is not 'self-hosted'. */
 export interface Features {
   homeassistant: boolean;
@@ -532,6 +535,8 @@ export interface Features {
   setupWizard: boolean;
   status: boolean;
   accountMenu: boolean;
+  /** Outlook.com, Hotmail and Microsoft 365 calendars (read only, Microsoft Graph). Off unless the server says so. */
+  microsoftCalendar: boolean;
 }
 
 export type FeatureName = keyof Features;
@@ -632,6 +637,8 @@ export interface AuthMeResponse {
   passwordFromEnv?: boolean;
   /** Only when user.method is 'account' (Marco Cloud). */
   account?: AccountInfo;
+  /** Marco Cloud: the admin shows the Microsoft accounts card when it is true (Microsoft calendars on for this account). */
+  microsoftConfigured?: boolean;
 }
 
 /** GET /api/setup/status */
@@ -689,6 +696,21 @@ export interface GoogleCalendarListItem {
   summary: string;
   backgroundColor?: string;
   primary?: boolean;
+}
+
+export interface MicrosoftAccount {
+  email: string;
+}
+
+export interface MicrosoftCalendarListItem {
+  id: string;
+  name: string;
+  /** #rrggbb, when the calendar has a colour */
+  color?: string;
+  /** the account's default calendar */
+  isDefault?: boolean;
+  /** owner address when the calendar is shared with the account by someone else */
+  owner?: string;
 }
 
 export interface TestIcsResponse {
@@ -1282,13 +1304,14 @@ export interface ImportPreview {
  *   openDisplayAccess  open display access (screens use private links and pairing)
  *   insecureTls        calendars imported with certificate checks on (items)
  *   google             Google calendars of accounts not connected here (items)
+ *   microsoft          Microsoft calendars of accounts not connected here, or on a server without them (items)
  *   blockedUrl         calendars and feeds on an address this server cannot fetch (items)
  *   refreshMin         calendars refreshed every 30 minutes at most (items)
  *   news               news feeds, while this server offers no news
  *   photos             screens show the gallery: photos are not in the file
  */
 export interface ImportNote {
-  code: 'secrets' | 'homeassistant' | 'signIn' | 'openDisplayAccess' | 'insecureTls' | 'google' | 'blockedUrl' | 'refreshMin' | 'news' | 'photos';
+  code: 'secrets' | 'homeassistant' | 'signIn' | 'openDisplayAccess' | 'insecureTls' | 'google' | 'microsoft' | 'blockedUrl' | 'refreshMin' | 'news' | 'photos';
   items?: string[];
 }
 
@@ -1309,6 +1332,8 @@ export type ActivityType =
   | 'auth.setup_rejected'
   | 'google.connected'
   | 'google.removed'
+  | 'microsoft.connected'
+  | 'microsoft.removed'
   | 'config.saved'
   | 'config.restored'
   | 'config.imported'
@@ -1364,6 +1389,6 @@ export interface DashboardResponse {
   announcements: Announcement[];
   schedulesNow: { id: string; title: string; emoji: string; screenIds: string[]; until: string }[];
   activity: ActivityEntry[];
-  /** codes: default_password | source_errors | no_displays | outdated_displays | google_auth_failed */
+  /** codes: default_password | source_errors | no_displays | outdated_displays | google_auth_failed | microsoft_auth_failed */
   warnings: string[];
 }

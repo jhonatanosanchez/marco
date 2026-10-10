@@ -50,13 +50,15 @@ test('caps: old servers and self-hosted keep every feature on', () => {
   const old = oldServer();
   assert.equal(old.edition, 'self-hosted');
   assert.equal(old.features, null);
-  for (const k of FEATURE_KEYS) assert.equal(hasFeature(old, k), k !== 'accountMenu', k);
+  for (const k of FEATURE_KEYS) assert.equal(hasFeature(old, k), k !== 'accountMenu' && k !== 'microsoftCalendar', k);
   assert.equal(old.pairCodeLength, 6);
   assert.equal(old.displayOrigin, null);
 
   const sh = capsFrom({ ok: true, uptime: 1, version: '0.5.0', edition: 'self-hosted', features: { news: true } });
   assert.equal(hasFeature(sh, 'gallery'), true, 'a missing key is on in self-hosted');
   assert.equal(hasFeature(sh, 'accountMenu'), false, 'the account menu is never on by default');
+  assert.equal(hasFeature(sh, 'microsoftCalendar'), false, 'nor are Microsoft calendars (Marco Cloud only)');
+  assert.equal(hasFeature(capsFrom({ ...cloudHealth(), features: { ...cloudHealth().features, microsoftCalendar: true } }), 'microsoftCalendar'), true);
   const sh2 = capsFrom({ ok: true, uptime: 1, version: '0.5.0', edition: 'self-hosted', features: { news: false } });
   assert.equal(hasFeature(sh2, 'news'), false, 'an explicit false is off everywhere');
 });
@@ -115,9 +117,10 @@ test('navFilter: self-hosted defaults and old servers show everything', () => {
   assert.deepEqual(nav.filterNav(nav.NAV_ITEMS, selfHosted()).map((n) => n.id), all);
   assert.deepEqual(nav.filterNav(nav.NAV_ITEMS, oldServer()).map((n) => n.id), all);
   const routes = all;
-  // every entry except the account ones (features.accountMenu, multi-tenant servers only)
-  const accountEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'accountMenu').length;
-  assert.equal(accountEntries, 2);
+  // every entry except the account ones (features.accountMenu, multi-tenant servers only) and Microsoft calendars
+  // (features.microsoftCalendar, Marco Cloud only for now)
+  const accountEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'accountMenu' || e.feature === 'microsoftCalendar').length;
+  assert.equal(accountEntries, 3);
   assert.equal(nav.filterSettings(search.SETTINGS_INDEX, oldServer(), routes).length, search.SETTINGS_INDEX.length - accountEntries);
   // without Google credentials a self-hosted admin still lists the Google entries (with the setup hint)
   assert.equal(nav.filterSettings(search.SETTINGS_INDEX, selfHosted(), routes).length, search.SETTINGS_INDEX.length - accountEntries);

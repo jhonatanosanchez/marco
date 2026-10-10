@@ -30,7 +30,9 @@ const cache = new Map();
 const inflight = new Map();
 
 const sourceKey = (s) =>
-  s.type === 'google' ? `google|${s.googleAccount}|${s.googleCalendarId}` : `ics|${s.url}|${s.insecureTls ? 1 : 0}`;
+  s.type === 'google' ? `google|${s.googleAccount}|${s.googleCalendarId}`
+    : s.type === 'microsoft' ? `microsoft|${s.microsoftAccount}|${s.microsoftCalendarId}`
+      : `ics|${s.url}|${s.insecureTls ? 1 : 0}`;
 
 const cacheFile = (id) => path.join(paths.cache, `src_${id.replace(/[^A-Za-z0-9_-]/g, '_')}.json`);
 
@@ -69,6 +71,9 @@ async function doRefresh(source, needWindow) {
   const entry = prev && prev.key === key ? { ...prev } : { key, version: 0, count: 0 };
   entry.fetchedAt = Date.now();
   try {
+    // Microsoft calendars (Microsoft Graph) are a Marco Cloud feature for now: the source stays in the config and
+    // shows this error until it is removed or the config goes back to Marco Cloud.
+    if (source.type === 'microsoft') throw new Error('Microsoft calendars are not available on a self-hosted server');
     if (source.type === 'ics') {
       const text = await fetchIcsText(source.url, source.insecureTls);
       const vevents = await parseIcsText(text);
@@ -302,6 +307,7 @@ export function eventsHash(events) {
 
 function rawForSource(source, entry, fromDate, toDate) {
   if (source.type === 'ics') return entry.vevents ? expandEvents(entry.vevents, fromDate, toDate) : [];
+  if (source.type !== 'google') return [];
   return (entry.items || []).map(googleToRaw).filter(Boolean);
 }
 
