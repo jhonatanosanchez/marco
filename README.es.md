@@ -299,7 +299,7 @@ inicio de sesión automático en el escritorio (modos con pantalla) o como un us
 
 ```
 ~/marco/                  (o /opt/marco)
-├── current -> releases/0.5.0   la versión en marcha, se cambia en un solo paso al actualizar
+├── current -> releases/0.5.1   la versión en marcha, se cambia en un solo paso al actualizar
 ├── releases/                   la versión actual y la anterior (para volver atrás)
 ├── data/                       configuración, secretos, fotos, copias (se conservan al actualizar y desinstalar)
 └── .env                        puerto y otros ajustes, consulta .env.example
@@ -486,10 +486,11 @@ carpeta `data/` real nunca se toca.
 `/?demo=1` (añade `&lang=es`, `&preset=agenda`, `&theme=light`, `&style=modern`, `&announce=success`, `&sched=1`,
 `&now=2026-10-09T10:42`, `&wx=rain|snow|clear` con `&wxfx=rich` para ver el efecto del tiempo, `&pair=1` para la pantalla de vinculación).
 
-**Vídeo de demostración.** Un recorrido de 48 segundos por la demo: la pantalla del salón con transiciones de fotos,
-un aviso y un mensaje programado, las pantallas de la cocina y vertical, y la vinculación de una pantalla nueva.
+**Vídeo de demostración.** Un recorrido de un minuto en el estilo Moderno: la vista de mes, un aviso enviado desde el
+móvil, los diseños Hoy y tablero, el marco de fotos, los estilos Clásico y cristal, los efectos del tiempo, una
+pantalla vertical, el panel (diseños, calendarios, galería) y el reloj tenue de noche para el dormitorio.
 
-[![Vídeo de demostración: la pantalla del salón a las 20:00 con el mensaje programado "Take out the bins"](docs/media/poster.webp)](https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4)
+[![Vídeo de demostración: la pantalla del salón en estilo Moderno con el calendario del mes, el tiempo y los próximos eventos](docs/media/poster.webp)](https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4)
 
 ## Enlaces privados y vinculación de pantallas
 

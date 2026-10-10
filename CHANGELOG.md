@@ -5,6 +5,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-10
+
 ### Added
 - **Apple iCloud calendars**: *Calendars → Linked accounts → Link account* now offers Apple iCloud. It opens a short
   guide (iPhone or iPad, Mac, iCloud.com) to get the calendar's public link, then tests the link and adds it as an
@@ -20,6 +22,8 @@ All notable changes to this project are documented here. The format is based on
   `?rotate=0` turn them off for a test, and `?demo=1&busy=1` adds a busy day and long titles to the demo.
 
 ### Changed
+- New demo video and README animation in the Modern style, with no flicker: layouts, an alert from a phone, weather
+  effects, a portrait screen, the admin and the night clock.
 - **Sign in with Google is off on self-hosted servers** by default: the admin uses the server's password, and Google
   is for calendars. `MARCO_GOOGLE_LOGIN=1` turns it on; servers that already sign in with Google only (password off,
   allowed emails set) keep it.

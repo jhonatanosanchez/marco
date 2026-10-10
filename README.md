@@ -282,7 +282,7 @@ with a screen) or as a new `marco` system user (server only).
 
 ```
 ~/marco/                  (or /opt/marco)
-├── current -> releases/0.5.0   the running version, switched in one step on update
+├── current -> releases/0.5.1   the running version, switched in one step on update
 ├── releases/                   the current version and the previous one (for rollback)
 ├── data/                       config, secrets, photos, backups (kept on update and uninstall)
 └── .env                        port and other settings, see .env.example
@@ -461,10 +461,11 @@ Just want to see the display? Any running instance shows a built-in sample datas
 (add `&lang=es`, `&preset=agenda`, `&theme=light`, `&style=modern`, `&announce=success`, `&sched=1`, `&now=2026-10-09T10:42`,
 `&wx=rain|snow|clear` with `&wxfx=rich` to see the weather effect, `&pair=1` for the pairing screen).
 
-**Demo video.** A 48-second tour of the demo: the living room screen with photo transitions, an alert and a scheduled
-message, the kitchen and portrait screens, and pairing a new screen.
+**Demo video.** A one-minute tour in the Modern style: the month view, an alert sent from a phone, the Today and
+board layouts, the photo frame, Classic and glass styles, live weather effects, a portrait screen, the admin
+(layouts, calendars, gallery) and the dim bedside clock at night.
 
-[![Demo video: the living room screen at 20:00 with the "Take out the bins" scheduled message](docs/media/poster.webp)](https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4)
+[![Demo video: the living room screen in the Modern style with the month calendar, weather and upcoming events](docs/media/poster.webp)](https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4)
 
 ## Private display links & pairing
 
