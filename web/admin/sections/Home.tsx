@@ -10,6 +10,7 @@ import { daysBetween, eventDay, eventTimeLabel, fmtDay, relDays, todayIn } from 
 import { has, runtime } from '../caps';
 import { screenHref, useDisplayLinks } from '../displayLinks';
 import { formatDuration, locale, nScreens, relTime, t } from '../i18n';
+import { withPollNote } from '../liveNote';
 import type { SectionProps } from './common';
 
 const WMO: Record<number, string> = {
@@ -66,7 +67,7 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
     try {
       const r = (await fn()) as { delivered?: number; displays?: number } | undefined;
       const n = r?.delivered ?? r?.displays;
-      toast(n != null ? `${ok} · ${nScreens(n)}` : ok, n === 0 ? 'info' : 'ok');
+      toast(n != null ? (n ? withPollNote(`${ok} · ${nScreens(n)}`) : `${ok} · ${nScreens(n)}`) : withPollNote(ok), n === 0 ? 'info' : 'ok');
       setTimeout(load, 1500);
     } catch (e) {
       toast((e as ApiError).message, 'error');

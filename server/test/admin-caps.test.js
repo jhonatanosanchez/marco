@@ -9,13 +9,15 @@ import { validateConfig as serverValidate } from '../core/validate.js';
 import { CONTRACT_PATH, contractText, generateContract } from '../../scripts/gen-contract.mjs';
 import { loadWebModules } from './webModules.js';
 
-const [capsMod, nav, search, util, auth, urls] = await loadWebModules(
+const [capsMod, nav, search, util, auth, urls, liveNote, dict] = await loadWebModules(
   '/web/admin/caps.ts',
   '/web/admin/navFilter.ts',
   '/web/admin/searchIndex.ts',
   '/web/admin/util.ts',
   '/web/admin/authRedirect.ts',
-  '/web/admin/screenUrl.ts'
+  '/web/admin/screenUrl.ts',
+  '/web/admin/liveNote.ts',
+  '/web/admin/i18n-dict.ts'
 );
 const { capsFrom, hasFeature, limitOf, setCaps } = capsMod;
 
@@ -291,6 +293,19 @@ test('screenUrl: private links, display origin and open mode', () => {
   assert.equal(urls.screenUrl({ slug: null, origin }), null);
   assert.equal(urls.screenUrl({ slug: 'kitchen', linkKey: 'k-1', origin }), `${origin}/d/k-1`);
   assert.equal(urls.screenUrl({ slug: 'kitchen', linkKey: 'k-1', origin, displayOrigin: 'https://tv.example.com/', preview: true }), 'https://tv.example.com/d/k-1?preview=1');
+});
+
+test('liveNote: sent messages mention the delay only when the server polls', () => {
+  setCaps(capsFrom({ ok: true, version: '0.5.0' }));
+  assert.equal(liveNote.pollNote(), '');
+  assert.equal(liveNote.withPollNote('Recargando · 2 pantallas'), 'Recargando · 2 pantallas');
+  setCaps(capsFrom({ ok: true, version: '0.5.0', live: 'poll' }));
+  assert.equal(liveNote.withPollNote('Recargando · 2 pantallas'), 'Recargando · 2 pantallas · llegará a las pantallas en unos 90 s');
+  setCaps(capsFrom(cloudHealth()));
+  assert.ok(liveNote.pollNote());
+  assert.equal(dict.EN['llegará a las pantallas en unos 90 s'], 'reaches the screens within about 90 s');
+  assert.ok(dict.PT['llegará a las pantallas en unos 90 s']);
+  setCaps(capsFrom(null));
 });
 
 test('adminContract.json is up to date', () => {

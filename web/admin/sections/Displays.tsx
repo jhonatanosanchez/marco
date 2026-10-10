@@ -9,6 +9,7 @@ import { fmtDateTime } from '../dates';
 import { has } from '../caps';
 import { screenHref, useDisplayLinks } from '../displayLinks';
 import { formatDuration, relTime, nScreens, t } from '../i18n';
+import { withPollNote } from '../liveNote';
 import type { SectionProps } from './common';
 
 function NightMenu({ value, onPick, busy }: { value: NightCommand | null; onPick: (m: NightCommand) => void; busy?: boolean }) {
@@ -169,7 +170,7 @@ export function DisplaysSection({ saved, go }: SectionProps) {
     setBusy((b) => ({ ...b, [key]: req.action === 'night' ? `night-${req.mode}` : req.action }));
     try {
       const r = await api.displayCommand(req);
-      toast(`${label} · ${nScreens(r.delivered)}`, r.delivered ? 'ok' : 'info');
+      toast(r.delivered ? withPollNote(`${label} · ${nScreens(r.delivered)}`) : `${label} · ${nScreens(r.delivered)}`, r.delivered ? 'ok' : 'info');
       setTimeout(load, 1200);
     } catch (e) {
       toast((e as ApiError).message, 'error');

@@ -17,4 +17,6 @@ export const ROWS11: [string, string, string][] = [
   ['Cargar la versión guardada', 'Load the saved version', 'Carregar a versão guardada'],
   ['Guardar mis cambios', 'Save my changes', 'Guardar as minhas alterações'],
   ['Se ha cargado la versión guardada', 'Loaded the saved version', 'Versão guardada carregada'],
+  // Sent messages on a server whose screens poll (liveNote.ts)
+  ['llegará a las pantallas en unos 90 s', 'reaches the screens within about 90 s', 'chega aos ecrãs em cerca de 90 s'],
 ];

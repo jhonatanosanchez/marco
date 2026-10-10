@@ -44,6 +44,7 @@ import { StatusSection } from './sections/Status';
 import { WeatherSection } from './sections/Weather';
 import { UNAUTHORIZED_EVENT } from './api';
 import { usesPrivateLinks, useScreenUrl } from './displayLinks';
+import { withPollNote } from './liveNote';
 import { clone, produce, sectionForError, sectionForServerPath, validateAll, type Errors } from './util';
 
 interface NavItem extends NavMeta {
@@ -554,7 +555,7 @@ export function App() {
   const refreshDisplays = async (screens?: string[]) => {
     try {
       await api.refreshDisplays(screens);
-      toast(t('Pantallas recargándose…'), 'info');
+      toast(withPollNote(t('Pantallas recargándose…')), 'info');
       setPreviewKey((k) => k + 1);
     } catch (e) {
       toast((e as ApiError).message, 'error');
@@ -565,7 +566,7 @@ export function App() {
     try {
       const r = await api.displayCommand({ action, mode });
       const label = action === 'identify' ? t('Identificando pantallas') : mode === 'on' ? t('Modo noche activado') : mode === 'off' ? t('Modo noche desactivado') : t('Modo noche automático');
-      toast(`${label} · ${nScreens(r.delivered)}`, r.delivered ? 'ok' : 'info');
+      toast(r.delivered ? withPollNote(`${label} · ${nScreens(r.delivered)}`) : `${label} · ${nScreens(r.delivered)}`, r.delivered ? 'ok' : 'info');
     } catch (e) {
       toast((e as ApiError).message, 'error');
     }

@@ -10,6 +10,7 @@ import { relTime, t } from '../i18n';
 import { has } from '../caps';
 import { takeIntent } from '../intent';
 import { clone, TIME_RE, uid } from '../util';
+import { withPollNote } from '../liveNote';
 import type { SectionProps } from './common';
 
 /* ---------------------------------------------------------------- schedule evaluation (docs/ARCHITECTURE.md) */
@@ -246,7 +247,7 @@ export function AlertsSection({ full, setFull, cfg, set, errors, saved }: Sectio
   const resend = async (a: Announcement) => {
     try {
       const r = await api.announce({ title: a.title, body: a.body, emoji: a.emoji, style: a.style, durationSec: a.durationSec, sound: a.sound, screens: a.screenIds });
-      toast(t('Aviso enviado a {n} pantallas', { n: r.delivered }));
+      toast(r.delivered ? withPollNote(t('Aviso enviado a {n} pantallas', { n: r.delivered })) : t('Aviso guardado: se mostrará cuando se conecte una pantalla'));
       load();
     } catch (e) {
       toast((e as ApiError).message, 'error');

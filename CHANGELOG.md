@@ -17,7 +17,8 @@ confirm step, place search through the server, and the shared logic moved into `
   after a command, 3 min while the page is hidden. A server restart or a lost cursor replays the active
   announcements, never old commands. A display that polled in the last 4 minutes is listed as connected and counts
   in "sent to N screens". Version reloads and moved devices work in this mode too, and the heartbeat drops to every
-  10 min. A server without the endpoint still gets the 90 s config check.
+  10 min. A server without the endpoint still gets the 90 s config check. In poll mode the admin's "sent" messages
+  say that screens get the command within about 90 s.
 - **Capabilities in `GET /api/health`**: `edition`, `tenancy`, `runtime`, `pairCodeLength` and a `features` block
   (plus optional `limits` and `displayOrigin`). The admin reads it at start: sections, palette actions and search
   results for features a server turns off are hidden, and add buttons stop at the server's limits. A server that

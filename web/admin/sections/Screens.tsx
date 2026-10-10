@@ -12,6 +12,7 @@ import { LimitNote } from '../components/LimitNote';
 import { t } from '../i18n';
 import { takeIntent } from '../intent';
 import { clone, moveItem, uid } from '../util';
+import { withPollNote } from '../liveNote';
 import type { SectionProps } from './common';
 
 const PRESET_LABEL: Record<string, string> = { bigCalendar: 'Calendario grande', leftRight: 'Izquierda / derecha', topBottom: 'Arriba / abajo', bigTime: 'Reloj grande', agenda: 'Agenda' };
@@ -178,7 +179,7 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
   const reload = async (s: ScreenProfile) => {
     try {
       await api.refreshDisplays([s.id]);
-      toast(t('Recargando {name}…', { name: s.name }), 'info');
+      toast(withPollNote(t('Recargando {name}…', { name: s.name })), 'info');
     } catch (e) {
       toast((e as ApiError).message, 'error');
     }
