@@ -128,7 +128,7 @@ installer() {
   exec bash "$INSTALLER" "$@"
 }
 
-usage() { sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,/^set -euo/p' "$0" | sed -e '/^set -euo/d' -e 's/^# \{0,1\}//'; }
 
 case "${1:-}" in
   status) cmd_status ;;

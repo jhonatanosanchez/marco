@@ -138,6 +138,7 @@ confirm_no() { # confirm_no <question> (default no: only y or yes goes ahead)
 # A kiosk link ends up in kiosk.env, which the kiosk script reads as shell: only plain URL characters are accepted.
 check_link() {
   case "$1" in http://*|https://*) ;; *) die "The link must start with http:// or https://" ;; esac
+  case "${1#*://}" in ""|/*|:*|\?*|\#*) die "The link has no server address: $1" ;; esac
   case "$1" in
     *[[:space:]]*|*\"*|*\'*|*\$*|*\`*|*\\*) die "The link contains spaces, quotes, \$, \` or \\. Copy it again from the admin." ;;
   esac
@@ -175,6 +176,9 @@ detect() {
     OS_VERSION="$(. /etc/os-release && echo "${VERSION_ID:-}")"
   fi
   ARCH="$(uname -m)"
+  # Raspberry Pi OS (32-bit) starts a 64-bit kernel on a Pi 4 or 5: uname says aarch64 but the programs are armhf,
+  # so an arm64 Node.js would not run. What the packages are built for decides.
+  if [ "$ARCH" = aarch64 ] && have dpkg && [ "$(dpkg --print-architecture 2>/dev/null)" = armhf ]; then ARCH=armv7l; fi
   if [ -r /proc/device-tree/model ]; then PI_MODEL="$(tr -d '\0' < /proc/device-tree/model)"; fi
   if [ -d /run/systemd/system ]; then SYSTEMD=1; fi
   # Raspberry Pi OS read-only overlay ("Overlay File System" in raspi-config). A container's root file system is
@@ -716,6 +720,16 @@ setup_kiosk() {
       ok "Private link saved in $kenv"
     fi
   fi
+  # All in one, no --url, but kiosk.env still holds a link to another server (from an earlier screen-only install)
+  if [ "$MODE" = all ] && [ -z "$KIOSK_URL" ] && [ -r "$kenv" ]; then
+    local saved
+    saved="$(sed -n 's/^KIOSK_URL=//p' "$kenv" | tail -n1 | tr -d "\"'")"
+    case "$saved" in
+      ""|http://localhost[:/]*|http://localhost|http://127.0.0.1[:/]*|http://127.0.0.1) ;;
+      *) warn "$kenv still makes this screen show $(printf '%s' "$saved" | sed -E 's|/d/[^/?#]+|/d/<private link>|')."
+         warn "To show the Marco server on this device instead, run the installer again with --url http://localhost:$PORT/" ;;
+    esac
+  fi
   # labwc (Raspberry Pi OS since late 2024)
   if [ "$DESKTOP" = labwc ] || have labwc; then
     add_line_once "$RUN_HOME/.config/labwc/autostart" "$kiosk_cmd >/tmp/marco-kiosk.log 2>&1 &"
@@ -802,7 +816,9 @@ summary() {
     echo
   fi
   if [ "$MODE" = kiosk ]; then
-    echo "  This screen will show: $(printf '%s' "$KIOSK_URL" | sed -E 's|/d/[^/?#]+|/d/<private link>|')"
+    local link="$KIOSK_URL"
+    if [ -z "$link" ]; then link="$(sed -n 's/^KIOSK_URL=//p' "$RUN_HOME/.config/marco/kiosk.env" 2>/dev/null | tail -n1 | tr -d "\"'")"; fi
+    echo "  This screen will show: $(printf '%s' "${link:-the link in ~/.config/marco/kiosk.env}" | sed -E 's|/d/[^/?#]+|/d/<private link>|')"
   fi
   if [ "$MODE" != server ]; then
     echo "  The kiosk starts with the desktop session: reboot to start it (sudo reboot)."
@@ -839,7 +855,8 @@ do_install_release() {
   if [ "$SYSTEMD" = 1 ]; then
     info "Starting Marco..."
     restart_service
-    if wait_healthy; then cur_ok=1; ok "The server is up (http://127.0.0.1:$PORT/api/health)"; fi
+    if [ "$DRY" = 1 ]; then cur_ok=1
+    elif wait_healthy; then cur_ok=1; ok "The server is up (http://127.0.0.1:$PORT/api/health)"; fi
     if [ "$cur_ok" = 0 ] && [ "$DRY" = 0 ]; then
       if [ -n "$PREV_REL" ] && [ "$PREV_REL" != "releases/$NEW_REL" ]; then
         warn "The new version did not start. Rolling back to ${PREV_REL#releases/}..."
@@ -1126,7 +1143,11 @@ main() {
     confirm "Continue?" || exit 0
   fi
 
-  if [ "$DRY" = 0 ] && [ -n "$SUDO" ]; then sudo -v || die "sudo failed"; fi
+  # `sudo -v` asks for a password whenever any sudoers rule for the user needs one (verifypw=all), even when a
+  # NOPASSWD rule covers every command, as on Raspberry Pi OS: try without a password first.
+  if [ "$DRY" = 0 ] && [ -n "$SUDO" ]; then
+    sudo -n true 2>/dev/null || sudo -v || die "sudo failed (with no terminal, sudo must work without a password)"
+  fi
   install_packages
   if [ "$MODE" != kiosk ]; then ensure_node; fi
   if [ "$LAYOUT" = checkout ] || [ "$REL_SOURCE" = checkout ]; then
