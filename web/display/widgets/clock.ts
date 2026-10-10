@@ -26,7 +26,8 @@ export class Clock {
     this.dateEl = root.querySelector('.date')!;
     // A large font size (screen.fontScale) or a narrow panel must never push the digits onto a second line:
     // the clock shrinks to the width it has.
-    if ('ResizeObserver' in window) new ResizeObserver(() => this.fit()).observe(root);
+    // (in the next frame: resizing inside the observer callback would loop)
+    if ('ResizeObserver' in window) new ResizeObserver(() => requestAnimationFrame(() => this.fit())).observe(root);
   }
 
   /** Scale the digital clock down (CSS zoom) when it is wider than its column; never up. */
