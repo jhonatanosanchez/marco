@@ -139,9 +139,16 @@ export interface DateTimeConfig {
   dateFormat: DateFormat;
 }
 
+/** Weather data sources (server/core/weather.js). 'homeassistant' = Open-Meteo plus a Home Assistant entity (self-hosted). */
+export type WeatherProvider = 'open-meteo' | 'met-norway' | 'pirate-weather' | 'homeassistant';
+/** Open-Meteo forecast models offered in the admin ('best_match' = Open-Meteo picks). */
+export type OpenMeteoModel = 'best_match' | 'ecmwf_ifs' | 'icon_seamless' | 'gfs_seamless' | 'meteofrance_seamless' | 'ukmo_seamless' | 'gem_seamless' | 'jma_seamless';
+
 export interface WeatherConfig {
   enabled: boolean;
-  provider: 'open-meteo' | 'homeassistant';
+  provider: WeatherProvider;
+  /** forecast model when the data comes from Open-Meteo (open-meteo, homeassistant) */
+  model: OpenMeteoModel;
   locationName: string;
   lat: number;
   lon: number;
@@ -390,10 +397,10 @@ export interface EventsResponse {
 
 export interface WeatherCurrent {
   temp: number;
-  feelsLike: number;
-  humidity: number;
-  windKmh: number;
-  windDir: number; // degrees
+  feelsLike: number | null;
+  humidity: number | null;
+  windKmh: number | null;
+  windDir: number | null; // degrees
   windDirLabel: string;
   code: number; // WMO
   isDay: boolean;
@@ -403,11 +410,11 @@ export interface WeatherCurrent {
 }
 
 export interface WeatherToday {
-  sunrise: string;
-  sunset: string;
+  sunrise: string | null;
+  sunset: string | null;
   min: number;
   max: number;
-  precipChance: number;
+  precipChance: number | null;
 }
 
 export interface WeatherDaily {
@@ -415,18 +422,36 @@ export interface WeatherDaily {
   code: number;
   min: number;
   max: number;
-  precipChance: number;
-  windKmh: number;
+  precipChance: number | null;
+  windKmh: number | null;
 }
 
 export interface WeatherHourly {
   time: string;
   temp: number;
   code: number;
-  precipChance: number;
+  precipChance: number | null;
   isDay: boolean;
 }
 
+/** Where the weather comes from: the display shows `name` (and `modelName`) small, as the licences ask. */
+export interface WeatherSource {
+  provider: Exclude<WeatherProvider, 'homeassistant'>;
+  name: string;
+  model: OpenMeteoModel | null;
+  modelName: string | null;
+  url: string;
+  /** e.g. 'CC BY 4.0'; empty when the provider names none */
+  licence: string;
+  licenceUrl: string;
+  /** another source on top (current conditions from Home Assistant) */
+  also?: string;
+}
+
+/**
+ * Fields a source does not have are null (MET Norway has no precipitation probability outside the Nordics,
+ * some Open-Meteo models have no UV index): the display leaves them out.
+ */
 export interface WeatherResponse {
   updatedAt: string;
   locationName: string;
@@ -435,6 +460,17 @@ export interface WeatherResponse {
   daily: WeatherDaily[];
   hourly: WeatherHourly[];
   indoor: { temp: number | null; humidity: number | null } | null;
+  /** since 0.5; missing from older servers (then it is Open-Meteo) */
+  source?: WeatherSource;
+}
+
+/** GET /api/admin/weather/key: the key itself is never sent back. */
+export interface WeatherKeyStatus {
+  set: boolean;
+  /** last 4 characters of the stored key, to recognise it */
+  hint: string;
+  /** PUT only: the provider accepted the key on a test call (false when that could not be tried) */
+  checked?: boolean;
 }
 
 export interface NewsItem {
@@ -725,9 +761,11 @@ export interface SourceStatus {
   error?: string | null;
 }
 
+export type WeatherErrorCode = 'key_missing' | 'key_invalid' | 'rate_limited' | 'http' | 'bad_response';
+
 export interface AdminStatus {
   sources: SourceStatus[];
-  weather: { ok: boolean; updatedAt: string | null };
+  weather: { ok: boolean; updatedAt: string | null; error?: string | null; errorCode?: WeatherErrorCode | null; provider?: WeatherProvider | null };
   news: { ok: boolean; updatedAt: string | null; count?: number; error?: string | null };
   displays: number;
   /** seconds; null where there is no long-running process (Marco Cloud) */
@@ -1194,6 +1232,8 @@ export interface BackupInfo {
 export interface ExportSecrets {
   passwordHash?: string;
   homeassistant?: { token?: string };
+  /** API key of a weather source that needs one (Pirate Weather) */
+  weather?: { apiKey?: string };
   google?: { accounts: Record<string, unknown> };
   apiTokens?: unknown[];
 }
@@ -1315,7 +1355,8 @@ export interface DashboardResponse {
   displays: DisplayInfo[];
   nextEvents: CalEvent[];
   sources: SourceStatus[];
-  weather: (WeatherCurrent & { locationName: string; updatedAt: string; min: number; max: number }) | null;
+  /** `source` since 0.5 (Marco Cloud copies the dashboard shape, so it may be missing) */
+  weather: (WeatherCurrent & { locationName: string; updatedAt: string; min: number; max: number; source?: WeatherSource }) | null;
   announcements: Announcement[];
   schedulesNow: { id: string; title: string; emoji: string; screenIds: string[]; until: string }[];
   activity: ActivityEntry[];

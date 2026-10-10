@@ -83,8 +83,11 @@ El único tráfico saliente va a los calendarios, al tiempo y a las fuentes de n
   fechas bloqueadas que puedes ocultar.
 - **Destacados y cuentas atrás:** "En 18 min · Llamada con cliente", "Salida · Mañana", "🎃 Fiesta de Halloween ·
   ¡Mañana!", "✈️ Viaje a Madeira · En 12 días".
-- **Tiempo:** condiciones actuales y previsión por horas y por días de [Open-Meteo](https://open-meteo.com/) (sin
-  clave de API), o tu propia entidad de tiempo y sensores interiores de [Home Assistant](https://www.home-assistant.io/);
+- **Tiempo:** condiciones actuales y previsión por horas y por días de la fuente gratuita que elijas:
+  [Open-Meteo](https://open-meteo.com/) (sin clave de API y con modelo a elegir: ECMWF, DWD ICON, NOAA GFS,
+  Météo-France, UK Met Office y más), [MET Norway](https://api.met.no/) (sin clave) o
+  [Pirate Weather](https://pirateweather.net/) (con tu propia clave gratuita). Las pantallas indican la fuente en letra
+  pequeña. También tu propia entidad de tiempo y sensores interiores de [Home Assistant](https://www.home-assistant.io/);
   lluvia/nieve animadas.
 - **Teletipo de noticias** desde cualquier fuente RSS/Atom, una lista de tareas y un mensaje del día.
 - **Fondo de fotos:** fotos de stock o tu propia galería, transiciones WebGL, zoom lento, un suave efecto ambiental de
@@ -666,8 +669,19 @@ iniciada con la contraseña se añade solo). Después, si quieres, puedes desact
   fuentes que ya formatean los títulos como `🏠 Guest - 4p+1m` conservan su emoji y convierten el número de huéspedes en
   iconos; las líneas `Adults: 2 / Children: 1 / Infants: 1 / Pets: 1` de la descripción (también
   `Adultos/Niños/Bebés/Mascotas`) dan 🧑🏻🧑🏻 🧒🏻 👶🏻 🐶.
-- **Tiempo:** [Open-Meteo](https://open-meteo.com/), sin clave: basta con definir la ubicación (búsqueda por nombre o
-  coordenadas) y las unidades en *Tiempo*.
+- **Tiempo:** define la ubicación (búsqueda por nombre o coordenadas) y las unidades en *Tiempo* y elige la fuente
+  en *Tiempo → Fuente de los datos* (`weather.provider`). Todas son gratuitas:
+
+  | Fuente | Clave | Notas |
+  |---|---|---|
+  | [Open-Meteo](https://open-meteo.com/) (predeterminada) | no | Usa el mejor modelo para tu zona o el que elijas en *Modelo de previsión* (`weather.model`: `best_match`, `ecmwf_ifs`, `icon_seamless`, `gfs_seamless`, `meteofrance_seamless`, `ukmo_seamless`, `gem_seamless`, `jma_seamless`). Algunos modelos no dan probabilidad de lluvia ni índice UV, o dan menos días; esos datos no se muestran. Gratis para uso no comercial; datos con licencia CC BY 4.0. |
+  | [MET Norway](https://api.met.no/) | no | Locationforecast 2.0 del instituto meteorológico de Noruega, para todo el mundo. Solo da probabilidad de lluvia en los países nórdicos; la salida y la puesta del sol se calculan. Marco se identifica con su User-Agent y respeta la hora de `Expires` que indica el servicio (unos 30 minutos). Datos con licencia CC BY 4.0 y NLOD. |
+  | [Pirate Weather](https://pirateweather.net/) | tuya, gratuita | Crea una clave en [pirate-weather.apiable.io](https://pirate-weather.apiable.io/) y pégala en *Tiempo*. El plan gratuito permite 10.000 consultas al mes; Marco consulta como mucho cada 15 minutos (unas 3.000). La clave se comprueba una vez y se guarda en `data/secrets.json`. |
+
+  Cada fuente se guarda en caché por lugar durante al menos 10 minutos y la comparten todas las pantallas e idiomas;
+  si la fuente falla, las pantallas siguen mostrando la última previsión hasta 6 horas. Las pantallas muestran el
+  nombre de la fuente en letra pequeña junto al tiempo (*Open-Meteo*, *Open-Meteo · ECMWF IFS*, *MET Norway*), como
+  pide la licencia CC BY.
 - **Home Assistant:** en Home Assistant abre tu **perfil → Seguridad → Tokens de acceso de larga duración → Crear
   token**; en *Administración → Home Assistant* introduce la URL (p. ej. `http://homeassistant.local:8123`) y el token,
   pulsa *Probar conexión* y, después, elige en *Tiempo* una entidad `weather.*` y/o entidades `sensor.*` de temperatura
@@ -818,7 +832,8 @@ les da valor.
 data/
 ├── config.json          # todos los ajustes (pantallas, calendarios, reglas, eventos, cumpleaños)
 ├── secrets.json         # hash de la contraseña, secreto de sesión, tokens de Google y Home Assistant, hashes de los tokens de API,
-│                        #   claves de los enlaces privados, hashes de las llaves de los dispositivos vinculados (modo 600)
+│                        #   claves de los enlaces privados, hashes de las llaves de los dispositivos vinculados,
+│                        #   clave de API del tiempo (modo 600)
 ├── photos/              # galería (+ .thumbs/ y .meta.json con los puntos focales y las fotos ocultas)
 ├── backups/             # copias de seguridad de la configuración automáticas y manuales
 ├── cache/               # cachés de las fuentes
@@ -911,7 +926,8 @@ Outfit (OFL-1.1); consulta [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 ## Agradecimientos
 
 - [DAKboard](https://dakboard.com/), por la idea de un panel de pared (este proyecto no está afiliado a él).
-- [Open-Meteo](https://open-meteo.com/): API meteorológica gratuita (datos bajo CC BY 4.0).
+- [Open-Meteo](https://open-meteo.com/) y [MET Norway](https://api.met.no/): API meteorológicas gratuitas (datos bajo
+  CC BY 4.0), y [Pirate Weather](https://pirateweather.net/).
 - [Lorem Picsum](https://picsum.photos/) y los fotógrafos de Unsplash, por las fotos de stock.
 - [three.js](https://threejs.org/), [Preact](https://preactjs.com/), [Vite](https://vite.dev/),
   [Express](https://expressjs.com/), [node-ical](https://github.com/jens-maus/node-ical), [rrule](https://github.com/jkbrzt/rrule),

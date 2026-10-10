@@ -7,10 +7,21 @@ All notable changes to this project are documented here. The format is based on
 
 ## [0.5.0] - 2026-10-10
 
-A Modern display style with glass options, six new layouts, alerts and display commands in poll mode, a capability block in `/api/health` that the admin follows, a pairing
+A Modern display style with glass options, six new layouts, a choice of free weather sources, alerts and display commands in poll mode, a capability block in `/api/health` that the admin follows, a pairing
 confirm step, place search through the server, and the shared logic moved into `server/core`.
 
 ### Added
+- **Weather sources** (*Weather → Data source*, `weather.provider`): besides Open-Meteo, the forecast can now come from
+  [MET Norway](https://api.met.no/) (Locationforecast 2.0, worldwide, no key) or [Pirate Weather](https://pirateweather.net/)
+  (your own free key, 10,000 calls a month; Marco uses about 3,000). With Open-Meteo you can also pick the forecast
+  model (`weather.model`): *Automatic* (as before), ECMWF IFS, DWD ICON, NOAA GFS, Météo-France, UK Met Office, GEM
+  or JMA. Each source shows a short description and its licence in the admin, and the screens credit it in small type
+  next to the weather (*Open-Meteo*, *Open-Meteo · ECMWF IFS*, *MET Norway*), in Classic and Modern, as the CC BY
+  licences ask. `GET /api/weather` has a new `source` field. The Pirate Weather key is pasted in *Weather*, tried once
+  (`PUT /api/admin/weather/key`), kept in `data/secrets.json`, included in exports with secrets and never sent back.
+  Values a source does not give (chance of rain from MET Norway outside the Nordics, UV from some models) are left
+  out instead of showing a dash. MET Norway's sleet now has its own description ("Sleet"). The provider code lives in
+  `server/core/weather.js`, so Marco Cloud offers the same sources.
 - **Display style** (*Layout → Display style*, `screen.style`): every screen can now be *Modern* or *Classic* (the look so far).
   New installs and new screens start Modern; screens saved before this release keep Classic, so nothing changes
   until you pick it. *Modern* is a more minimal, Apple-like look: glass widget
@@ -80,6 +91,10 @@ confirm step, place search through the server, and the shared logic moved into `
   the admin and the display show the same glyphs.
 
 ### Changed
+- **Weather cache**: one forecast per place, shared by every language and screen (it was fetched once per language),
+  for at least 10 minutes and, with MET Norway, until the `Expires` time it gives (then asked again with
+  `If-Modified-Since`). Coordinates are rounded to 2 decimals (about 1 km) before they are sent. When the source
+  fails, the last forecast stays for up to 6 hours, and *Status* shows why (for example a refused key).
 - **Ambient backdrop**: the *Aurora* now looks like real northern lights: folding curtains with fine vertical rays
   that shimmer slowly, green and teal at the lower edge fading to violet at the top, gentle brightness pulses and a
   dither so the soft gradients never band. In the light theme it is a very faint pastel tint. *Particles* are now

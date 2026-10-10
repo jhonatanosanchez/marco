@@ -6,7 +6,8 @@ import * as google from '../google.js';
 import * as ha from '../homeassistant.js';
 import { testIcs, sourceStatus } from '../calendars.js';
 import { testFeed, status as newsStatus } from '../news.js';
-import { status as weatherStatus } from '../weather.js';
+import { status as weatherStatus, weatherKey, checkWeatherKey } from '../weather.js';
+import { WEATHER_KEY_RE, weatherKeyStatus } from '../core/weather.js';
 import {
   listGallery, uploadMiddleware, thumbMiddleware, deletePhoto, finalizeUpload, readMeta, writeMeta, setFocus, setHidden, getPhoto, checkNames,
   cleanupTempUploads, isUnit, isGalleryFile, isThumbField, storeThumb, validThumb, CONFLICT_POLICIES,
@@ -38,7 +39,7 @@ export function adminRouter({ onConfigSaved } = {}) {
         return res.status(400).json({ error: 'invalid config', details: [{ path: 'baseRevision', message: 'expected a revision number' }] });
       }
     }
-    const result = saveConfig(body, { reason: 'admin', req, baseRevision });
+    const result = saveConfig(body, { reason: 'admin', req, baseRevision, checks: { weatherKeySet: Boolean(weatherKey()) } });
     if (result.conflict) return res.status(409).json({ error: 'conflict', revision: result.config.revision });
     if (!result.ok) return res.status(400).json({ error: 'invalid config', details: result.errors });
     onConfigSaved?.(result.config);
@@ -96,6 +97,20 @@ export function adminRouter({ onConfigSaved } = {}) {
     updateSecrets((s) => { s.homeassistant.token = token.trim(); });
     res.json({ ok: true });
   });
+
+  // --- weather API key (Pirate Weather): kept in secrets.json, never sent back, only whether one is set ---
+  r.get('/weather/key', (req, res) => res.json(weatherKeyStatus(weatherKey())));
+  r.put('/weather/key', wrap(async (req, res) => {
+    const key = req.body?.key;
+    if (typeof key !== 'string' || key.length > 200) return res.status(400).json({ error: 'key must be a string' });
+    const k = key.trim();
+    if (k && !WEATHER_KEY_RE.test(k)) return res.status(400).json({ error: 'key_invalid' });
+    // A new key is tried once against the provider: a key it refuses is not stored.
+    const checked = k ? await checkWeatherKey(k) : null;
+    if (checked === false) return res.status(400).json({ error: 'key_invalid' });
+    updateSecrets((s) => { s.weather = { ...(s.weather || {}), apiKey: k }; });
+    res.json({ ...weatherKeyStatus(k), checked: checked === true });
+  }));
 
   // --- gallery ---
   r.get('/photos', (req, res) => res.json(listGallery()));

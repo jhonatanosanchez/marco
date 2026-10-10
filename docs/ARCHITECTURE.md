@@ -11,7 +11,7 @@ display and the server guarantee. The HTTP endpoints and event formats are in [A
  │                                                                                             │
  │   sources ──► server/calendars.js ──► events pipeline ──► /api/events (per screen)          │
  │   ICS · Google · local events · birthdays    (rules, icons, rental feeds, countdowns)       │
- │   Open-Meteo / Home Assistant ──► /api/weather      RSS ──► /api/news                       │
+ │   weather sources · HA        ──► /api/weather      RSS ──► /api/news                       │
  │   data/ (JSON files, atomic writes)          SSE hub ──► /api/stream (live updates)         │
  │   serves dist/ (Vite build): /  = display, /admin/ = admin panel                            │
  └───────────────▲──────────────────────────────────────────────▲──────────────────────────────┘
@@ -67,7 +67,7 @@ The stored config has **global** sections shared by every screen and a list of *
   // ---------- global ----------
   "calendar":   { "sources": [CalendarSource], "iconRules": [IconRule] },
   "datetime":   { "timezone": "Europe/Lisbon" },
-  "weather":    { "provider": "open-meteo", "locationName": "Lisbon, Portugal", "lat": 38.7223, "lon": -9.1393,
+  "weather":    { "provider": "open-meteo", "model": "best_match", "locationName": "Lisbon, Portugal", "lat": 38.7223, "lon": -9.1393,
                   "units": "metric", "haWeatherEntity": "", "haIndoorTempEntity": "", "haIndoorHumidityEntity": "" },
   "news":       { "feeds": [{ "id", "name", "url", "enabled" }], "maxItems": 30 },
   "todo":       { "items": [{ "id", "text", "done" }] },
@@ -122,7 +122,7 @@ Global vs per-screen for the "split" sections:
 | screen, layout, background, message, alerts | none | all |
 | calendar | sources, iconRules | view settings + `sourceIds` |
 | datetime | timezone | clock and date format, enabled |
-| weather | provider, location, units, HA entities | enabled, forecastDays, showHourly, showPrecipChance |
+| weather | provider, model, location, units, HA entities | enabled, forecastDays, showHourly, showPrecipChance |
 | news | feeds, maxItems | enabled, rotateSec |
 | todo | items | enabled |
 | countdowns | items + inclusion settings | enabled, max |

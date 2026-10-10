@@ -51,6 +51,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { label: 'Cuentas atrás', route: 'countdowns', anchor: 'cd-list', keywords: 'countdown faltan días navidad viaje contagem' },
   { label: 'Cuentas atrás automáticas (cumpleaños, eventos marcados)', route: 'countdowns', anchor: 'cd-auto', keywords: 'auto include birthdays flagged' },
   { label: 'Ubicación del tiempo', route: 'weather', anchor: 'wx-main', keywords: 'weather location city ciudad lat lon open-meteo' },
+  { label: 'Fuente de los datos del tiempo', route: 'weather', anchor: 'wx-source', keywords: 'weather source provider data open-meteo met norway yr pirate weather model ecmwf icon gfs api key fuente modelo clave licencia' },
   { label: 'Previsión por horas y días', route: 'weather', anchor: 'wx-main', keywords: 'forecast hourly days previsión' },
   { label: 'Sensores de Home Assistant para el tiempo', route: 'weather', anchor: 'wx-ha', keywords: 'indoor temperatura humedad sensor', feature: 'homeassistant' },
   { label: 'Fuentes de noticias (RSS)', route: 'news', anchor: 'news-feeds', keywords: 'rss feed news noticias titulares' },

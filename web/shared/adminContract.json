@@ -1003,6 +1003,40 @@
       ]
     },
     {
+      "method": "GET",
+      "path": "/api/admin/weather/key",
+      "query": [],
+      "feature": null,
+      "callers": [
+        "weatherKey"
+      ],
+      "request": null,
+      "response": "WeatherKeyStatus",
+      "responseArray": false,
+      "responseKeys": [
+        "set",
+        "hint",
+        "checked?"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/weather/key",
+      "query": [],
+      "feature": null,
+      "callers": [
+        "setWeatherKey"
+      ],
+      "request": "{key}",
+      "response": "WeatherKeyStatus",
+      "responseArray": false,
+      "responseKeys": [
+        "set",
+        "hint",
+        "checked?"
+      ]
+    },
+    {
       "method": "POST",
       "path": "/api/auth/login",
       "query": [],

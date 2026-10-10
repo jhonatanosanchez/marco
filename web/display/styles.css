@@ -388,6 +388,8 @@ body {
 .wx-desc .hilo i { font-style: normal; margin: 0 0.3rem; opacity: 0.5; }
 .wx-desc .loc { font-size: 1.5rem; color: rgb(255 255 255 / 0.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wx-meta { display: flex; flex-wrap: wrap; gap: 0.8rem 2.2rem; font-size: 1.85rem; }
+/* data source credit (CC BY 4.0 for Open-Meteo and MET Norway): small and quiet, never wrapping */
+.wx-src { font-size: 1.1rem; font-weight: 500; letter-spacing: 0.02em; color: rgb(255 255 255 / 0.42); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
 .wx-meta .m { display: inline-flex; align-items: center; gap: 0.55rem; white-space: nowrap; }
 .wx-meta em { font-style: normal; color: rgb(255 255 255 / 0.62); font-weight: 400; }
 .wx-meta b { font-weight: 600; }

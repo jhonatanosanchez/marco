@@ -4,6 +4,7 @@ import { defaultConfig, defaultScreenProfile, CONFIG_VERSION, RESERVED_SOURCE_ID
 import { isValidTimeZone } from './lib/tz.js';
 import { randomId, fold } from './lib/text.js';
 import { LANGS } from './lib/i18n.js';
+import { WEATHER_PROVIDER_IDS, OPEN_METEO_MODEL_IDS, KEY_PROVIDERS } from './weather.js';
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
@@ -463,8 +464,10 @@ export function migrateConfig(raw) {
 /**
  * Validate a full (v2) config object. v1 input is migrated first. Returns { ok, errors, value }.
  * `value` is always a complete, sanitised config (defaults fill gaps); callers decide whether to persist it on errors.
+ * `opts.weatherKeySet` (the admin save only): false when no weather API key is stored, so choosing a source that
+ * needs one is refused (weather.apiKey 'API key required'). Left out, keys are not checked (imports, restores).
  */
-export function validateConfig(input) {
+export function validateConfig(input, opts = {}) {
   const ctx = new Ctx();
   const D = defaultConfig();
   const c = obj(ctx, '', migrateConfig(input));
@@ -492,7 +495,8 @@ export function validateConfig(input) {
     return s;
   };
   const weather = {
-    provider: oneOf(ctx, 'weather.provider', we.provider, D.weather.provider, ['open-meteo', 'homeassistant']),
+    provider: oneOf(ctx, 'weather.provider', we.provider, D.weather.provider, WEATHER_PROVIDER_IDS),
+    model: oneOf(ctx, 'weather.model', we.model, D.weather.model, OPEN_METEO_MODEL_IDS),
     locationName: str(ctx, 'weather.locationName', we.locationName, D.weather.locationName, 80),
     lat: num(ctx, 'weather.lat', we.lat, D.weather.lat, -90, 90),
     lon: num(ctx, 'weather.lon', we.lon, D.weather.lon, -180, 180),
@@ -501,6 +505,7 @@ export function validateConfig(input) {
     haIndoorTempEntity: entity('weather.haIndoorTempEntity', we.haIndoorTempEntity),
     haIndoorHumidityEntity: entity('weather.haIndoorHumidityEntity', we.haIndoorHumidityEntity),
   };
+  if (opts.weatherKeySet === false && KEY_PROVIDERS.includes(weather.provider)) ctx.err('weather.apiKey', 'API key required');
 
   const ne = obj(ctx, 'news', c.news);
   const feedSeen = new Set();

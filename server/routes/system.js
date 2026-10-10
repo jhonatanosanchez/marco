@@ -135,6 +135,7 @@ export function systemRouter({ version = getServerVersion() } = {}) {
       const s = sanitizeImportedSecrets(parsed.secrets);
       updateSecrets((x) => {
         if (s.haToken !== undefined) { x.homeassistant.token = s.haToken; applied.push('homeassistant'); }
+        if (s.weatherKey !== undefined) { x.weather = { ...(x.weather || {}), apiKey: s.weatherKey }; applied.push('weather'); }
         if (s.googleAccounts) { x.google.accounts = s.googleAccounts; applied.push('google'); }
         if (s.apiTokens) { x.apiTokens = s.apiTokens; applied.push('apiTokens'); }
         if (s.displayKeys) { x.displayKeys = { ...(x.displayKeys || {}), ...s.displayKeys }; applied.push('displayKeys'); }
@@ -196,7 +197,7 @@ export function systemRouter({ version = getServerVersion() } = {}) {
       console.warn('[dashboard] events:', err.message);
     }
     const w = cachedWeather();
-    const weather = w ? { ...w.current, locationName: w.locationName, updatedAt: w.updatedAt, min: w.today?.min ?? null, max: w.today?.max ?? null } : null;
+    const weather = w ? { ...w.current, locationName: w.locationName, updatedAt: w.updatedAt, min: w.today?.min ?? null, max: w.today?.max ?? null, source: w.source } : null;
     res.json({
       version,
       uptime: Math.round(process.uptime()),

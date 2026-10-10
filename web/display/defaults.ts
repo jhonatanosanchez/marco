@@ -25,7 +25,7 @@ export const DEFAULT_CONFIG: DisplayConfig = {
     dateFormat: 'weekday_d_month',
   },
   weather: {
-    enabled: true, provider: 'open-meteo', locationName: 'Lisbon, Portugal', lat: 38.7223, lon: -9.1393, units: 'metric',
+    enabled: true, provider: 'open-meteo', model: 'best_match', locationName: 'Lisbon, Portugal', lat: 38.7223, lon: -9.1393, units: 'metric',
     forecastDays: 5, showHourly: true, showPrecipChance: true, haWeatherEntity: '', haIndoorTempEntity: '',
     haIndoorHumidityEntity: '',
   },

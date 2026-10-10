@@ -69,7 +69,7 @@ export function wmoKind(code: number): WxKind {
   if (code === 3) return 'overcast';
   if (code === 45 || code === 48) return 'fog';
   if (code >= 51 && code <= 55) return 'drizzle';
-  if (code === 56 || code === 57 || code === 66 || code === 67) return 'sleet';
+  if (code === 56 || code === 57 || (code >= 66 && code <= 69)) return 'sleet'; // 68, 69: rain and snow (sleet)
   if (code === 61 || code === 63 || code === 80 || code === 81) return 'rain';
   if (code === 65 || code === 82) return 'heavyrain';
   if ((code >= 71 && code <= 77) || code === 85 || code === 86) return 'snow';
@@ -85,7 +85,7 @@ export interface WeatherFxPlan { mode: 'rain' | 'snow' | 'sun' | 'fog' | null; l
 export function weatherFxOf(code: number, isDay: boolean): WeatherFxPlan {
   const k = wmoKind(code);
   if (k === 'drizzle') return { mode: 'rain', level: code === 55 ? 0.5 : 0.35, storm: false };
-  if (k === 'sleet') return { mode: 'rain', level: code === 57 || code === 67 ? 0.75 : 0.55, storm: false };
+  if (k === 'sleet') return { mode: 'rain', level: code === 57 || code === 67 || code === 69 ? 0.75 : 0.55, storm: false };
   if (k === 'rain') return { mode: 'rain', level: code === 61 || code === 80 ? 0.6 : 0.8, storm: false };
   if (k === 'heavyrain') return { mode: 'rain', level: 1, storm: false };
   if (k === 'thunder') return { mode: 'rain', level: 1, storm: true };

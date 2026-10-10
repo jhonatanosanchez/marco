@@ -313,6 +313,7 @@
 .style-modern .wxm-cond { font-size: 2rem; font-weight: 600; line-height: 1.2; }
 .style-modern .wxm-hl { display: flex; gap: 1rem; font-size: 1.9rem; font-weight: 500; color: var(--m-ink-2); }
 .style-modern .wxm-hl b { color: #fff; font-weight: 600; font-feature-settings: 'tnum'; }
+.style-modern .weather .wx-src { margin-top: 0.3rem; font-size: 1.1rem; color: var(--m-ink-2); opacity: 0.7; max-width: 100%; }
 .style-modern .weather .wx-meta { margin-top: 1rem; gap: 0.4rem 1.8rem; font-size: 1.7rem; color: var(--m-ink-2); }
 .style-modern .weather .wx-meta em { display: none; }
 .style-modern .weather .wx-meta b { font-weight: 500; color: rgb(255 255 255 / 0.86); }
