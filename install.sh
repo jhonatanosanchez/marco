@@ -5,12 +5,12 @@
 #   curl -fsSL https://marcohome.app/install | bash -s -- --mode kiosk --url http://homeserver.lan:3000/d/<key>
 #
 # Modes:
-#   all     server and screen on this device (Raspberry Pi with a desktop, or any Debian/Ubuntu desktop)
 #   server  server only (home server, NAS, any Debian/Ubuntu machine); screens connect to it over the network
+#   all     server and screen on this device (Raspberry Pi with a desktop, or any Debian/Ubuntu desktop)
 #   kiosk   screen only: this device opens the private link of a Marco server that runs elsewhere
 #
 # Options:
-#   --mode all|server|kiosk   What to install (asked when omitted and a terminal is available)
+#   --mode server|all|kiosk   What to install (asked when omitted and a terminal is available)
 #   --url <link>              Private display link for the kiosk (Admin > Screen > Settings > Private link)
 #   --port <n>                Server port (default 3000)
 #   --dir <path>              Install folder (default ~/marco, or /opt/marco when run as root)
@@ -1157,14 +1157,14 @@ choose_mode() {
   {
     echo
     echo "What should this device do?"
-    echo "  1) All in one: the server and the screen on this device"
-    echo "  2) Server only: other screens and browsers connect to it"
+    echo "  1) Server only: other screens and browsers connect to it"
+    echo "  2) All in one: the server and the screen on this device"
     echo "  3) Screen only (kiosk): show a Marco server that runs on another machine"
   } > "$TTY"
-  local n=1; [ "$def" = server ] && n=2
+  local n=1; [ "$def" = all ] && n=2
   while :; do
     ask "Choose 1, 2 or 3 [$n]: " "$n"
-    case "$REPLY" in 1) MODE=all; break ;; 2) MODE=server; break ;; 3) MODE=kiosk; break ;; esac
+    case "$REPLY" in 1) MODE=server; break ;; 2) MODE=all; break ;; 3) MODE=kiosk; break ;; esac
   done
 }
 

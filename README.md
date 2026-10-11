@@ -219,8 +219,8 @@ Run it as your normal user (it asks for `sudo` when it needs it). It works on De
 
 ```
 What should this device do?
-  1) All in one: the server and the screen on this device
-  2) Server only: other screens and browsers connect to it
+  1) Server only: other screens and browsers connect to it
+  2) All in one: the server and the screen on this device
   3) Screen only (kiosk): show a Marco server that runs on another machine
 ```
 

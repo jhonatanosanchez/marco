@@ -231,13 +231,13 @@ instalador habla en inglés):
 
 ```
 What should this device do?
-  1) All in one: the server and the screen on this device
-  2) Server only: other screens and browsers connect to it
+  1) Server only: other screens and browsers connect to it
+  2) All in one: the server and the screen on this device
   3) Screen only (kiosk): show a Marco server that runs on another machine
 ```
 
-1 es todo en uno (servidor y pantalla en este dispositivo), 2 solo servidor (otras pantallas y navegadores se
-conectan a él) y 3 solo pantalla o kiosco (muestra un servidor de Marco que está en otra máquina).
+1 es solo servidor (otras pantallas y navegadores se conectan a él), 2 todo en uno (servidor y pantalla en este
+dispositivo) y 3 solo pantalla o kiosco (muestra un servidor de Marco que está en otra máquina).
 
 Después muestra lo que ha encontrado (sistema, modelo de Raspberry Pi, escritorio, overlay de solo lectura,
 instalación existente) y pregunta antes de cambiar nada. El instalador:
