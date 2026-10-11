@@ -11,7 +11,7 @@ import {
 } from '../compact';
 import type { Tick } from '../time';
 import {
-  CARD_GAP_U, CARD_PAD_U, CARD_TIME_FONT, CARD_TIME_LINE, CARD_TITLE_FONT, CARD_TITLE_LINE, type CardMetrics,
+  CARD_BORDER_PX, CARD_GAP_U, CARD_PAD_U, CARD_TIME_FONT, CARD_TIME_LINE, CARD_TITLE_FONT, CARD_TITLE_LINE, type CardMetrics,
   AUTO_WEEKS_MAX, barLanesFor, cardHeight, cardRowNeed, lineRowNeed, planDayCards, resolveWeeks, titleLines,
 } from '../cards';
 
@@ -602,6 +602,7 @@ export class MonthCalendar {
       timeH: Math.round(timeFs * CARD_TIME_LINE),
       lineH: Math.round(titleFs * CARD_TITLE_LINE),
       gap: Math.round(CARD_GAP_U * rem),
+      border: this.cardBorder(),
     };
     const set = (k: string, px: number) => {
       const val = `${px.toFixed(2)}px`;
@@ -614,6 +615,15 @@ export class MonthCalendar {
     set('--card-line-h', cm.lineH);
     set('--card-gap', cm.gap);
     return cm;
+  }
+
+  /** Top plus bottom border of a drawn card (px), so the plan counts it; CARD_BORDER_PX before any card is drawn. */
+  private cardBorder(): number {
+    const card = this.root.querySelector<HTMLElement>('.cstack.cards .ev.card');
+    if (!card) return CARD_BORDER_PX;
+    const cs = getComputedStyle(card);
+    const b = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+    return Number.isFinite(b) ? b : CARD_BORDER_PX;
   }
 
   /** Title lines a card needs (1 or 2), from the measured title width and the column width. */

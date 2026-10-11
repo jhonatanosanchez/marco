@@ -122,7 +122,7 @@ test('automatic weeks: between 2 and the cap, fewer rows when each day must fit 
   assert.equal(autoWeeks(5000, 100), 6); // never more than 6
   assert.equal(autoWeeks(5000, 100, 4), 4); // a layout's cap
   assert.equal(autoWeeks(0, 250), 4); // not laid out yet
-  const m = { pad: 4, timeH: 17, lineH: 19, gap: 4 };
+  const m = { pad: 4, timeH: 17, lineH: 19, gap: 4, border: 2 };
   const area = 1300; // a portrait 1080×1920 planner
   let prev = Infinity;
   for (let perDay = 1; perDay <= 8; perDay++) {
@@ -163,11 +163,12 @@ test('regression: a number of weeks is drawn exactly as before, whatever the scr
 
 test('cards: heights, title lines and how a busy day is split into pages', () => {
   const { cardHeight, titleLines, planCardPages, planDayCards, barLanesFor, CARD_MAX_LINES } = cards;
-  const m = { pad: 4, timeH: 17, lineH: 19, gap: 4 };
+  const m = { pad: 4, timeH: 17, lineH: 19, gap: 4, border: 2 };
   assert.equal(CARD_MAX_LINES, 2);
-  assert.equal(cardHeight(1, true, m), 8 + 17 + 19);
-  assert.equal(cardHeight(2, true, m), 8 + 17 + 38);
-  assert.equal(cardHeight(1, false, m), 8 + 19);
+  assert.equal(cardHeight(1, true, m), 8 + 2 + 17 + 19);
+  assert.equal(cardHeight(2, true, m), 8 + 2 + 17 + 38);
+  assert.equal(cardHeight(1, false, m), 8 + 2 + 19);
+  assert.equal(cardHeight(1, true, { ...m, border: 0 }), 8 + 17 + 19); // the border counts in the plan
   assert.equal(cardHeight(5, true, m), cardHeight(2, true, m)); // at most two title lines
   assert.equal(titleLines(80, 120), 1);
   assert.equal(titleLines(200, 120), 2);

@@ -44,7 +44,12 @@ export interface CardMetrics {
   lineH: number;
   /** space between two cards */
   gap: number;
+  /** top plus bottom border width of a card (the browser draws it outside the padding) */
+  border: number;
 }
+
+/** Card border (top plus bottom, px) assumed until a drawn card can be measured. */
+export const CARD_BORDER_PX = 2;
 
 /** Card text sizes as a share of the chip font (--chip-fs), line heights in that font, spacing in display units. */
 export const CARD_TITLE_FONT = 0.94;
@@ -59,7 +64,7 @@ export const CARD_MAX_LINES = 2;
 /** Height (px) of a card whose title takes `lines` lines; `timed` adds the time line on top. */
 export function cardHeight(lines: number, timed: boolean, m: CardMetrics): number {
   const n = Math.max(1, Math.min(CARD_MAX_LINES, Math.round(lines) || 1));
-  return 2 * m.pad + (timed ? m.timeH : 0) + n * m.lineH;
+  return 2 * m.pad + m.border + (timed ? m.timeH : 0) + n * m.lineH;
 }
 
 /** Title lines (1..CARD_MAX_LINES) for a title `textW` px wide in a card `innerW` px wide (word wrap wastes a bit). */
@@ -73,7 +78,7 @@ export function titleLines(textW: number, innerW: number): number {
  * a time line and a title of one and a quarter lines on average (some titles take two).
  */
 export function cardRowNeed(numH: number, rowGap: number, perDay: number, m: CardMetrics): number {
-  const card = 2 * m.pad + m.timeH + 1.25 * m.lineH;
+  const card = 2 * m.pad + m.border + m.timeH + 1.25 * m.lineH;
   return numH + rowGap + Math.max(1, perDay) * (card + m.gap) + m.pad;
 }
 
