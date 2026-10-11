@@ -98,6 +98,10 @@ export function defaultConfig() {
     eventRules: { items: [] },
     countdowns: { items: [], includeBirthdays: true, birthdayDays: 30, includeFlagged: true, horizonDays: 365 },
     schedules: { items: [] },
+    // carousels: screens shown one after another on the same TV (server/core/carousels.js). Each item:
+    // { id: 'v_…', enabled, name, slug, transition: 'fade' | 'none', holdOnAlert, nightRotate, offScreenId,
+    //   schedule: [{ id, enabled, days, from, to }], steps: [{ screenId, seconds }] }
+    carousels: { items: [] },
     // doorbell: camera entity (camera.*), seconds on screen (10..300), screenIds ([] = all), door chime on/off
     homeassistant: {
       enabled: false, url: 'http://homeassistant.local:8123',

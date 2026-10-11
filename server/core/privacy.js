@@ -9,7 +9,7 @@
 // - A manual "off" while a schedule window is running lasts until that window ends (the next schedule boundary);
 //   outside a window it only clears the manual state.
 // - Without a manual state, the screen is private while one of its schedule rules is running.
-import { scheduleState, localInstant, dayOk } from './schedules.js';
+import { localInstant, windowState, nextWindowBoundary, enabledWindows } from './schedules.js';
 import { zonedParts, addDays } from './lib/tz.js';
 import { t } from './lib/i18n.js';
 import { LOCAL_SOURCE_ID, BIRTHDAYS_SOURCE_ID } from './defaults.js';
@@ -69,48 +69,16 @@ export const countdownSourceAllowed = (cfg, sourceId) => sourcePrivacyMode(cfg, 
 
 // ---------------------------------------------------------------- schedule
 
-const asSchedule = (r) => ({ enabled: r.enabled !== false, days: r.days || [], from: r.from, to: r.to, startDate: null, endDate: null });
-const enabledRules = (screen) => (Array.isArray(screen?.privacy?.schedule) ? screen.privacy.schedule : []).filter((r) => r && r.enabled !== false && r.from !== r.to);
+const enabledRules = (screen) => enabledWindows(screen?.privacy?.schedule);
 
 /**
  * Is one of `rules` running at `now`? `until` = end of the whole running stretch (back-to-back or overlapping
- * windows count as one), as an ISO time with offset.
+ * windows count as one), as an ISO time with offset. Shared with carousels (core/schedules.js windowState).
  */
-export function privacyScheduleState(rules, now, tz) {
-  let at = now.getTime();
-  let until = null;
-  for (let i = 0; i < 16; i++) {
-    let best = null;
-    for (const r of rules) {
-      const st = scheduleState(asSchedule(r), new Date(at), tz);
-      if (st.active && (!best || Date.parse(st.until) > Date.parse(best))) best = st.until;
-    }
-    if (!best || Date.parse(best) <= at) break;
-    until = best;
-    at = Date.parse(best);
-  }
-  return { active: until !== null, until };
-}
+export const privacyScheduleState = windowState;
 
 /** Next instant after `now` where one of `rules` starts or ends (ms), or null without rules. */
-export function nextScheduleBoundary(rules, now, tz) {
-  if (!rules.length) return null;
-  const p = zonedParts(now, tz);
-  const today = `${String(p.y).padStart(4, '0')}-${pad(p.m)}-${pad(p.d)}`;
-  const t0 = now.getTime();
-  let best = null;
-  for (const r of rules) {
-    const m = asSchedule(r);
-    for (let i = -1; i <= 8; i++) {
-      const day = addDays(today, i);
-      if (!dayOk(m, day)) continue;
-      const start = Date.parse(localInstant(day, m.from, tz));
-      const end = Date.parse(localInstant(m.from < m.to ? day : addDays(day, 1), m.to, tz));
-      for (const x of [start, end]) if (x > t0 && (best === null || x < best)) best = x;
-    }
-  }
-  return best;
-}
+export const nextScheduleBoundary = nextWindowBoundary;
 
 /** The next time `hhmm` comes round in `tz` after `now`, as an ISO time with offset. */
 export function nextLocalTime(hhmm, now, tz) {

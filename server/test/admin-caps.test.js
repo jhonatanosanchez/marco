@@ -52,7 +52,10 @@ test('caps: old servers and self-hosted keep every feature on', () => {
   assert.equal(old.edition, 'self-hosted');
   assert.equal(old.features, null);
   // accountMenu, microsoftCalendar, updates, feedback, privacy and the doorbell only exist on servers that say so
-  for (const k of FEATURE_KEYS) assert.equal(hasFeature(old, k), !['accountMenu', 'microsoftCalendar', 'updates', 'feedback', 'privacy', 'doorbell', 'doorbellLive'].includes(k), k);
+  for (const k of FEATURE_KEYS) assert.equal(hasFeature(old, k), !['accountMenu', 'microsoftCalendar', 'updates', 'feedback', 'privacy', 'doorbell', 'doorbellLive', 'carousels'].includes(k), k);
+  // carousels: on for this server, off for servers that do not say so (they would drop config.carousels)
+  assert.equal(hasFeature(selfHosted(), 'carousels'), true);
+  assert.equal(hasFeature(capsFrom({ ok: true, uptime: 1, version: '0.5.0', edition: 'self-hosted', features: { news: true } }), 'carousels'), false);
   assert.equal(old.pairCodeLength, 6);
   assert.equal(old.displayOrigin, null);
 
@@ -124,7 +127,8 @@ test('navFilter: cloud caps hide news, photos, Home Assistant and the API page',
 test('navFilter: self-hosted defaults and old servers show everything', () => {
   const all = nav.NAV_ITEMS.map((n) => n.id);
   assert.deepEqual(nav.filterNav(nav.NAV_ITEMS, selfHosted()).map((n) => n.id), all);
-  assert.deepEqual(nav.filterNav(nav.NAV_ITEMS, oldServer()).map((n) => n.id), all);
+  // an old server has no carousels page (opt-in: it would drop the section on save)
+  assert.deepEqual(nav.filterNav(nav.NAV_ITEMS, oldServer()).map((n) => n.id), all.filter((id) => id !== 'carousels'));
   const routes = all;
   // every entry except the account ones (features.accountMenu, multi-tenant servers only), Microsoft calendars
   // (features.microsoftCalendar), updates (features.updates) and the doorbell (features.doorbell): an old server lists
@@ -136,7 +140,9 @@ test('navFilter: self-hosted defaults and old servers show everything', () => {
   assert.equal(updateEntries, 2);
   const doorbellEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'doorbell').length;
   assert.equal(doorbellEntries, 2);
-  assert.equal(nav.filterSettings(search.SETTINGS_INDEX, oldServer(), routes).length, search.SETTINGS_INDEX.length - accountEntries - updateEntries - doorbellEntries);
+  const carouselEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'carousels').length;
+  assert.equal(carouselEntries, 1);
+  assert.equal(nav.filterSettings(search.SETTINGS_INDEX, oldServer(), routes).length, search.SETTINGS_INDEX.length - accountEntries - updateEntries - doorbellEntries - carouselEntries);
   // without Google credentials a self-hosted admin still lists the Google entries (with the setup hint); the doorbell
   // card is on the Home Assistant page there, so the entry for API & webhooks (servers without a live camera) is out
   const snapshotEntries = search.SETTINGS_INDEX.filter((e) => e.unless === 'doorbellLive').length;
@@ -245,6 +251,30 @@ test('validateAll: Home Assistant rules apply only with the feature', () => {
   const cl = util.validateAll(cfg, cloud());
   assert.ok(!('homeassistant.url' in cl.global));
   assert.ok(!('weather.haWeatherEntity' in cl.global));
+});
+
+test('validateAll: carousels need a name, a free address, a screen and 10 s to 1 h per step', () => {
+  const cfg = baseConfig();
+  cfg.carousels = {
+    items: [
+      { id: 'v_a', enabled: true, name: '', slug: cfg.screens[0].slug, transition: 'fade', holdOnAlert: true, nightRotate: false, offScreenId: null, schedule: [{ id: 'p_1', enabled: true, days: [], from: '08:00', to: '08:00' }], steps: [{ screenId: cfg.screens[0].id, seconds: 5 }] },
+      { id: 'v_b', enabled: true, name: 'B', slug: 'loop', transition: 'fade', holdOnAlert: true, nightRotate: false, offScreenId: null, schedule: [], steps: [] },
+      { id: 'v_c', enabled: false, name: 'C', slug: 'loop', transition: 'none', holdOnAlert: true, nightRotate: false, offScreenId: null, schedule: [], steps: [] },
+    ],
+  };
+  const g = util.validateAll(cfg, selfHosted()).global;
+  assert.ok(g['car.v_a.name']);
+  assert.ok(g['car.v_a.slug'], 'a screen already uses the address');
+  assert.ok(g['car.v_a.step0.seconds']);
+  assert.ok(g['car.v_a.sched.p_1.to']);
+  assert.ok(g['car.v_b.steps'], 'an enabled carousel needs a screen');
+  assert.ok(!g['car.v_c.steps'], 'a paused one may be empty');
+  assert.ok(g['car.v_c.slug'], 'two carousels cannot share an address');
+  assert.ok(g[`scr.${cfg.screens[0].id}.slug`], 'the screen is flagged too');
+  assert.equal(util.sectionForError('car.v_a.name'), 'carousels');
+  assert.equal(util.sectionForServerPath('carousels.items[0].slug').section, 'carousels');
+  // the Spanish keys have English and Portuguese rows
+  for (const k of Object.values(g)) assert.ok(k in dict.EN && k in dict.PT, k);
 });
 
 test('validateAll: going over a limit is flagged', () => {

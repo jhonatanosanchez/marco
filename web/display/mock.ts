@@ -81,6 +81,37 @@ export function mockConfig(): DisplayConfig {
   });
 }
 
+/**
+ * ?demo=1&carousel=1: a carousel of four demo screens with different layouts (&stepSec= seconds each, default 8),
+ * for filming the rotation. Every config carries the same carousel block, as the server sends it.
+ */
+export function mockCarouselConfigs(): DisplayConfig[] {
+  const q = new URLSearchParams(location.search);
+  const sec = Math.min(3600, Math.max(3, Number(q.get('stepSec')) || 8));
+  const screens: [string, string, string, string][] = [
+    ['s_main', 'living-room', L('Living room', 'Salón', 'Sala'), 'bigCalendar'],
+    ['s_today', 'today', L('Today', 'Hoy', 'Hoje'), 'today'],
+    ['s_photos', 'photos', L('Photos', 'Fotos', 'Fotos'), 'photoFrame'],
+    ['s_agenda', 'agenda', L('Agenda', 'Agenda', 'Agenda'), 'agenda'],
+  ];
+  const carousel = {
+    id: 'v_demo', slug: 'demo-loop', name: L('Living room loop', 'Bucle del salón', 'Ciclo da sala'),
+    enabled: true, transition: (q.get('fade') === '0' ? 'none' : 'fade') as 'fade' | 'none', holdOnAlert: true, nightRotate: false,
+    offScreenId: 's_main', schedule: [],
+    steps: screens.map(([screenId, slug, name]) => ({ screenId, slug, name, seconds: sec })),
+  };
+  const base = mockConfig();
+  return screens.map(([screenId, slug, name, preset]) => ({
+    ...base,
+    screenId,
+    slug,
+    screen: { ...base.screen, name },
+    layout: { ...base.layout, preset: preset as DisplayConfig['layout']['preset'] },
+    target: { id: carousel.id, kind: 'carousel' as const, slug: carousel.slug, name: carousel.name },
+    carousel,
+  }));
+}
+
 /** ISO string with offset for a wall-clock time in TZ. */
 function isoAt(key: string, hh: number, mm: number): string {
   const [y, m, d] = key.split('-').map(Number);

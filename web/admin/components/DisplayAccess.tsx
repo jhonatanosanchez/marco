@@ -2,8 +2,8 @@
 // openPairDialog(), e.g. the QR on a waiting display → /admin/#pair=<code>), paired devices list and the
 // open-mode recommendation. Server side: server/displayAccess.js, server/pairing.js; docs/API.md "Display access".
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import type { DisplayAccessMode, DisplayLinksResponse, PairConfirm, PairedDevice, ScreenProfile, StoredConfig } from '../../shared/types';
-import { caps, pairCodeLength } from '../caps';
+import type { DisplayAccessMode, DisplayLinksResponse, PairConfirm, PairedDevice, StoredConfig } from '../../shared/types';
+import { caps, has, pairCodeLength } from '../caps';
 import { claimErrorCode, cleanCode, confirmWhere, formatCode } from '../pairCode';
 import { displayOriginOf, refreshDisplayLinks, useDisplayLinks, usesPrivateLinks } from '../displayLinks';
 import { api, ApiError } from '../api';
@@ -202,6 +202,19 @@ function PrivateLinkAlt({ saved, screenId }: { saved: StoredConfig; screenId: st
   );
 }
 
+/**
+ * What a display can be bound to: the screens, then the carousels (servers with carousels). Grouped when there are
+ * carousels, so the plain list looks as it always did.
+ */
+export function targetOptions(saved: StoredConfig): { value: string; label: string; group?: string }[] {
+  const carousels = has('carousels') ? saved.carousels?.items ?? [] : [];
+  if (!carousels.length) return saved.screens.map((s) => ({ value: s.id, label: s.name }));
+  return [
+    ...saved.screens.map((s) => ({ value: s.id, label: s.name, group: t('Pantallas') })),
+    ...carousels.map((c) => ({ value: c.id, label: c.name, group: t('Carruseles') })),
+  ];
+}
+
 function PairDialog({ initialCode, saved, defaultScreenId, onClose, onPaired }: { initialCode: string; saved: StoredConfig; defaultScreenId: string; onClose: () => void; onPaired?: (d: PairedDevice) => void }) {
   const screens = saved.screens;
   const len = pairCodeLength();
@@ -217,7 +230,8 @@ function PairDialog({ initialCode, saved, defaultScreenId, onClose, onPaired }: 
   const [ask, setAsk] = useState<PairConfirm | null>(null);
   const [done, setDone] = useState<PairedDevice | null>(null);
   const complete = code.length === len;
-  const screenName = screens.find((s) => s.id === screenId)?.name ?? '';
+  const options = targetOptions(saved);
+  const screenName = options.find((o) => o.value === screenId)?.label ?? '';
 
   const paired = (device: PairedDevice) => {
     setDone(device);
@@ -330,8 +344,8 @@ function PairDialog({ initialCode, saved, defaultScreenId, onClose, onPaired }: 
               }}
             />
           </Field>
-          <Field label={t('Qué pantalla mostrará')}>
-            <Select value={screenId} options={screens.map((s) => ({ value: s.id, label: s.name }))} onChange={(v) => setScreenId(v)} />
+          <Field label={options.some((o) => o.group) ? t('Qué mostrará') : t('Qué pantalla mostrará')}>
+            <Select value={screenId} options={options} onChange={(v) => setScreenId(v)} />
           </Field>
           <Field label={t('Nombre del dispositivo (opcional)')} hint={t('Por ejemplo «Tablet de la cocina». Por defecto: {name}.', { name: screenName })}>
             <TextInput value={name} maxLength={60} placeholder={screenName} onValue={setName} />
@@ -439,7 +453,7 @@ export function PairedDevicesCard({ saved, onChanged }: { saved: StoredConfig; o
       {editing && (
         <EditDeviceDialog
           device={editing}
-          screens={saved.screens}
+          saved={saved}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
@@ -452,7 +466,7 @@ export function PairedDevicesCard({ saved, onChanged }: { saved: StoredConfig; o
   );
 }
 
-function EditDeviceDialog({ device, screens, onClose, onSaved }: { device: PairedDevice; screens: ScreenProfile[]; onClose: () => void; onSaved: () => void }) {
+function EditDeviceDialog({ device, saved, onClose, onSaved }: { device: PairedDevice; saved: StoredConfig; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(device.name);
   const [screenId, setScreenId] = useState(device.screenId);
   const [busy, setBusy] = useState(false);
@@ -470,7 +484,7 @@ function EditDeviceDialog({ device, screens, onClose, onSaved }: { device: Paire
       setBusy(false);
     }
   };
-  const options = useMemo(() => screens.map((s) => ({ value: s.id, label: s.name })), [screens]);
+  const options = useMemo(() => targetOptions(saved), [saved]);
   return (
     <Modal
       title={t('Editar dispositivo')}
@@ -493,7 +507,7 @@ function EditDeviceDialog({ device, screens, onClose, onSaved }: { device: Paire
         <Field label={t('Nombre')}>
           <TextInput value={name} maxLength={60} onValue={setName} />
         </Field>
-        <Field label={t('Qué pantalla mostrará')} hint={t('El dispositivo cambia de pantalla al momento.')}>
+        <Field label={options.some((o) => o.group) ? t('Qué mostrará') : t('Qué pantalla mostrará')} hint={t('El dispositivo cambia de pantalla al momento.')}>
           <Select value={screenId} options={options} onChange={(v) => setScreenId(v)} />
         </Field>
       </div>

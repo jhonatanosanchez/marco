@@ -5338,3 +5338,84 @@ h1 .scope {
     max-width: none;
   }
 }
+
+/* ---------------------------------------------------------------- carousels (sections/Carousels.tsx) */
+.car-card.is-off .car-steps {
+  opacity: 0.6;
+}
+.car-steps {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.car-step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+.car-step__n {
+  width: 22px;
+  text-align: center;
+  font-weight: 650;
+  color: var(--text-2);
+}
+.car-step__screen {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+.car-step__secs {
+  width: 110px;
+}
+.car-step__chips .pill {
+  padding: 3px 9px;
+}
+.car-step__tail {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.car-step__tail .reorder {
+  flex-direction: row;
+}
+.car-step__err {
+  flex-basis: 100%;
+}
+.car-steps__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.car-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--r);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-2));
+  font-size: 13px;
+}
+.car-now__night {
+  margin-left: auto;
+}
+@media (max-width: 640px) {
+  .car-step__secs {
+    flex: 1 1 100px;
+  }
+  .car-step__tail {
+    margin-left: 0;
+  }
+  .car-now__night {
+    margin-left: 0;
+  }
+}

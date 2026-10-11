@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import type { DisplayInfo, DisplaysResponse, NightCommand } from '../../shared/types';
+import type { DisplayInfo, DisplaysResponse, NightCommand, StoredConfig } from '../../shared/types';
+import { carouselBlock, carouselPhase } from '../../shared/carousels';
 import { api, ApiError } from '../api';
 import { confirmDialog, toast } from '../components/feedback';
 import { OpenModeCallout, openPairDialog, PairedDevicesCard } from '../components/DisplayAccess';
@@ -32,8 +33,21 @@ function NightMenu({ value, onPick, busy }: { value: NightCommand | null; onPick
   );
 }
 
-function DisplayCard({ d, serverVersion, onCmd, onForget, busy }: { d: DisplayInfo; serverVersion: string; onCmd: (action: 'reload' | 'identify' | 'night', mode?: NightCommand) => void; onForget: () => void; busy: string }) {
+/**
+ * Screen a display on a carousel shows now: what the carousel's clock says (the same rule the TVs follow, with the
+ * night hold when the display reports night mode), else the screen its last heartbeat named.
+ */
+export function carouselShowing(saved: StoredConfig, d: DisplayInfo): string {
+  const c = saved.carousels?.items.find((x) => x.id === d.screenId);
+  if (!c) return d.showingScreenName ?? '';
+  const block = carouselBlock(saved, c);
+  const ph = carouselPhase(block, Date.now(), { tz: saved.datetime.timezone, night: d.night === true });
+  return saved.screens.find((s) => s.id === ph.screenId)?.name ?? d.showingScreenName ?? '';
+}
+
+function DisplayCard({ d, saved, serverVersion, onCmd, onForget, busy }: { d: DisplayInfo; saved: StoredConfig; serverVersion: string; onCmd: (action: 'reload' | 'identify' | 'night', mode?: NightCommand) => void; onForget: () => void; busy: string }) {
   const res = d.screenRes ? `${d.screenRes.w}×${d.screenRes.h}` : '–';
+  const showing = d.targetKind === 'carousel' ? carouselShowing(saved, d) : '';
   const vp = d.viewport ? `${d.viewport.w}×${d.viewport.h}` : null;
   return (
     <section class={`disp ${d.connected ? 'is-on' : 'is-off'}`}>
@@ -42,7 +56,10 @@ function DisplayCard({ d, serverVersion, onCmd, onForget, busy }: { d: DisplayIn
           <Icon name={d.connected ? 'wifi' : 'wifiOff'} size={16} />
         </span>
         <div class="disp__titles">
-          <strong>{d.screenName || d.screenSlug || '–'}</strong>
+          <strong>
+            {d.targetKind === 'carousel' && <Icon name="repeat" size={14} />} {d.screenName || d.screenSlug || '–'}
+          </strong>
+          {d.targetKind === 'carousel' && <span class="muted small">{t('Carrusel')}{showing ? ` · ${t('ahora: {name}', { name: showing })}` : ''}</span>}
           <span class="muted small">
             <span class="mono">{d.clientId.length > 14 ? `…${d.clientId.slice(-8)}` : d.clientId}</span> · {d.ip || '–'}
           </span>
@@ -196,11 +213,15 @@ export function DisplaysSection({ saved, go }: SectionProps) {
   const list = (data?.displays ?? []).filter((d) => (!filter || d.screenId === filter) && (showOffline || d.connected));
   const online = data?.displays.filter((d) => d.connected) ?? [];
   const outdated = online.filter((d) => d.outdated);
-  // Filter pills list SAVED screens only: commands resolve screen ids against the saved config.
-  const target = filter && saved.screens.some((s) => s.id === filter) ? { screens: [filter] } : {};
+  // Filter pills list SAVED screens and carousels only: commands resolve their ids against the saved config.
+  const carousels = saved.carousels?.items ?? [];
+  const isScreen = !!filter && saved.screens.some((s) => s.id === filter);
+  const target = filter && (isScreen || carousels.some((c) => c.id === filter)) ? { screens: [filter] } : {};
   const onlineHere = online.filter((d) => !filter || d.screenId === filter);
   const privacy = usePrivacy();
-  const privRows = (privacy ?? []).filter((r) => !target.screens || r.screenId === filter);
+  // privacy mode belongs to screens: a carousel filter keeps the "every screen" menu
+  const privTarget = isScreen ? { screens: [filter] } : {};
+  const privRows = (privacy ?? []).filter((r) => !privTarget.screens || r.screenId === filter);
   const privRow = privRows.length ? { active: privRows.some((r) => r.active), until: privRows.find((r) => r.active)?.until ?? null } : undefined;
 
   return (
@@ -247,6 +268,14 @@ export function DisplaysSection({ saved, go }: SectionProps) {
               </button>
             );
           })}
+          {carousels.map((c) => {
+            const n = data?.displays.filter((d) => d.screenId === c.id).length ?? 0;
+            return (
+              <button type="button" class={`pill ${filter === c.id ? 'is-on' : ''}`} title={t('Carrusel')} onClick={() => setFilter(c.id)}>
+                <Icon name="repeat" size={13} /> {c.name} <span class="pill__n">{n}</span>
+              </button>
+            );
+          })}
         </div>
         <label class="mini-toggle">
           <input type="checkbox" checked={showOffline} onChange={(e) => setShowOffline(e.currentTarget.checked)} />
@@ -258,8 +287,8 @@ export function DisplaysSection({ saved, go }: SectionProps) {
         </div>
         {has('privacy') && (
           <div class="toolbar__night">
-            <span class="muted small">{target.screens ? t('Privado en esta pantalla') : t('Privado en todas')}</span>
-            <PrivacyMenu screenId={target.screens ? filter : ''} row={privRow} tz={saved.datetime.timezone} />
+            <span class="muted small">{privTarget.screens ? t('Privado en esta pantalla') : t('Privado en todas')}</span>
+            <PrivacyMenu screenId={privTarget.screens ? filter : ''} row={privRow} tz={saved.datetime.timezone} />
           </div>
         )}
       </div>
@@ -293,6 +322,7 @@ export function DisplaysSection({ saved, go }: SectionProps) {
             <DisplayCard
               key={d.clientId}
               d={d}
+              saved={saved}
               serverVersion={data.serverVersion}
               busy={busy[d.clientId] ?? ''}
               onForget={() => forget(d)}

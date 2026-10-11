@@ -7,6 +7,9 @@ import { LANGS } from './lib/i18n.js';
 import { WEATHER_PROVIDER_IDS, OPEN_METEO_MODEL_IDS, KEY_PROVIDERS } from './weather.js';
 import { PRIVACY_MODES, MAX_PRIVACY_RULES, defaultSourcePrivacy } from './privacy.js';
 import { CAMERA_RE, DOORBELL_MIN_SEC, DOORBELL_MAX_SEC } from './doorbellCore.js';
+import {
+  CAROUSEL_PREFIX, MAX_CAROUSELS, MAX_CAROUSEL_STEPS, MIN_STEP_SEC, MAX_STEP_SEC, DEFAULT_STEP_SEC, CAROUSEL_TRANSITIONS, pruneCarousels,
+} from './carousels.js';
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
@@ -339,7 +342,8 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
   };
 
   return {
-    id: id(ctx, `${p}.id`, x.id, 's_', seenIds), slug, name,
+    // "v_" belongs to carousels (isCarouselId); a screen id with it gets a new one
+    id: id(ctx, `${p}.id`, typeof x.id === 'string' && x.id.startsWith(CAROUSEL_PREFIX) ? undefined : x.id, 's_', seenIds), slug, name,
     screen, layout, background, calendar, datetime, weather, news, todo, message, countdowns, alerts, privacy,
   };
 }
@@ -463,6 +467,45 @@ function sanitizeSchedule(ctx, p, x, seen) {
   if (out.from === out.to) ctx.err(`${p}.to`, 'must differ from `from`');
   if (out.startDate && out.endDate && out.endDate < out.startDate) ctx.err(`${p}.endDate`, 'must be >= startDate');
   return out;
+}
+
+/**
+ * A carousel (core/carousels.js). `screenSlugs` = slugs taken by screens (a carousel never takes one: the URL of a
+ * TV must not change by itself), `seenSlugs` = slugs of the carousels before this one (a clash gets "-2").
+ * Steps that point at unknown screens are pruned later (pruneCarousels), like every other screen reference.
+ */
+function sanitizeCarousel(ctx, p, x, seen, screenSlugs, seenSlugs) {
+  if (!isObj(x)) { ctx.err(p, 'expected object'); return null; }
+  const name = requiredStr(ctx, `${p}.name`, x.name, '', 40);
+  let slug = typeof x.slug === 'string' ? x.slug.trim().toLowerCase() : '';
+  if (slug && !SLUG_RE.test(slug)) { ctx.err(`${p}.slug`, 'invalid slug (a-z, 0-9, -)'); slug = ''; }
+  if (!slug) slug = slugify(name) || 'carousel';
+  if (screenSlugs.has(slug)) ctx.err(`${p}.slug`, 'a screen already uses this address');
+  for (let i = 2, base = slug; seenSlugs.has(slug) || screenSlugs.has(slug); i++) slug = `${base.slice(0, 29)}-${i}`;
+  seenSlugs.add(slug);
+  const steps = arr(ctx, `${p}.steps`, x.steps, [], MAX_CAROUSEL_STEPS).map((st, i) => {
+    const q = `${p}.steps[${i}]`;
+    if (!isObj(st)) { ctx.err(q, 'expected object'); return null; }
+    if (typeof st.screenId !== 'string' || !ID.test(st.screenId)) { ctx.err(`${q}.screenId`, 'invalid screen id'); return null; }
+    return { screenId: st.screenId, seconds: num(ctx, `${q}.seconds`, st.seconds, DEFAULT_STEP_SEC, MIN_STEP_SEC, MAX_STEP_SEC, true) };
+  }).filter(Boolean);
+  const off = x.offScreenId === undefined || x.offScreenId === null || x.offScreenId === '' ? null : x.offScreenId;
+  if (off !== null && (typeof off !== 'string' || !ID.test(off))) ctx.err(`${p}.offScreenId`, 'invalid screen id');
+  return {
+    // only "v_" ids (isCarouselId); `seen` already holds the screen ids, so a carousel never shares one with a screen
+    id: id(ctx, `${p}.id`, typeof x.id === 'string' && x.id.startsWith(CAROUSEL_PREFIX) ? x.id : undefined, CAROUSEL_PREFIX, seen),
+    enabled: bool(ctx, `${p}.enabled`, x.enabled, true),
+    name, slug,
+    transition: oneOf(ctx, `${p}.transition`, x.transition, 'fade', CAROUSEL_TRANSITIONS),
+    // a doorbell ring or an announcement on screen keeps the current step until it is gone
+    holdOnAlert: bool(ctx, `${p}.holdOnAlert`, x.holdOnAlert, true),
+    // night mode: keep rotating (true) or hold the off-schedule screen so the dimming does not change (false)
+    nightRotate: bool(ctx, `${p}.nightRotate`, x.nightRotate, false),
+    offScreenId: typeof off === 'string' && ID.test(off) ? off : null,
+    // when it rotates (the rule shape of privacy schedules); [] = always
+    schedule: list(ctx, `${p}.schedule`, x.schedule, [], MAX_PRIVACY_RULES, sanitizePrivacyRule),
+    steps,
+  };
 }
 
 const list = (ctx, path, v, d, max, fn) => {
@@ -673,10 +716,23 @@ export function validateConfig(input, opts = {}) {
   }
 
   if (dbLost) homeassistant.doorbell.screenIds = [defaultScreen];
+
+  // ---- carousels (global; steps that point at deleted screens are dropped, an empty carousel is turned off)
+  const ca2 = obj(ctx, 'carousels', c.carousels);
+  const carSeen = new Set(screenIds);
+  const carSlugs = new Set();
+  const screenSlugs = new Set(screens.map((s) => s.slug));
+  const carousels = {
+    items: pruneCarousels(
+      arr(ctx, 'carousels.items', ca2.items, [], MAX_CAROUSELS)
+        .map((x, i) => sanitizeCarousel(ctx, `carousels.items[${i}]`, x, carSeen, screenSlugs, carSlugs)).filter(Boolean),
+      screenIds,
+    ),
+  };
   const revision = Number.isInteger(c.revision) && c.revision > 0 ? c.revision : 1;
   const value = {
     version: CONFIG_VERSION, revision, defaultScreen, screens,
-    calendar, datetime, weather, news, todo, localEvents, birthdays, eventRules, countdowns, schedules, homeassistant, auth, security,
+    calendar, datetime, weather, news, todo, localEvents, birthdays, eventRules, countdowns, schedules, carousels, homeassistant, auth, security,
   };
   return { ok: ctx.errors.length === 0, errors: ctx.errors, value };
 }

@@ -8,7 +8,7 @@ import { getNews } from '../news.js';
 import { getPhotos } from '../photos.js';
 import { sseHandler } from '../sse.js';
 import { streamInit, streamHello, onStreamOpen, onStreamClose, pollDisplay } from '../displays.js';
-import { resolveScreen, displayConfig as projectDisplayConfig } from '../core/screens.js';
+import { displayConfig as projectDisplayConfig } from '../core/screens.js';
 import { requestScreen } from '../displayAccess.js';
 import { addDays, localDate, isDateStr, daysBetween } from '../core/lib/tz.js';
 import { healthBody } from '../capabilities.js';
@@ -21,16 +21,15 @@ import { hash } from '../lib/text.js';
 /** Privacy of a screen as displayConfig() takes it ({ status, next }). */
 const privacyOf = (cfg, screen) => ({ status: screenPrivacy(cfg, screen), next: screenPrivacyNext(cfg, screen) });
 
-/** GET /api/display/config payload for `screenKey` (slug or id; empty → default screen). */
+/** GET /api/display/config payload for `screenKey` (screen or carousel slug or id; empty → default screen). */
 export function displayConfig(cfg, screenKey) {
-  const { screen, fallback } = resolveScreen(cfg, screenKey);
-  return projectDisplayConfig(cfg, screen, { fallback, privacy: privacyOf(cfg, screen) });
+  return displayConfigFor(cfg, { query: { screen: screenKey } });
 }
 
-/** Display config for a request (screen bound to its key / device, else ?screen=). */
+/** Display config for a request (screen or carousel bound to its key / device, else ?screen=). */
 function displayConfigFor(cfg, req) {
-  const { screen, fallback } = requestScreen(cfg, req);
-  return projectDisplayConfig(cfg, screen, { fallback, privacy: privacyOf(cfg, screen) });
+  const { screen, fallback, carousel } = requestScreen(cfg, req);
+  return projectDisplayConfig(cfg, screen, { fallback, privacy: privacyOf(cfg, screen), carousel });
 }
 
 /**

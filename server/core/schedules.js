@@ -59,3 +59,52 @@ export function schedulesNow(cfg, now = new Date()) {
   }
   return out;
 }
+
+// ---------------------------------------------------------------- time windows ({ enabled, days, from, to })
+// The rule shape of privacy schedules and carousel schedules: days (0 = Sunday, [] = every day) and a from/to
+// window (`to < from` crosses midnight and belongs to the day it starts).
+
+const asSchedule = (r) => ({ enabled: r.enabled !== false, days: r.days || [], from: r.from, to: r.to, startDate: null, endDate: null });
+
+/** The rules of `list` that can run: enabled, with a window that is not empty. */
+export const enabledWindows = (list) => (Array.isArray(list) ? list : []).filter((r) => r && r.enabled !== false && r.from !== r.to);
+
+/**
+ * Is one of `rules` running at `now`? `until` = end of the whole running stretch (back-to-back or overlapping
+ * windows count as one), as an ISO time with offset.
+ */
+export function windowState(rules, now, tz) {
+  let at = now.getTime();
+  let until = null;
+  for (let i = 0; i < 16; i++) {
+    let best = null;
+    for (const r of rules) {
+      const st = scheduleState(asSchedule(r), new Date(at), tz);
+      if (st.active && (!best || Date.parse(st.until) > Date.parse(best))) best = st.until;
+    }
+    if (!best || Date.parse(best) <= at) break;
+    until = best;
+    at = Date.parse(best);
+  }
+  return { active: until !== null, until };
+}
+
+/** Next instant after `now` where one of `rules` starts or ends (ms), or null without rules. */
+export function nextWindowBoundary(rules, now, tz) {
+  if (!rules.length) return null;
+  const p = zonedParts(now, tz);
+  const today = `${String(p.y).padStart(4, '0')}-${pad(p.m)}-${pad(p.d)}`;
+  const t0 = now.getTime();
+  let best = null;
+  for (const r of rules) {
+    const m = asSchedule(r);
+    for (let i = -1; i <= 8; i++) {
+      const day = addDays(today, i);
+      if (!dayOk(m, day)) continue;
+      const start = Date.parse(localInstant(day, m.from, tz));
+      const end = Date.parse(localInstant(m.from < m.to ? day : addDays(day, 1), m.to, tz));
+      for (const x of [start, end]) if (x > t0 && (best === null || x < best)) best = x;
+    }
+  }
+  return best;
+}

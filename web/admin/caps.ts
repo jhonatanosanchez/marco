@@ -35,6 +35,7 @@ export const BUILTIN_LIMITS: Partial<Record<LimitName, number>> = {
   localEvents: 1000,
   birthdays: 500,
   countdowns: 100,
+  carousels: 6,
 };
 
 const DEFAULT_PAIR_CODE_LENGTH = 6;
@@ -77,8 +78,9 @@ export function capsFrom(health: Partial<HealthResponse> | null | undefined): Ca
  *  microsoftCalendar: Marco Cloud, or a self-hosted server with its own Entra app; updates: self-hosted servers
  *  that have the update endpoints; feedback: Marco Cloud's help and feedback form; privacy: privacy mode (servers
  *  that filter events for it, see /api/admin/privacy); doorbell, doorbellLive: servers with POST /api/hooks/doorbell
- *  (live = frames proxied from Home Assistant). */
-const OPT_IN: readonly FeatureName[] = ['accountMenu', 'microsoftCalendar', 'updates', 'feedback', 'privacy', 'doorbell', 'doorbellLive'];
+ *  (live = frames proxied from Home Assistant); carousels: servers that keep config.carousels and serve displays
+ *  bound to one. */
+const OPT_IN: readonly FeatureName[] = ['accountMenu', 'microsoftCalendar', 'updates', 'feedback', 'privacy', 'doorbell', 'doorbellLive', 'carousels'];
 
 export function hasFeature(caps: Caps, feature: FeatureName): boolean {
   if (!caps.features) return !OPT_IN.includes(feature);

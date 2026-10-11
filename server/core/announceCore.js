@@ -88,5 +88,13 @@ export function alertsEnabled(cfg, screenId) {
   return s ? s.alerts?.enabled !== false : true;
 }
 
-/** Delivery filter for `announce`: clients of screens with alerts disabled never get it. */
-export const alertsFilter = (cfg) => (client) => alertsEnabled(cfg, client.screenId);
+/**
+ * Delivery filter for `announce`: clients of screens with alerts disabled never get it. A display on a carousel
+ * (`memberIds`) gets it when one of the carousel's screens that the announcement targets (`screenIds`, [] = all)
+ * has alerts on: the same rule as the replay on connect, so live and reconnect agree.
+ */
+export const alertsFilter = (cfg, screenIds = []) => (client) => {
+  const members = Array.isArray(client.memberIds) && client.memberIds.length ? client.memberIds : [client.screenId];
+  const all = !screenIds?.length || screenIds.includes(client.screenId);
+  return members.some((id) => (all || screenIds.includes(id)) && alertsEnabled(cfg, id));
+};

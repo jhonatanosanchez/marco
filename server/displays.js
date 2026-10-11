@@ -9,6 +9,7 @@ import { logActivityThrottled } from './activity.js';
 import { activeFor } from './announce.js';
 import { ringPayloadFor } from './doorbell.js';
 import { deviceName, requestScreen } from './displayAccess.js';
+import { carouselMembers, findTarget, isCarouselId, isTargetId, targetInfo, targetMembers } from './core/carousels.js';
 
 export const MAX_DISPLAYS = 100;
 const PRUNE_OFFLINE_MS = 30 * 24 * 3600_000;
@@ -102,9 +103,44 @@ export function shortUserAgent(ua) {
   return [browser || ua.split(/[\s/]/)[0].slice(0, 30), platform].filter(Boolean).join(' · ');
 }
 
+/** Slug and name of what a display is bound to (a screen or a carousel). */
 function screenMeta(cfg, screenId) {
-  const s = cfg.screens.find((x) => x.id === screenId);
+  const s = targetInfo(cfg, screenId);
   return s ? { screenId: s.id, screenSlug: s.slug, screenName: s.name } : { screenId: screenId || '', screenSlug: '', screenName: '' };
+}
+
+/**
+ * What a display key (?screen= value or bound id) subscribes to: { screenId, memberIds }. A screen: its id, no
+ * members. A carousel: the carousel id and its screens, so live events for any of them reach the display.
+ */
+export function subscriptionFor(cfg, key) {
+  const t = findTarget(cfg, key);
+  if (t?.kind === 'carousel') return { screenId: t.id, memberIds: carouselMembers(cfg, t.carousel) };
+  return { screenId: resolveScreen(cfg, key).screen.id, memberIds: null };
+}
+
+/** Screens behind a client: its carousel's screens, or its own screen. */
+const membersOf = (c) => (Array.isArray(c.memberIds) && c.memberIds.length ? c.memberIds : [c.screenId]);
+
+/** Announcements still running on any of `ids` (screens with alerts off left out), each once. */
+function activeOn(cfg, ids) {
+  const out = [];
+  const seen = new Set();
+  for (const id of ids) {
+    const s = cfg.screens.find((x) => x.id === id);
+    if (s?.alerts.enabled === false) continue;
+    for (const a of activeFor(id)) if (!seen.has(a.id)) { seen.add(a.id); out.push(a); }
+  }
+  return out;
+}
+
+/** The doorbell ring on the first of `ids` that rings, or null. */
+function ringOn(ids) {
+  for (const id of ids) {
+    const r = ringPayloadFor(id);
+    if (r) return r;
+  }
+  return null;
 }
 
 function blankEntry(clientId, now) {
@@ -112,7 +148,7 @@ function blankEntry(clientId, now) {
     clientId, screenKey: '', screenId: '', ip: '', userAgent: '', firstSeen: now, lastSeen: now,
     viewport: null, screenRes: null, dpr: null, webgl: null, lite: null, version: null, build: null,
     night: null, nightOverride: null, uptimeSec: null, lastError: null, lastConnectAt: null,
-    streams: 0, connectedAt: null, access: 'open', deviceId: null,
+    streams: 0, connectedAt: null, access: 'open', deviceId: null, showingScreenId: null,
   };
 }
 
@@ -136,10 +172,10 @@ function streamAccess(req) {
   return a;
 }
 
-/** Screen id bound to the request's key / device token (null: none, or that screen no longer exists). */
+/** Screen or carousel id bound to the request's key / device token (null: none, or it no longer exists). */
 function boundScreen(cfg, req) {
   const id = req?.displayAccess?.screenId;
-  return id && cfg.screens.some((s) => s.id === id) ? id : null;
+  return id && isTargetId(cfg, id) ? id : null;
 }
 
 /** Values for sseHandler's `init`: parse ?screen / ?client of the stream request (a key / device decides the screen). */
@@ -149,11 +185,11 @@ export function streamInit(req) {
   const raw = typeof req.query?.client === 'string' ? req.query.client.trim() : '';
   const anonymous = !CLIENT_ID_RE.test(raw) || raw.startsWith('anon-');
   const clientId = anonymous ? `anon-${++anonSeq}` : raw;
-  const { screen } = resolveScreen(getConfig(), screenKey);
+  const sub = subscriptionFor(getConfig(), screenKey);
   // Admin preview iframes get live updates but are not listed as connected displays.
   const preview = req.query?.preview === '1';
   return {
-    screenKey, screenId: screen.id, clientId: preview ? `anon-preview-${++anonSeq}` : clientId, anonymous: anonymous || preview, preview,
+    screenKey, ...sub, clientId: preview ? `anon-preview-${++anonSeq}` : clientId, anonymous: anonymous || preview, preview,
     access: streamAccess(req),
   };
 }
@@ -161,26 +197,28 @@ export function streamInit(req) {
 /** StreamHello payload for a new SSE client. */
 export function streamHello(client) {
   const cfg = getConfig();
-  const s = cfg.screens.find((x) => x.id === client.screenId);
+  const s = targetInfo(cfg, client.screenId);
+  const ids = membersOf(client);
   return {
     revision: cfg.revision,
     screenId: client.screenId,
+    // what the display is bound to: a screen, or a carousel (then screenId is the carousel's id)
+    targetKind: s?.kind || 'screen',
     slug: s?.slug || '',
     clientId: client.anonymous ? null : client.clientId,
     serverVersion,
     now: new Date().toISOString(),
     // Lets a reconnecting display drop announcements cleared while it was offline (clear events aren't replayed).
-    activeAnnouncementIds: s?.alerts.enabled === false ? [] : activeFor(client.screenId).map((a) => a.id),
+    activeAnnouncementIds: activeOn(cfg, ids).map((a) => a.id),
     // The doorbell ring on this screen (null = none): a display that missed `doorbell-end` while offline closes it.
-    doorbellId: ringPayloadFor(client.screenId)?.id ?? null,
+    doorbellId: ringOn(ids)?.id ?? null,
   };
 }
 
 export function onStreamOpen(client) {
   load();
   if (client.preview) {
-    const s = getConfig().screens.find((x) => x.id === client.screenId);
-    if (s?.alerts.enabled !== false) for (const a of activeFor(client.screenId)) send(client, 'announce', a);
+    for (const a of activeOn(getConfig(), membersOf(client))) send(client, 'announce', a);
     replayDoorbell(client);
     return;
   }
@@ -221,15 +259,13 @@ export function onStreamOpen(client) {
     });
   }
   // Replay announcements that are still running for this screen (display dedupes by id).
-  const cfg = getConfig();
-  const screen = cfg.screens.find((x) => x.id === client.screenId);
-  if (screen?.alerts.enabled !== false) for (const a of activeFor(client.screenId)) send(client, 'announce', a);
+  for (const a of activeOn(getConfig(), membersOf(client))) send(client, 'announce', a);
   replayDoorbell(client);
 }
 
 /** A display that connects while its screen rings gets the ring (the display dedupes by id). */
 function replayDoorbell(client) {
-  const d = ringPayloadFor(client.screenId);
+  const d = ringOn(membersOf(client));
   if (d) send(client, 'doorbell', d);
 }
 
@@ -291,14 +327,16 @@ export function pollDisplay(req, nowMs = Date.now()) {
   load();
   const cfg = getConfig();
   const q = req.query || {};
-  const { screen } = requestScreen(cfg, req);
+  const { screen, carousel } = requestScreen(cfg, req);
   const raw = typeof q.client === 'string' ? q.client.trim() : '';
   const preview = q.preview === '1';
   const anonymous = preview || !CLIENT_ID_RE.test(raw) || raw.startsWith('anon-');
   const bound = boundScreen(cfg, req);
+  // a display on a carousel is registered under the carousel and gets the live events of all its screens
+  const sub = carousel ? { screenId: carousel.id, memberIds: carouselMembers(cfg, carousel) } : { screenId: screen.id, memberIds: null };
   const client = {
     clientId: anonymous ? '' : raw,
-    screenId: screen.id,
+    ...sub,
     screenKey: bound || (typeof q.screen === 'string' ? q.screen.trim().slice(0, 64) : ''),
     anonymous,
     preview,
@@ -307,16 +345,18 @@ export function pollDisplay(req, nowMs = Date.now()) {
     access: streamAccess(req),
   };
   if (!anonymous) notePoll(client, req, nowMs);
-  const alertsOn = screen.alerts.enabled !== false;
-  const out = readSince(typeof q.cursor === 'string' ? q.cursor : '', client, (id) => cfg.screens.find((x) => x.id === id) || null, nowMs);
-  const active = () => (alertsOn ? activeFor(screen.id) : []);
-  const ringing = out.reset ? ringPayloadFor(screen.id) : null;
+  const ids = membersOf(client);
+  const out = readSince(typeof q.cursor === 'string' ? q.cursor : '', client, (id) => targetInfo(cfg, id), nowMs);
+  const active = () => activeOn(cfg, ids);
+  const ringing = out.reset ? ringOn(ids) : null;
   const commands = out.reset
     ? [...active().map((a) => ({ ...a, type: 'announce' })), ...(ringing ? [{ ...ringing, type: 'doorbell' }] : [])]
     : out.commands;
   const res = {
     revision: cfg.revision,
-    screenId: screen.id,
+    // the screen or carousel this display is bound to: a different one later (device moved) reloads the page
+    screenId: client.screenId,
+    targetKind: carousel ? 'carousel' : 'screen',
     now: new Date(nowMs).toISOString(),
     serverVersion,
     cursor: out.cursor,
@@ -414,11 +454,13 @@ export function recordHeartbeat(body, req) {
   // Prefer the screen of the open stream; else resolve what the display says it asked for.
   const stream = listClients().find((c) => c.clientId === hb.clientId);
   const bound = boundScreen(cfg, req);
-  const screenId = stream?.screenId || bound || resolveScreen(cfg, hb.screen).screen.id;
+  const screenId = stream?.screenId || bound || subscriptionFor(cfg, hb.screen).screenId;
   const access = accessOf(req);
   Object.assign(d, {
     screenKey: stream ? stream.screenKey : bound || hb.screen,
     screenId,
+    // a display on a carousel reports the screen it shows (hb.screenId, one of the carousel's screens)
+    showingScreenId: isCarouselId(screenId) && hb.screenId && targetMembers(cfg, screenId).includes(hb.screenId) ? hb.screenId : null,
     ...(req?.displayAccess ? { access: access.via, deviceId: access.deviceId } : {}),
     ip: req?.ip || d.ip,
     userAgent: String(req?.get?.('user-agent') || d.userAgent || '').slice(0, 300),
@@ -435,9 +477,14 @@ export function recordHeartbeat(body, req) {
 function toInfo(d, cfg) {
   const m = screenMeta(cfg, d.screenId);
   const connected = isLive(d);
+  const showing = d.showingScreenId ? cfg.screens.find((s) => s.id === d.showingScreenId) : null;
   return {
     clientId: d.clientId,
     ...m,
+    // a screen, or a carousel (screenId is then the carousel's id; showing* = the screen it reported last)
+    targetKind: isCarouselId(d.screenId) ? 'carousel' : 'screen',
+    showingScreenId: showing?.id ?? null,
+    showingScreenName: showing?.name ?? null,
     connected,
     ip: d.ip || '',
     userAgent: d.userAgent || '',
@@ -485,15 +532,19 @@ export function forgetDisplay(clientId) {
   return 'ok';
 }
 
-/** Screen ids for a list of ids/slugs. Returns { ids } or { error: 'unknown screen', unknown }. */
-export function resolveScreenList(cfg, keys) {
+/**
+ * Screen ids for a list of ids/slugs. Returns { ids } or { error: 'unknown screen', unknown }. With `carousels`,
+ * carousel ids/slugs are accepted too (display commands: they reach the displays that run that carousel).
+ */
+export function resolveScreenList(cfg, keys, { carousels = false } = {}) {
   if (keys === undefined || keys === null) return { ids: [] };
   if (!Array.isArray(keys)) return { error: 'screens must be an array' };
   const ids = [];
   const unknown = [];
   for (const k of keys.slice(0, 50)) {
     const key = typeof k === 'string' ? k.trim().toLowerCase() : '';
-    const s = key && cfg.screens.find((x) => x.slug === key || x.id.toLowerCase() === key);
+    const t = key ? findTarget(cfg, key) : null;
+    const s = t && (t.kind === 'screen' || carousels) ? t : null;
     if (s) { if (!ids.includes(s.id)) ids.push(s.id); } else unknown.push(String(k).slice(0, 64));
   }
   return unknown.length ? { error: 'unknown screen', unknown } : { ids };
@@ -508,7 +559,7 @@ export function runCommand(cmd) {
   const { action } = cmd;
   if (!['reload', 'identify', 'night'].includes(action)) return { error: 'action must be reload, identify or night', status: 400 };
   if (action === 'night' && !['on', 'off', 'auto'].includes(cmd.mode)) return { error: 'mode must be on, off or auto', status: 400 };
-  const scr = resolveScreenList(cfg, cmd.screens);
+  const scr = resolveScreenList(cfg, cmd.screens, { carousels: true });
   if (scr.error) return { error: scr.error, unknown: scr.unknown, status: 400 };
   let clientIds = [];
   if (cmd.clientIds !== undefined) {
@@ -525,7 +576,7 @@ export function runCommand(cmd) {
     delivered = recordIdentify(target);
     for (const c of listClients()) {
       if (!matches(c, target)) continue;
-      const s = cfg.screens.find((x) => x.id === c.screenId);
+      const s = targetInfo(cfg, c.screenId);
       if (send(c, 'identify', { name: s?.name || '', slug: s?.slug || '', clientId: c.anonymous ? null : c.clientId, durationSec: 10 })) delivered++;
     }
   }
@@ -537,7 +588,7 @@ export function reresolveDisplays(cfg) {
   load();
   let changed = false;
   for (const d of registry.values()) {
-    const id = resolveScreen(cfg, d.screenKey || '').screen.id;
+    const id = subscriptionFor(cfg, d.screenKey || '').screenId;
     if (id !== d.screenId) { d.screenId = id; changed = true; }
   }
   if (changed) scheduleSave();

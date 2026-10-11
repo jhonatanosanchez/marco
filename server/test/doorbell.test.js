@@ -82,7 +82,7 @@ test('ring state: a second ring extends (never shortens), dismiss ends, expiry, 
   assert.equal(rings.s_kitchen.id, 'd_2');
   assert.equal(activeRing(rings, 's_main', t0 + 151_000), null, 'over');
   const p = ringPayload(rings.s_kitchen);
-  assert.deepEqual(Object.keys(p).sort(), ['expiresAt', 'frames', 'id', 'refreshMs', 'sound', 'startedAt', 'updatedAt']);
+  assert.deepEqual(Object.keys(p).sort(), ['expiresAt', 'frames', 'id', 'refreshMs', 'screenId', 'sound', 'startedAt', 'updatedAt']);
   assert.equal(JSON.stringify(p).includes('camera'), false);
   assert.equal(ringPayload({ ...rings.s_kitchen, camera: '' }).frames, false);
   assert.deepEqual(dismiss(rings, ['s_kitchen'], t0 + 31_000).map((r) => r.id), ['d_2']);
@@ -355,7 +355,7 @@ test('delivery: poll reset and commands reach only the ringing screen, without s
     const k1 = await poll('kitchen', { client: 'kiosk-k1', cursor: k0.cursor });
     const db = k1.commands.find((c) => c.type === 'doorbell');
     assert.ok(db, JSON.stringify(k1.commands));
-    assert.deepEqual(Object.keys(db).sort(), ['expiresAt', 'frames', 'id', 'refreshMs', 'sound', 'startedAt', 'type', 'updatedAt']);
+    assert.deepEqual(Object.keys(db).sort(), ['expiresAt', 'frames', 'id', 'refreshMs', 'screenId', 'sound', 'startedAt', 'type', 'updatedAt']);
     assert.equal(db.frames, true);
     const text = JSON.stringify(k1);
     for (const secret of [HA_TOKEN, 'camera.front_door', '127.0.0.1']) assert.equal(text.includes(secret), false, secret);

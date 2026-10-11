@@ -117,8 +117,29 @@ function resolveClientId(): string {
 export const clientId = resolveClientId();
 
 
-/** Append `screen=` (when set) to an API path. */
-export function withScreen(path: string): string {
+/**
+ * Screen of a carousel on display now (id); '' = not on a carousel, every request then asks for `screenKey` as it
+ * always did. Set by main.ts when a carousel switches screen.
+ */
+let activeScreen = '';
+export const getActiveScreen = (): string => activeScreen;
+export function setActiveScreen(id: string): void {
+  activeScreen = id || '';
+}
+
+/** Append `screen=<what the display is bound to>` (when set) to an API path: the live channels use this one. */
+export function withTarget(path: string): string {
   if (!screenKey) return path;
   return `${path}${path.includes('?') ? '&' : '?'}screen=${encodeURIComponent(screenKey)}`;
+}
+
+/**
+ * Append `screen=` (when set) to an API path: `screen` (default: the carousel screen on display), else the
+ * screen key from the URL. Without a credential (open mode) a carousel screen also sends `via=<carousel>`, so the
+ * server knows which carousel it belongs to; with one, the credential already says so.
+ */
+export function withScreen(path: string, screen: string = activeScreen): string {
+  if (!screen) return withTarget(path);
+  const via = !credential && screenKey && screenKey !== screen ? `&via=${encodeURIComponent(screenKey)}` : '';
+  return `${path}${path.includes('?') ? '&' : '?'}screen=${encodeURIComponent(screen)}${via}`;
 }

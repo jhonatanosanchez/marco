@@ -14,7 +14,8 @@ export const MAX_STREAMS_PER_IP = 24;
  * @property {string} userAgent
  * @property {number} since       connect time (ms)
  * @property {string} screenKey   requested ?screen= ('' = default)
- * @property {string} screenId    resolved screen id (re-resolved on config save)
+ * @property {string} screenId    resolved screen id, or the carousel id (re-resolved on config save)
+ * @property {string[] | null} [memberIds] a carousel's screens (null for a plain screen)
  * @property {string} clientId    display id (?client=, or "anon-<n>" for old builds)
  * @property {boolean} anonymous  true when the display did not send a clientId
  */
@@ -86,12 +87,18 @@ export function dropClient(client, last) {
   try { if (!client.res.writableEnded) client.res.end(); } catch { /* ignore */ }
 }
 
-/** True when `client` matches `target` ({ screenIds?, clientIds? }; empty/absent target = everybody). */
+/**
+ * True when `client` matches `target` ({ screenIds?, clientIds? }; empty/absent target = everybody). A display on a
+ * carousel (`memberIds`) matches the carousel's id and every screen of the carousel.
+ */
 export function matches(client, target) {
   const sids = target?.screenIds?.length ? target.screenIds : null;
   const cids = target?.clientIds?.length ? target.clientIds : null;
   if (!sids && !cids) return true;
-  return Boolean((sids && sids.includes(client.screenId)) || (cids && cids.includes(client.clientId)));
+  if (cids && cids.includes(client.clientId)) return true;
+  if (!sids) return false;
+  if (sids.includes(client.screenId)) return true;
+  return Array.isArray(client.memberIds) && client.memberIds.some((id) => sids.includes(id));
 }
 
 /**
@@ -117,10 +124,20 @@ export const clientCount = () => clients.size;
 /** Snapshot of the connected clients (read-only use). */
 export const listClients = () => [...clients];
 
-/** Re-resolve every client's screen id (config saved: slugs may have changed, screens deleted). */
+/**
+ * Re-resolve every client's screen id (config saved: slugs may have changed, screens deleted). `resolve(screenKey)`
+ * returns the screen id, or { screenId, memberIds } (a carousel: its id and its screens).
+ */
 export function reresolveClients(resolve) {
   for (const c of clients) {
-    try { c.screenId = resolve(c.screenKey) || c.screenId; } catch { /* keep */ }
+    try {
+      const r = resolve(c.screenKey);
+      if (typeof r === 'string' && r) c.screenId = r;
+      else if (r && typeof r === 'object' && r.screenId) {
+        c.screenId = r.screenId;
+        c.memberIds = r.memberIds ?? null;
+      }
+    } catch { /* keep */ }
   }
 }
 
