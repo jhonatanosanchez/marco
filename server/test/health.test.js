@@ -51,11 +51,11 @@ test('health has the capability block', async () => {
   for (const k of FEATURE_KEYS) assert.equal(typeof j.features[k], 'boolean', k);
 });
 
-test('self-hosted features default to on, except Google without credentials, the account menu and Microsoft calendars', async () => {
+test('self-hosted features default to on, except Google without credentials, the account menu, Microsoft calendars and the feedback form', async () => {
   await withEnv({ GOOGLE_CLIENT_ID: undefined, GOOGLE_CLIENT_SECRET: undefined }, async () => {
     const { features } = await getHealth();
     for (const k of FEATURE_KEYS) {
-      const expected = !['googleCalendar', 'googleLogin', 'accountMenu', 'microsoftCalendar'].includes(k);
+      const expected = !['googleCalendar', 'googleLogin', 'accountMenu', 'microsoftCalendar', 'feedback'].includes(k);
       assert.equal(features[k], expected, k);
     }
   });
@@ -64,6 +64,7 @@ test('self-hosted features default to on, except Google without credentials, the
     assert.equal(f.googleCalendar, true);
     assert.equal(f.googleLogin, false, 'sign in with Google is off by default: home servers use their password');
     assert.equal(f.accountMenu, false);
+    assert.equal(f.feedback, false, 'the feedback form reaches Marco Cloud only');
     assert.equal(f.microsoftCalendar, false, 'Microsoft calendars need an Entra app of the server');
   });
   await withEnv({ GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: 'secret', MARCO_GOOGLE_LOGIN: '1' }, () => {

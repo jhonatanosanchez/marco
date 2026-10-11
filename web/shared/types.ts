@@ -543,6 +543,8 @@ export interface Features {
   microsoftCalendar: boolean;
   /** Update banner, settings and the update button (self-hosted only; absent on older servers = off). */
   updates: boolean;
+  /** Help and feedback form that reaches the people who run the server (Marco Cloud only; absent = off). */
+  feedback: boolean;
 }
 
 export type FeatureName = keyof Features;
@@ -594,6 +596,34 @@ export interface HealthResponse {
   adminOrigin?: string;
   /** This server's LAN addresses; only sent to a client on the server itself (a kiosk on http://localhost). */
   lanAddresses?: string[];
+}
+
+// ---- Feedback (Marco Cloud, features.feedback) ----
+
+export type FeedbackKind = 'problem' | 'idea' | 'other';
+
+/** Technical details the person chose to send with a message (every field optional, all shown before sending). */
+export interface FeedbackMeta {
+  version?: string;
+  /** admin page the form was opened from, e.g. 'calendars' */
+  page?: string;
+  screens?: number;
+  userAgent?: string;
+  lang?: string;
+  timeZone?: string;
+}
+
+/** POST /api/admin/feedback */
+export interface FeedbackRequest {
+  kind: FeedbackKind;
+  message: string;
+  /** null or absent: no technical details */
+  meta?: FeedbackMeta | null;
+}
+
+export interface FeedbackResponse {
+  ok: true;
+  id: string;
 }
 
 // ---- Updates (self-hosted, features.updates) ----

@@ -48,6 +48,8 @@ import type {
   TestRssResponse,
   UpdateInfo,
   UpdateSettings,
+  FeedbackRequest,
+  FeedbackResponse,
 } from '../shared/types';
 import { getLang } from './i18n';
 import { apiErrorCode, apiErrorMessage, type ApiErrorCode } from './apiErrors';
@@ -119,6 +121,8 @@ export const api = {
   // Marco Cloud account (features.accountMenu): the language follows the account, the household can be renamed.
   accountLang: (lang: string) => request<{ ok: true }>('POST', '/api/account/lang', { lang }),
   renameHousehold: (name: string) => request<{ ok: true; household: HouseholdInfo }>('PATCH', '/api/admin/household', { name }),
+  // Marco Cloud only (features.feedback): help and feedback form, mailed to the team with the signed in email as reply-to.
+  sendFeedback: (body: FeedbackRequest) => request<FeedbackResponse>('POST', '/api/admin/feedback', body),
 
   // First-run setup wizard (no session yet; the optional setup token travels in x-setup-token).
   setupStatus: (token?: string) =>

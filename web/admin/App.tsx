@@ -10,6 +10,8 @@ import { Icon, type IconName } from './components/icons';
 import { ScreenSwitcher } from './components/ScreenSwitcher';
 import { openPairDialog, PairDialogHost } from './components/DisplayAccess';
 import { UpdateBanner, UpdateDialogHost, WhatsNewHost } from './components/Updates';
+import { FeedbackDialog } from './components/FeedbackDialog';
+import { feedbackMeta } from './feedbackForm';
 import { Button, setScopeScreenName } from './components/ui';
 import { getLang, initialLang, setLang, nScreens, t } from './i18n';
 import { setIntent } from './intent';
@@ -237,6 +239,7 @@ export function App() {
   const [navOpen, setNavOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [palette, setPalette] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [adminTheme, setAdminTheme] = useState(() => lsGet(LS_THEME) || '');
   const [showErrors, setShowErrors] = useState(false);
   const [displays, setDisplays] = useState<DisplayInfo[] | null>(null);
@@ -657,6 +660,7 @@ export function App() {
       { id: 'a-token', group: gActions, icon: 'key', label: t('Crear token de API'), keywords: 'token webhook home assistant', run: run('api/api-tokens', 'new') },
       { id: 'a-view', group: gActions, icon: 'external', label: t('Ver pantalla'), hint: curScreen?.name, run: () => viewUrl && window.open(viewUrl, '_blank', 'noopener') },
       { id: 'a-theme', group: gActions, icon: 'moon', label: t('Cambiar tema del panel'), keywords: 'dark light theme', run: () => setAdminTheme((x) => (x === 'dark' ? 'light' : x === 'light' ? '' : 'dark')) },
+      { id: 'a-feedback', group: gActions, icon: 'help', label: t('Ayuda y comentarios'), keywords: 'help feedback ayuda comentarios ajuda bug error problema issue github idea', run: () => setFeedbackOpen(true) },
     ];
     items.push(...filterActions(actions, caps));
     if (dirty) items.unshift({ id: 'a-save', group: gActions, icon: 'check', label: t('Guardar cambios'), keywords: 'save', run: () => save() });
@@ -778,6 +782,7 @@ export function App() {
   const user = me.user;
   const household = me.account?.household ?? null;
   const links = has('accountMenu') ? accountLinks(me) : null;
+  const feedback = hasFeature(caps, 'feedback');
   const accountPage = caps.tenancy === 'multi';
   const portrait = view.screen.orientation === 'portrait';
   const previewSide = wide && showPreview;
@@ -859,14 +864,21 @@ export function App() {
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            class="icon-btn"
-            title={t('Tema del panel')}
-            onClick={() => setAdminTheme(adminTheme === 'dark' ? 'light' : adminTheme === 'light' ? '' : 'dark')}
-          >
-            <Icon name={adminTheme === 'light' ? 'sun' : adminTheme === 'dark' ? 'moon' : 'monitor'} size={16} />
-          </button>
+          <div class="sidebar__tools">
+            <button
+              type="button"
+              class="icon-btn"
+              title={t('Tema del panel')}
+              onClick={() => setAdminTheme(adminTheme === 'dark' ? 'light' : adminTheme === 'light' ? '' : 'dark')}
+            >
+              <Icon name={adminTheme === 'light' ? 'sun' : adminTheme === 'dark' ? 'moon' : 'monitor'} size={16} />
+            </button>
+            {feedback && (
+              <button type="button" class="icon-btn" title={t('Ayuda y comentarios')} aria-label={t('Ayuda y comentarios')} onClick={() => (setNavOpen(false), setFeedbackOpen(true))}>
+                <Icon name="help" size={16} />
+              </button>
+            )}
+          </div>
         </div>
       </aside>
       <div class="scrim" onClick={() => setNavOpen(false)} />
@@ -964,6 +976,18 @@ export function App() {
                     <a class="menu__item" href="#/displays" onClick={() => setMenuOpen(false)}>
                       <Icon name="wifi" size={16} /> {t('Pantallas conectadas')}
                     </a>
+                    {feedback && (
+                      <button
+                        type="button"
+                        class="menu__item"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          setFeedbackOpen(true);
+                        }}
+                      >
+                        <Icon name="help" size={16} /> {t('Ayuda y comentarios')}
+                      </button>
+                    )}
                     {links ? (
                       <>
                         {(accountPage || links.account) && (
@@ -1042,6 +1066,20 @@ export function App() {
       <PairDialogHost saved={saved} defaultScreenId={screenId} onPaired={() => window.dispatchEvent(new Event('marco:paired'))} />
       <UpdateDialogHost />
       <WhatsNewHost />
+      {feedbackOpen && feedback && (
+        <FeedbackDialog
+          email={user.email}
+          meta={feedbackMeta({
+            version: caps.version,
+            page: route,
+            screens: draft.screens.length,
+            userAgent: navigator.userAgent,
+            lang: getLang(),
+            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          })}
+          onClose={() => setFeedbackOpen(false)}
+        />
+      )}
       <ToastHost />
       <DialogHost />
     </div>

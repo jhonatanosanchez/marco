@@ -5047,3 +5047,130 @@ h1 .scope {
 .pair-alt .copy-field code {
   font-size: 12.5px;
 }
+
+/* ---------------------------------------------------------------- help and feedback (Marco Cloud) */
+.sidebar__tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.fb {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.fb .field {
+  margin: 0;
+}
+.fb__intro {
+  margin: 0;
+  line-height: 1.5;
+}
+.fb__count {
+  text-align: right;
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.fb__reply {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  color: var(--text-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.fb__reply .ico {
+  flex: none;
+  color: var(--muted);
+}
+.fb__meta {
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 12px 14px;
+}
+.fb__check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.fb__check input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.fb__check input:focus-visible + .check-box {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.fb__meta-note {
+  margin: 6px 0 0 27px;
+}
+.fb__list {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 10px 0 0 27px;
+  font-size: 12.5px;
+}
+.fb__list dt {
+  color: var(--muted);
+}
+.fb__list dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.fb__github {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.fb__github .link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+.fb__github p {
+  margin: 4px 0 0;
+}
+.fb-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 18px 8px 8px;
+}
+.fb-done__icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--ok) 16%, transparent);
+  color: var(--ok);
+  margin-bottom: 12px;
+}
+.fb-done h4 {
+  margin: 0 0 6px;
+  font-size: 17px;
+}
+.fb-done p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 520px) {
+  .fb__list {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .fb__list dd {
+    margin-bottom: 6px;
+  }
+}

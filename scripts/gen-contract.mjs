@@ -37,6 +37,7 @@ const FEATURE_RULES = [
   [/^\/api\/admin\/(displays\/command|refresh-displays)$/, 'displayCommands'],
   [/^\/api\/(account\/|admin\/household$)/, 'accountMenu'],
   [/^\/api\/admin\/update(\/|$)/, 'updates'],
+  [/^\/api\/admin\/feedback$/, 'feedback'],
 ];
 
 const featureFor = (path) => FEATURE_RULES.find(([re]) => re.test(path))?.[1] ?? null;

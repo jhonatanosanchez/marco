@@ -499,6 +499,22 @@
       ]
     },
     {
+      "method": "POST",
+      "path": "/api/admin/feedback",
+      "query": [],
+      "feature": "feedback",
+      "callers": [
+        "sendFeedback"
+      ],
+      "request": "FeedbackRequest",
+      "response": "FeedbackResponse",
+      "responseArray": false,
+      "responseKeys": [
+        "ok",
+        "id"
+      ]
+    },
+    {
       "method": "GET",
       "path": "/api/admin/geocode",
       "query": [

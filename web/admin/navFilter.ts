@@ -60,6 +60,7 @@ export const ACTION_FEATURES: Record<string, Gate> = {
   'a-export': 'importExport',
   'a-backup': 'backups',
   'a-token': 'apiTokens',
+  'a-feedback': 'feedback',
 };
 
 /** Whether a gate is open for these capabilities (no gate = always). */

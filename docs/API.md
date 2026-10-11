@@ -93,12 +93,14 @@ The admin and the display read these fields to decide which sections, actions an
 - `features`: one boolean per feature: `homeassistant`, `news`, `customCss`, `gallery`, `schedules`,
   `announcements`, `displayCommands`, `openDisplayAccess`, `insecureTls`, `googleCalendar`, `googleLogin`,
   `passwordLogin`, `apiTokens`, `webhooks`, `backups`, `importExport`, `includeSecrets`, `activity`, `setupWizard`,
-  `status`, `accountMenu`, `microsoftCalendar`, `updates`. A self-hosted server turns all of them on, except
+  `status`, `accountMenu`, `microsoftCalendar`, `updates`, `feedback`. A self-hosted server turns all of them on, except
   `googleCalendar` and `googleLogin` (on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set),
   `microsoftCalendar` (Outlook and Microsoft 365 calendars, on when `MICROSOFT_CLIENT_ID` and
-  `MICROSOFT_CLIENT_SECRET` are set) and `accountMenu` (always off). `updates` is the update banner,
+  `MICROSOFT_CLIENT_SECRET` are set), `accountMenu` and `feedback` (always off). `updates` is the update banner,
   *Status → Updates* and `/api/admin/update*`; Marco Cloud answers `false` and shows the CHANGELOG section of a new
-  version once instead.
+  version once instead. `feedback` is Marco Cloud's *Help and feedback* form (account menu, sidebar and command
+  palette), which sends `POST /api/admin/feedback` with `{ kind: 'problem'|'idea'|'other', message, meta }` to the
+  people who run the service; a self-hosted admin never shows it.
 - `limits` (optional): plan limits such as `screens`, `sources` or `devices`. Absent means no limit beyond the
   config validator's own caps (12 screens, 50 calendars, 20 news feeds, 1000 local events, 500 birthdays,
   100 countdowns). The admin disables "add" at the limit and flags a config that goes over it.
@@ -114,8 +116,9 @@ The admin and the display read these fields to decide which sections, actions an
   `http://localhost` can say where other devices reach the admin.
 
 Clients treat a response with no `features` field (servers older than 0.5.0) as having every feature on, except
-`accountMenu`, `microsoftCalendar` and `updates`. A key missing from `features` counts as off only when `edition` is
-not `'self-hosted'`, and a missing `accountMenu`, `microsoftCalendar` or `updates` is always off.
+`accountMenu`, `microsoftCalendar`, `updates` and `feedback`. A key missing from `features` counts as off only when
+`edition` is not `'self-hosted'`, and a missing `accountMenu`, `microsoftCalendar`, `updates` or `feedback` is always
+off.
 
 ### Account mode
 

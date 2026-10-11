@@ -9,7 +9,7 @@ import { validateConfig as serverValidate } from '../core/validate.js';
 import { CONTRACT_PATH, contractText, generateContract } from '../../scripts/gen-contract.mjs';
 import { loadWebModules } from './webModules.js';
 
-const [capsMod, nav, search, util, auth, urls, liveNote, dict] = await loadWebModules(
+const [capsMod, nav, search, util, auth, urls, liveNote, dict, fb] = await loadWebModules(
   '/web/admin/caps.ts',
   '/web/admin/navFilter.ts',
   '/web/admin/searchIndex.ts',
@@ -17,7 +17,8 @@ const [capsMod, nav, search, util, auth, urls, liveNote, dict] = await loadWebMo
   '/web/admin/authRedirect.ts',
   '/web/admin/screenUrl.ts',
   '/web/admin/liveNote.ts',
-  '/web/admin/i18n-dict.ts'
+  '/web/admin/i18n-dict.ts',
+  '/web/admin/feedbackForm.ts'
 );
 const { capsFrom, hasFeature, limitOf, setCaps } = capsMod;
 
@@ -50,8 +51,8 @@ test('caps: old servers and self-hosted keep every feature on', () => {
   const old = oldServer();
   assert.equal(old.edition, 'self-hosted');
   assert.equal(old.features, null);
-  // accountMenu, microsoftCalendar and updates only exist on servers that say so
-  for (const k of FEATURE_KEYS) assert.equal(hasFeature(old, k), !['accountMenu', 'microsoftCalendar', 'updates'].includes(k), k);
+  // accountMenu, microsoftCalendar, updates and feedback only exist on servers that say so
+  for (const k of FEATURE_KEYS) assert.equal(hasFeature(old, k), !['accountMenu', 'microsoftCalendar', 'updates', 'feedback'].includes(k), k);
   assert.equal(old.pairCodeLength, 6);
   assert.equal(old.displayOrigin, null);
 
@@ -62,6 +63,8 @@ test('caps: old servers and self-hosted keep every feature on', () => {
   assert.equal(hasFeature(capsFrom({ ...cloudHealth(), features: { ...cloudHealth().features, microsoftCalendar: true } }), 'microsoftCalendar'), true);
   assert.equal(hasFeature(sh, 'updates'), false, 'a self-hosted server that does not list updates has no update endpoints');
   assert.equal(hasFeature(selfHosted(), 'updates'), true);
+  assert.equal(hasFeature(sh, 'feedback'), false, 'the feedback form is never on unless the server says so');
+  assert.equal(hasFeature(selfHosted(), 'feedback'), false, 'a self-hosted server has no feedback form');
   const sh2 = capsFrom({ ok: true, uptime: 1, version: '0.5.0', edition: 'self-hosted', features: { news: false } });
   assert.equal(hasFeature(sh2, 'news'), false, 'an explicit false is off everywhere');
 });
@@ -129,8 +132,41 @@ test('navFilter: self-hosted defaults and old servers show everything', () => {
   assert.equal(nav.filterSettings(search.SETTINGS_INDEX, oldServer(), routes).length, search.SETTINGS_INDEX.length - accountEntries - updateEntries);
   // without Google credentials a self-hosted admin still lists the Google entries (with the setup hint)
   assert.equal(nav.filterSettings(search.SETTINGS_INDEX, selfHosted(), routes).length, search.SETTINGS_INDEX.length - accountEntries);
+  // every action except the feedback form (Marco Cloud only)
   const actions = Object.keys(nav.ACTION_FEATURES).map((id) => ({ id }));
-  assert.equal(nav.filterActions(actions, selfHosted()).length, actions.length);
+  assert.deepEqual(nav.filterActions(actions, selfHosted()).map((a) => a.id), actions.map((a) => a.id).filter((id) => id !== 'a-feedback'));
+  assert.ok(!nav.filterActions(actions, oldServer()).some((a) => a.id === 'a-feedback'));
+});
+
+test('feedback: self-hosted never offers it, the cloud does when it says so', () => {
+  assert.equal(healthBody({ version: '0.5.0', env: {} }).features.feedback, false);
+  assert.equal(hasFeature(selfHosted(), 'feedback'), false);
+  assert.equal(hasFeature(oldServer(), 'feedback'), false);
+  assert.equal(hasFeature(cloud(), 'feedback'), true);
+  assert.equal(hasFeature(capsFrom({ ...cloudHealth(), features: { ...cloudHealth().features, feedback: undefined } }), 'feedback'), false);
+  const actions = ['a-feedback', 'a-view'].map((id) => ({ id }));
+  assert.deepEqual(nav.filterActions(actions, cloud()).map((a) => a.id), ['a-feedback', 'a-view']);
+  assert.deepEqual(nav.filterActions(actions, selfHosted()).map((a) => a.id), ['a-view']);
+  assert.equal(generateContract().endpoints.find((e) => e.path === '/api/admin/feedback').feature, 'feedback');
+});
+
+test('feedback form: limits, the details it sends and nothing else', () => {
+  const meta = fb.feedbackMeta({ version: ' 0.5.1 ', page: 'calendars', screens: 2, userAgent: 'UA/1.0', lang: 'es', timeZone: 'Europe/Lisbon', extra: 'x' });
+  assert.deepEqual(meta, { version: '0.5.1', page: 'calendars', screens: 2, userAgent: 'UA/1.0', lang: 'es', timeZone: 'Europe/Lisbon' });
+  assert.deepEqual(fb.metaRows(meta).map(([k]) => k), ['Versión', 'Página', 'Pantallas', 'Idioma', 'Zona horaria', 'Navegador']);
+  assert.deepEqual(fb.feedbackMeta({ screens: -1, userAgent: 'x'.repeat(500) }), { userAgent: 'x'.repeat(300) });
+  assert.equal(fb.messageError('  ab '), 'Escribe un poco más para que podamos entenderlo.');
+  assert.equal(fb.messageError('It broke'), '');
+  assert.equal(fb.messageError('x'.repeat(fb.FEEDBACK_MAX + 1)), 'El mensaje es demasiado largo.');
+  assert.deepEqual(fb.feedbackBody('idea', '  More colors ', meta, true), { kind: 'idea', message: 'More colors', meta });
+  assert.deepEqual(fb.feedbackBody('problem', 'Broken', meta, false), { kind: 'problem', message: 'Broken', meta: null });
+  assert.equal(fb.feedbackBody('weird', 'Hi there', meta, false).kind, 'other');
+  assert.equal(fb.GITHUB_ISSUES_URL, 'https://github.com/mr-reb00t/marco/issues/new/choose');
+  // every label and message of the form is translated
+  for (const k of ['Ayuda y comentarios', 'Problema', 'Idea', 'Otra cosa', 'Abrir un issue en GitHub', 'Gracias, lo leeremos.', ...fb.metaRows(meta).map(([k]) => k), fb.messageError(''), fb.messageError('x'.repeat(fb.FEEDBACK_MAX + 1))]) {
+    assert.ok(dict.EN[k], k);
+    assert.ok(dict.PT[k], k);
+  }
 });
 
 test('navFilter: palette and settings search follow the features', () => {

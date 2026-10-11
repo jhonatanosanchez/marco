@@ -5,6 +5,9 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- Admin: *Help and feedback* form on servers that offer it (`features.feedback`, Marco Cloud only), with a GitHub link.
+
 ### Changed
 - **Long titles slide in more places**: timed chips in the month, Two weeks and week grids, the pills next to the
   clock ("In 23 min · …", check-outs, birthdays), countdowns, scheduled messages and the news headline. A chip title
