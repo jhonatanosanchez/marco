@@ -5,6 +5,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-11
+
 ### Added
 - Carousels (*Carruseles*): several screens in a loop on the same TV, each for as long as you choose (10 s to 1 h),
   in the order you set. Every TV on the same carousel switches at the same moment. A
@@ -75,8 +77,6 @@ All notable changes to this project are documented here. The format is based on
   empty or turned off, like the screen legend. A built-in list with the same name as a calendar (for example an ICS
   calendar called *Cumpleaños*) is shown as "Cumpleaños (Marco list)" there and in the calendar pickers, filters and
   status lists.
-
-### Fixed
 - Planner and top / bottom layouts on a portrait screen: a long title in the next-event pill under the clock no longer
   widens the clock column and pushes the weather card off the screen. The pill now ends with an ellipsis (or slides,
   with *Slide long titles*).
