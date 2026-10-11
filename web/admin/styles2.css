@@ -5338,3 +5338,69 @@ h1 .scope {
     max-width: none;
   }
 }
+
+/* ---- Immich albums (Immich page, album picker in Background) ---- */
+.immich-albums {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+.immich-albums--pick {
+  max-height: 360px;
+  overflow-y: auto;
+}
+.immich-album {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+}
+button.immich-album {
+  cursor: pointer;
+}
+button.immich-album:hover {
+  border-color: var(--border-strong);
+}
+.immich-album.is-active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.immich-album > svg {
+  color: var(--accent);
+  flex: none;
+}
+.immich-album__cover {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 7px;
+  object-fit: cover;
+  background: var(--surface-3);
+}
+.immich-album__cover--empty {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.immich-album__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.immich-album__text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -251,6 +251,7 @@
         "countdowns",
         "schedules",
         "homeassistant",
+        "immich",
         "auth",
         "security"
       ]
@@ -282,6 +283,7 @@
         "countdowns",
         "schedules",
         "homeassistant",
+        "immich",
         "auth",
         "security"
       ]
@@ -650,6 +652,111 @@
       "responseKeys": [
         "ok",
         "household"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/immich/albums",
+      "query": [],
+      "feature": "immich",
+      "callers": [
+        "immichAlbums"
+      ],
+      "request": null,
+      "response": "ImmichAlbum[]",
+      "responseArray": true,
+      "responseKeys": [
+        "id",
+        "name",
+        "count",
+        "cover",
+        "shared",
+        "start",
+        "end"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/immich/cache",
+      "query": [],
+      "feature": "immich",
+      "callers": [
+        "clearImmichCache"
+      ],
+      "request": null,
+      "response": "inline",
+      "responseArray": false,
+      "responseKeys": [
+        "ok",
+        "freed"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/immich/key",
+      "query": [],
+      "feature": "immich",
+      "callers": [
+        "immichKey"
+      ],
+      "request": null,
+      "response": "ImmichKeyStatus",
+      "responseArray": false,
+      "responseKeys": [
+        "set",
+        "hint",
+        "checked?"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/immich/key",
+      "query": [],
+      "feature": "immich",
+      "callers": [
+        "setImmichKey"
+      ],
+      "request": "{key}",
+      "response": "ImmichKeyStatus",
+      "responseArray": false,
+      "responseKeys": [
+        "set",
+        "hint",
+        "checked?"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/immich/refresh",
+      "query": [],
+      "feature": "immich",
+      "callers": [
+        "refreshImmich"
+      ],
+      "request": null,
+      "response": "ImmichStatus",
+      "responseArray": false,
+      "responseKeys": [
+        "usable",
+        "albums",
+        "cache"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/immich/status",
+      "query": [],
+      "feature": "immich",
+      "callers": [
+        "immichStatus"
+      ],
+      "request": null,
+      "response": "ImmichStatus",
+      "responseArray": false,
+      "responseKeys": [
+        "usable",
+        "albums",
+        "cache"
       ]
     },
     {
@@ -1048,6 +1155,24 @@
         "ok",
         "count?",
         "sample?",
+        "error?"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/test/immich",
+      "query": [],
+      "feature": "immich",
+      "callers": [
+        "testImmich"
+      ],
+      "request": "{ url?: string; key?: string; insecureTls?: boolean }",
+      "response": "TestImmichResponse",
+      "responseArray": false,
+      "responseKeys": [
+        "ok",
+        "version?",
+        "missingScopes?",
         "error?"
       ]
     },

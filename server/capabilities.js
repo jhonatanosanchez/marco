@@ -11,13 +11,14 @@ export const FEATURE_KEYS = Object.freeze([
   'homeassistant', 'news', 'customCss', 'gallery', 'schedules', 'announcements', 'displayCommands',
   'openDisplayAccess', 'insecureTls', 'googleCalendar', 'googleLogin', 'passwordLogin', 'apiTokens',
   'webhooks', 'backups', 'importExport', 'includeSecrets', 'activity', 'setupWizard', 'status', 'accountMenu',
-  'microsoftCalendar', 'updates', 'feedback', 'privacy', 'doorbell', 'doorbellLive',
+  'microsoftCalendar', 'updates', 'feedback', 'privacy', 'doorbell', 'doorbellLive', 'immich',
 ]);
 
 /** Feature flags of a self-hosted server: all on (`updates` too: the update banner and settings), Google and
  *  Microsoft follow their credentials, no account menu and no feedback form (that one reaches Marco Cloud's team).
  *  `doorbell` is the ring overlay and its hook; `doorbellLive` says the frames are a live camera picture proxied
- *  from Home Assistant (a server without it serves the latest uploaded snapshot instead). */
+ *  from Home Assistant (a server without it serves the latest uploaded snapshot instead). `immich` is the Immich
+ *  photo source (server/immich.js), which needs a server on the same network as the library. */
 export function selfHostedFeatures() {
   const google = googleConfigured();
   const out = {};

@@ -49,6 +49,10 @@ import type {
   HaEntity,
   TestHomeAssistantResponse,
   WeatherKeyStatus,
+  TestImmichResponse,
+  ImmichKeyStatus,
+  ImmichAlbum,
+  ImmichStatus,
   TestIcsResponse,
   TestRssResponse,
   UpdateInfo,
@@ -173,6 +177,15 @@ export const api = {
   setHaToken: (token: string) => request<unknown>('PUT', '/api/admin/homeassistant/token', { token }),
   /** Test ring (or dismiss) with the draft settings: the screens show the camera as the webhook would. */
   doorbell: (body: DoorbellRequest) => request<DoorbellResponse>('POST', '/api/admin/doorbell', body),
+  // Immich (self-hosted, features.immich): the key is write-only
+  testImmich: (body: { url?: string; key?: string; insecureTls?: boolean }) => request<TestImmichResponse>('POST', '/api/admin/test/immich', body),
+  immichKey: () => request<ImmichKeyStatus>('GET', '/api/admin/immich/key'),
+  /** '' removes the key; a key Immich refuses answers 400 invalid_key */
+  setImmichKey: (key: string) => request<ImmichKeyStatus>('PUT', '/api/admin/immich/key', { key }),
+  immichAlbums: () => request<ImmichAlbum[]>('GET', '/api/admin/immich/albums'),
+  immichStatus: () => request<ImmichStatus>('GET', '/api/admin/immich/status'),
+  refreshImmich: () => request<ImmichStatus>('POST', '/api/admin/immich/refresh'),
+  clearImmichCache: () => request<{ ok: boolean; freed: number }>('DELETE', '/api/admin/immich/cache'),
   weatherKey: () => request<WeatherKeyStatus>('GET', '/api/admin/weather/key'),
   /** '' removes the key; a key the provider refuses answers 400 key_invalid */
   setWeatherKey: (key: string) => request<WeatherKeyStatus>('PUT', '/api/admin/weather/key', { key }),

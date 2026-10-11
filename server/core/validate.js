@@ -7,6 +7,7 @@ import { LANGS } from './lib/i18n.js';
 import { WEATHER_PROVIDER_IDS, OPEN_METEO_MODEL_IDS, KEY_PROVIDERS } from './weather.js';
 import { PRIVACY_MODES, MAX_PRIVACY_RULES, defaultSourcePrivacy } from './privacy.js';
 import { CAMERA_RE, DOORBELL_MIN_SEC, DOORBELL_MAX_SEC } from './doorbellCore.js';
+import { IMMICH_ID_RE, MAX_IMMICH_ALBUMS, PORTRAIT_FITS, normalizeImmichUrl } from './immichCore.js';
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
@@ -252,9 +253,12 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
   };
 
   const bg = obj(ctx, `${p}.background`, x.background);
+  const im = obj(ctx, `${p}.background.immich`, bg.immich);
+  const albumIds = arr(ctx, `${p}.background.immich.albumIds`, im.albumIds, [], MAX_IMMICH_ALBUMS);
+  if (albumIds.some((a) => typeof a !== 'string' || !IMMICH_ID_RE.test(a))) ctx.err(`${p}.background.immich.albumIds`, 'invalid album id');
   const background = {
     enabled: bool(ctx, `${p}.background.enabled`, bg.enabled, D.background.enabled),
-    source: oneOf(ctx, `${p}.background.source`, bg.source, D.background.source, ['stock', 'gallery', 'mixed']),
+    source: oneOf(ctx, `${p}.background.source`, bg.source, D.background.source, ['stock', 'gallery', 'mixed', 'immich']),
     stockTopic: str(ctx, `${p}.background.stockTopic`, bg.stockTopic, D.background.stockTopic, 60),
     order: oneOf(ctx, `${p}.background.order`, bg.order, D.background.order, ['random', 'newest', 'name']),
     intervalSec: num(ctx, `${p}.background.intervalSec`, bg.intervalSec, D.background.intervalSec, 10, 86400, true),
@@ -266,6 +270,11 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
     panelBlur: num(ctx, `${p}.background.panelBlur`, bg.panelBlur, D.background.panelBlur, 0, 40, true),
     panelShade: num(ctx, `${p}.background.panelShade`, bg.panelShade, D.background.panelShade, 0, 1),
     weatherFx: oneOf(ctx, `${p}.background.weatherFx`, bg.weatherFx, D.background.weatherFx, ['off', 'simple', 'rich']),
+    portraitFit: oneOf(ctx, `${p}.background.portraitFit`, bg.portraitFit, D.background.portraitFit, PORTRAIT_FITS),
+    immich: {
+      albumIds: [...new Set(albumIds.filter((a) => typeof a === 'string' && IMMICH_ID_RE.test(a)).map((a) => a.toLowerCase()))],
+      favoritesOnly: bool(ctx, `${p}.background.immich.favoritesOnly`, im.favoritesOnly, D.background.immich.favoritesOnly),
+    },
   };
 
   const ca = obj(ctx, `${p}.calendar`, x.calendar);
@@ -505,6 +514,7 @@ export function migrateConfig(raw) {
  * `value` is always a complete, sanitised config (defaults fill gaps); callers decide whether to persist it on errors.
  * `opts.weatherKeySet` (the admin save only): false when no weather API key is stored, so choosing a source that
  * needs one is refused (weather.apiKey 'API key required'). Left out, keys are not checked (imports, restores).
+ * `opts.immichAvailable` false (servers without Immich, such as Marco Cloud): a screen with the Immich source is refused.
  */
 export function validateConfig(input, opts = {}) {
   const ctx = new Ctx();
@@ -630,6 +640,16 @@ export function validateConfig(input, opts = {}) {
     },
   };
 
+  // Immich photo library: one server per install. The API key lives in secrets.json.
+  const imm = obj(ctx, 'immich', c.immich);
+  const immUrl = normalizeImmichUrl(str(ctx, 'immich.url', imm.url, D.immich.url, 512));
+  if (immUrl && !isHttpUrl(immUrl)) ctx.err('immich.url', 'invalid URL');
+  const immich = {
+    enabled: bool(ctx, 'immich.enabled', imm.enabled, D.immich.enabled),
+    url: immUrl,
+    insecureTls: bool(ctx, 'immich.insecureTls', imm.insecureTls, D.immich.insecureTls),
+  };
+
   const au = obj(ctx, 'auth', c.auth);
   const emails = arr(ctx, 'auth.allowedGoogleEmails', au.allowedGoogleEmails, [], 50)
     .filter((e) => typeof e === 'string').map((e) => e.trim().toLowerCase()).filter(Boolean);
@@ -650,6 +670,9 @@ export function validateConfig(input, opts = {}) {
   const seenIds = new Set();
   const seenSlugs = new Set();
   const screens = rawScreens.map((s, i) => sanitizeScreenProfile(ctx, `screens[${i}]`, s, seenIds, seenSlugs));
+  if (opts.immichAvailable === false) {
+    screens.forEach((s, i) => { if (s.background.source === 'immich') ctx.err(`screens[${i}].background.source`, 'Immich is not available'); });
+  }
   // Drop references to sources / screens that no longer exist (silently: deleting a source is legit).
   const knownSources = new Set([...RESERVED_SOURCE_IDS, ...calendar.sources.map((s) => s.id)]);
   for (const s of screens) if (s.calendar.sourceIds) s.calendar.sourceIds = s.calendar.sourceIds.filter((x) => knownSources.has(x));
@@ -676,7 +699,7 @@ export function validateConfig(input, opts = {}) {
   const revision = Number.isInteger(c.revision) && c.revision > 0 ? c.revision : 1;
   const value = {
     version: CONFIG_VERSION, revision, defaultScreen, screens,
-    calendar, datetime, weather, news, todo, localEvents, birthdays, eventRules, countdowns, schedules, homeassistant, auth, security,
+    calendar, datetime, weather, news, todo, localEvents, birthdays, eventRules, countdowns, schedules, homeassistant, immich, auth, security,
   };
   return { ok: ctx.errors.length === 0, errors: ctx.errors, value };
 }

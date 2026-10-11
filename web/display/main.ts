@@ -712,7 +712,7 @@ async function fetchNews(): Promise<void> {
 async function fetchPhotos(): Promise<void> {
   if (state.demo) return set('photos', mockPhotos());
   try {
-    set('photos', await api.photos(20, photos.lastGalleryFile));
+    set('photos', await api.photos(20, photos.lastKey));
   } catch (e) {
     if (deniedBy(e)) return;
     console.warn('[photos]', (e as Error).message);
@@ -763,7 +763,7 @@ on('config', (s) => {
   // photo source changed in the admin → fetch a fresh list right away; privacy mode with "hide photos" also
   // replaces the photo on screen at once
   const b = ctx.cfg.background;
-  const sig = `${b.enabled}|${b.source}|${b.stockTopic}|${b.order ?? 'random'}`;
+  const sig = `${b.enabled}|${b.source}|${b.stockTopic}|${b.order ?? 'random'}|${(b.immich?.albumIds ?? []).join(',')}|${b.immich?.favoritesOnly ? 1 : 0}`;
   if (photoSig && sig !== photoSig) void fetchPhotos().then(() => (privChanged ? photos.next() : undefined));
   photoSig = sig;
 });

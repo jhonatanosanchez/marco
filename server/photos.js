@@ -1,4 +1,5 @@
-// Background photos: picsum.photos stock (with author info) and the local gallery in data/photos/.
+// Background photos: picsum.photos stock (with author info), the local gallery in data/photos/ and Immich albums
+// (server/immich.js).
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -6,6 +7,8 @@ import multer from 'multer';
 import { requestJson } from './lib/http.js';
 import { defaultScreen } from './core/screens.js';
 import { getConfig, paths, writeFileAtomic } from './store.js';
+import { immichItems, warm } from './immich.js';
+import { IMMICH_ID_RE, placeOf } from './core/immichCore.js';
 import {
   ALLOWED_EXT, ALLOWED_MIME, imageInfo as imageInfoOf, imageHeaderNeed, isJpeg, isGalleryFile, uploadName as coreUploadName,
 } from './core/imageInfo.js';
@@ -239,7 +242,7 @@ export function getPhoto(file) {
 
 export const PHOTO_ORDERS = ['random', 'newest', 'name'];
 const collator = new Intl.Collator('es', { numeric: true, sensitivity: 'base' });
-/** Per-screen memory of the last gallery batch served: { files, last } (random: avoid repeats; sequential: cursor). */
+/** Per-screen memory of the last batch served (gallery, Immich): { files, last } (random: avoid repeats; sequential: cursor). */
 const recent = new Map();
 const RECENT_MAX = 64;
 export function resetPhotoHistory() { recent.clear(); }
@@ -254,45 +257,55 @@ function sortFor(list, order) {
 }
 
 /**
- * Pick `n` gallery photos for one batch. Sequential orders ('newest' / 'name') continue right after `after`
- * (the photo the display showed last; else where the previous batch for this screen ended) and wrap around.
- * 'random' shuffles, putting the photos of the previous batch last and never starting with `after`.
+ * Pick `n` items for one batch (gallery files, Immich assets). Sequential orders ('newest' / 'name') continue right
+ * after `after` (what the display showed last; else where the previous batch for this rotation key ended) and wrap
+ * around. 'random' shuffles, putting the items of the previous batch last and never starting with `after`.
+ * `sort(list)` sorts in place for the sequential orders; `resume(sorted, ref)` = where to continue when `ref` is gone.
  */
-function pickGallery(order, n, key, after) {
-  const all = listGallery();
-  const list = all.filter((g) => !g.hidden);
+function pickFrom(all, order, n, key, after, { idOf, sort, isHidden = () => false, resume = null }) {
+  const list = all.filter((g) => !isHidden(g));
   if (!list.length || n <= 0) return [];
   const prev = recent.get(key);
   let out;
   if (order === 'newest' || order === 'name') {
-    // Locate the reference in the full sorted gallery (it may have just been hidden), then take the next
-    // photos in rotation from there.
-    const full = sortFor(all, order);
+    // Locate the reference in the full sorted list (it may have just been hidden), then take the next items in
+    // rotation from there.
+    const full = sort(all.slice());
     const ref = after || prev?.last;
     let start = 0;
     if (ref) {
-      const i = full.findIndex((g) => g.file === ref);
+      const i = full.findIndex((g) => idOf(g) === ref);
       if (i >= 0) start = i + 1;
-      else if (order === 'name') {
-        // deleted meanwhile: continue with the next name after it
-        const j = full.findIndex((g) => collator.compare(g.file, ref) > 0);
+      else if (resume) {
+        const j = resume(full, ref);
         start = j < 0 ? 0 : j;
       }
     }
-    const seq = [...full.slice(start), ...full.slice(0, start)].filter((g) => !g.hidden);
+    const seq = [...full.slice(start), ...full.slice(0, start)].filter((g) => !isHidden(g));
     out = seq.slice(0, n);
   } else {
     const seen = new Set(prev?.files || []);
-    const fresh = shuffle(list.filter((g) => !seen.has(g.file)));
-    const stale = shuffle(list.filter((g) => seen.has(g.file)));
+    const fresh = shuffle(list.filter((g) => !seen.has(idOf(g))));
+    const stale = shuffle(list.filter((g) => seen.has(idOf(g))));
     out = [...fresh, ...stale].slice(0, n);
     const avoid = after || prev?.last;
-    if (out.length > 1 && out[0].file === avoid) [out[0], out[1]] = [out[1], out[0]];
+    if (out.length > 1 && idOf(out[0]) === avoid) [out[0], out[1]] = [out[1], out[0]];
   }
   recent.delete(key);
-  recent.set(key, { files: out.map((g) => g.file), last: out[out.length - 1].file });
+  recent.set(key, { files: out.map(idOf), last: idOf(out[out.length - 1]) });
   if (recent.size > RECENT_MAX) recent.delete(recent.keys().next().value);
-  return out.map((g) => ({
+  return out;
+}
+
+function pickGallery(order, n, key, after) {
+  const picked = pickFrom(listGallery(), order, n, key, after, {
+    idOf: (g) => g.file,
+    sort: (l) => sortFor(l, order),
+    isHidden: (g) => g.hidden,
+    // a file deleted meanwhile: continue with the next name after it
+    resume: order === 'name' ? (full, ref) => full.findIndex((g) => collator.compare(g.file, ref) > 0) : null,
+  });
+  return picked.map((g) => ({
     url: g.url,
     file: g.file,
     title: g.file.replace(/\.[^.]+$/, ''),
@@ -301,15 +314,43 @@ function pickGallery(order, n, key, after) {
   }));
 }
 
+/** Immich items in rotation order: newest = date taken, name = original file name (never shown). */
+function sortImmich(list, order) {
+  if (order === 'name') list.sort((a, b) => collator.compare(a.name, b.name) || a.id.localeCompare(b.id));
+  else if (order === 'newest') list.sort((a, b) => b.t.localeCompare(a.t) || a.id.localeCompare(b.id));
+  return list;
+}
+
+/** Photo sent to the display for an Immich asset: the server proxies the image, captions get date and place. */
+const immichPhoto = (it) => ({
+  url: `/media/immich/${it.id}?v=${it.v}`,
+  source: 'immich',
+  id: it.id,
+  ...(it.t ? { takenAt: it.t } : {}),
+  ...(placeOf(it) ? { place: placeOf(it) } : {}),
+});
+
+async function pickImmich(bg, order, n, key, after) {
+  const items = await immichItems(bg.immich);
+  const picked = pickFrom(items, order, n, `${key}|immich`, after, { idOf: (it) => it.id, sort: (l) => sortImmich(l, order) });
+  warm(picked);
+  return picked.map(immichPhoto);
+}
+
 /**
- * One batch for the display. `opts.key` identifies the screen (rotation memory), `opts.after` = gallery file the
- * display showed last. Hidden photos never appear; a gallery with nothing in rotation falls back to stock.
+ * One batch for the display. `opts.key` identifies the screen (rotation memory), `opts.after` = gallery file or
+ * Immich asset id the display showed last. Hidden photos never appear; a gallery with nothing in rotation, or an
+ * Immich source with no photos (not set up, no albums, unreachable with nothing cached), falls back to stock.
  */
 export async function getPhotos(count = 20, bg = defaultScreen(getConfig()).background, { key = '', after = '' } = {}) {
   count = Math.max(1, Math.min(100, count | 0 || 20));
   const order = PHOTO_ORDERS.includes(bg.order) ? bg.order : 'random';
-  if (!isGalleryFile(after)) after = '';
   key = String(key || 'default');
+  if (bg.source === 'immich') {
+    const p = await pickImmich(bg, order, count, key, IMMICH_ID_RE.test(after) ? after.toLowerCase() : '');
+    return p.length ? p : stockPhotos(count);
+  }
+  if (!isGalleryFile(after)) after = '';
   if (bg.source === 'gallery') {
     const g = pickGallery(order, count, key, after);
     return g.length ? g : stockPhotos(count); // fall back to stock when nothing is in rotation

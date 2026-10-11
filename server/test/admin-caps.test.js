@@ -26,7 +26,7 @@ const { capsFrom, hasFeature, limitOf, setCaps } = capsMod;
 const cloudHealth = () => {
   const features = {};
   for (const k of FEATURE_KEYS) features[k] = true;
-  for (const k of ['homeassistant', 'insecureTls', 'openDisplayAccess', 'passwordLogin', 'includeSecrets', 'setupWizard', 'news', 'gallery', 'apiTokens', 'webhooks', 'googleCalendar', 'googleLogin', 'updates']) features[k] = false;
+  for (const k of ['homeassistant', 'insecureTls', 'openDisplayAccess', 'passwordLogin', 'includeSecrets', 'setupWizard', 'news', 'gallery', 'apiTokens', 'webhooks', 'googleCalendar', 'googleLogin', 'updates', 'immich']) features[k] = false;
   return {
     ok: true,
     uptime: null,
@@ -52,7 +52,7 @@ test('caps: old servers and self-hosted keep every feature on', () => {
   assert.equal(old.edition, 'self-hosted');
   assert.equal(old.features, null);
   // accountMenu, microsoftCalendar, updates, feedback, privacy and the doorbell only exist on servers that say so
-  for (const k of FEATURE_KEYS) assert.equal(hasFeature(old, k), !['accountMenu', 'microsoftCalendar', 'updates', 'feedback', 'privacy', 'doorbell', 'doorbellLive'].includes(k), k);
+  for (const k of FEATURE_KEYS) assert.equal(hasFeature(old, k), !['accountMenu', 'microsoftCalendar', 'updates', 'feedback', 'privacy', 'doorbell', 'doorbellLive', 'immich'].includes(k), k);
   assert.equal(old.pairCodeLength, 6);
   assert.equal(old.displayOrigin, null);
 
@@ -68,6 +68,10 @@ test('caps: old servers and self-hosted keep every feature on', () => {
   assert.equal(hasFeature(selfHosted(), 'doorbell'), true);
   assert.equal(hasFeature(selfHosted(), 'doorbellLive'), true);
   assert.equal(hasFeature(sh, 'doorbell'), false, 'an older self-hosted server has no doorbell hook');
+  assert.equal(hasFeature(selfHosted(), 'immich'), true);
+  assert.equal(hasFeature(sh, 'immich'), false, 'an older self-hosted server has no Immich proxy');
+  assert.equal(hasFeature(cloud(), 'immich'), false, 'Marco Cloud has no Immich');
+  assert.equal(hasFeature(capsFrom({ ...cloudHealth(), features: { news: true } }), 'immich'), false, 'a missing key is off');
   const sh2 = capsFrom({ ok: true, uptime: 1, version: '0.5.0', edition: 'self-hosted', features: { news: false } });
   assert.equal(hasFeature(sh2, 'news'), false, 'an explicit false is off everywhere');
 });
@@ -117,14 +121,15 @@ test('caps: loadCaps keeps everything on when /api/health cannot be read', async
 
 test('navFilter: cloud caps hide news, photos, Home Assistant and the API page', () => {
   const ids = nav.filterNav(nav.NAV_ITEMS, cloud()).map((n) => n.id);
-  for (const hidden of ['news', 'photos', 'homeassistant', 'api']) assert.ok(!ids.includes(hidden), hidden);
+  for (const hidden of ['news', 'photos', 'homeassistant', 'api', 'immich']) assert.ok(!ids.includes(hidden), hidden);
   for (const shown of ['home', 'screen', 'calendars', 'alerts', 'displays', 'backups', 'activity', 'security', 'status']) assert.ok(ids.includes(shown), shown);
 });
 
 test('navFilter: self-hosted defaults and old servers show everything', () => {
   const all = nav.NAV_ITEMS.map((n) => n.id);
   assert.deepEqual(nav.filterNav(nav.NAV_ITEMS, selfHosted()).map((n) => n.id), all);
-  assert.deepEqual(nav.filterNav(nav.NAV_ITEMS, oldServer()).map((n) => n.id), all);
+  // Immich is opt-in (features.immich): servers older than it have no proxy
+  assert.deepEqual(nav.filterNav(nav.NAV_ITEMS, oldServer()).map((n) => n.id), all.filter((id) => id !== 'immich'));
   const routes = all;
   // every entry except the account ones (features.accountMenu, multi-tenant servers only), Microsoft calendars
   // (features.microsoftCalendar), updates (features.updates) and the doorbell (features.doorbell): an old server lists
@@ -136,7 +141,9 @@ test('navFilter: self-hosted defaults and old servers show everything', () => {
   assert.equal(updateEntries, 2);
   const doorbellEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'doorbell').length;
   assert.equal(doorbellEntries, 2);
-  assert.equal(nav.filterSettings(search.SETTINGS_INDEX, oldServer(), routes).length, search.SETTINGS_INDEX.length - accountEntries - updateEntries - doorbellEntries);
+  const immichEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'immich').length;
+  assert.equal(immichEntries, 1);
+  assert.equal(nav.filterSettings(search.SETTINGS_INDEX, oldServer(), routes).length, search.SETTINGS_INDEX.length - accountEntries - updateEntries - doorbellEntries - immichEntries);
   // without Google credentials a self-hosted admin still lists the Google entries (with the setup hint); the doorbell
   // card is on the Home Assistant page there, so the entry for API & webhooks (servers without a live camera) is out
   const snapshotEntries = search.SETTINGS_INDEX.filter((e) => e.unless === 'doorbellLive').length;
@@ -414,6 +421,10 @@ test('adminContract.json: shape, features and account endpoints', () => {
   assert.ok(get('GET /api/admin/config').responseKeys.includes('screens'));
   assert.ok(get('GET /api/health').responseKeys.includes('features?'));
   assert.equal(get('GET /api/admin/photos').feature, 'gallery');
+  for (const id of ['POST /api/admin/test/immich', 'GET /api/admin/immich/key', 'PUT /api/admin/immich/key', 'GET /api/admin/immich/albums', 'GET /api/admin/immich/status', 'POST /api/admin/immich/refresh', 'DELETE /api/admin/immich/cache']) {
+    assert.equal(get(id)?.feature, 'immich', id);
+  }
+  assert.equal(get('GET /api/admin/immich/albums').responseArray, true);
   assert.equal(get('GET /api/admin/photos').responseArray, true);
   assert.equal(get('PUT /api/admin/password').feature, 'passwordLogin');
   assert.equal(get('POST /api/admin/pair/claim').feature, null);

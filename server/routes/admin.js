@@ -5,6 +5,8 @@ import { requireAuth, changePasswordHandler } from '../auth.js';
 import * as google from '../google.js';
 import * as microsoft from '../microsoft.js';
 import * as ha from '../homeassistant.js';
+import * as immich from '../immich.js';
+import { IMMICH_KEY_RE, immichKeyStatus } from '../core/immichCore.js';
 import { testIcs, sourceStatus } from '../calendars.js';
 import { testFeed, status as newsStatus } from '../news.js';
 import { status as weatherStatus, weatherKey, checkWeatherKey } from '../weather.js';
@@ -121,6 +123,49 @@ export function adminRouter({ onConfigSaved } = {}) {
     updateSecrets((s) => { s.homeassistant.token = token.trim(); });
     res.json({ ok: true });
   });
+
+  // --- Immich (server/immich.js): the API key is write-only, like the weather key ---
+  r.post('/test/immich', wrap(async (req, res) => {
+    const { url, key, insecureTls } = req.body || {};
+    if (url !== undefined && url !== '' && (typeof url !== 'string' || !isHttpUrl(url))) return res.json({ ok: false, error: 'invalid_url' });
+    if (key !== undefined && key !== '' && (typeof key !== 'string' || !IMMICH_KEY_RE.test(key.trim()))) return res.json({ ok: false, error: 'invalid_key' });
+    res.json(await immich.testConnection({
+      url: url || undefined,
+      key: typeof key === 'string' && key.trim() ? key.trim() : undefined,
+      insecureTls: typeof insecureTls === 'boolean' ? insecureTls : undefined,
+    }));
+  }));
+  r.get('/immich/key', (req, res) => res.json(immichKeyStatus(immich.immichSettings().key)));
+  r.put('/immich/key', wrap(async (req, res) => {
+    const key = req.body?.key;
+    if (typeof key !== 'string' || key.length > 200) return res.status(400).json({ error: 'key must be a string' });
+    const k = key.trim();
+    if (k && !IMMICH_KEY_RE.test(k)) return res.status(400).json({ error: 'invalid_key' });
+    // With a server URL saved, a new key is tried first: a key Immich refuses is not stored.
+    let checked = false;
+    if (k && immich.immichSettings().url) {
+      const t = await immich.testConnection({ key: k });
+      if (t.error === 'invalid_key') return res.status(400).json({ error: 'invalid_key' });
+      checked = t.ok === true;
+    }
+    updateSecrets((s) => { s.immich = { ...(s.immich || {}), apiKey: k }; });
+    res.json({ ...immichKeyStatus(k), checked });
+  }));
+  r.get('/immich/albums', wrap(async (req, res) => {
+    try {
+      res.json(await immich.listAlbums());
+    } catch (err) {
+      const code = err instanceof immich.ImmichError ? err.code : 'unreachable';
+      res.status(code === 'not_configured' ? 409 : 502).json({ error: code });
+    }
+  }));
+  r.get('/immich/status', (req, res) => res.json(immich.immichStatus()));
+  r.post('/immich/refresh', wrap(async (req, res) => {
+    await immich.refreshAll();
+    publish('photos', {});
+    res.json(immich.immichStatus());
+  }));
+  r.delete('/immich/cache', (req, res) => res.json({ ok: true, freed: immich.clearCache() }));
 
   // --- weather API key (Pirate Weather): kept in secrets.json, never sent back, only whether one is set ---
   r.get('/weather/key', (req, res) => res.json(weatherKeyStatus(weatherKey())));

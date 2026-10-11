@@ -20,7 +20,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { label: 'Plantilla de diseño', route: 'layout', anchor: 'layout-presets', keywords: 'layout preset agenda calendario grande reloj grande template' },
   { label: 'Plantillas: hoy, por persona, dos semanas, tablero, marco de fotos, mesilla', route: 'layout', anchor: 'layout-presets', keywords: 'today hoy hoje timeline per person por persona pessoa columns columnas board tablero quadro tasks tareas photo frame marco moldura bedside mesilla dormitorio bedroom quarto two weeks dos semanas duas semanas corner esquina' },
   { label: 'Panel lateral (izquierda/derecha, anchura)', route: 'layout', anchor: 'layout-side', keywords: 'side panel width columna lateral largura' },
-  { label: 'Fotos de fondo', route: 'background', anchor: 'bg-photos', keywords: 'background wallpaper fondo stock galería intervalo brillo fotos orden aleatorio order random shuffle newest name' },
+  { label: 'Fotos de fondo', route: 'background', anchor: 'bg-photos', keywords: 'background wallpaper fondo stock galería intervalo brillo fotos orden aleatorio order random shuffle newest name immich álbumes albums vertical portrait difuminado blur' },
   { label: 'Efecto ambiental (aurora, partículas)', route: 'background', anchor: 'bg-ambient', keywords: 'ambient aurora particles three webgl animación' },
   { label: 'Efecto del tiempo (lluvia, nieve, sol)', route: 'background', anchor: 'bg-weather', keywords: 'weather effect rain snow sun drops lluvia nieve sol gotas webgl' },
   { label: 'Nombre de la pantalla', route: 'screen', anchor: 'scr-general', keywords: 'name nombre nome' },
@@ -68,6 +68,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   // Integraciones
   { label: 'Galería de fotos', route: 'photos', keywords: 'photos upload subir galería' },
   { label: 'Conexión con Home Assistant', route: 'homeassistant', anchor: 'ha-conn', keywords: 'home assistant token url' },
+  { label: 'Conexión con Immich', route: 'immich', anchor: 'immich-conn', keywords: 'immich fotos photos álbumes albums api key clave chave url', feature: 'immich' },
   { label: 'Timbre y cámara', route: 'homeassistant', anchor: 'ha-doorbell', keywords: 'doorbell timbre campainha camera cámara puerta door', feature: 'doorbell' },
   // servers without a live camera (Marco Cloud) have no Home Assistant page: the card is in API & webhooks
   { label: 'Timbre', route: 'api', anchor: 'api-doorbell', keywords: 'doorbell timbre campainha camera cámara puerta door foto snapshot', feature: 'doorbell', unless: 'doorbellLive' },
