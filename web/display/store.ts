@@ -64,3 +64,24 @@ export function loadCache<T>(k: Topic): T | null {
     return null;
   }
 }
+
+/**
+ * Per-screen copies for a carousel (`cs.cache.<ns>.m.<screenId>.<part>`): a display that boots offline keeps
+ * looping through the screens it has data for. Config, events and countdowns only (photos are refetched).
+ */
+const CAROUSEL_PARTS = ['config', 'events', 'countdowns'];
+export function saveScreenCache(screenId: string, part: string, v: unknown): void {
+  if (isPreview || !CAROUSEL_PARTS.includes(part) || !/^[A-Za-z0-9_-]{1,64}$/.test(screenId)) return;
+  try {
+    localStorage.setItem(`${LS_PREFIX}m.${screenId}.${part}`, JSON.stringify(v));
+  } catch { /* quota / private mode */ }
+}
+export function loadScreenCache<T>(screenId: string, part: string): T | null {
+  if (isPreview || !/^[A-Za-z0-9_-]{1,64}$/.test(screenId)) return null;
+  try {
+    const s = localStorage.getItem(`${LS_PREFIX}m.${screenId}.${part}`);
+    return s ? (JSON.parse(s) as T) : null;
+  } catch {
+    return null;
+  }
+}

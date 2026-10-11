@@ -1,0 +1,298 @@
+// Carousel runtime of the display (docs/ARCHITECTURE.md, Carousels): which screen of the carousel is on now, when
+// the next one comes, and the data of every screen kept ready ("bundles") so a switch needs no request.
+//
+// - The step comes from the epoch clock and the server time (shared/carousels.ts carouselPhase), so every TV on the
+//   same carousel switches at the same moment, also after a reconnect or a reload. One timer to the next boundary,
+//   recomputed at every switch, so it never drifts.
+// - A few seconds before a switch the next screen's data is refreshed when it is old (events older than a minute, a
+//   new config revision, a privacy change for that screen, a live event that marked it).
+// - Missing data (offline, server error): stay on the current screen and try again at the next step.
+// - A doorbell ring or an announcement on screen holds the current step (holdOnAlert); when it is gone the display
+//   jumps straight to the step the clock says.
+// The controller does no DOM work and no fetches itself: main.ts passes them in (CarouselDeps), so it is tested
+// with a fake clock (server/test/display-carousel.test.js).
+import type { CarouselBlock, CountdownsResponse, DisplayConfig, EventsResponse, PhotosResponse } from '../shared/types';
+import { carouselPhase, type CarouselPhase } from '../shared/carousels';
+
+/** Everything one screen needs on the display, fetched for that screen. */
+export interface Bundle {
+  config: DisplayConfig | null;
+  configAt: number;
+  events: EventsResponse | null;
+  eventsAt: number;
+  countdowns: CountdownsResponse | null;
+  countdownsAt: number;
+  photos: PhotosResponse | null;
+  photosAt: number;
+  /** a live event said this screen changed (privacy, config, calendar data): refresh before showing it */
+  dirty: boolean;
+}
+
+export type BundlePart = 'config' | 'events' | 'countdowns' | 'photos';
+
+export interface CarouselDeps {
+  /** server time (ms) */
+  now: () => number;
+  /** night mode with the night settings of `cfg` (the screen held at night) */
+  night: (cfg: DisplayConfig | null) => boolean;
+  /** true while a doorbell ring or an announcement is on screen */
+  alertOn: () => boolean;
+  /** fetch these parts for `screenId`; resolves with what came back (missing = failed) */
+  fetch: (screenId: string, parts: BundlePart[], cfg: DisplayConfig | null) => Promise<Partial<Pick<Bundle, BundlePart>>>;
+  /** put `screenId` on screen with its bundle */
+  show: (screenId: string, b: Bundle, transition: 'fade' | 'none') => void;
+  /** the screen's data was refreshed while it is on screen */
+  refreshed?: (screenId: string, b: Bundle, parts: BundlePart[]) => void;
+  /** debug: ?step=<slug> pins one screen, ?carousel=0 freezes on the first step */
+  pin?: string | null;
+  frozen?: boolean;
+  /** persist a bundle part (offline boot); optional */
+  save?: (screenId: string, part: BundlePart, value: unknown) => void;
+  setTimer?: (fn: () => void, ms: number) => unknown;
+  clearTimer?: (t: unknown) => void;
+}
+
+export const EVENTS_MAX_AGE = 60_000;
+export const COUNTDOWNS_MAX_AGE = 30 * 60_000;
+export const PHOTOS_MAX_AGE = 60 * 60_000;
+/** How long before a switch the next screen is refreshed (at most half the step). */
+export const PREFETCH_LEAD = 8_000;
+/** While nothing changes by time (night hold, paused), check again this often. */
+export const IDLE_CHECK_MS = 30_000;
+/** While an alert holds the step, check again this often. */
+export const HOLD_CHECK_MS = 1_000;
+
+export const emptyBundle = (): Bundle => ({
+  config: null, configAt: 0, events: null, eventsAt: 0, countdowns: null, countdownsAt: 0, photos: null, photosAt: 0, dirty: false,
+});
+
+export class CarouselController {
+  readonly bundles = new Map<string, Bundle>();
+  private block: CarouselBlock;
+  private tz: string;
+  private active: string;
+  private revision = 0;
+  private timer: unknown = null;
+  private prefetchTimer: unknown = null;
+  private stopped = false;
+  private loading = new Map<string, Promise<Bundle | null>>();
+  private setTimer: (fn: () => void, ms: number) => unknown;
+  private clearTimer: (t: unknown) => void;
+
+  constructor(block: CarouselBlock, tz: string, active: string, private d: CarouselDeps) {
+    this.block = block;
+    this.tz = tz;
+    this.active = active;
+    this.setTimer = d.setTimer ?? ((fn, ms) => setTimeout(fn, ms));
+    this.clearTimer = d.clearTimer ?? ((t) => clearTimeout(t as ReturnType<typeof setTimeout>));
+  }
+
+  /** Screen on the display now. */
+  get current(): string {
+    return this.active;
+  }
+
+  get carousel(): CarouselBlock {
+    return this.block;
+  }
+
+  /** Bundle of a screen (created empty). */
+  bundle(screenId: string): Bundle {
+    let b = this.bundles.get(screenId);
+    if (!b) {
+      b = emptyBundle();
+      this.bundles.set(screenId, b);
+    }
+    return b;
+  }
+
+  /** Store fresh data of a screen (main.ts calls it for the screen on display, whatever fetched it). */
+  put(screenId: string, part: BundlePart, value: unknown, at = this.d.now()): void {
+    const b = this.bundle(screenId);
+    (b as any)[part] = value;
+    (b as any)[`${part}At`] = at;
+    if (part === 'config' && value) this.revision = Math.max(this.revision, (value as DisplayConfig).revision || 0);
+    this.d.save?.(screenId, part, value);
+  }
+
+  /** What the clock says now (no pin, no hold). */
+  phase(nowMs = this.d.now()): CarouselPhase {
+    const off = this.bundles.get(this.block.offScreenId)?.config ?? null;
+    return carouselPhase(this.block, nowMs, { tz: this.tz, night: this.d.night(off) });
+  }
+
+  /** The screen that should be on: the pinned one, the first step while frozen, else the clock's. */
+  wanted(nowMs = this.d.now()): string {
+    const steps = this.block.steps;
+    if (this.d.pin) {
+      const hit = steps.find((s) => s.slug === this.d.pin || s.screenId === this.d.pin);
+      if (hit) return hit.screenId;
+    }
+    if (this.d.frozen && steps.length) return steps[0].screenId;
+    return this.phase(nowMs).screenId || this.active;
+  }
+
+  /** The display shows `screenId` without the controller asking (the server answered with it). */
+  adopt(screenId: string): void {
+    this.active = screenId;
+  }
+
+  /** Start: keep the screen already on display, load the others in the background, then follow the clock. */
+  start(): void {
+    this.stopped = false;
+    // the off-schedule screen decides the night hold: load it first, then look again
+    void this.ensure(this.block.offScreenId).then(() => this.tick());
+    this.tick();
+  }
+
+  /** New carousel definition (config saved) or time zone. */
+  update(block: CarouselBlock, tz: string): void {
+    this.block = block;
+    this.tz = tz;
+    for (const id of [...this.bundles.keys()]) if (!this.members().includes(id)) this.bundles.delete(id);
+    this.tick();
+  }
+
+  /** A new config revision exists: every screen's config (and what depends on it) is refreshed before it shows. */
+  revisionSeen(revision: number): void {
+    if (revision > this.revision) {
+      this.revision = revision;
+      for (const [id, b] of this.bundles) if (id !== this.active) b.dirty = true;
+    }
+  }
+
+  /** Mark one screen (or all) as changed: refreshed before it comes on screen. */
+  invalidate(screenId?: string | null, parts?: BundlePart[]): void {
+    const list = screenId ? [this.bundles.get(screenId)].filter(Boolean) as Bundle[] : [...this.bundles.values()];
+    for (const b of list) {
+      if (!parts) b.dirty = true;
+      else for (const p of parts) (b as any)[`${p}At`] = 0;
+    }
+  }
+
+  stop(): void {
+    this.stopped = true;
+    if (this.timer !== null) this.clearTimer(this.timer);
+    if (this.prefetchTimer !== null) this.clearTimer(this.prefetchTimer);
+    this.timer = null;
+    this.prefetchTimer = null;
+  }
+
+  /** Re-evaluate now: switch when the clock says so, then arm the next timers. Safe to call any time. */
+  tick(): void {
+    if (this.stopped) return;
+    const now = this.d.now();
+    const want = this.wanted(now);
+    let holding = false;
+    if (want && want !== this.active) {
+      if (this.block.holdOnAlert && this.d.alertOn()) holding = true;
+      else void this.switchTo(want);
+    }
+    this.arm(now, holding);
+  }
+
+  private members(): string[] {
+    const ids = this.block.steps.map((s) => s.screenId);
+    if (this.block.offScreenId) ids.push(this.block.offScreenId);
+    return [...new Set(ids)];
+  }
+
+  private arm(now: number, holding: boolean): void {
+    if (this.timer !== null) this.clearTimer(this.timer);
+    if (this.prefetchTimer !== null) this.clearTimer(this.prefetchTimer);
+    this.timer = null;
+    this.prefetchTimer = null;
+    if (this.stopped) return;
+    if (holding) {
+      this.timer = this.setTimer(() => this.tick(), HOLD_CHECK_MS);
+      return;
+    }
+    const pinned = Boolean(this.d.pin && this.block.steps.some((s) => s.slug === this.d.pin || s.screenId === this.d.pin)) || (this.d.frozen && this.block.steps.length > 0);
+    const ph = pinned ? null : this.phase(now);
+    const endsAt = ph?.endsAt ?? null;
+    if (endsAt === null) {
+      this.timer = this.setTimer(() => this.tick(), IDLE_CHECK_MS);
+      return;
+    }
+    // a little after the boundary, so the clock is surely on the other side of it
+    const wait = Math.max(50, endsAt - now + 30);
+    this.timer = this.setTimer(() => this.tick(), Math.min(wait, 24 * 3600_000));
+    const next = this.phase(endsAt + 1);
+    // at most half of the step that is on (a 10 s step refreshes the next one 5 s ahead)
+    const stepMs = ph && ph.mode === 'rotate' && ph.index >= 0 ? Math.max(1, Number(this.block.steps[ph.index]?.seconds) || 0) * 1000 : 2 * PREFETCH_LEAD;
+    const lead = Math.min(PREFETCH_LEAD, Math.floor(stepMs / 2));
+    if (next.screenId && next.screenId !== this.active) {
+      this.prefetchTimer = this.setTimer(() => {
+        this.prefetchTimer = null;
+        if (typeof document !== 'undefined' && document.hidden) return;
+        void this.ensure(next.screenId);
+      }, Math.max(0, endsAt - lead - now));
+    }
+  }
+
+  /** Parts of a screen's bundle that need a refresh now. */
+  stale(screenId: string, now = this.d.now()): BundlePart[] {
+    const b = this.bundles.get(screenId);
+    if (!b || !b.config) return ['config', 'events', 'countdowns', 'photos'];
+    const out: BundlePart[] = [];
+    const priv = b.config.privacy;
+    const privDue = [priv?.next, priv?.active ? priv?.until : null].some((x) => x && Date.parse(x) <= now);
+    if (b.dirty || b.config.revision < this.revision || privDue) out.push('config', 'events', 'countdowns');
+    else {
+      if (!b.events || now - b.eventsAt > EVENTS_MAX_AGE) out.push('events');
+      if (!b.countdowns || now - b.countdownsAt > COUNTDOWNS_MAX_AGE) out.push('countdowns');
+    }
+    if (!b.photos || now - b.photosAt > PHOTOS_MAX_AGE || out.includes('config')) out.push('photos');
+    return out;
+  }
+
+  /** Refresh what is old in a screen's bundle. Resolves with the bundle, or null when it has no config yet. */
+  ensure(screenId: string): Promise<Bundle | null> {
+    if (!screenId) return Promise.resolve(null);
+    const running = this.loading.get(screenId);
+    if (running) return running;
+    const parts = this.stale(screenId);
+    if (!parts.length) return Promise.resolve(this.bundle(screenId));
+    const p = (async () => {
+      try {
+        const b0 = this.bundle(screenId);
+        const got = await this.d.fetch(screenId, parts, b0.config);
+        const at = this.d.now();
+        for (const k of parts) if (got[k]) this.put(screenId, k, got[k], at);
+        const b = this.bundle(screenId);
+        if (got.config) b.dirty = false;
+        if (screenId === this.active && !this.stopped) this.d.refreshed?.(screenId, b, parts.filter((k) => got[k]));
+        return b.config ? b : null;
+      } catch {
+        return this.bundles.get(screenId)?.config ? this.bundle(screenId) : null;
+      } finally {
+        this.loading.delete(screenId);
+      }
+    })();
+    this.loading.set(screenId, p);
+    return p;
+  }
+
+  private switchTo(screenId: string): Promise<void> | void {
+    const b = this.bundles.get(screenId);
+    const ready = b?.config && b.events;
+    if (ready && !b.dirty && !(b.config!.revision < this.revision)) {
+      this.show(screenId, b);
+      // anything old is refreshed while it is on screen
+      if (this.stale(screenId).length) void this.ensure(screenId);
+      return;
+    }
+    return this.ensure(screenId).then((fresh) => {
+      if (this.stopped || !fresh?.config || !fresh.events) return; // no data: stay, try again at the next step
+      if (this.wanted() !== screenId || this.active === screenId) return;
+      if (this.block.holdOnAlert && this.d.alertOn()) return this.tick();
+      this.show(screenId, fresh);
+    });
+  }
+
+  private show(screenId: string, b: Bundle): void {
+    if (screenId === this.active) return;
+    this.active = screenId;
+    this.d.show(screenId, b, this.block.transition === 'none' ? 'none' : 'fade');
+  }
+}

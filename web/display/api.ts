@@ -5,7 +5,7 @@ import type {
   CountdownsResponse, DisplayConfig, DisplayHeartbeat, EventsResponse, HealthResponse, HeartbeatResponse, NewsResponse,
   PhotosResponse, PollResponse, WeatherResponse,
 } from '../shared/types';
-import { authHeaders, withScreen } from './identity';
+import { authHeaders, withScreen, withTarget } from './identity';
 
 export class ApiError extends Error {
   constructor(message: string, public status = 0, public code = '') {
@@ -45,21 +45,23 @@ export function getJSON<T>(path: string, timeoutMs = 15000): Promise<T> {
   return request<T>(path, {}, timeoutMs);
 }
 
+// `screen` (optional) asks for one screen of the carousel the display runs (a prefetch); left out, the request is for
+// the screen on display.
 export const api = {
-  config: () => getJSON<DisplayConfig>(withScreen('/api/display/config')),
+  config: (screen?: string) => getJSON<DisplayConfig>(withScreen('/api/display/config', screen)),
   /** First config fetch at boot: short timeout so an unreachable server falls back to the cache quickly. */
   configQuick: () => getJSON<DisplayConfig>(withScreen('/api/display/config'), 5000),
-  events: (from: string, to: string) =>
-    getJSON<EventsResponse>(withScreen(`/api/events?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)),
-  weather: () => getJSON<WeatherResponse>(withScreen('/api/weather')),
+  events: (from: string, to: string, screen?: string) =>
+    getJSON<EventsResponse>(withScreen(`/api/events?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, screen)),
+  weather: (screen?: string) => getJSON<WeatherResponse>(withScreen('/api/weather', screen)),
   news: () => getJSON<NewsResponse>('/api/news'),
   /** `after` = gallery file shown last, so sequential orders continue from there and random avoids repeating it. */
-  photos: (count = 20, after = '') =>
-    getJSON<PhotosResponse>(withScreen(`/api/photos?count=${count}${after ? `&after=${encodeURIComponent(after)}` : ''}`)),
-  countdowns: () => getJSON<CountdownsResponse>(withScreen('/api/countdowns')),
+  photos: (count = 20, after = '', screen?: string) =>
+    getJSON<PhotosResponse>(withScreen(`/api/photos?count=${count}${after ? `&after=${encodeURIComponent(after)}` : ''}`, screen)),
+  countdowns: (screen?: string) => getJSON<CountdownsResponse>(withScreen('/api/countdowns', screen)),
   health: () => getJSON<HealthResponse>('/api/health', 5000),
-  /** `q` from stream.ts pollUrl (client, cursor, rev, hidden, preview). */
-  poll: (q: string) => getJSON<PollResponse>(withScreen(`/api/display/poll?${q}`), 10000),
+  /** `q` from stream.ts pollUrl (client, cursor, rev, hidden, preview). Asks for what the display is bound to. */
+  poll: (q: string) => getJSON<PollResponse>(withTarget(`/api/display/poll?${q}`), 10000),
   heartbeat: (hb: DisplayHeartbeat) =>
     request<HeartbeatResponse>('/api/display/heartbeat', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(hb),

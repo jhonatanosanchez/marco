@@ -90,6 +90,10 @@ body {
   transition: opacity 1.4s var(--ease);
 }
 #app.booting { opacity: 0; }
+/* carousel: a short fade between two screens (web/display/main.ts showScreen) */
+html.has-carousel #app { transition: opacity 0.25s ease; }
+#app.is-switching { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { html.has-carousel #app { transition: none; } }
 
 .photo-area, .side { grid-row: 1; grid-column: 1; min-width: 0; min-height: 0; }
 .main { grid-row: 1; grid-column: 2; min-width: 0; min-height: 0; }

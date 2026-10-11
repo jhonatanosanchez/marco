@@ -90,8 +90,9 @@ export interface StreamHandlers {
   announceClear?: (d: { id: string | null }) => void;
   identify?: (d: IdentifyPayload) => void;
   night?: (d: { mode: NightCommand }) => void;
-  /** privacy mode turned on or off for this screen: refetch config, events, countdowns and photos */
-  privacy?: (d: { active: boolean }) => void;
+  /** privacy mode turned on or off for this screen (`screenId`: which one, for a display on a carousel): refetch
+   *  config, events, countdowns and photos */
+  privacy?: (d: { active: boolean; screenId?: string }) => void;
   /** doorbell ring on this screen (a later one with the same id extends it) */
   doorbell?: (d: DoorbellRing) => void;
   doorbellEnd?: (d: { id: string | null }) => void;
@@ -118,7 +119,7 @@ export function dispatch(name: string, d: any, h: StreamHandlers): boolean {
     case 'announce-clear': h.announceClear?.({ id: typeof d?.id === 'string' ? d.id : null }); return true;
     case 'identify': h.identify?.(d); return true;
     case 'night': if (d?.mode === 'on' || d?.mode === 'off' || d?.mode === 'auto') h.night?.(d); return true;
-    case 'privacy': h.privacy?.({ active: d?.active === true }); return true;
+    case 'privacy': h.privacy?.({ active: d?.active === true, ...(typeof d?.screenId === 'string' ? { screenId: d.screenId } : {}) }); return true;
     case 'doorbell': if (d && typeof d.id === 'string' && typeof d.expiresAt === 'string') h.doorbell?.(d); return true;
     case 'doorbell-end': h.doorbellEnd?.({ id: typeof d?.id === 'string' ? d.id : null }); return true;
     case 'revoked': h.revoked?.({ code: typeof d?.code === 'string' ? d.code : 'invalid_key' }); return true;
@@ -139,7 +140,7 @@ export const POLL_ERROR_MAX_MS = 5 * 60_000;
 export interface PollHandlers extends StreamHandlers {
   /** First answer or a reset: the poll version of the SSE `hello`. */
   first: (r: PollResponse) => void;
-  /** The credential now belongs to another screen (device moved): reload the page. */
+  /** The credential now belongs to another screen or carousel (device moved): reload the page. */
   screenChanged: () => void;
   /** Server time from a regular answer. */
   now?: (iso: string) => void;

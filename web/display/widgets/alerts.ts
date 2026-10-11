@@ -57,6 +57,13 @@ export class Announcements {
     return this.live.size;
   }
 
+  /** Announcements shown big right now (not yet settled into the corner): a carousel waits for them. */
+  get expandedCount(): number {
+    let n = 0;
+    for (const lv of this.live.values()) if (!lv.compact) n++;
+    return n;
+  }
+
   /** Show (or update) an announcement. Ignored when alerts are disabled on this screen or already expired. */
   show(raw: Announcement): void {
     const alerts = ctx.cfg.alerts;

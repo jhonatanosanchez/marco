@@ -7,7 +7,7 @@ import './styles.css';
 import './styles-views.css';
 import './styles-modern.css';
 import type {
-  Announcement, CountdownsResponse, DisplayConfig, EventsResponse, NewsResponse, NightCommand, StreamHello, WeatherResponse,
+  Announcement, CountdownsResponse, DisplayConfig, EventsResponse, NewsResponse, NightCommand, PhotosResponse, StreamHello, WeatherResponse,
 } from '../shared/types';
 import { addDays, startOfWeek } from '../shared/i18n';
 import { api, ApiError } from './api';
@@ -15,7 +15,10 @@ import { parseColor, toHex } from './color';
 import { ctx, setCtxConfig } from './ctx';
 import { normalizeConfig } from './defaults';
 import { Heartbeat, noteError } from './heartbeat';
-import { authHeaders, clearDeviceToken, clientId, credential, credentialKind, screenKey, storedDeviceToken, withScreen } from './identity';
+import {
+  authHeaders, clearDeviceToken, clientId, credential, credentialKind, getActiveScreen, screenKey, setActiveScreen, storedDeviceToken, withScreen,
+} from './identity';
+import { CarouselController, type Bundle, type BundlePart } from './carousel';
 import { $ } from './dom';
 import { type NEvent, normalizeEvents } from './eventModel';
 import type { AmbientLayer } from './gl/ambientLayer';
@@ -24,13 +27,13 @@ import type { PhotoLayer } from './gl/photoLayer';
 import type { PrecipLayer } from './gl/precipLayer';
 import type { WeatherFxLayer } from './gl/weatherFxLayer';
 import { weatherFxOf } from './icons';
-import { mockAnnouncements, mockConfig, mockCountdowns, mockEvents, mockNews, mockPhotos, mockWeather } from './mock';
-import { loadCache, on, saveCache, set, state } from './store';
+import { mockAnnouncements, mockCarouselConfigs, mockConfig, mockCountdowns, mockEvents, mockNews, mockPhotos, mockWeather } from './mock';
+import { loadCache, loadScreenCache, on, saveCache, saveScreenCache, set, state } from './store';
 import { detectLiveMode, startConfigPoll, startPoll, type StreamHandlers } from './live';
 import { connectStream, pollUrl } from './stream';
 import { current, onTick, setClockOffset, setTimezone, startTicker, type Tick } from './time';
 import { Agenda } from './widgets/agenda';
-import { Announcements, IdentifyOverlay, ScheduleBanners, setServerNow } from './widgets/alerts';
+import { Announcements, IdentifyOverlay, ScheduleBanners, serverNow, setServerNow } from './widgets/alerts';
 import { Countdowns } from './widgets/countdowns';
 import { DoorbellOverlay, type FrameSource } from './widgets/doorbell';
 import { mockDoorbellFrame, mockDoorbellRing } from './mockDoorbell';
@@ -81,14 +84,19 @@ const announcements = new Announcements($('#alerts'));
 const identify = new IdentifyOverlay($('#identify'));
 /** Doorbell frames: GET /api/display/doorbell/frame (a counter keeps every answer fresh), drawn ones in the demo.
  *  404 and lost access mean there is nothing more to show for this ring. */
+/** Screen that rings (a display on a carousel asks for that screen's frames, whichever screen is on display). */
+let doorbellScreen = '';
 const doorbellFrames: FrameSource = async (n, signal) => {
   if (state.demo) return mockDoorbellFrame(n);
-  const r = await fetch(withScreen(`/api/display/doorbell/frame?n=${n}`), { headers: authHeaders(), cache: 'no-store', signal });
+  const r = await fetch(withScreen(`/api/display/doorbell/frame?n=${n}`, doorbellScreen || undefined), { headers: authHeaders(), cache: 'no-store', signal });
   if (r.status === 404 || r.status === 401 || r.status === 403) return null;
   if (!r.ok || !(r.headers.get('content-type') || '').startsWith('image/')) throw new Error(`frame: HTTP ${r.status}`);
   return r.blob();
 };
-const doorbell = new DoorbellOverlay($('#doorbell'), doorbellFrames);
+// a ring that ends lets a carousel held by it move on right away
+const doorbell = new DoorbellOverlay($('#doorbell'), doorbellFrames, (on) => {
+  if (!on) carousel?.tick();
+});
 const views = new Views($('#view'));
 const screenNote = $('#screen-note');
 const statusDot = $('#status');
@@ -574,8 +582,7 @@ let nightOverride: NightCommand = 'auto';
 let overrideBase: boolean | null = null;
 let nightNow = false;
 
-function autoNight(tick: Tick): boolean {
-  const nm = ctx.cfg.screen.nightMode;
+function autoNight(tick: Tick, nm = ctx.cfg.screen.nightMode): boolean {
   let on = false;
   if (nm.enabled) {
     const f = hmToMin(nm.from), t = hmToMin(nm.to);
@@ -586,10 +593,19 @@ function autoNight(tick: Tick): boolean {
   return on;
 }
 
+/** Night mode as it would be with the night settings of `cfg` (a carousel holds its off screen by these). */
+function nightWith(cfg: DisplayConfig | null): boolean {
+  if (!cfg?.screen?.nightMode) return false;
+  if (nightOverride === 'on') return true;
+  if (nightOverride === 'off') return false;
+  return autoNight(current(), cfg.screen.nightMode);
+}
+
 function setNightCommand(mode: NightCommand): void {
   nightOverride = mode;
   overrideBase = mode === 'auto' ? null : autoNight(current());
   updateNight(current());
+  carousel?.tick();
 }
 
 function updateNight(tick: Tick): void {
@@ -634,6 +650,7 @@ function denyAccess(status: number): void {
   intervals.forEach(clearInterval);
   intervals.length = 0;
   liveStream?.close();
+  carousel?.stop();
   heartbeat.stop();
   // keep the language the screen was showing; the browser's language may differ
   const deniedLang = state.config ? ctx.lang : pairingLang(params);
@@ -653,10 +670,10 @@ function deniedBy(e: unknown): boolean {
 // ---------------------------------------------------------------------------------------------
 // Data
 // ---------------------------------------------------------------------------------------------
-function eventsRange(): [string, string] {
+function eventsRange(cal: { weekStart: number; weeks: number } = ctx.cfg.calendar): [string, string] {
   const today = current().dayKey;
-  const from = startOfWeek(today, ctx.cfg.calendar.weekStart);
-  const to = addDays(from, Math.max(ctx.cfg.calendar.weeks * 7, 21) + 1);
+  const from = startOfWeek(today, cal.weekStart ?? 1);
+  const to = addDays(from, Math.max((cal.weeks ?? 5) * 7, 21) + 1);
   return [from, to];
 }
 
@@ -668,9 +685,12 @@ async function fetchEvents(): Promise<void> {
   }
   try {
     const [from, to] = eventsRange();
+    const sid = getActiveScreen();
     const r = await api.events(from, to);
     setOnline(true);
     if (r.errors?.length) console.warn('[events] source errors', r.errors);
+    if (sid) carousel?.put(sid, 'events', r);
+    if (sid !== getActiveScreen()) return; // the carousel moved on: the answer is kept for that screen
     if (!state.events || state.events.hash !== r.hash) {
       set('events', r);
       saveCache('events', r);
@@ -688,7 +708,10 @@ async function fetchWeather(): Promise<void> {
     return set('weather', w);
   }
   try {
+    const lang = ctx.lang;
     const r = await api.weather();
+    weatherByLang.set(lang, { w: r, at: Date.now() });
+    if (lang !== ctx.lang) return;
     set('weather', r);
     saveCache('weather', r);
   } catch (e) {
@@ -712,7 +735,11 @@ async function fetchNews(): Promise<void> {
 async function fetchPhotos(): Promise<void> {
   if (state.demo) return set('photos', mockPhotos());
   try {
-    set('photos', await api.photos(20, photos.lastGalleryFile));
+    const sid = getActiveScreen();
+    const r = await api.photos(20, photos.lastGalleryFile);
+    if (sid) carousel?.put(sid, 'photos', r);
+    if (sid !== getActiveScreen()) return;
+    set('photos', r);
   } catch (e) {
     if (deniedBy(e)) return;
     console.warn('[photos]', (e as Error).message);
@@ -723,7 +750,10 @@ async function fetchPhotos(): Promise<void> {
 async function fetchCountdowns(): Promise<void> {
   if (state.demo) return set('countdowns', mockCountdowns(current().now));
   try {
+    const sid = getActiveScreen();
     const r = await api.countdowns();
+    if (sid) carousel?.put(sid, 'countdowns', r);
+    if (sid !== getActiveScreen()) return;
     if (!state.countdowns || state.countdowns.hash !== r.hash || state.countdowns.today !== r.today) {
       set('countdowns', r);
       saveCache('countdowns', r);
@@ -737,8 +767,11 @@ async function fetchCountdowns(): Promise<void> {
 
 async function fetchConfig(): Promise<boolean> {
   try {
+    const sid = getActiveScreen();
     const c = await api.config();
     setOnline(true);
+    if (sid && c.target?.kind === 'carousel' && c.screenId === sid) carousel?.put(sid, 'config', c);
+    if (sid && sid !== getActiveScreen()) return true; // kept for that screen; the one on display is not touched
     saveCache('config', c);
     set('config', c);
     return true;
@@ -752,6 +785,8 @@ async function fetchConfig(): Promise<boolean> {
 
 let photoSig = '';
 let privateSig = '';
+/** What decides the photo list of a screen (a carousel keeps the list when the next screen has the same). */
+const photoSigOf = (b: { enabled: boolean; source: string; stockTopic: string; order?: string }) => `${b.enabled}|${b.source}|${b.stockTopic}|${b.order ?? 'random'}`;
 on('config', (s) => {
   if (!s.config) return;
   applyConfig(s.config);
@@ -762,11 +797,154 @@ on('config', (s) => {
   applyPrivacy(priv);
   // photo source changed in the admin → fetch a fresh list right away; privacy mode with "hide photos" also
   // replaces the photo on screen at once
-  const b = ctx.cfg.background;
-  const sig = `${b.enabled}|${b.source}|${b.stockTopic}|${b.order ?? 'random'}`;
+  const sig = photoSigOf(ctx.cfg.background);
   if (photoSig && sig !== photoSig) void fetchPhotos().then(() => (privChanged ? photos.next() : undefined));
   photoSig = sig;
+  syncCarousel(s.config);
 });
+
+// ---------------------------------------------------------------------------------------------
+// Carousel (web/display/carousel.ts): a display bound to a carousel shows its screens one after another. A display
+// bound to a plain screen never creates one, so nothing here runs for it.
+// ---------------------------------------------------------------------------------------------
+let carousel: CarouselController | null = null;
+/** ?step=<slug> shows one step only, ?carousel=0 stays on the first step (testing, the admin preview). */
+const stepParam = (params.get('step') || '').trim().toLowerCase() || null;
+const carouselFrozen = params.get('carousel') === '0';
+/** Weather per language: screens of a carousel may speak different languages. */
+const weatherByLang = new Map<string, { w: WeatherResponse; at: number }>();
+
+function syncCarousel(c: DisplayConfig): void {
+  const block = c.carousel;
+  if (!block || c.target?.kind !== 'carousel' || !c.screenId) {
+    // the carousel was deleted or this display was moved: start again with what it is bound to now
+    if (carousel && !state.demo) location.reload();
+    return;
+  }
+  if (carousel) {
+    // the server answered with another screen (the one on display left the carousel): that one is on display now
+    if (c.screenId !== carousel.current) {
+      carousel.adopt(c.screenId);
+      setActiveScreen(c.screenId);
+    }
+    carousel.revisionSeen(c.revision);
+    carousel.update(block, c.datetime.timezone);
+    return;
+  }
+  carousel = new CarouselController(block, c.datetime.timezone, c.screenId, {
+    now: () => serverNow(),
+    night: (cfg) => nightWith(cfg),
+    // a ring, or an announcement shown big (a corner one stays on every screen anyway)
+    alertOn: () => doorbell.active || announcements.expandedCount > 0,
+    fetch: fetchBundle,
+    show: showScreen,
+    refreshed: (id, b, parts) => {
+      if (id !== getActiveScreen()) return;
+      if (parts.includes('config') && b.config && b.config !== state.config) set('config', b.config);
+      if (parts.includes('events') && b.events && b.events !== state.events) set('events', b.events);
+      if (parts.includes('countdowns') && b.countdowns && b.countdowns !== state.countdowns) set('countdowns', b.countdowns);
+    },
+    pin: stepParam,
+    frozen: carouselFrozen,
+    save: state.demo ? undefined : (id, part, v) => saveScreenCache(id, part, v),
+  });
+  setActiveScreen(c.screenId);
+  document.documentElement.classList.add('has-carousel');
+  carousel.put(c.screenId, 'config', c);
+  if (state.events) carousel.put(c.screenId, 'events', state.events);
+  if (state.countdowns) carousel.put(c.screenId, 'countdowns', state.countdowns);
+  if (state.photos) carousel.put(c.screenId, 'photos', state.photos);
+  // offline boot: what this browser kept of the other screens (they are refreshed before they show)
+  if (!state.demo) {
+    for (const st of [...block.steps, { screenId: block.offScreenId }]) {
+      if (st.screenId === c.screenId || carousel.bundles.has(st.screenId)) continue;
+      const cfg = loadScreenCache<DisplayConfig>(st.screenId, 'config');
+      if (!cfg) continue;
+      carousel.put(st.screenId, 'config', cfg, 0);
+      const ev = loadScreenCache<EventsResponse>(st.screenId, 'events');
+      if (ev) carousel.put(st.screenId, 'events', ev, 0);
+      const cd = loadScreenCache<CountdownsResponse>(st.screenId, 'countdowns');
+      if (cd) carousel.put(st.screenId, 'countdowns', cd, 0);
+    }
+  }
+  carousel.start();
+}
+
+/** Fetch parts of one carousel screen's data (a prefetch, or a screen shown without data yet). */
+async function fetchBundle(id: string, parts: BundlePart[], known: DisplayConfig | null): Promise<Partial<Pick<Bundle, BundlePart>>> {
+  if (state.demo) {
+    const cfg = mockCarouselConfigs().find((x) => x.screenId === id) ?? null;
+    const t = current().now;
+    return { config: cfg, events: mockEvents(t), countdowns: mockCountdowns(t), photos: mockPhotos() };
+  }
+  const out: Partial<Pick<Bundle, BundlePart>> = {};
+  const one = async <T,>(fn: () => Promise<T>): Promise<T | null> => {
+    try {
+      return await fn();
+    } catch (e) {
+      if (deniedBy(e)) throw e;
+      return null;
+    }
+  };
+  const cfg = parts.includes('config') ? await one(() => api.config(id)) : known;
+  // the server answers with another screen when this one left the carousel: keep nothing
+  if (!cfg || cfg.screenId !== id) return {};
+  if (parts.includes('config')) out.config = cfg;
+  const [from, to] = eventsRange(cfg.calendar);
+  const [events, countdowns, ph] = await Promise.all([
+    parts.includes('events') ? one(() => api.events(from, to, id)) : null,
+    parts.includes('countdowns') ? one(() => api.countdowns(id)) : null,
+    parts.includes('photos') ? one(() => api.photos(20, '', id)) : null,
+  ]);
+  if (events) out.events = events;
+  if (countdowns) out.countdowns = countdowns;
+  if (ph) out.photos = ph;
+  const lang = cfg.screen?.language;
+  if (lang && lang !== ctx.lang && !(Date.now() - (weatherByLang.get(lang)?.at ?? 0) < 10 * 60_000)) {
+    const w = await one(() => api.weather(id));
+    if (w) weatherByLang.set(lang, { w, at: Date.now() });
+  }
+  return out;
+}
+
+const reducedMotion = () => {
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
+};
+
+/** Put one carousel screen on display from its bundle: no request, a short fade unless turned off. */
+function showScreen(id: string, b: Bundle, transition: 'fade' | 'none'): void {
+  // from now on, answers for the screen that leaves are kept for it and never shown
+  setActiveScreen(id);
+  const apply = () => {
+    if (!b.config || accessDenied || getActiveScreen() !== id) return;
+    state.events = b.events;
+    state.countdowns = b.countdowns;
+    // the photo list only changes when the photo settings differ (same source: the slideshow just goes on)
+    const sig = photoSigOf(b.config.background);
+    const newPhotos = !!photoSig && sig !== photoSig;
+    photoSig = sig;
+    if (b.config.screen?.language && b.config.screen.language !== ctx.lang) {
+      const w = weatherByLang.get(b.config.screen.language);
+      state.weather = w ? w.w : state.weather;
+    }
+    set('config', b.config);
+    if (newPhotos) {
+      if (b.photos) {
+        set('photos', b.photos as PhotosResponse);
+        void photos.next();
+      } else void fetchPhotos();
+    }
+    if (!weatherByLang.has(ctx.lang)) void fetchWeather();
+    app.classList.remove('is-switching');
+  };
+  if (transition === 'none' || reducedMotion() || app.classList.contains('booting')) return apply();
+  app.classList.add('is-switching');
+  setTimeout(apply, 250);
+}
 
 // ---------------------------------------------------------------------------------------------
 // Privacy mode: the server already filtered the events; the display shows a small lock and asks again when the
@@ -832,6 +1010,7 @@ onTick((tick) => {
     schedules.render(tick);
     updateNight(tick);
     fitSide();
+    carousel?.tick(); // night mode may have started or ended
   }
   if (tick.dayChanged) {
     void fetchEvents();
@@ -883,7 +1062,8 @@ window.addEventListener('resize', () => {
 function enterDemo(): void {
   state.demo = true;
   statusDot.classList.remove('show');
-  set('config', mockConfig());
+  // &carousel=1: the demo screens in a loop (web/display/mock.ts mockCarouselConfigs)
+  set('config', params.get('carousel') === '1' ? mockCarouselConfigs()[0] : mockConfig());
   void fetchEvents();
   void fetchWeather();
   void fetchNews();
@@ -1010,7 +1190,8 @@ async function goLive(): Promise<void> {
     liveStream = startPoll({
       poll: (cursor, rev, hidden) => api.poll(pollUrl(cursor, rev, hidden)),
       revision: () => state.config?.revision,
-      screenId: () => state.config?.screenId,
+      // what the display is bound to: the carousel itself while it rotates through its screens
+      screenId: () => state.config?.target?.id ?? state.config?.screenId,
       handlers: {
         ...liveHandlers,
         first: onHello,
@@ -1056,14 +1237,18 @@ function onHello(d: Partial<StreamHello>): void {
 /** What each live event does, whichever transport brought it (live.ts dispatch). */
 const liveHandlers: StreamHandlers = {
   // Config can change the event range (weeks/weekStart), colours, icons and countdowns → refetch them too.
-  config: () => void fetchConfig().then((ok) => (ok ? Promise.all([fetchEvents(), fetchCountdowns()]) : undefined)),
+  config: (d) => {
+    if (typeof d?.revision === 'number') carousel?.revisionSeen(d.revision);
+    void fetchConfig().then((ok) => (ok ? Promise.all([fetchEvents(), fetchCountdowns()]) : undefined));
+  },
   // gallery changed in the admin (upload, replace, delete, focal point, shown / hidden) → fresh list;
   // a photo taken out of the rotation while on screen is replaced right away
   photos: (d) =>
-    void fetchPhotos().then(() => {
+    void (carousel?.invalidate(null, ['photos']), fetchPhotos()).then(() => {
       if (photos.currentFile && d.hidden?.includes(photos.currentFile)) void photos.next();
     }),
   events: (d) => {
+    carousel?.invalidate(null, ['events', 'countdowns']);
     if (!state.events || d.hash !== state.events.hash) void fetchEvents();
     void fetchCountdowns();
   },
@@ -1071,7 +1256,10 @@ const liveHandlers: StreamHandlers = {
   announce: (a) => announcements.show(a),
   announceClear: (d) => announcements.clear(d.id),
   identify: (d) => {
-    identify.show(d, { name: ctx.cfg.screen.name, slug: state.config?.slug || screenKey, clientId });
+    const car = carousel?.carousel;
+    // on a carousel: "Kitchen loop · now: Photos"
+    const shown = car ? { ...d, name: ctx.t('carouselShowing', { name: d.name || car.name, screen: ctx.cfg.screen.name }), slug: car.slug } : d;
+    identify.show(shown, { name: ctx.cfg.screen.name, slug: state.config?.slug || screenKey, clientId });
     heartbeat.soon();
   },
   night: (d) => {
@@ -1079,9 +1267,16 @@ const liveHandlers: StreamHandlers = {
     heartbeat.soon();
   },
   // privacy mode turned on or off: new config (lock, photo source), filtered events and countdowns
-  privacy: () => refreshForPrivacy(),
+  // (a carousel only refetches now when it is the screen on display; the others before they show)
+  privacy: (d) => {
+    if (carousel && d.screenId && d.screenId !== getActiveScreen()) return carousel.invalidate(d.screenId);
+    refreshForPrivacy();
+  },
   // Doorbell: full screen above the night layer while it lasts (it wakes a dimmed screen, see widgets/doorbell.ts).
-  doorbell: (d) => doorbell.show(d),
+  doorbell: (d) => {
+    doorbellScreen = typeof d.screenId === 'string' ? d.screenId : '';
+    doorbell.show(d);
+  },
   doorbellEnd: (d) => doorbell.end(d.id),
   // Link regenerated / device revoked → "no longer valid"; switched to private without a key → pairing.
   revoked: (d) => denyAccess(d.code === 'key_required' ? 401 : 403),
