@@ -1,0 +1,97 @@
+/* =============================================================================================
+   Planner options of the month / week grid and the Planner layout.
+   - Cards (calendar.eventStyle = 'cards'): every rule is scoped to .ev-cards, .wk.cards or .cstack.cards, which
+     only exist in that style, so screens with one-line chips look exactly as before.
+   - Planner layout (layout.preset = 'planner'): every rule is scoped to .preset-planner. On a portrait screen it
+     uses the top / bottom frame (#app also gets .preset-topBottom), on a landscape one the big calendar frame.
+   The card sizes (--card-*) are set in px by calendar.ts, which plans the cards with the same numbers.
+   ============================================================================================= */
+
+/* ------------------------------------------------------------------------------------- cards */
+/* week view: the bars above the cards keep their usual height (the one-line week chips are taller) */
+.cal.is-week.ev-cards { --lane-h: 3.6rem; --lane-min: 3.4rem; }
+.cal .wk.cards { grid-template-rows: var(--num-h) minmax(0, 1fr); }
+.cal .cstack.cards { gap: var(--card-gap, 0.38rem); padding-bottom: var(--card-pad, 0.4rem); }
+.cal .cstack.cards.paged > .cpg { gap: var(--card-gap, 0.38rem); }
+.cal .cstack.cards .ev.card {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0;
+  row-gap: 0;
+  margin: 0 0.35rem;
+  padding: var(--card-pad, 0.4rem) 0.6rem var(--card-pad, 0.4rem) 0.95rem;
+  border-radius: 0.35rem 0.7rem 0.7rem 0.35rem;
+  font-size: var(--card-fs, 1.58rem);
+  line-height: normal;
+  white-space: normal;
+}
+.cal .cstack.cards .ev.card.bar { padding-left: 0.6rem; border-radius: 0.7rem; box-shadow: none; }
+.cal .cstack.cards .ev.card .ch {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  height: var(--card-tm-h, 1.75rem);
+  font-size: var(--card-tm-fs, 1.34rem);
+  line-height: var(--card-tm-h, 1.75rem);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.cal .cstack.cards .ev.card .ch .em { font-size: 1.05em; }
+.cal .cstack.cards .ev.card .ch .tm { flex: none; line-height: inherit; padding: 0; font-weight: 700; color: var(--tint); }
+.cal .cstack.cards .ev.card .ch .loc { flex: 0 1 auto; max-width: none; line-height: inherit; padding: 0; }
+.cal .cstack.cards .ev.card .tx {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--clamp, 2);
+  line-clamp: var(--clamp, 2);
+  overflow: hidden;
+  min-width: 0;
+  max-height: calc(var(--clamp, 2) * var(--card-line-h, 1.9rem));
+  line-height: var(--card-line-h, 1.9rem);
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+.cal .cstack.cards .ev.card .tx > span { display: inline; }
+.cal .cstack.cards .ev.card .tx .em { margin-right: 0.4rem; font-size: 1em; }
+.cal .cstack.cards .ev.card .tt { overflow: visible; line-height: inherit; padding: 0; }
+.cal .cstack.cards .ev.card .tx.mqv { max-height: none; }
+.theme-light .cal .cstack.cards .ev.card .ch .tm { color: var(--shade); }
+
+/* Modern: a tinted card with a colour stripe (as in its week view) instead of the dot of the one-line chips */
+.style-modern .cal .cstack.cards .ev.card { border-radius: 0.4rem 0.8rem 0.8rem 0.4rem; }
+.style-modern .cal .cstack.cards .ev.card.bar { border-radius: 0.8rem; }
+.style-modern .cal .cstack.cards .ev.card.timed { background: rgb(var(--c) / 0.2); padding-left: 1rem; }
+.style-modern .cal .cstack.cards .ev.card.timed::before {
+  display: block;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0.4rem;
+  height: auto;
+  border-radius: 0;
+  transform: none;
+}
+.style-modern .cal .cstack.cards .ev.card.ongoing { background: rgb(var(--c) / 0.32); }
+.style-modern .cal .cstack.cards .ev.card .ch .tm { color: var(--tint); }
+.style-modern.theme-light .cal .cstack.cards .ev.card.timed { background: rgb(var(--c) / 0.16); color: #000; }
+.style-modern.theme-light .cal .cstack.cards .ev.card .ch .tm { color: var(--shade); }
+
+/* --------------------------------------------------------------------------- planner layout */
+/* portrait: a short band with the clock and the date on the left, the weather and its forecast on the right */
+#app.preset-planner.portrait { grid-template-rows: 23% minmax(0, 1fr); }
+.preset-planner.portrait .side { padding: 2.4rem 3.6rem 1.8rem; gap: 2rem; align-items: center; }
+.preset-planner.portrait .side-top { align-self: center; }
+.preset-planner.portrait .side-bottom { align-self: center; }
+#app.preset-planner.portrait .clock.digital { font-size: 11.5rem; }
+.style-modern #app.preset-planner.portrait .clock.digital { font-size: 14rem; }
+/* Classic: the next days side by side as small columns (the row form of the taller band does not fit here) */
+#app.preset-planner.portrait .dp { flex-direction: column; gap: 0.3rem; padding: 0.6rem 0.4rem; }
+#app.preset-planner.portrait .dp svg { width: 3.8rem; height: 4rem; }
+.preset-planner.portrait .hl-pill:nth-child(n + 2) { display: none; }
+.preset-planner.portrait .highlights { margin-top: 1.2rem; }
+.preset-planner.portrait .main { padding-top: 0.6rem; }

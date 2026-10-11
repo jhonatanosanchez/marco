@@ -26,6 +26,7 @@ import {
 import { atLimit, has, offers } from '../caps';
 import { defaultPrivacyOf, privacyModeOptions } from './Privacy';
 import { LimitNote } from '../components/LimitNote';
+import { EventStyleField, WeeksField } from '../components/PlannerFields';
 import { t } from '../i18n';
 import { allSourceOptions, guessKind, HOLIDAY_PRESETS, isHttpUrl, KIND_EMOJI, moveItem, SWATCHES, uid } from '../util';
 import type { SectionProps } from './common';
@@ -710,15 +711,16 @@ export function CalendarsSection(props: SectionProps) {
                 onChange={(v) => set((d) => void (d.calendar.weekStart = v))}
               />
             </Field>
-            <Field label={t('Semanas a mostrar')} error={errors['calendar.weeks']}>
-              <Segmented full value={c.weeks} options={[1, 2, 3, 4, 5, 6].map((n) => ({ value: n, label: String(n) }))} onChange={(v) => set((d) => void (d.calendar.weeks = v))} />
-            </Field>
+            <WeeksField cfg={props.cfg} set={set} error={errors['calendar.weeks']} />
+            <EventStyleField cfg={props.cfg} set={set} />
             <Field
               label={t('Máx. eventos visibles por día')}
               hint={
-                c.compactBusyDays === true
-                  ? t('Los días con más eventos pasan a líneas cortas y los muestran todos. Con 3 o 4, los días normales se ven grandes.')
-                  : t('Los eventos que no caben se muestran por turnos o con “+N”.')
+                c.eventStyle === 'cards'
+                  ? t('Con tarjetas, cada día muestra las que caben en su alto. Este número cuenta para elegir las semanas en Auto.')
+                  : c.compactBusyDays === true
+                    ? t('Los días con más eventos pasan a líneas cortas y los muestran todos. Con 3 o 4, los días normales se ven grandes.')
+                    : t('Los eventos que no caben se muestran por turnos o con “+N”.')
               }
               error={errors['calendar.maxEventsPerDay']}
             >
@@ -748,7 +750,11 @@ export function CalendarsSection(props: SectionProps) {
             <ToggleRow
               icon="🗜️"
               label={t('Días llenos en compacto')}
-              hint={t('Si en un día no caben sus eventos, se muestran en líneas pequeñas, y las semanas con más eventos ocupan más alto. Lo que aun así no cabe se muestra por turnos o con “+N”.')}
+              hint={
+                c.eventStyle === 'cards'
+                  ? t('Con el estilo de tarjetas no se usa: las tarjetas ya se apilan en cada día.')
+                  : t('Si en un día no caben sus eventos, se muestran en líneas pequeñas, y las semanas con más eventos ocupan más alto. Lo que aun así no cabe se muestra por turnos o con “+N”.')
+              }
               checked={c.compactBusyDays === true}
               onChange={(v) => set((d) => void (d.calendar.compactBusyDays = v))}
             />

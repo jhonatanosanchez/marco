@@ -23,13 +23,15 @@ export const RESERVED_SOURCE_IDS = [LOCAL_SOURCE_ID, BIRTHDAYS_SOURCE_ID];
 
 /** Per-screen part of the keys that are split between global and per-screen ("merged sections"). */
 export const SCREEN_SPLIT_KEYS = {
-  calendar: ['enabled', 'view', 'weeks', 'weekStart', 'showLocation', 'showEndTime', 'showDayXofY', 'showLegend', 'hidePast', 'maxEventsPerDay', 'marquee', 'rotateBusyDays', 'compactBusyDays', 'sourceIds'],
+  calendar: ['enabled', 'view', 'weeks', 'weekStart', 'showLocation', 'showEndTime', 'showDayXofY', 'showLegend', 'hidePast', 'maxEventsPerDay', 'marquee', 'rotateBusyDays', 'compactBusyDays', 'eventStyle', 'sourceIds'],
   datetime: ['enabled', 'clock', 'format24', 'showSeconds', 'showAmPm', 'dateFormat', 'dateCustom'],
   weather: ['enabled', 'forecastDays', 'showHourly', 'showPrecipChance'],
   news: ['enabled', 'rotateSec'],
   todo: ['enabled'],
   countdowns: ['enabled', 'max'],
 };
+/** Calendar settings the 'planner' layout comes with (the admin and the setup wizard apply them when it is picked). */
+export const PLANNER_CALENDAR = { weeks: 'auto', eventStyle: 'cards' };
 /** Keys that only exist per screen (whole object lives in the screen profile). */
 export const SCREEN_ONLY_KEYS = ['screen', 'layout', 'background', 'message', 'alerts', 'privacy'];
 
@@ -59,6 +61,9 @@ export function defaultScreenProfile({ id = 's_main', slug = 'living-room', name
       // compactBusyDays: a month-grid day that cannot fit its events shows them as small one-line entries, and week
       // rows share the height by how many events they have (on for new screens, off for screens saved before it)
       compactBusyDays: true,
+      // eventStyle: 'lines' (one-line chips) or 'cards' (time on top, title below on up to 2 lines, stacked in the day);
+      // weeks may also be 'auto' (rows picked so each day fits maxEventsPerDay events). The planner layout sets both.
+      eventStyle: 'lines',
       sourceIds: null, // null = every enabled source (incl. local + birthdays); array = only these ids
     },
     datetime: { enabled: true, clock: 'digital', format24: true, showSeconds: true, showAmPm: false, dateFormat: 'weekday_d_month', dateCustom: '{dddd}, {d} {mmmm} {yyyy}' },

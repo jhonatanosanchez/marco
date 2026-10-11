@@ -5,7 +5,7 @@ import type { PhotoFrame } from './focus';
 export type Lang = 'es' | 'en' | 'pt';
 export type LayoutPreset =
   | 'bigCalendar' | 'leftRight' | 'topBottom' | 'bigTime' | 'agenda'
-  | 'today' | 'people' | 'photoFrame' | 'twoWeeks' | 'board' | 'bedside';
+  | 'today' | 'people' | 'photoFrame' | 'twoWeeks' | 'board' | 'bedside' | 'planner';
 /** Corner of the clock card in the 'photoFrame' layout: top-left, top-right, bottom-left, bottom-right. */
 export type FrameCorner = 'tl' | 'tr' | 'bl' | 'br';
 export type SourceKind = 'generic' | 'airbnb' | 'birthdays' | 'holidays';
@@ -192,10 +192,14 @@ export interface IconRule {
   color: string | null;
 }
 
+export type CalendarWeeks = number | 'auto';
+export type EventStyle = 'lines' | 'cards';
+
 export interface CalendarConfig<S = CalendarSource> {
   enabled: boolean;
   view: 'month' | 'agenda' | 'week';
-  weeks: number;
+  /** Week rows of the month view, or 'auto': 2 to 6 rows, as many as fit maxEventsPerDay events per day. */
+  weeks: CalendarWeeks;
   weekStart: number; // 0 = Sunday, 1 = Monday
   showLocation: boolean;
   showEndTime: boolean;
@@ -212,6 +216,11 @@ export interface CalendarConfig<S = CalendarSource> {
    * rows share the height by how many events they have (on for new screens, off for screens saved before it).
    */
   compactBusyDays: boolean;
+  /**
+   * Month / week grid: 'lines' (one-line chips, the original look) or 'cards' (time on top, title below on up to two
+   * lines, stacked in the day; multi-day events stay bars). Cards take precedence over compactBusyDays inside a day.
+   */
+  eventStyle: EventStyle;
   /** v2, per screen: null = every enabled source (incl. 'local' + 'birthdays'); array = only these ids. */
   sourceIds?: string[] | null;
   sources: S[];
@@ -1038,7 +1047,7 @@ export interface ScreenProfile {
   screen: Omit<ScreenConfig, 'name'>;
   layout: LayoutConfig;
   background: BackgroundConfig;
-  calendar: Pick<CalendarConfig, 'enabled' | 'view' | 'weeks' | 'weekStart' | 'showLocation' | 'showEndTime' | 'showDayXofY' | 'showLegend' | 'hidePast' | 'maxEventsPerDay' | 'marquee' | 'rotateBusyDays' | 'compactBusyDays'> & { sourceIds: string[] | null };
+  calendar: Pick<CalendarConfig, 'enabled' | 'view' | 'weeks' | 'weekStart' | 'showLocation' | 'showEndTime' | 'showDayXofY' | 'showLegend' | 'hidePast' | 'maxEventsPerDay' | 'marquee' | 'rotateBusyDays' | 'compactBusyDays' | 'eventStyle'> & { sourceIds: string[] | null };
   datetime: Omit<DateTimeConfig, 'timezone'>;
   weather: Pick<WeatherConfig, 'enabled' | 'forecastDays' | 'showHourly' | 'showPrecipChance'>;
   news: { enabled: boolean; rotateSec: number };

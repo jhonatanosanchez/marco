@@ -6,6 +6,7 @@ import '../shared/emoji-font.css';
 import './styles.css';
 import './styles-views.css';
 import './styles-modern.css';
+import './styles-planner.css';
 import type {
   Announcement, CountdownsResponse, DisplayConfig, EventsResponse, NewsResponse, NightCommand, StreamHello, WeatherResponse,
 } from '../shared/types';
@@ -35,6 +36,7 @@ import { Countdowns } from './widgets/countdowns';
 import { DoorbellOverlay, type FrameSource } from './widgets/doorbell';
 import { mockDoorbellFrame, mockDoorbellRing } from './mockDoorbell';
 import { MonthCalendar } from './widgets/calendar';
+import { AUTO_WEEKS_MAX, rangeWeeks } from './cards';
 import { Clock } from './widgets/clock';
 import { renderMessage, renderTodo } from './widgets/extras';
 import { Highlights } from './widgets/highlights';
@@ -198,9 +200,15 @@ function hueShift(hex: string, deg: number): string {
   return toHex([(r1 + m) * 255, (g1 + m) * 255, (b1 + m) * 255]);
 }
 
-const PRESETS = ['bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda', 'today', 'people', 'photoFrame', 'twoWeeks', 'board', 'bedside'];
+const PRESETS = ['bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda', 'today', 'people', 'photoFrame', 'twoWeeks', 'board', 'bedside', 'planner'];
 /** Newer layouts built on an older one's frame: they also get its class, so its rules (and the Modern ones) apply. */
 const PRESET_BASE: Record<string, string> = { today: 'bigCalendar', twoWeeks: 'bigCalendar', people: 'topBottom', board: 'topBottom' };
+
+/** Planner: the top / bottom frame on a portrait screen, the big calendar one (side column) on a landscape one. */
+function presetBase(preset: string, portrait: boolean): string {
+  if (preset === 'planner') return portrait ? 'topBottom' : 'bigCalendar';
+  return PRESET_BASE[preset] ?? '';
+}
 
 function effectivePreset(cfg: DisplayConfig): string {
   const p = params.get('preset') || cfg.layout.preset;
@@ -223,7 +231,7 @@ function applyLayout(): void {
   app.className = [
     `preset-${preset}`, `side-${side === 'right' ? 'right' : 'left'}`, portrait ? 'portrait' : 'landscape',
     cfg.background.enabled ? 'has-photo' : 'no-photo',
-    PRESET_BASE[preset] ? `preset-${PRESET_BASE[preset]}` : '',
+    presetBase(preset, portrait) ? `preset-${presetBase(preset, portrait)}` : '',
     preset === 'photoFrame' ? `corner-${['tl', 'tr', 'bl', 'br'].includes(corner) ? corner : 'br'}` : '',
   ].filter(Boolean).join(' ');
   app.classList.toggle('has-view', VIEW_PRESETS.includes(preset));
@@ -283,11 +291,21 @@ function applyConfig(raw: DisplayConfig): void {
   if (pm === '0' || pm === '1') cfg.calendar.marquee = pm === '1';
   const pr = params.get('rotate');
   if (pr === '0' || pr === '1') cfg.calendar.rotateBusyDays = pr === '1';
-  // ?compact=0|1 (busy days as small one-line entries, rows sized by their events) and ?weeks=1..8
+  // ?compact=0|1 (busy days as small one-line entries, rows sized by their events), ?weeks=1..8|auto and ?cards=0|1
+  // (calendar.eventStyle: cards or one-line chips)
   const pcp = params.get('compact');
   if (pcp === '0' || pcp === '1') cfg.calendar.compactBusyDays = pcp === '1';
   const pw = Number(params.get('weeks'));
   if (Number.isInteger(pw) && pw >= 1 && pw <= 8) cfg.calendar.weeks = pw;
+  if (params.get('weeks') === 'auto') cfg.calendar.weeks = 'auto';
+  const pcd = params.get('cards');
+  if (pcd === '0' || pcd === '1') cfg.calendar.eventStyle = pcd === '1' ? 'cards' : 'lines';
+  // automatic weeks: at most 6 rows, fewer where a layout caps the rows below
+  let autoMax = AUTO_WEEKS_MAX;
+  const capWeeks = (n: number) => {
+    if (cfg.calendar.weeks === 'auto') autoMax = Math.min(autoMax, n);
+    else cfg.calendar.weeks = Math.min(cfg.calendar.weeks, n);
+  };
   const pa = params.get('ambient');
   if (pa === 'aurora' || pa === 'particles' || pa === 'none') cfg.background.ambient = pa;
   const ptr = params.get('transition');
@@ -295,7 +313,7 @@ function applyConfig(raw: DisplayConfig): void {
   const pfx = params.get('wxfx');
   if (pfx === 'off' || pfx === 'simple' || pfx === 'rich') cfg.background.weatherFx = pfx;
   // the top-bottom preset has a shorter calendar: cap the number of week rows so chips stay readable
-  if (effectivePreset(cfg) === 'topBottom') cfg.calendar.weeks = Math.min(cfg.calendar.weeks, 4);
+  if (effectivePreset(cfg) === 'topBottom') capWeeks(4);
   // Two weeks: the month grid with two roomy rows (more events per day)
   if (effectivePreset(cfg) === 'twoWeeks') {
     cfg.calendar.view = 'month';
@@ -308,7 +326,8 @@ function applyConfig(raw: DisplayConfig): void {
     cfg.background.ambient = 'none';
   }
   // Small landscape screens (e.g. 1280×720 on the Pi): one week fewer so text can be bigger.
-  if (window.innerWidth > window.innerHeight && window.innerHeight <= 820 && effectivePreset(cfg) !== 'twoWeeks') cfg.calendar.weeks = Math.min(cfg.calendar.weeks, 4);
+  if (window.innerWidth > window.innerHeight && window.innerHeight <= 820 && effectivePreset(cfg) !== 'twoWeeks') capWeeks(4);
+  calendar.maxAutoWeeks = autoMax;
   setCtxConfig(cfg);
   setTimezone(ctx.tz);
   const root = document.documentElement;
@@ -339,7 +358,7 @@ function applyConfig(raw: DisplayConfig): void {
 
   // WebGL needs
   const preset = effectivePreset(cfg);
-  const wantAmbient = !lite && cfg.background.ambient !== 'none' && ['bigCalendar', 'agenda', 'topBottom', 'today', 'twoWeeks', 'people'].includes(preset);
+  const wantAmbient = !lite && cfg.background.ambient !== 'none' && ['bigCalendar', 'agenda', 'topBottom', 'today', 'twoWeeks', 'people', 'planner'].includes(preset);
   const wantGLPhoto = !lite && cfg.background.enabled && cfg.background.transition === 'webgl';
   if ((wantAmbient || wantGLPhoto) && !engine && !glFailed) {
     void initGL().then(() => {
@@ -656,7 +675,7 @@ function deniedBy(e: unknown): boolean {
 function eventsRange(): [string, string] {
   const today = current().dayKey;
   const from = startOfWeek(today, ctx.cfg.calendar.weekStart);
-  const to = addDays(from, Math.max(ctx.cfg.calendar.weeks * 7, 21) + 1);
+  const to = addDays(from, Math.max(rangeWeeks(ctx.cfg.calendar.weeks) * 7, 21) + 1);
   return [from, to];
 }
 

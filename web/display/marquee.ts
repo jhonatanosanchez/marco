@@ -24,8 +24,8 @@ const SLIDE = [
   '.cd-tt', // countdowns
   '.sched-body', // scheduled messages
 ].join(',');
-/** Chip titles clamped to a few lines: they scroll up. */
-const SCROLL = '.cal .ev.wrap > .tx';
+/** Chip titles clamped to a few lines (and card titles, calendar.eventStyle = 'cards'): they scroll up. */
+const SCROLL = ['.cal .ev.wrap > .tx', '.cal .ev.card > .tx'].join(',');
 /** The news headline: one slide per item (its .news-item carries data-mq-until, when it leaves). */
 const ONCE = '.news-item:last-child > .news-title';
 

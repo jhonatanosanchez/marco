@@ -1,0 +1,39 @@
+// Planner: automatic weeks, event cards and the Planner layout. Spanish key; [es, en, pt].
+export const ROWS_PLANNER: [string, string, string][] = [
+  // the layout card (one line each: server/test/display-layouts.test.js looks for the whole row)
+  ['Planificador', 'Planner', 'Planeador'],
+  ['Para familias con muchas citas: reloj, fecha y tiempo arriba, y debajo el mes con tarjetas que llenan cada día. Pensado para pantallas verticales.', 'For busy families: clock, date and weather on top, and below them the month with cards that fill each day. Made for portrait screens.', 'Para famílias com muitos compromissos: relógio, data e tempo em cima e, por baixo, o mês com cartões que enchem cada dia. Pensado para ecrãs verticais.'],
+  [
+    'Al elegirlo se activan las semanas automáticas y las tarjetas. Puedes cambiarlo aquí o en Calendarios, Vista del calendario.',
+    'Picking it turns on automatic weeks and cards. You can change them here or in Calendars, Calendar view.',
+    'Ao escolhê-lo ativam-se as semanas automáticas e os cartões. Podes mudá-los aqui ou em Calendários, Vista do calendário.',
+  ],
+  [
+    'Auto elige entre 2 y 6 semanas, las que caben con el máximo de eventos por día a buen tamaño. Se recalcula si la pantalla gira.',
+    'Auto picks 2 to 6 weeks, as many as fit with the most events per day at a good size. It is worked out again when the screen turns.',
+    'Auto escolhe entre 2 e 6 semanas, as que cabem com o máximo de eventos por dia num bom tamanho. É recalculado se o ecrã rodar.',
+  ],
+  ['Estilo de los eventos', 'Event style', 'Estilo dos eventos'],
+  ['Líneas', 'Lines', 'Linhas'],
+  ['Tarjetas', 'Cards', 'Cartões'],
+  [
+    'Tarjetas: la hora arriba y el título debajo, en hasta dos líneas, una tras otra en cada día. Los eventos de varios días siguen siendo barras.',
+    'Cards: the time on top and the title below on up to two lines, one after another in each day. Events of several days stay as bars.',
+    'Cartões: a hora em cima e o título por baixo, em até duas linhas, uns a seguir aos outros em cada dia. Os eventos de vários dias continuam a ser barras.',
+  ],
+  [
+    'Líneas: cada evento en una línea, con la hora delante.',
+    'Lines: each event on one line, with the time in front.',
+    'Linhas: cada evento numa linha, com a hora à frente.',
+  ],
+  [
+    'Con tarjetas, cada día muestra las que caben en su alto. Este número cuenta para elegir las semanas en Auto.',
+    'With cards, each day shows as many as fit in its height. This number is used to pick the weeks with Auto.',
+    'Com cartões, cada dia mostra os que cabem na sua altura. Este número conta para escolher as semanas em Auto.',
+  ],
+  [
+    'Con el estilo de tarjetas no se usa: las tarjetas ya se apilan en cada día.',
+    'Not used with the cards style: cards already stack up in each day.',
+    'Não se usa com o estilo de cartões: os cartões já se empilham em cada dia.',
+  ],
+];

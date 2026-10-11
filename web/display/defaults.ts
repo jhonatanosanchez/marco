@@ -18,7 +18,7 @@ export const DEFAULT_CONFIG: DisplayConfig = {
   },
   calendar: {
     enabled: true, view: 'month', weeks: 5, weekStart: 1, showLocation: false, showEndTime: false, showDayXofY: true,
-    showLegend: true, hidePast: false, maxEventsPerDay: 4, marquee: true, rotateBusyDays: true, compactBusyDays: false, sources: [], iconRules: DEFAULT_ICON_RULES,
+    showLegend: true, hidePast: false, maxEventsPerDay: 4, marquee: true, rotateBusyDays: true, compactBusyDays: false, eventStyle: 'lines', sources: [], iconRules: DEFAULT_ICON_RULES,
   },
   datetime: {
     enabled: true, timezone: 'Europe/Lisbon', clock: 'digital', format24: true, showSeconds: true, showAmPm: false,
@@ -61,7 +61,10 @@ export function deepMerge<T>(base: T, src: unknown): T {
 
 export function normalizeConfig(raw: unknown): DisplayConfig {
   const c = deepMerge(DEFAULT_CONFIG, raw);
-  c.calendar.weeks = clampInt(c.calendar.weeks, 1, 8, 5);
+  // weeks: a number of rows, or 'auto' (deepMerge keeps only values of the default's type, so look at the raw one)
+  const rawCal = isObj(raw) && isObj(raw.calendar) ? raw.calendar : null;
+  c.calendar.weeks = rawCal?.weeks === 'auto' || c.calendar.weeks === 'auto' ? 'auto' : clampInt(c.calendar.weeks, 1, 8, 5);
+  c.calendar.eventStyle = c.calendar.eventStyle === 'cards' ? 'cards' : 'lines';
   c.calendar.maxEventsPerDay = clampInt(c.calendar.maxEventsPerDay, 1, 12, 4);
   c.calendar.weekStart = clampInt(c.calendar.weekStart, 0, 6, 1);
   c.layout.sideWidth = Math.min(0.6, Math.max(0.2, Number(c.layout.sideWidth) || 0.36));

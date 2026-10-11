@@ -48,7 +48,7 @@ export const MOCK_SOURCES: PublicCalendarSource[] = [
 
 export function mockConfig(): DisplayConfig {
   const q = new URLSearchParams(location.search);
-  return deepMerge(DEFAULT_CONFIG, {
+  const cfg = deepMerge(DEFAULT_CONFIG, {
     revision: 1,
     screenId: 's_main',
     slug: 'living-room',
@@ -79,6 +79,13 @@ export function mockConfig(): DisplayConfig {
     },
     message: { enabled: q.get('msg') === '1', text: L('Have a great weekend, everyone!', '¡Buen fin de semana, familia!', 'Bom fim de semana, família!'), emoji: '💛' },
   });
+  // ?planner=1: the Planner layout with what picking it in the admin sets (automatic weeks, cards)
+  if (q.get('planner') === '1') {
+    cfg.layout.preset = 'planner';
+    cfg.calendar.weeks = 'auto';
+    cfg.calendar.eventStyle = 'cards';
+  }
+  return cfg;
 }
 
 /** ISO string with offset for a wall-clock time in TZ. */
