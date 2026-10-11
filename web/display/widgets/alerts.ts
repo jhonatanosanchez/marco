@@ -30,6 +30,8 @@ interface Live {
   timer: ReturnType<typeof setTimeout> | null;
   settleTimer: ReturnType<typeof setTimeout> | null;
   compact: boolean;
+  /** a carousel waits for it until then (ms): urgent ones never settle into the corner, so the wait is capped */
+  holdUntil: number;
 }
 
 /** Non-urgent announcements stay big for this long, then settle into a compact corner toast. */
@@ -57,10 +59,14 @@ export class Announcements {
     return this.live.size;
   }
 
-  /** Announcements shown big right now (not yet settled into the corner): a carousel waits for them. */
+  /**
+   * Announcements shown big right now (not yet settled into the corner): a carousel waits for them, but never past
+   * `holdUntil` (an urgent one stays big until it expires, up to 24 h).
+   */
   get expandedCount(): number {
+    const now = serverNow();
     let n = 0;
-    for (const lv of this.live.values()) if (!lv.compact) n++;
+    for (const lv of this.live.values()) if (!lv.compact && now < lv.holdUntil) n++;
     return n;
   }
 
@@ -93,6 +99,7 @@ export class Announcements {
     const node = el('div', `an an-${a.style}`);
     const lv: Live = {
       a, el: node, expiresMs: expires, timer: null, settleTimer: null, compact: a.style !== 'urgent' && age > EXPANDED_MS,
+      holdUntil: Math.max((Number.isFinite(created) ? created : serverNow()) + EXPANDED_MS, serverNow() + 15_000),
     };
     this.fill(lv);
     this.live.set(a.id, lv);

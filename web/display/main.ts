@@ -808,6 +808,8 @@ on('config', (s) => {
 // bound to a plain screen never creates one, so nothing here runs for it.
 // ---------------------------------------------------------------------------------------------
 let carousel: CarouselController | null = null;
+/** Booted from this browser's cache (server unreachable): what the carousel starts with is old, not fresh. */
+let offlineBoot = false;
 /** ?step=<slug> shows one step only, ?carousel=0 stays on the first step (testing, the admin preview). */
 const stepParam = (params.get('step') || '').trim().toLowerCase() || null;
 const carouselFrozen = params.get('carousel') === '0';
@@ -843,6 +845,7 @@ function syncCarousel(c: DisplayConfig): void {
       if (parts.includes('config') && b.config && b.config !== state.config) set('config', b.config);
       if (parts.includes('events') && b.events && b.events !== state.events) set('events', b.events);
       if (parts.includes('countdowns') && b.countdowns && b.countdowns !== state.countdowns) set('countdowns', b.countdowns);
+      saveShown(b);
     },
     pin: stepParam,
     frozen: carouselFrozen,
@@ -850,14 +853,16 @@ function syncCarousel(c: DisplayConfig): void {
   });
   setActiveScreen(c.screenId);
   document.documentElement.classList.add('has-carousel');
-  carousel.put(c.screenId, 'config', c);
-  if (state.events) carousel.put(c.screenId, 'events', state.events);
-  if (state.countdowns) carousel.put(c.screenId, 'countdowns', state.countdowns);
-  if (state.photos) carousel.put(c.screenId, 'photos', state.photos);
+  // offline: what came from the cache is marked old (at = 0), so it is fetched again as soon as the server answers
+  const at = offlineBoot ? 0 : undefined;
+  carousel.put(c.screenId, 'config', c, at);
+  if (state.events) carousel.put(c.screenId, 'events', state.events, at);
+  if (state.countdowns) carousel.put(c.screenId, 'countdowns', state.countdowns, at);
+  if (state.photos) carousel.put(c.screenId, 'photos', state.photos, at);
   // offline boot: what this browser kept of the other screens (they are refreshed before they show)
   if (!state.demo) {
     for (const st of [...block.steps, { screenId: block.offScreenId }]) {
-      if (st.screenId === c.screenId || carousel.bundles.has(st.screenId)) continue;
+      if (!st.screenId || st.screenId === c.screenId || carousel.bundles.has(st.screenId)) continue;
       const cfg = loadScreenCache<DisplayConfig>(st.screenId, 'config');
       if (!cfg) continue;
       carousel.put(st.screenId, 'config', cfg, 0);
@@ -915,6 +920,17 @@ const reducedMotion = () => {
   }
 };
 
+/**
+ * The plain caches (config, events, countdowns) always hold the screen on display, all three from the same one:
+ * an offline boot reads them together. Each screen also keeps its own copy (saveScreenCache).
+ */
+function saveShown(b: Bundle): void {
+  if (state.demo || !b.config) return;
+  saveCache('config', b.config);
+  if (b.events) saveCache('events', b.events);
+  if (b.countdowns) saveCache('countdowns', b.countdowns);
+}
+
 /** Put one carousel screen on display from its bundle: no request, a short fade unless turned off. */
 function showScreen(id: string, b: Bundle, transition: 'fade' | 'none'): void {
   // from now on, answers for the screen that leaves are kept for it and never shown
@@ -932,6 +948,7 @@ function showScreen(id: string, b: Bundle, transition: 'fade' | 'none'): void {
       state.weather = w ? w.w : state.weather;
     }
     set('config', b.config);
+    saveShown(b);
     if (newPhotos) {
       if (b.photos) {
         set('photos', b.photos as PhotosResponse);
@@ -1127,10 +1144,13 @@ async function boot(): Promise<void> {
   }
   const cached = loadCache<DisplayConfig>('config');
   if (cached) {
-    set('events', loadCache<EventsResponse>('events'));
+    offlineBoot = true;
+    // on a carousel, take the copy kept for that screen, so its events never come from another step
+    const own = cached.target?.kind === 'carousel' && cached.screenId ? cached.screenId : '';
+    set('events', own ? loadScreenCache<EventsResponse>(own, 'events') : loadCache<EventsResponse>('events'));
     set('weather', loadCache<WeatherResponse>('weather'));
     set('news', loadCache<NewsResponse>('news'));
-    set('countdowns', loadCache<CountdownsResponse>('countdowns'));
+    set('countdowns', own ? loadScreenCache<CountdownsResponse>(own, 'countdowns') : loadCache<CountdownsResponse>('countdowns'));
     set('config', cached);
   }
   const ok = await fetchConfig();
