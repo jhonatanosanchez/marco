@@ -18,16 +18,18 @@ let told = new Map();
 
 const file = () => paths.privacy;
 
-function load() {
+function load(cfg = getConfig()) {
   if (states && loadedFrom === file()) return;
+  // no config loaded yet (unit tests that call the display helpers directly): nothing stored, try again later
+  if (!cfg) { states = {}; return; }
   loadedFrom = file();
   states = {};
   try {
     const j = JSON.parse(fs.readFileSync(file(), 'utf8'));
     if (j && typeof j.screens === 'object') states = j.screens;
   } catch { /* no file yet */ }
-  states = pruneStates(getConfig(), states);
-  told = new Map(getConfig().screens.map((s) => [s.id, privacyStatus(getConfig(), s, states[s.id]).active]));
+  states = pruneStates(cfg, states);
+  told = new Map(cfg.screens.map((s) => [s.id, privacyStatus(cfg, s, states[s.id]).active]));
 }
 
 function save() {
@@ -42,13 +44,13 @@ export function privacyStateOf(screenId) {
 
 /** privacyStatus() of a screen profile with the stored state. */
 export function screenPrivacy(cfg, screen, now = new Date()) {
-  load();
+  load(cfg);
   return privacyStatus(cfg, screen, states[screen.id], now);
 }
 
 /** Next instant (ms) the privacy of `screen` may change on its own. */
 export function screenPrivacyNext(cfg, screen, now = new Date()) {
-  load();
+  load(cfg);
   return privacyNextChange(cfg, screen, states[screen.id], now);
 }
 
