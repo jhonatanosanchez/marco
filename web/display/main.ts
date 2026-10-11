@@ -674,7 +674,8 @@ function screenMissing(): void {
   accessDenied = true;
   showScreenMissing(stopDisplay(), async () => {
     try {
-      await api.config();
+      // the carousel itself (or the screen in the URL), never one of its screens
+      await api.config('');
       return true;
     } catch (e) {
       // access changed meanwhile: reload so the pairing / invalid-link screen takes over
@@ -699,6 +700,34 @@ function deniedBy(e: unknown): boolean {
 }
 
 const isScreenNotFound = (e: unknown) => e instanceof ApiError && e.status === 404 && e.code === 'screen_not_found';
+
+/**
+ * True (and the "Screen not found" page shown) when `e` is a 404 screen_not_found for what the display opened: the
+ * live channels and `api.config('')` always ask for that, so on a carousel this means the carousel itself is gone.
+ */
+function targetMissing(e: unknown): boolean {
+  if (!isScreenNotFound(e)) return false;
+  screenMissing();
+  return true;
+}
+
+/**
+ * The SSE stream failed while a carousel rotates. EventSource never tells the status, so a carousel deleted while
+ * the display was offline (the `reload` event missed) would keep it retrying a 404 forever: ask for the carousel
+ * itself, at most once a minute.
+ */
+let targetCheckedAt = 0;
+async function checkTarget(): Promise<void> {
+  if (accessDenied || state.demo || !getActiveScreen()) return;
+  const now = Date.now();
+  if (now - targetCheckedAt < 60_000) return;
+  targetCheckedAt = now;
+  try {
+    await api.config('');
+  } catch (e) {
+    if (!deniedBy(e)) targetMissing(e);
+  }
+}
 
 // ---------------------------------------------------------------------------------------------
 // Data
@@ -807,7 +836,12 @@ async function fetchConfig(): Promise<boolean> {
     } catch (e) {
       // a carousel screen deleted meanwhile: ask for the carousel itself (the screen it shows now)
       if (!sid || !isScreenNotFound(e)) throw e;
-      c = await api.config('');
+      try {
+        c = await api.config('');
+      } catch (e2) {
+        if (targetMissing(e2)) return false; // the carousel itself is gone
+        throw e2;
+      }
     }
     setOnline(true);
     if (sid && c.target?.kind === 'carousel' && c.screenId === sid) carousel?.put(sid, 'config', c);
@@ -1319,7 +1353,9 @@ async function goLive(): Promise<void> {
         now: (iso) => setServerNow(iso),
         sync: (ids) => announcements.sync(ids),
       },
-      denied: (e) => deniedBy(e),
+      // the poll always asks for what the display opened (withTarget): a 404 screen_not_found there is never one
+      // screen of a carousel, so it is the "Screen not found" page and not the 90 s fallback below
+      denied: (e) => deniedBy(e) || targetMissing(e),
       status: (e) => (e instanceof ApiError ? e.status : 0),
       hidden: () => document.hidden,
       // A server that says 'poll' but has no /api/display/poll: check the config revision every 90 s.
@@ -1338,7 +1374,14 @@ async function goLive(): Promise<void> {
     return;
   }
   heartbeat.start();
-  liveStream = connectStream({ ...liveHandlers, hello: onHello });
+  liveStream = connectStream({
+    ...liveHandlers,
+    hello: onHello,
+    down: () => {
+      setOnline(false);
+      void checkTarget();
+    },
+  });
 }
 
 /** SSE `hello`, and the first answer (or a reset) of the poll channel. */
