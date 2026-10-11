@@ -79,13 +79,14 @@ export function showableAsset(a, { favoritesOnly = false } = {}) {
 const shortStr = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 
 /**
- * Compact item kept in memory and on disk: { id, t (local date taken, YYYY-MM-DD), name (sort key only, never shown),
- * city, country, v (version for the image URL) }.
+ * Compact item kept in memory and on disk: { id, t (local date and time taken, YYYY-MM-DDTHH:MM:SS, or only the
+ * date; sort key, the caption shows the date), name (sort key only, never shown), city, country, v (version for the
+ * image URL) }.
  */
 export function compactAsset(a) {
   const ex = a.exifInfo && typeof a.exifInfo === 'object' ? a.exifInfo : {};
   const when = shortStr(a.localDateTime, 40) || shortStr(ex.dateTimeOriginal, 40) || shortStr(a.fileCreatedAt, 40);
-  const t = /^\d{4}-\d{2}-\d{2}/.test(when) ? when.slice(0, 10) : '';
+  const t = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(when) ? when.slice(0, 19) : /^\d{4}-\d{2}-\d{2}/.test(when) ? when.slice(0, 10) : '';
   const ms = Date.parse(shortStr(a.updatedAt, 40) || shortStr(a.fileModifiedAt, 40));
   return {
     id: a.id.toLowerCase(),

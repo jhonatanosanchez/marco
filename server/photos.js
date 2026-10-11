@@ -326,7 +326,7 @@ const immichPhoto = (it) => ({
   url: `/media/immich/${it.id}?v=${it.v}`,
   source: 'immich',
   id: it.id,
-  ...(it.t ? { takenAt: it.t } : {}),
+  ...(it.t ? { takenAt: it.t.slice(0, 10) } : {}),
   ...(placeOf(it) ? { place: placeOf(it) } : {}),
 });
 

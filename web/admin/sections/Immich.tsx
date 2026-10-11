@@ -47,8 +47,10 @@ export function AlbumCover({ album }: { album: ImmichAlbum }) {
   return <img class="immich-album__cover" src={`/media/immich/${album.cover}?s=thumb`} alt="" loading="lazy" onError={() => setFailed(true)} />;
 }
 
-export function ImmichSection({ cfg, set, errors }: SectionProps) {
+export function ImmichSection({ cfg, set, errors, saved }: SectionProps) {
   const im = cfg.immich ?? DEFAULT_IMMICH;
+  const live = saved.immich ?? DEFAULT_IMMICH;
+  const liveSig = `${live.enabled === true}|${live.url}|${live.insecureTls === true}`;
   const [keyStatus, setKeyStatus] = useState<ImmichKeyStatus | null>(null);
   const [key, setKey] = useState('');
   const [editKey, setEditKey] = useState(false);
@@ -68,12 +70,15 @@ export function ImmichSection({ cfg, set, errors }: SectionProps) {
   };
   useEffect(() => {
     api.immichKey().then(setKeyStatus).catch(() => setKeyStatus(null));
-    api.immichStatus().then(setStatus).catch(() => setStatus(null));
   }, []);
+  // the status depends on the saved settings: ask again after each save that changes them
+  useEffect(() => {
+    api.immichStatus().then(setStatus).catch(() => setStatus(null));
+  }, [liveSig]);
   // the server reads the saved settings: list the albums once Immich is saved as usable
   useEffect(() => {
     if (status?.usable) loadAlbums();
-  }, [status?.usable]);
+  }, [status?.usable, liveSig]);
 
   const saveKey = async (value: string) => {
     setSavingKey(true);

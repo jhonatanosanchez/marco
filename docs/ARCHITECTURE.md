@@ -266,10 +266,14 @@ flagged by a local event or a style rule (nearest occurrence per title), sorted 
   `GET /api/albums/:id?withoutAssets=false`. Images only: videos, trashed, offline, hidden and locked assets are left
   out, archived ones stay. At most 20000 assets per album.
 - **Lists**: cached per album for 30 minutes (stale while revalidating, one fetch at a time), failures for 60 s,
-  saved in `data/immich/albums/` and served for up to 24 h while Immich cannot be reached. An album that answers 404
-  is skipped and shown as not found in the admin. With nothing to show, the screen gets stock photos.
+  saved in `data/immich/albums/` and served for up to 24 h while Immich cannot be reached (a list on disk is also read
+  back by the media route after a restart). An album that answers 400 or 404 (Immich's answer for a deleted album
+  or one the key cannot read) is skipped and shown as not found in the admin. A new server URL or a new key forgets
+  every list (a fetch still running for the old one is dropped); a new URL also empties the image cache. Changing
+  the URL, *enabled*, *insecure TLS* or the key sends a live `photos` event, so displays ask for a new batch. With
+  nothing to show, the screen gets stock photos.
 - **Rotation**: the same picker as the gallery (`pickFrom` in `server/photos.js`), rotation key `<screen>|immich`;
-  `newest` = date taken, `name` = original file name (never shown). Captions (`showMeta`) are the place and the date
+  `newest` = date and time taken, `name` = original file name (never shown). Captions (`showMeta`) are the place and the date
   taken, formatted by the display in the screen's language.
 - **Images**: `GET /media/immich/<assetId>` (after `mediaAuth`) serves Immich's `preview` render from
   `data/immich/cache/`, fetched on a miss (20 s timeout, 8 MB cap, JPEG, WebP, PNG or AVIF only, sniffed when Immich

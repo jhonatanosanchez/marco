@@ -148,7 +148,9 @@ export function adminRouter({ onConfigSaved } = {}) {
       if (t.error === 'invalid_key') return res.status(400).json({ error: 'invalid_key' });
       checked = t.ok === true;
     }
+    const changed = immich.immichSettings().key !== k;
     updateSecrets((s) => { s.immich = { ...(s.immich || {}), apiKey: k }; });
+    if (changed) immich.keyChanged();
     res.json({ ...immichKeyStatus(k), checked });
   }));
   r.get('/immich/albums', wrap(async (req, res) => {

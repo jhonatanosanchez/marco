@@ -47,7 +47,8 @@ test('immichCore: URL, scopes, filters, compact items, sniffing, versions', () =
   assert.equal(showableAsset({ ...asset(1), id: '../etc' }), false);
   const c = compactAsset(asset(3));
   assert.deepEqual(Object.keys(c).sort(), ['city', 'country', 'id', 'name', 't', 'v']);
-  assert.equal(c.t, '2019-08-04');
+  assert.equal(c.t, '2019-08-04T12:00:00', 'date and time: the sort key for newest');
+  assert.equal(compactAsset(asset(3, { localDateTime: '2019-08-04', exifInfo: {} })).t, '2019-08-04');
   assert.equal(sniffImageType(JPEG), 'image/jpeg');
   assert.equal(sniffImageType(Buffer.from('<html>not an image</html>')), null);
   assert.equal(mapAlbum({ id: 'nope' }), null);
@@ -356,16 +357,68 @@ test('Immich down: a warm list keeps serving, a cold one falls back to stock, fa
   });
 });
 
-test('an album that is gone is skipped and flagged, the others still play', async () => {
-  await withApp(async ({ photos, call, login }) => {
+for (const version of ['1.120.0', '2.5.0', '3.3.0']) {
+  test(`Immich ${version}: an album that is gone is skipped and flagged, the others still play`, async () => {
+    await withApp(async ({ photos, call, login }) => {
+      const list = await photos();
+      assert.equal(list.length, 12);
+      const cookie = await login();
+      const st = (await call('GET', '/api/admin/immich/status', { cookie })).json;
+      const gone = st.albums.find((a) => a.id === albumId(9));
+      assert.equal(gone.missing, true);
+      assert.equal(gone.error, 'not_found');
+      assert.equal(st.usable, true);
+    }, { selection: [ALBUM_A, albumId(9)], version });
+  });
+}
+
+test('an album deleted after it was cached stops playing at the next refresh', async () => {
+  await withApp(async ({ photos, fake }) => {
+    assert.equal((await photos()).length, 12);
+    fake.state.albums = fake.state.albums.filter((a) => a.id !== ALBUM_A);
+    await immich.refreshAll();
+    assert.equal(immich.immichStatus().albums[0].missing, true);
+    assert.ok((await photos()).every((p) => p.source === 'stock'));
+  }, { version: '2.5.0' });
+});
+
+test('after a restart the media route knows the photos of the lists saved on disk', async () => {
+  await withApp(async ({ photos, call, k }) => {
+    const [p] = await photos();
+    immich._reset();
+    assert.equal((await call('GET', `${p.url}&k=${k}`)).status, 200);
+  });
+});
+
+test('newest keeps the time order inside a day', async () => {
+  const sameDay = Array.from({ length: 6 }, (_, i) => asset(i + 1, { localDateTime: `2019-08-04T${String(10 + ((i * 5) % 6)).padStart(2, '0')}:00:00.000Z` }));
+  await withApp(async ({ photos }) => {
     const list = await photos();
-    assert.equal(list.length, 12);
-    const cookie = await login();
-    const st = (await call('GET', '/api/admin/immich/status', { cookie })).json;
-    const gone = st.albums.find((a) => a.id === albumId(9));
-    assert.equal(gone.missing, true);
-    assert.equal(st.usable, true);
-  }, { selection: [ALBUM_A, albumId(9)], version: '2.5.0' });
+    const want = [...sameDay].sort((a, b) => b.localDateTime.localeCompare(a.localDateTime)).map((a) => a.id);
+    assert.deepEqual(list.map((p) => p.id), want);
+    assert.ok(list.every((p) => p.takenAt === '2019-08-04'), 'the caption gets the date only');
+  }, { albums: [{ id: ALBUM_A, albumName: 'Trip', assets: sameDay }], mutate: (c) => { c.screens[0].background.order = 'newest'; } });
+});
+
+test('a fetch still running when the lists are cleared is dropped', async () => {
+  await withApp(async () => {
+    const dir = path.join(store.paths.data, 'immich', 'albums');
+    const running = immich.refreshAll();
+    immich.clearLists();
+    await running;
+    assert.equal(fs.existsSync(dir) && fs.readdirSync(dir).length > 0, false, 'nothing written for the old server');
+    assert.equal(immich.immichStatus().albums[0].count, null);
+  });
+});
+
+test('a fetched image is not written into a cache emptied meanwhile', async () => {
+  await withApp(async () => {
+    const dir = path.join(store.paths.data, 'immich', 'cache');
+    const p = immich.cachedImage(assetId(1), 'x1');
+    immich.clearCache();
+    await assert.rejects(p);
+    assert.equal(fs.existsSync(dir) && fs.readdirSync(dir).length > 0, false);
+  }, { fake: { thumbDelayMs: 40 } });
 });
 
 test('admin: key is write-only, checked before it is stored; refresh and cache clear', async () => {
@@ -382,6 +435,7 @@ test('admin: key is write-only, checked before it is stored; refresh and cache c
     const ok = await call('PUT', '/api/admin/immich/key', { body: { key: 'new-key-abcdefghij' }, cookie });
     assert.deepEqual(ok.json, { set: true, hint: 'ghij', checked: true });
     assert.equal(JSON.parse(fs.readFileSync(store.paths.secrets, 'utf8')).immich.apiKey, 'new-key-abcdefghij');
+    assert.equal(immich.immichStatus().albums[0].count, null, 'lists read with the old key are forgotten');
     // the config never carries the key
     assert.ok(!(await call('GET', '/api/admin/config', { cookie })).text.includes('new-key-abcdefghij'));
 

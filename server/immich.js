@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { requestBuffer } from './lib/http.js';
 import { events, getConfig, getSecrets, paths, writeFileAtomic } from './store.js';
+import { publish } from './pollHub.js';
 import { screenPrivacy } from './privacy.js';
 import {
   IMMICH_ID_RE, IMMICH_IMAGE_TYPES, MAX_IMMICH_ALBUMS, compactAsset, errorCodeFor, mapAlbum, mergeItems, missingScopes,
@@ -162,7 +163,14 @@ async function searchAssets(s, albumId, favoritesOnly) {
 }
 
 async function albumRouteAssets(s, albumId) {
-  const j = await callJson(s, `/api/albums/${albumId}?withoutAssets=false`);
+  let j;
+  try {
+    j = await callJson(s, `/api/albums/${albumId}?withoutAssets=false`);
+  } catch (err) {
+    // Immich answers 400 "Not found or no album.read access" for a deleted album or one the key cannot read
+    if (err.status === 400 || err.status === 404) throw new ImmichError('not_found', err.message, err.status);
+    throw err;
+  }
   if (!Array.isArray(j?.assets)) throw new ImmichError('bad_response');
   return j.assets;
 }
@@ -185,6 +193,8 @@ async function fetchAlbum(s, albumId, favoritesOnly) {
 
 /** albumId|fav → { items, byId, at, failAt, error, missing, inflight } */
 const lists = new Map();
+/** Bumped by clearLists: a fetch that started before it is dropped (it belongs to the old server or key). */
+let listsGen = 0;
 const listKey = (albumId, fav) => `${albumId}|${fav ? 1 : 0}`;
 const albumsDir = () => path.join(paths.data, 'immich', 'albums');
 const albumFile = (albumId, fav) => path.join(albumsDir(), `${albumId}${fav ? '-fav' : ''}.json`);
@@ -212,8 +222,10 @@ function listEntry(albumId, fav) {
 
 function refreshList(s, e, albumId, fav) {
   if (e.inflight) return e.inflight;
+  const gen = listsGen;
   e.inflight = fetchAlbum(s, albumId, fav)
     .then((items) => {
+      if (gen !== listsGen) return [];
       setItems(e, items, Date.now());
       Object.assign(e, { failAt: 0, error: null, missing: false });
       try {
@@ -224,6 +236,7 @@ function refreshList(s, e, albumId, fav) {
       }
       return items;
     }, (err) => {
+      if (gen !== listsGen) throw err;
       e.failAt = Date.now();
       e.error = err instanceof ImmichError ? err.code : 'unreachable';
       if (e.error === 'not_found') {
@@ -279,7 +292,8 @@ function selections(cfg = getConfig()) {
 function assetVersion(id, screen = null) {
   for (const sel of selections()) {
     if (screen && sel.screenId !== screen.id) continue;
-    const v = lists.get(listKey(sel.albumId, sel.fav))?.byId.get(id);
+    // listEntry: after a restart the list comes back from disk (no fetch), so displays keep their current batch
+    const v = listEntry(sel.albumId, sel.fav).byId.get(id);
     if (v !== undefined) return v;
   }
   return null;
@@ -298,21 +312,35 @@ export async function refreshAll() {
   }));
 }
 
-/** Forget every album list (memory and disk), e.g. when the server URL changes. */
+/** Forget every album list (memory and disk), e.g. when the server URL or the key changes. */
 export function clearLists() {
+  listsGen++;
   lists.clear();
   coverIds.clear();
   versions.clear();
   try { fs.rmSync(albumsDir(), { recursive: true, force: true }); } catch { /* ignore */ }
 }
 
-// another Immich server: its album lists and images are not this one's
+// another Immich server: its album lists and images are not this one's. Any change to the connection settings
+// tells the displays to ask for a new batch, so they do not keep asking for photos that are gone.
 events.on('config', (cfg, prev) => {
-  if (prev && normalizeImmichUrl(prev.immich?.url) !== normalizeImmichUrl(cfg.immich?.url)) {
+  if (!prev) return;
+  const a = prev.immich || {}, b = cfg.immich || {};
+  const urlChanged = normalizeImmichUrl(a.url) !== normalizeImmichUrl(b.url);
+  if (urlChanged) {
     clearLists();
     clearCache();
   }
+  if (urlChanged || (a.enabled === true) !== (b.enabled === true) || (a.insecureTls === true) !== (b.insecureTls === true)) {
+    publish('photos', {});
+  }
 });
+
+/** The stored key changed (admin): the lists were read with the old key, which may see other albums. */
+export function keyChanged() {
+  clearLists();
+  publish('photos', {});
+}
 
 /** Admin status: albums in use with their state, and the image cache size. */
 export function immichStatus() {
@@ -345,6 +373,8 @@ export const cacheLimitBytes = (env = process.env) => {
 };
 
 const imageInflight = new Map();
+/** Bumped by clearCache: an image fetch that started before it is not written into the new cache. */
+let cacheGen = 0;
 let active = 0;
 const waiting = [];
 async function limited(fn) {
@@ -383,6 +413,7 @@ export async function cachedImage(id, v, size = 'preview') {
     return hit;
   }
   if (imageInflight.has(base)) return imageInflight.get(base);
+  const gen = cacheGen;
   const p = limited(async () => {
     const res = await call(immichSettings(), `/api/assets/${id}/thumbnail?size=${size}`, { accept: 'image/*', maxBytes: IMAGE_MAX_BYTES, timeout: IMAGE_TIMEOUT });
     let type = String(res.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
@@ -391,12 +422,13 @@ export async function cachedImage(id, v, size = 'preview') {
       if (!sniffed) throw new ImmichError('bad_type');
       type = sniffed;
     }
+    if (gen !== cacheGen) throw new ImmichError('stale');
     fs.mkdirSync(cacheDir(), { recursive: true });
     const file = path.join(cacheDir(), `${base}.${IMMICH_IMAGE_TYPES[type]}`);
     writeFileAtomic(file, res.buffer);
     schedulePrune();
     return { file, type };
-  }).finally(() => imageInflight.delete(base));
+  }).finally(() => { if (imageInflight.get(base) === p) imageInflight.delete(base); });
   imageInflight.set(base, p);
   return p;
 }
@@ -443,6 +475,8 @@ export function pruneCache(max = cacheLimitBytes()) {
 }
 
 export function clearCache() {
+  cacheGen++;
+  imageInflight.clear();
   const { bytes } = cacheStats();
   try { fs.rmSync(cacheDir(), { recursive: true, force: true }); } catch { /* ignore */ }
   return bytes;

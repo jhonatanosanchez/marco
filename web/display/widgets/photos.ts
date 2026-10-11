@@ -315,6 +315,8 @@ export class Photos {
     // a composed frame is already framed: no focal point
     const focus = composed ? undefined : p;
     if (this.usingGL && this.glLayer) {
+      // composed for the CSS path before WebGL came back: its blob URL is not used here
+      if (composed?.url) URL.revokeObjectURL(composed.url);
       this.glLayer.show(src, focus);
       if (this.domCur) {
         dropNode(this.domCur);

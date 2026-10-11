@@ -82,7 +82,7 @@ export async function fakeImmich(opts = {}) {
     if (m && req.method === 'GET') {
       if (!can('album.read')) return deny('album.read');
       const a = state.albums.find((x) => x.id === m[1]);
-      if (!a) return json(res, 404, { message: 'Album not found' });
+      if (!a) return json(res, 400, { message: 'Not found or no album.read access' }); // what Immich answers
       const out = { id: a.id, albumName: a.albumName, assetCount: a.assets.length };
       if (!atLeast(3, 0) && u.searchParams.get('withoutAssets') === 'false') out.assets = a.assets;
       return json(res, 200, out);

@@ -302,7 +302,7 @@ Rules for the mutating setup endpoints:
 | `PUT /api/admin/homeassistant/token` | `{ token }` |
 | `POST /api/admin/test/immich` | `{ url?, key?, insecureTls? }` (unsaved values; missing ones come from the saved settings) → `{ ok, version?, missingScopes?, error? }`. `missingScopes` lists what the key lacks of `album.read`, `asset.read`, `asset.view`. `error`: `not_configured`, `key_missing`, `invalid_url`, `invalid_key`, `missing_scope`, `not_found`, `unreachable`, `bad_response`, `http` (`features.immich`) |
 | `GET /api/admin/immich/key` | `{ set, hint }`: whether an Immich API key is stored and its last 4 characters. The key itself is never sent back |
-| `PUT /api/admin/immich/key` | `{ key }` (letters, digits, `-` and `_`, 10 to 128; `""` removes it). With a server URL saved, the key is tried first: `400 { error: "invalid_key" }` when Immich refuses it (nothing is stored); `{ set, hint, checked }` otherwise |
+| `PUT /api/admin/immich/key` | `{ key }` (letters, digits, `-` and `_`, 10 to 128; `""` removes it). With a server URL saved, the key is tried first: `400 { error: "invalid_key" }` when Immich refuses it (nothing is stored); `{ set, hint, checked }` otherwise. A changed key forgets the album lists and sends a live `photos` event |
 | `GET /api/admin/immich/albums` | `ImmichAlbum[]`: `{ id, name, count, cover, shared, start, end }`, by name. `409 { error: "not_configured" }`, `502 { error }` when Immich fails |
 | `GET /api/admin/immich/status` | `ImmichStatus`: `{ usable, albums: [{ id, favoritesOnly, count, updatedAt, error, missing }], cache: { files, bytes } }` (albums some screen plays) |
 | `POST /api/admin/immich/refresh` | Fetch the albums in use again now, then tell the displays (live `photos` event) → `ImmichStatus` |
