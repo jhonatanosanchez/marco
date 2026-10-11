@@ -1,6 +1,7 @@
 import { GLASS_DEFAULTS, glassVars, normalizeGlass, type PhotoStats } from '../../shared/glass';
 import type { DisplayStyle, FrameCorner, GlassConfig, LayoutPreset } from '../../shared/types';
 import { Icon } from '../components/icons';
+import { EventStyleField, PLANNER_CALENDAR, WeeksField } from '../components/PlannerFields';
 import { Button, Callout, Card, Field, PageHeader, Segmented, Slider, ToggleRow } from '../components/ui';
 import { t } from '../i18n';
 import { allSourceOptions } from '../util';
@@ -18,6 +19,7 @@ export const PRESETS: { id: LayoutPreset; name: string; desc: string; wizard?: b
   { id: 'bigTime', name: 'Hora grande', desc: 'Reloj protagonista sobre la foto, con la agenda de hoy y mañana.', wizard: true },
   { id: 'photoFrame', name: 'Marco de fotos', desc: 'La foto es la protagonista: solo un reloj pequeño, la temperatura y el próximo evento en una esquina. Ideal para un marco vertical.' },
   { id: 'bedside', name: 'Mesilla', desc: 'Reloj enorme, el próximo evento y la temperatura con muy poco brillo, para el dormitorio. Se atenúa más por la noche.' },
+  { id: 'planner', name: 'Planificador', desc: 'Para familias con muchas citas: reloj, fecha y tiempo arriba, y debajo el mes con tarjetas que llenan cada día. Pensado para pantallas verticales.' },
 ];
 
 /** Tiny schematic drawing of each layout preset. */
@@ -152,6 +154,32 @@ export function Schematic({ id, side }: { id: LayoutPreset; side: 'left' | 'righ
           <rect x="117" y="59" width="26" height="9" rx="2" fill="var(--schem-line)" />
           <rect x="117" y="72" width="16" height="3.5" rx="1.5" fill="var(--schem-line)" opacity=".6" />
           <rect x="117" y="78" width="30" height="3" rx="1.5" fill={accent} opacity=".8" />
+        </g>
+      )}
+      {id === 'planner' && (
+        <g>
+          <rect x="6" y="6" width="148" height="18" rx="4" fill={block} opacity="0.9" />
+          <rect x="11" y="10" width="30" height="10" rx="2" fill={accent} />
+          <rect x="104" y="10" width="44" height="10" rx="3" fill="var(--schem-line)" opacity=".5" />
+          {[0, 1, 2].map((r) =>
+            [0, 1, 2, 3, 4, 5, 6].map((c) => (
+              <g>
+                {[0, 1, 2].slice(0, 1 + ((r + c) % 3)).map((k) => (
+                  <rect
+                    x={6.6 + c * 21.14}
+                    y={28.6 + r * 19 + 4 + k * 4.4}
+                    width="19.9"
+                    height="3.6"
+                    rx="0.8"
+                    fill={['#4c8dff', '#ff9f1c', '#9b5de5', '#2ec4b6'][(r + c + k) % 4]}
+                    opacity=".75"
+                  />
+                ))}
+                <rect x={6.6 + c * 21.14} y={28.6 + r * 19} width="5" height="2.4" rx="0.8" fill="var(--schem-line)" opacity=".6" />
+              </g>
+            )),
+          )}
+          <rect x={6.6 + 4 * 21.14 - 0.6} y={28} width="21.1" height="18.4" rx="1.5" fill="none" stroke={accent} stroke-width="1.2" />
         </g>
       )}
       {id === 'bedside' && (
@@ -394,6 +422,22 @@ function PresetOptions({ cfg, set, full }: SectionProps) {
       </Card>
     );
   }
+  if (l.preset === 'planner') {
+    return (
+      <Card
+        id="layout-options"
+        scope="screen"
+        title={t('Planificador')}
+        icon="calendar"
+        desc={t('Al elegirlo se activan las semanas automáticas y las tarjetas. Puedes cambiarlo aquí o en Calendarios, Vista del calendario.')}
+      >
+        <div class="grid grid--2">
+          <WeeksField cfg={cfg} set={set} />
+          <EventStyleField cfg={cfg} set={set} />
+        </div>
+      </Card>
+    );
+  }
   if (l.preset !== 'people') return null;
   const opts = allSourceOptions(full, { includeDisabled: false }).filter((o) => o.id !== 'birthdays');
   const holidays = new Set(full.calendar.sources.filter((x) => x.kind === 'holidays').map((x) => x.id));
@@ -452,7 +496,8 @@ function PresetOptions({ cfg, set, full }: SectionProps) {
 export function LayoutSection(props: SectionProps) {
   const { cfg, set } = props;
   const l = cfg.layout;
-  const hasSide = ['bigCalendar', 'leftRight', 'today', 'twoWeeks'].includes(l.preset);
+  // the planner has a side column on landscape screens
+  const hasSide = ['bigCalendar', 'leftRight', 'today', 'twoWeeks', 'planner'].includes(l.preset);
   const style: DisplayStyle = cfg.screen.style === 'modern' ? 'modern' : 'classic';
   return (
     <>
@@ -497,7 +542,13 @@ export function LayoutSection(props: SectionProps) {
           <button
             type="button"
             class={`preset ${l.preset === p.id ? 'is-active' : ''}`}
-            onClick={() => set((d) => void (d.layout.preset = p.id))}
+            onClick={() =>
+              set((d) => {
+                // picking the planner also turns on what it is made for (automatic weeks, cards); both can be changed later
+                if (p.id === 'planner' && d.layout.preset !== 'planner') Object.assign(d.calendar, PLANNER_CALENDAR);
+                d.layout.preset = p.id;
+              })
+            }
             aria-pressed={l.preset === p.id}
           >
             <Schematic id={p.id} side={l.sidePanel} />

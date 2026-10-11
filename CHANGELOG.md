@@ -36,6 +36,26 @@ All notable changes to this project are documented here. The format is based on
   for Immich photos only, so gallery and stock photos look as they did.
 - `features.immich` in `/api/health` (off when missing, and on Marco Cloud). `validateConfig` takes
   `immichAvailable: false` to refuse the Immich source on servers without it.
+- Planner for busy families, all opt-in (screens that do not turn it on look exactly as before):
+  - *Weeks to show: Auto* (`calendar.weeks: "auto"`): the month view picks 2 to 6 weeks, as many as fit with
+    *Max. visible events per day* at a readable size, and works it out again when the screen size or orientation
+    changes. `?weeks=auto` on the display does the same.
+  - *Event style* (`calendar.eventStyle`, per screen, *Calendars → Calendar view*): *Lines* (the default, one-line
+    chips) or *Cards*: the time on top (and the end time when it is on), the title below on up to two lines, stacked in
+    each day of the month and week views. Events of several days stay as bars. A day with more cards than fit takes
+    turns (*Rotate busy days*) or shows "+N"; titles longer than two lines scroll up with *Slide long titles*. Cards
+    take precedence over *Compact busy days*. `?cards=1` on the display.
+  - *Planner* layout (`layout.preset: "planner"`): on a portrait screen the clock, the date and the weather with the
+    next days on top and the month below, filling the rest; on a landscape screen a side column with the clock and the
+    weather. Picking it in *Layout* (or in the setup API) also turns on *Auto* weeks and *Cards*, which can be changed
+    afterwards. `?demo=1&planner=1` shows it with the sample data.
+
+- *Days in the agenda* (`calendar.agendaDays`, per screen, *Calendars → Calendar view* when the agenda is used):
+  *Automatic* (the default), 7, 14 or 30 days. The agenda view used to look 14 days ahead, so a quiet screen never
+  showed events three weeks away. *Automatic* shows Today and Tomorrow, then the next days with events for as long as
+  each whole day fits, and works it out again when the screen size or the events change. It never shows less than
+  the 14 days did, so a busy agenda looks the same. The compact agenda of the side panel still shows 3 days.
+  `?agendaDays=` on the display, and `?demo=1&sparse=1` for a quiet sample calendar.
 
 ### Changed
 - Security: a display opened with `?screen=<address>` that names no screen or carousel no longer shows the default
@@ -55,6 +75,11 @@ All notable changes to this project are documented here. The format is based on
   empty or turned off, like the screen legend. A built-in list with the same name as a calendar (for example an ICS
   calendar called *Cumpleaños*) is shown as "Cumpleaños (Marco list)" there and in the calendar pickers, filters and
   status lists.
+
+### Fixed
+- Planner and top / bottom layouts on a portrait screen: a long title in the next-event pill under the clock no longer
+  widens the clock column and pushes the weather card off the screen. The pill now ends with an ellipsis (or slides,
+  with *Slide long titles*).
 
 ## [0.6.1] - 2026-10-11
 

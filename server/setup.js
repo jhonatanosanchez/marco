@@ -24,7 +24,7 @@ import { passwordProblem, PASSWORD_MESSAGES } from './lib/password.js';
 import { isHttpUrl, LAYOUT_PRESETS, slugify } from './core/validate.js';
 import { isValidTimeZone } from './core/lib/tz.js';
 import { LANGS, langFromHeader } from './core/lib/i18n.js';
-import { DEFAULT_SOURCES } from './core/defaults.js';
+import { DEFAULT_SOURCES, PLANNER_CALENDAR } from './core/defaults.js';
 import { displayAccessMode, displayKeyFor } from './displayAccess.js';
 
 let generatedToken = null;
@@ -226,6 +226,8 @@ export function applySetup(cfg, v) {
   if (v.accent) scr.screen.accent = v.accent;
   if (v.theme) scr.screen.theme = v.theme;
   if (v.layout) scr.layout.preset = v.layout;
+  // the planner layout comes with its calendar settings (the admin does the same when it is picked there)
+  if (v.layout === 'planner') Object.assign(scr.calendar, PLANNER_CALENDAR);
   if (v.photos) scr.background.source = v.photos;
   if (v.ambient) scr.background.ambient = v.ambient;
   if (v.format24 !== undefined) {

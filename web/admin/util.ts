@@ -149,7 +149,7 @@ export function validateConfig(c: AppConfig, caps: Caps = currentCaps()): Errors
   const b = c.background;
   if (!(b.intervalSec >= 10)) e['background.intervalSec'] = 'Mínimo 10 s';
   const cal = c.calendar;
-  if (!(cal.weeks >= 1 && cal.weeks <= 6)) e['calendar.weeks'] = 'Entre 1 y 6';
+  if (cal.weeks !== 'auto' && !(cal.weeks >= 1 && cal.weeks <= 6)) e['calendar.weeks'] = 'Entre 1 y 6';
   if (!(cal.maxEventsPerDay >= 1 && cal.maxEventsPerDay <= 12)) e['calendar.maxEventsPerDay'] = 'Entre 1 y 12';
   cal.sources.forEach((src) => {
     const p = `source.${src.id}`;

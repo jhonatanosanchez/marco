@@ -10,6 +10,10 @@ import {
   COMPACT_FONT, COMPACT_GAP_U, COMPACT_LINE, COMPACT_PAD_U, type CompactDay, laneHeight, linesThatFit, shareRows, weekNeed,
 } from '../compact';
 import type { Tick } from '../time';
+import {
+  CARD_BORDER_PX, CARD_GAP_U, CARD_PAD_U, CARD_TIME_FONT, CARD_TIME_LINE, CARD_TITLE_FONT, CARD_TITLE_LINE, type CardMetrics,
+  AUTO_WEEKS_MAX, barLanesFor, cardHeight, cardRowNeed, lineRowNeed, planDayCards, resolveWeeks, titleLines,
+} from '../cards';
 
 /** Grid metrics in px, read from the calendar's CSS variables (see lanesFor / planCompact). */
 interface Metrics {
@@ -80,6 +84,8 @@ export class MonthCalendar {
   readonly root: HTMLElement;
   /** Two weeks layout: rows are tall, so chips may wrap onto four lines (five for the only event of a day). */
   roomy = false;
+  /** Most week rows calendar.weeks = 'auto' may pick (layouts with a shorter calendar lower it). */
+  maxAutoWeeks = AUTO_WEEKS_MAX;
   private head: HTMLElement;
   private dow: HTMLElement;
   private weeks: HTMLElement;
@@ -98,11 +104,17 @@ export class MonthCalendar {
     const { cfg, lang, tz, t } = ctx;
     const c = cfg.calendar;
     const isWeek = c.view === 'week';
-    const nWeeks = isWeek ? 1 : c.weeks;
+    // eventStyle 'cards': one-day events are stacked cards (cardWeek); it takes precedence over compact busy days
+    const cards = c.eventStyle === 'cards';
     const wantL = Math.max(1, isWeek ? Math.min(14, c.maxEventsPerDay * 3) : c.maxEventsPerDay);
     this.root.classList.toggle('is-week', isWeek);
-    const compact = c.compactBusyDays === true;
+    this.root.classList.toggle('ev-cards', cards);
+    const compact = c.compactBusyDays === true && !cards;
     const m = this.metrics();
+    const cm = cards && m ? this.cardMetrics(m.rem) : null;
+    // a number of weeks is used as it is; 'auto' fits maxEventsPerDay events (chips or cards) in every day
+    const rowNeed = !m ? 0 : cm ? cardRowNeed(m.numH, m.gap, c.maxEventsPerDay, cm) : lineRowNeed(m.numH, m.laneH, m.gap, wantL);
+    const nWeeks = isWeek ? 1 : resolveWeeks(c.weeks, m ? m.h : 0, rowNeed, this.maxAutoWeeks);
     const L = Math.max(1, Math.min(wantL, m ? this.lanesFor(m.h / nWeeks - 1, m) : 99));
     const today = tick.dayKey;
     const nowMs = tick.now.getTime();
@@ -145,7 +157,7 @@ export class MonthCalendar {
     for (let w = 0; w < nWeeks; w++) {
       const ws = addDays(gridStart, w * 7);
       weekRows.push({ key: ws, start: ws });
-      weekSpecs.push({ key: `w${ws}`, className: 'wk', html: '' });
+      weekSpecs.push({ key: `w${ws}`, className: cards ? 'wk cards' : 'wk', html: '' });
     }
     reconcile(this.weeks, weekSpecs, { flip: true });
     const rowEls = Array.from(this.weeks.children).filter((x) => !(x as any).__leaving) as HTMLElement[];
@@ -167,6 +179,10 @@ export class MonthCalendar {
     weekRows.forEach((row, w) => {
       const el = rowEls[w];
       if (!el) return;
+      if (cards) {
+        this.cardWeek(el, row.start, layouts[w], m && cm ? { m, cm, rowH: m.h / nWeeks - 1 } : null, today, nowMs, t, tz, isWeek);
+        return;
+      }
       const rowH = rowHs ? rowHs[w] - 1 : m ? m.h / nWeeks - 1 : 0;
       const Lw = rowHs && m ? Math.max(1, Math.min(wantL, this.lanesFor(rowH, m))) : L;
       el.style.setProperty('--lanes', String(Lw));
@@ -552,15 +568,10 @@ export class MonthCalendar {
     return `<div class="${cls}" style="--c:${col.base};--on:${col.onSolid};--tint:${col.tint};--shade:${col.shade}">${html}</div>`;
   }
 
-  private weekSpecs(
-    ws: string, segs: Placed[], L: number, today: string, nowMs: number, t: Ctx['t'], tz: string, isWeek: boolean,
-    compact: Metrics | null, rowH: number,
-  ): Spec[] {
-    const { cfg, lang } = ctx;
-    const c = cfg.calendar;
+  /** Day cells and day numbers of the week starting `ws` (both event styles). */
+  private dayCells(ws: string, today: string, isWeek: boolean): Spec[] {
+    const { lang } = ctx;
     const specs: Spec[] = [];
-
-    // Day cells + numbers
     for (let d = 0; d < 7; d++) {
       const key = addDays(ws, d);
       const wd = weekdayOfKey(key);
@@ -576,6 +587,209 @@ export class MonthCalendar {
       const numHtml = isToday ? `<span class="dot"><span>${label}</span></span>` : `<span>${label}</span>`;
       specs.push({ key: `n${key}`, className: `num${cls}`, style: `${col};grid-row:1`, html: numHtml });
     }
+    return specs;
+  }
+
+  /** Card sizes in px from the chip font (set as CSS variables too, so the cards are drawn the size planned). */
+  private cardMetrics(rem: number): CardMetrics {
+    const raw = getComputedStyle(this.root).getPropertyValue('--chip-fs').trim();
+    const n = parseFloat(raw);
+    const chip = Number.isFinite(n) ? (raw.endsWith('px') ? n : n * rem) : 1.68 * rem;
+    const titleFs = chip * CARD_TITLE_FONT;
+    const timeFs = chip * CARD_TIME_FONT;
+    const cm: CardMetrics = {
+      pad: Math.round(CARD_PAD_U * rem),
+      timeH: Math.round(timeFs * CARD_TIME_LINE),
+      lineH: Math.round(titleFs * CARD_TITLE_LINE),
+      gap: Math.round(CARD_GAP_U * rem),
+      border: this.cardBorder(),
+    };
+    const set = (k: string, px: number) => {
+      const val = `${px.toFixed(2)}px`;
+      if (this.root.style.getPropertyValue(k) !== val) this.root.style.setProperty(k, val);
+    };
+    set('--card-fs', titleFs);
+    set('--card-tm-fs', timeFs);
+    set('--card-pad', cm.pad);
+    set('--card-tm-h', cm.timeH);
+    set('--card-line-h', cm.lineH);
+    set('--card-gap', cm.gap);
+    return cm;
+  }
+
+  /** Top plus bottom border of a drawn card (px), so the plan counts it; CARD_BORDER_PX before any card is drawn. */
+  private cardBorder(): number {
+    const card = this.root.querySelector<HTMLElement>('.cstack.cards .ev.card');
+    if (!card) return CARD_BORDER_PX;
+    const cs = getComputedStyle(card);
+    const b = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+    return Number.isFinite(b) ? b : CARD_BORDER_PX;
+  }
+
+  /** Title lines a card needs (1 or 2), from the measured title width and the column width. */
+  private cardLines(e: NEvent, withEmoji: boolean): number {
+    const g = this.geom;
+    if (!g) return 1;
+    const px = g.chipPx * CARD_TITLE_FONT;
+    // card: 0.35rem margins, 0.95rem padding on the stripe side, 0.6rem on the other
+    const inner = g.colW - 0.7 * g.rem - 1.55 * g.rem - 2;
+    let w = textWidth(e.title, px, 560);
+    if (withEmoji && e.emoji) w += px * 1.12 + 0.45 * g.rem;
+    return titleLines(w, inner);
+  }
+
+  /** One card: time line on top (timed events), title below on `lines` lines; all-day ones look like their chips. */
+  private cardHtml(sg: Placed, lines: number, today: string, nowMs: number, tz: string): string {
+    const { cfg } = ctx;
+    const c = cfg.calendar;
+    const e = sg.e;
+    const col = chipColors(e.color);
+    const timed = e.timed;
+    const pastEv = e.timed ? e.endMs <= nowMs : e.spanLast < today;
+    const ongoing = e.timed && e.startMs <= nowMs && e.endMs > nowMs;
+    const cls = ['ev', 'card', timed ? 'timed' : 'bar single', pastEv ? 'past' : '', ongoing ? 'ongoing' : '', sg.piece ? 'piece' : '']
+      .filter(Boolean).join(' ');
+    const em = e.emoji ? `<span class="em">${esc(e.emoji)}</span>` : '';
+    const loc = c.showLocation && e.ev.location ? `<span class="loc">${esc(e.ev.location)}</span>` : '';
+    let html = '';
+    if (timed) {
+      const tm = timeLabel(e, tz, cfg.datetime.format24, cfg.datetime.showAmPm, c.showEndTime, false);
+      html += `<div class="ch">${em}<span class="tm">${esc(tm)}</span>${loc}</div>`;
+      html += `<div class="tx"><span class="tt">${esc(e.title)}</span></div>`;
+    } else {
+      // the emoji is glued to the first word (U+2060 word joiner), the title wraps after it
+      html += `<div class="tx">${em ? `${em}\u2060` : ''}<span class="tt">${esc(e.title)}</span></div>`;
+      if (loc) html += `<div class="ch">${loc}</div>`;
+    }
+    const style = `--c:${col.base};--on:${col.onSolid};--tint:${col.tint};--shade:${col.shade};--clamp:${lines}`;
+    return `<div class="${cls}" style="${style}">${html}</div>`;
+  }
+
+  /**
+   * A week in the cards style (calendar.eventStyle = 'cards'): bars for the events that cover more than one day (at
+   * most a few lanes; the others show a one-day card on each of their days), then every day stacks its one-day
+   * events as cards below its bars. A day with more cards than fit takes turns (calendar.rotateBusyDays) or shows
+   * "+N". Rows keep equal heights.
+   */
+  private cardWeek(
+    el: HTMLElement, ws: string, segs: Placed[], size: { m: Metrics; cm: CardMetrics; rowH: number } | null,
+    today: string, nowMs: number, t: Ctx['t'], tz: string, isWeek: boolean,
+  ): void {
+    const { cfg } = ctx;
+    const c = cfg.calendar;
+    const rotate = c.rotateBusyDays !== false;
+    const specs = this.dayCells(ws, today, isWeek);
+    const dayOf = (sg: Placed) => Math.floor(sg.s / 2);
+    const isCard = (sg: Placed) =>
+      !sg.contL && !sg.contR && dayOf(sg) === Math.floor((sg.eSlot - 1) / 2) && !(sg.e.airbnb && !sg.e.checkoutMarker);
+    // bars get their lanes again without the one-day events (layoutWeek's order: longest and earliest first)
+    const bars = segs.filter((sg) => !isCard(sg));
+    const occ: boolean[][] = [];
+    for (const sg of bars) {
+      let lane = 0;
+      for (;; lane++) {
+        const row = (occ[lane] ||= new Array(14).fill(false));
+        let free = true;
+        for (let i = sg.s; i < sg.eSlot; i++) if (row[i]) { free = false; break; }
+        if (free) {
+          for (let i = sg.s; i < sg.eSlot; i++) row[i] = true;
+          break;
+        }
+      }
+      sg.lane = lane;
+      sg.span = 1;
+    }
+    const m = size?.m;
+    const cm = size?.cm;
+    const rowH = size?.rowH ?? 0;
+    const minCard = cm ? cardHeight(1, true, cm) : 0;
+    const maxBars = m && cm ? barLanesFor(rowH, m.numH, m.laneH, m.gap, minCard) : 2;
+    const shown = bars.filter((sg) => sg.lane < maxBars);
+    const nb = shown.reduce((n, sg) => Math.max(n, sg.lane + 1), 0);
+    const rows = `var(--num-h) ${'var(--lane-h) '.repeat(nb)}minmax(0, 1fr)`;
+    if (el.style.gridTemplateRows !== rows) el.style.gridTemplateRows = rows;
+
+    // bars: the same chips as the lines style draws for them
+    for (const sg of shown) {
+      const e = sg.e;
+      const col = chipColors(e.color);
+      const pastEv = e.timed ? e.endMs <= nowMs : e.spanLast < today;
+      const airbnb = e.airbnb && !e.checkoutMarker;
+      const cls = [
+        'ev', 'bar', sg.contL ? 'cont-l' : '', sg.contR ? 'cont-r' : '',
+        e.halfStart && !sg.contL ? 'half-l' : '', e.halfEnd && !sg.contR ? 'half-r' : '',
+        pastEv ? 'past' : '', airbnb ? 'airbnb' : '',
+      ].filter(Boolean).join(' ');
+      let html = e.emoji ? `<span class="em">${esc(e.emoji)}</span>` : '';
+      const short = sg.contL && sg.eSlot - sg.s <= 2;
+      if (short && airbnb && !sg.contR) html = `<span class="em">🚪</span>`;
+      else html += `<span class="tt">${esc(e.title)}</span>`;
+      if (c.showLocation && e.ev.location) html += `<span class="loc">${esc(e.ev.location)}</span>`;
+      if (c.showDayXofY && sg.contL && e.days > 1 && !short) {
+        const x = diffDays(e.spanFirst, addDays(ws, dayOf(sg))) + 1;
+        html += `<span class="dx">${esc(t('dayXofY', { x, y: airbnb ? e.days + 1 : e.days }))}</span>`;
+      }
+      if (airbnb && !sg.contR && !short && sg.eSlot - sg.s >= 3) html += `<span class="co">🚪</span>`;
+      specs.push({
+        key: `e${e.id}@${ws}`,
+        className: cls,
+        style: `grid-column:${sg.s + 1} / ${sg.eSlot + 1};grid-row:${sg.lane + 2};--c:${col.base};--on:${col.onSolid};--tint:${col.tint};--shade:${col.shade}`,
+        html,
+      });
+    }
+
+    if (!rotate) this.busyPages.clear();
+    for (let d = 0; d < 7; d++) this.busyPages.delete(addDays(ws, d));
+    for (let d = 0; d < 7; d++) {
+      const key = addDays(ws, d);
+      const a = 2 * d, b = 2 * d + 2;
+      const top = shown.filter((sg) => sg.s < b && a < sg.eSlot).reduce((n, sg) => Math.max(n, sg.lane + 1), 0);
+      // a bar without a lane shows as a one-day card on each of its days
+      const cut: Placed[] = bars.filter((sg) => sg.lane >= maxBars && sg.s < b && a < sg.eSlot).map((sg) => ({
+        e: sg.e, s: Math.max(sg.s, a), eSlot: Math.min(sg.eSlot, b), lane: -1,
+        contL: sg.contL || sg.s < a, contR: sg.contR || sg.eSlot > b, piece: true, day: key,
+      }));
+      const items = [...segs.filter((sg) => isCard(sg) && dayOf(sg) === d), ...cut].sort((x, y) => sortForDay(x.e, y.e));
+      if (!items.length) continue;
+      const lines = items.map((sg) => this.cardLines(sg.e, !sg.e.timed));
+      let pages: number[][] = [items.map((_, i) => i)];
+      let more = 0;
+      if (m && cm) {
+        const space = rowH - m.numH - m.gap - top * (m.laneH + m.gap) - cm.pad;
+        const plan = planDayCards(items.map((sg, i) => cardHeight(lines[i], sg.e.timed, cm)), space, cm.gap, rotate);
+        pages = plan.pages;
+        more = plan.more;
+      }
+      const html = (idx: number[]) => idx.map((i) => this.cardHtml(items[i], lines[i], today, nowMs, tz)).join('');
+      const n = pages.length;
+      specs.push({
+        key: `k${key}`,
+        className: `cstack cards${n > 1 ? ' paged' : ''}`,
+        style: `grid-column:${2 * d + 1} / span 2;grid-row:${top + 2} / -1`,
+        // pages are stacked in the same place; applyPages() shows one at a time
+        html: n > 1 ? pages.map((idx, p) => `<div class="cpg" data-day="${key}" data-pg="${p}" data-pgs="${n}">${html(idx)}</div>`).join('') : html(pages[0]),
+      });
+      if (n > 1) this.busyPages.set(key, n);
+      if (n > 1 || more) {
+        specs.push({
+          key: `m${key}`,
+          className: `more${key < today ? ' past' : ''}${n > 1 ? ' pgi' : ''}`,
+          style: `grid-column:${2 * d + 1} / span 2`,
+          html: n > 1 ? esc(pageLabel(0, n)) : esc(t('more', { n: more })),
+          data: n > 1 ? { day: key, pgs: String(n) } : undefined,
+        });
+      }
+    }
+    reconcile(el, specs, { flip: true });
+  }
+
+  private weekSpecs(
+    ws: string, segs: Placed[], L: number, today: string, nowMs: number, t: Ctx['t'], tz: string, isWeek: boolean,
+    compact: Metrics | null, rowH: number,
+  ): Spec[] {
+    const { cfg } = ctx;
+    const c = cfg.calendar;
+    const specs: Spec[] = this.dayCells(ws, today, isWeek);
 
     // Overflow: days with items beyond L lanes show "+N" in the last lane.
     const days = (sg: Placed) => {

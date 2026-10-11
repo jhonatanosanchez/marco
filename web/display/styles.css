@@ -224,7 +224,11 @@ body {
 .preset-topBottom .photo-area, .preset-topBottom .side { grid-column: 1 !important; grid-row: 1; }
 .preset-topBottom .main { grid-column: 1 !important; grid-row: 2; }
 .preset-topBottom .side { display: grid; grid-template-columns: 1fr auto; grid-template-rows: 1fr; align-items: end; padding: 3rem 4rem; }
-.preset-topBottom .side-top { align-items: flex-start; text-align: left; align-self: start; }
+.preset-topBottom .side-top { align-items: flex-start; text-align: left; align-self: start; max-width: 100%; }
+/* The pills under the clock take the width of the clock column but never widen it (width 0, min-width 100%): the
+   column is as wide as the clock and the date, and a long title in the next-event pill is cut with an ellipsis (or
+   slides, calendar.marquee) instead of pushing the weather card off the screen. */
+.preset-topBottom .highlights { width: 0; min-width: 100%; }
 .preset-topBottom .side-mid { display: none; }
 .preset-topBottom .side-bottom { align-self: end; max-width: 62rem; }
 .preset-topBottom .wx-hourly { display: none; }

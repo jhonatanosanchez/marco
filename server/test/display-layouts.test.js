@@ -1,4 +1,4 @@
-// The six newer layouts (today, people, photoFrame, twoWeeks, board, bedside): validation, defaults and wiring.
+// The newer layouts (today, people, photoFrame, twoWeeks, board, bedside, planner): validation, defaults and wiring.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -7,7 +7,7 @@ import { defaultConfig, defaultScreenProfile } from '../core/defaults.js';
 import { displayConfig } from '../core/screens.js';
 import { parseSetupBody } from '../setup.js';
 
-const NEW = ['today', 'people', 'photoFrame', 'twoWeeks', 'board', 'bedside'];
+const NEW = ['today', 'people', 'photoFrame', 'twoWeeks', 'board', 'bedside', 'planner'];
 const read = (p) => fs.readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
 
 test('every layout is accepted and reaches the display', () => {
@@ -125,7 +125,7 @@ test('display, admin and types know every layout', () => {
 
 test('the new layouts have Spanish, English and Portuguese texts', () => {
   const admin = read('web/admin/sections/Layout.tsx');
-  const dict = ['', '2', '3', '4', '5', '6', '7'].map((n) => read(`web/admin/i18n-dict${n}.ts`)).join('\n');
+  const dict = ['', '2', '3', '4', '5', '6', '7', '-planner'].map((n) => read(`web/admin/i18n-dict${n}.ts`)).join('\n');
   for (const m of admin.matchAll(/\{ id: '(\w+)', name: '([^']+)', desc: '([^']+)'/g)) {
     if (!NEW.includes(m[1])) continue;
     for (const s of [m[2], m[3]]) {

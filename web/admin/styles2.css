@@ -1300,6 +1300,22 @@ h1 .scope {
   display: block;
   grid-column: 1 / 3;
 }
+.field--weeks .seg button,
+.field--agenda-days .seg button {
+  padding-inline: 4px;
+}
+.mini-layout--planner {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 22% 1fr;
+}
+.mini-layout--planner .ml-a,
+.mini-layout--planner .ml-b {
+  grid-row: 1;
+}
+.mini-layout--planner .ml-c {
+  display: block;
+  grid-column: 1 / 3;
+}
 .mini-layout--bigTime {
   grid-template-columns: 1fr;
   grid-template-rows: 1fr 30%;

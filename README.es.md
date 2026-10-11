@@ -88,11 +88,15 @@ color de la foto, transparencia, desenfoque y borde de luz:
 
 <img src="docs/screenshots/display-portrait-1080x1920.webp" width="280" align="right" alt="Diseño vertical de 1080x1920">
 
-- **Calendario:** vistas de mes (con número de semanas configurable), agenda y semana; once diseños (*calendario
+- **Calendario:** vistas de mes (con un número de semanas, o *Auto*), agenda y semana; doce diseños (*calendario
   grande*, *dos semanas*, *izquierda/derecha*, *arriba/abajo*, *agenda*, *hoy*, *por persona*, *tablero*, *hora
-  grande*, *marco de fotos*, *mesilla*), en horizontal o vertical, y cada calendario con su propio color.
+  grande*, *marco de fotos*, *mesilla*, *planificador*), en horizontal o vertical, y cada calendario con su propio color.
 - **Días llenos:** un día con más eventos de los que caben los muestra en líneas pequeñas, y las semanas con más
   eventos ocupan más alto; lo que aun así no cabe se muestra por turnos.
+- **Planificador para familias con muchas citas:** los eventos pueden verse como *tarjetas* (la hora arriba y el
+  título debajo, en hasta dos líneas, una tras otra en cada día) en lugar de líneas, y las semanas *Auto* eligen entre
+  2 y 6 filas para que cada día muestre sus eventos a buen tamaño. El diseño *Planificador* pone el reloj, la fecha y
+  el tiempo arriba y el mes debajo; mira [Un planificador para una familia con muchas citas](#un-planificador-para-una-familia-con-muchas-citas).
 - **Un diseño para cada habitación:** *Hoy* muestra el día hora a hora con una línea de ahora, el próximo evento en
   grande y el tiempo de las próximas horas (la cocina por la mañana). *Por persona* da a cada calendario su columna
   con lo de hoy y lo de mañana (eliges hasta cinco en *Diseño*). *Tablero* es un tablón de organización familiar:
@@ -498,6 +502,28 @@ móvil, los diseños Hoy y tablero, el marco de fotos, los estilos Clásico y cr
 pantalla vertical, el panel (diseños, calendarios, galería) y el reloj tenue de noche para el dormitorio.
 
 [![Vídeo de demostración: la pantalla del salón en estilo Moderno con el calendario del mes, el tiempo y los próximos eventos](docs/media/poster.webp)](https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4)
+
+## Un planificador para una familia con muchas citas
+
+Cuando una familia tiene varios eventos al día, la cuadrícula del mes con eventos en una línea se llena y los días
+acaban con "+3". Para una pantalla en vertical (una tele de lado, una tablet), Marco tiene una configuración de
+planificador:
+
+1. En *Diseño*, elige **Planificador**. El reloj, la fecha y el tiempo (con los próximos días) van arriba y el mes
+   ocupa el resto de la pantalla. Al elegirlo también se activan las semanas *Auto* y las *Tarjetas*.
+2. En *Calendarios → Vista del calendario*, ajusta si quieres:
+   - **Semanas a mostrar: Auto** elige entre 2 y 6 semanas, las que caben con *Máx. eventos visibles por día* a buen
+     tamaño (con 6 salen unas 3 semanas en una pantalla vertical de 1080×1920). Se recalcula si la pantalla gira.
+   - **Estilo de los eventos: Tarjetas** muestra cada evento como una tarjeta pequeña: la hora arriba (y la de fin si
+     la tienes activada) y el título debajo, en hasta dos líneas. Los eventos de varios días siguen siendo barras a lo
+     ancho de la semana.
+   - Un día con más tarjetas de las que caben las muestra por turnos (*Rotar los días con muchos eventos*) o con "+N".
+     Los títulos de más de dos líneas suben poco a poco con *Desplazar los textos largos*.
+3. En una pantalla horizontal, el planificador mantiene una columna lateral con el reloj y el tiempo.
+
+Nada cambia en las pantallas que no usan estas opciones: lo de serie siguen siendo eventos en una línea y un número
+fijo de semanas. Las *Tarjetas* y las semanas *Auto* también funcionan con los demás diseños, en las vistas de mes y de
+semana. Con tarjetas no se usan los *Días llenos en compacto* (las tarjetas ya se apilan en cada día).
 
 ## Enlaces privados y vinculación de pantallas
 
@@ -983,6 +1009,8 @@ Haz copia de seguridad de toda la carpeta (o usa *Exportar*) para conservarlo to
 | `?demo=1&pair=1` `?demo=1&pair=invalid` `&pairLen=6\|8` | Muestra la pantalla de vinculación o la de “enlace ya no válido” con un código de ejemplo (sin servidor) |
 | `?empty=1` `?photos=0` | Con `?demo=1`: sin eventos, cuentas atrás ni tareas, o sin foto de fondo (para ver los estados vacíos) |
 | `?marquee=0\|1` `?rotate=0\|1` | Desactiva (o activa) los títulos largos que se deslizan (eventos del calendario, las píldoras junto al reloj, las cuentas atrás, el titular de las noticias; los de varias líneas suben línea a línea) y los días con muchos eventos que los muestran por turnos (*Calendarios → Vista del calendario*); con `?demo=1`, `&busy=1` añade un día lleno y títulos largos para probarlo |
+| `?cards=0\|1` `?weeks=auto` `?preset=planner` | Eventos como tarjetas (o en líneas), semanas automáticas, el diseño *Planificador*. Con `?demo=1`, `&planner=1` muestra el planificador tal como queda al elegirlo en el panel (prueba con `&busy=2`) |
+| `?agendaDays=auto\|7\|14\|30` | Hasta dónde mira la vista de agenda (*Calendarios → Vista del calendario → Días en la agenda*). Con `?demo=1`, `&sparse=1&preset=agenda` muestra un calendario tranquilo con eventos dentro de varias semanas |
 | `?compact=0\|1` `?weeks=1..8` | Desactiva (o activa) los días llenos en compacto: un día en el que no caben sus eventos los muestra en líneas pequeñas y las filas de semanas se reparten el alto según los eventos que tienen (*Calendarios → Vista del calendario*); `?weeks=` muestra ese número de semanas. Con `?demo=1`, `&busy=2` llena todo el mes |
 | `?client=<name>` | Nombre de este dispositivo en *Pantallas conectadas* (lo define el script del kiosco) |
 

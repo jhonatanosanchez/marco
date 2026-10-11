@@ -6,6 +6,7 @@ import '../shared/emoji-font.css';
 import './styles.css';
 import './styles-views.css';
 import './styles-modern.css';
+import './styles-planner.css';
 import type {
   Announcement, CountdownsResponse, DisplayConfig, EventsResponse, Lang, NewsResponse, NightCommand, PhotosResponse, StreamHello, WeatherResponse,
 } from '../shared/types';
@@ -13,7 +14,7 @@ import { addDays, startOfWeek } from '../shared/i18n';
 import { api, ApiError } from './api';
 import { parseColor, toHex } from './color';
 import { ctx, setCtxConfig } from './ctx';
-import { normalizeConfig } from './defaults';
+import { normalizeAgendaDays, normalizeConfig } from './defaults';
 import { Heartbeat, noteError } from './heartbeat';
 import {
   authHeaders, clearDeviceToken, clientId, credential, credentialKind, getActiveScreen, screenKey, setActiveScreen, storedDeviceToken, withScreen,
@@ -36,11 +37,13 @@ import { detectLiveMode, startConfigPoll, startPoll, type StreamHandlers } from 
 import { connectStream, pollUrl } from './stream';
 import { current, onTick, setClockOffset, setTimezone, startTicker, type Tick } from './time';
 import { Agenda } from './widgets/agenda';
+import { agendaFetchDays } from './agendaFill';
 import { Announcements, IdentifyOverlay, ScheduleBanners, serverNow, setServerNow } from './widgets/alerts';
 import { Countdowns } from './widgets/countdowns';
 import { DoorbellOverlay, type FrameSource } from './widgets/doorbell';
 import { mockDoorbellFrame, mockDoorbellRing } from './mockDoorbell';
 import { MonthCalendar } from './widgets/calendar';
+import { AUTO_WEEKS_MAX, rangeWeeks } from './cards';
 import { Clock } from './widgets/clock';
 import { renderMessage, renderTodo } from './widgets/extras';
 import { Highlights } from './widgets/highlights';
@@ -78,7 +81,7 @@ const clock = new Clock($('#clock'));
 const highlights = new Highlights($('#highlights'));
 const weather = new Weather($('#weather'));
 const calendar = new MonthCalendar($('#calendar'));
-const agenda = new Agenda($('#agenda'), { days: 14 });
+const agenda = new Agenda($('#agenda'), {}); // days: calendar.agendaDays
 const sideAgenda = new Agenda($('#side-agenda'), { days: 3, compact: true, maxPerDay: 4 });
 const news = new News($('#news'));
 const photos = new Photos(photoArea, $('.photo-meta'));
@@ -215,9 +218,15 @@ function hueShift(hex: string, deg: number): string {
   return toHex([(r1 + m) * 255, (g1 + m) * 255, (b1 + m) * 255]);
 }
 
-const PRESETS = ['bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda', 'today', 'people', 'photoFrame', 'twoWeeks', 'board', 'bedside'];
+const PRESETS = ['bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda', 'today', 'people', 'photoFrame', 'twoWeeks', 'board', 'bedside', 'planner'];
 /** Newer layouts built on an older one's frame: they also get its class, so its rules (and the Modern ones) apply. */
 const PRESET_BASE: Record<string, string> = { today: 'bigCalendar', twoWeeks: 'bigCalendar', people: 'topBottom', board: 'topBottom' };
+
+/** Planner: the top / bottom frame on a portrait screen, the big calendar one (side column) on a landscape one. */
+function presetBase(preset: string, portrait: boolean): string {
+  if (preset === 'planner') return portrait ? 'topBottom' : 'bigCalendar';
+  return PRESET_BASE[preset] ?? '';
+}
 
 function effectivePreset(cfg: DisplayConfig): string {
   const p = params.get('preset') || cfg.layout.preset;
@@ -240,7 +249,7 @@ function applyLayout(): void {
   app.className = [
     `preset-${preset}`, `side-${side === 'right' ? 'right' : 'left'}`, portrait ? 'portrait' : 'landscape',
     cfg.background.enabled ? 'has-photo' : 'no-photo',
-    PRESET_BASE[preset] ? `preset-${PRESET_BASE[preset]}` : '',
+    presetBase(preset, portrait) ? `preset-${presetBase(preset, portrait)}` : '',
     preset === 'photoFrame' ? `corner-${['tl', 'tr', 'bl', 'br'].includes(corner) ? corner : 'br'}` : '',
   ].filter(Boolean).join(' ');
   app.classList.toggle('has-view', VIEW_PRESETS.includes(preset));
@@ -300,11 +309,26 @@ function applyConfig(raw: DisplayConfig): void {
   if (pm === '0' || pm === '1') cfg.calendar.marquee = pm === '1';
   const pr = params.get('rotate');
   if (pr === '0' || pr === '1') cfg.calendar.rotateBusyDays = pr === '1';
-  // ?compact=0|1 (busy days as small one-line entries, rows sized by their events) and ?weeks=1..8
+  // ?compact=0|1 (busy days as small one-line entries, rows sized by their events), ?weeks=1..8|auto and ?cards=0|1
+  // (calendar.eventStyle: cards or one-line chips)
   const pcp = params.get('compact');
   if (pcp === '0' || pcp === '1') cfg.calendar.compactBusyDays = pcp === '1';
   const pw = Number(params.get('weeks'));
   if (Number.isInteger(pw) && pw >= 1 && pw <= 8) cfg.calendar.weeks = pw;
+  if (params.get('weeks') === 'auto') cfg.calendar.weeks = 'auto';
+  // ?agendaDays=auto|7|14|30 (how far the agenda view looks ahead)
+  if (params.has('agendaDays')) {
+    const pad = params.get('agendaDays');
+    cfg.calendar.agendaDays = normalizeAgendaDays(pad === 'auto' ? 'auto' : Number(pad));
+  }
+  const pcd = params.get('cards');
+  if (pcd === '0' || pcd === '1') cfg.calendar.eventStyle = pcd === '1' ? 'cards' : 'lines';
+  // automatic weeks: at most 6 rows, fewer where a layout caps the rows below
+  let autoMax = AUTO_WEEKS_MAX;
+  const capWeeks = (n: number) => {
+    if (cfg.calendar.weeks === 'auto') autoMax = Math.min(autoMax, n);
+    else cfg.calendar.weeks = Math.min(cfg.calendar.weeks, n);
+  };
   const pa = params.get('ambient');
   if (pa === 'aurora' || pa === 'particles' || pa === 'none') cfg.background.ambient = pa;
   const ptr = params.get('transition');
@@ -312,7 +336,7 @@ function applyConfig(raw: DisplayConfig): void {
   const pfx = params.get('wxfx');
   if (pfx === 'off' || pfx === 'simple' || pfx === 'rich') cfg.background.weatherFx = pfx;
   // the top-bottom preset has a shorter calendar: cap the number of week rows so chips stay readable
-  if (effectivePreset(cfg) === 'topBottom') cfg.calendar.weeks = Math.min(cfg.calendar.weeks, 4);
+  if (effectivePreset(cfg) === 'topBottom') capWeeks(4);
   // Two weeks: the month grid with two roomy rows (more events per day)
   if (effectivePreset(cfg) === 'twoWeeks') {
     cfg.calendar.view = 'month';
@@ -325,7 +349,8 @@ function applyConfig(raw: DisplayConfig): void {
     cfg.background.ambient = 'none';
   }
   // Small landscape screens (e.g. 1280×720 on the Pi): one week fewer so text can be bigger.
-  if (window.innerWidth > window.innerHeight && window.innerHeight <= 820 && effectivePreset(cfg) !== 'twoWeeks') cfg.calendar.weeks = Math.min(cfg.calendar.weeks, 4);
+  if (window.innerWidth > window.innerHeight && window.innerHeight <= 820 && effectivePreset(cfg) !== 'twoWeeks') capWeeks(4);
+  calendar.maxAutoWeeks = autoMax;
   setCtxConfig(cfg);
   setTimezone(ctx.tz);
   const root = document.documentElement;
@@ -356,7 +381,7 @@ function applyConfig(raw: DisplayConfig): void {
 
   // WebGL needs
   const preset = effectivePreset(cfg);
-  const wantAmbient = !lite && cfg.background.ambient !== 'none' && ['bigCalendar', 'agenda', 'topBottom', 'today', 'twoWeeks', 'people'].includes(preset);
+  const wantAmbient = !lite && cfg.background.ambient !== 'none' && ['bigCalendar', 'agenda', 'topBottom', 'today', 'twoWeeks', 'people', 'planner'].includes(preset);
   const wantGLPhoto = !lite && cfg.background.enabled && cfg.background.transition === 'webgl';
   if ((wantAmbient || wantGLPhoto) && !engine && !glFailed) {
     void initGL().then(() => {
@@ -732,10 +757,16 @@ async function checkTarget(): Promise<void> {
 // ---------------------------------------------------------------------------------------------
 // Data
 // ---------------------------------------------------------------------------------------------
-function eventsRange(cal: { weekStart: number; weeks: number } = ctx.cfg.calendar): [string, string] {
+function eventsRange(cfg: DisplayConfig = ctx.cfg): [string, string] {
   const today = current().dayKey;
-  const from = startOfWeek(today, cal.weekStart ?? 1);
-  const to = addDays(from, Math.max((cal.weeks ?? 5) * 7, 21) + 1);
+  const from = startOfWeek(today, cfg.calendar.weekStart ?? 1);
+  let to = addDays(from, Math.max(rangeWeeks(cfg.calendar.weeks ?? 5) * 7, 21) + 1);
+  // the agenda view looks further ahead than the grid (calendar.agendaDays; 'auto' up to AGENDA_AUTO_MAX_DAYS)
+  const view = params.get('view') || cfg.calendar.view;
+  if (effectivePreset(cfg) === 'agenda' || view === 'agenda') {
+    const agendaTo = addDays(today, agendaFetchDays(cfg.calendar.agendaDays));
+    if (agendaTo > to) to = agendaTo;
+  }
   return [from, to];
 }
 
@@ -978,7 +1009,7 @@ async function fetchBundle(id: string, parts: BundlePart[], known: DisplayConfig
   // the server answers with another screen when this one left the carousel: keep nothing
   if (!cfg || cfg.screenId !== id) return {};
   if (parts.includes('config')) out.config = cfg;
-  const [from, to] = eventsRange(cfg.calendar);
+  const [from, to] = eventsRange(cfg);
   const [events, countdowns, ph] = await Promise.all([
     parts.includes('events') ? one(() => api.events(from, to, id)) : null,
     parts.includes('countdowns') ? one(() => api.countdowns(id)) : null,
@@ -1194,6 +1225,28 @@ try {
       if (roT) clearTimeout(roT);
       roT = setTimeout(() => renderCalendar(current()), 60);
     }).observe(weeksEl);
+  }
+} catch { /* ignore */ }
+
+// The agenda's automatic days fill the room it has: lay it out again when its size changes (news appearing, …).
+// Rendering never changes the agenda's own size, so this cannot loop.
+let lastAgendaSize = '';
+let agT: ReturnType<typeof setTimeout> | null = null;
+try {
+  const agendaEl = document.getElementById('agenda');
+  if (agendaEl && 'ResizeObserver' in window) {
+    new ResizeObserver((entries) => {
+      const r = entries[0].contentRect;
+      const size = `${Math.round(r.width)}x${Math.round(r.height)}`;
+      if (size === lastAgendaSize) return;
+      lastAgendaSize = size;
+      if (!r.width || !r.height || !state.config || !app.classList.contains('view-agenda')) return;
+      if (agT) clearTimeout(agT);
+      agT = setTimeout(() => {
+        renderCalendar(current());
+        fitSide();
+      }, 80);
+    }).observe(agendaEl);
   }
 } catch { /* ignore */ }
 

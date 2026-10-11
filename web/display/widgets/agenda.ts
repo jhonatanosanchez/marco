@@ -1,4 +1,8 @@
 // Agenda list view (today / tomorrow / next days) with big emojis.
+// How far it looks ahead is calendar.agendaDays (agendaFill.ts): a number of days, or 'auto', which lays every
+// candidate day out in a hidden copy of the agenda, keeps the leading day blocks that fit whole and shows those.
+import type { AgendaDays } from '../../shared/types';
+import { agendaHorizon, agendaKeep } from '../agendaFill';
 import { addDays, diffDays, relativeDayLabel, weekdayName, keyToUTC, monthName } from '../../shared/i18n';
 import { chipColors } from '../color';
 import { ctx } from '../ctx';
@@ -7,19 +11,76 @@ import { type NEvent, sortForDay, timeLabel } from '../eventModel';
 import type { Tick } from '../time';
 
 export class Agenda {
-  constructor(private root: HTMLElement, private opts: { days: number; compact?: boolean; maxPerDay?: number }) {
+  /** Hidden copy of the agenda the 'auto' days are measured in (created on first use). */
+  private probe: HTMLElement | null = null;
+  /** Last 'auto' measurement: what was laid out (the day blocks, the box, the look) and how many blocks fit. */
+  private fill: { sig: string; keep: number } | null = null;
+
+  /** `days`: a fixed number of days (the side agenda), or omitted to follow calendar.agendaDays. */
+  constructor(private root: HTMLElement, private opts: { days?: number; compact?: boolean; maxPerDay?: number }) {
     root.classList.add('agenda');
     if (opts.compact) root.classList.add('compact');
   }
 
   render(events: NEvent[], tick: Tick): void {
+    const setting: AgendaDays | number = this.opts.days ?? ctx.cfg.calendar.agendaDays ?? 'auto';
+    const { specs, offsets } = this.days(events, tick, agendaHorizon(setting));
+    let shown = specs;
+    if (setting === 'auto' && specs.length) shown = specs.slice(0, this.autoKeep(specs, offsets));
+    if (!shown.length) shown = [{ key: 'empty', className: 'ag-empty big', html: esc(ctx.t('noUpcoming')) }];
+    reconcile(this.root, shown, { flip: true });
+  }
+
+  /**
+   * 'auto': lay every candidate day out in a hidden agenda of the same size and look, and keep the leading day
+   * blocks that are fully inside it (agendaKeep). Measured again only when the days, the size or the look change,
+   * and the visible agenda is written once, so a render never feeds back into the next one.
+   */
+  private autoKeep(specs: Spec[], offsets: number[]): number {
+    const root = this.root;
+    const w = root.offsetWidth, h = root.offsetHeight;
+    // not on screen (another view, booting): show what the 14 days would show; the next render measures
+    if (!w || !h || !root.parentElement) return agendaKeep(offsets, offsets.map(() => false));
+    let fonts = '';
+    try {
+      fonts = document.fonts?.status ?? '';
+    } catch { /* old browser */ }
+    const sig = `${w}x${h}|${root.className}|${document.documentElement.className}|${fonts}|${specs.map((s) => `${s.key}|${s.className}|${s.html}`).join('\n')}`;
+    if (this.fill?.sig === sig) return this.fill.keep;
+    let probe = this.probe;
+    if (!probe) {
+      probe = this.probe = document.createElement('div');
+      probe.setAttribute('aria-hidden', 'true');
+    }
+    probe.className = root.className;
+    probe.classList.add('ag-probe');
+    probe.style.cssText = `position:absolute;left:0;top:0;width:${w}px;height:${h}px;visibility:hidden;pointer-events:none;`;
+    if (probe.parentElement !== root.parentElement) root.parentElement.appendChild(probe);
+    probe.innerHTML = specs.map((s) => `<div class="${s.className}">${s.html}</div>`).join('');
+    const box = probe.getBoundingClientRect();
+    const cs = getComputedStyle(probe);
+    const right = box.right - (parseFloat(cs.paddingRight) || 0) + 1;
+    const bottom = box.bottom - (parseFloat(cs.paddingBottom) || 0) + 1;
+    const fits = Array.from(probe.children).map((d) => {
+      const r = d.getBoundingClientRect();
+      return r.right <= right && r.bottom <= bottom;
+    });
+    // emptied right away: nothing else (the sliding titles) ever sees the copy
+    probe.innerHTML = '';
+    const keep = agendaKeep(offsets, fits);
+    this.fill = { sig, keep };
+    return keep;
+  }
+
+  /** The day blocks of the next `horizon` days (Today and Tomorrow always, later days only with events). */
+  private days(events: NEvent[], tick: Tick, horizon: number): { specs: Spec[]; offsets: number[] } {
     const { cfg, lang, tz, t } = ctx;
     const c = cfg.calendar;
     const today = tick.dayKey;
     const nowMs = tick.now.getTime();
     const specs: Spec[] = [];
-    let shown = 0;
-    for (let i = 0; i < this.opts.days; i++) {
+    const offsets: number[] = [];
+    for (let i = 0; i < horizon; i++) {
       const key = addDays(today, i);
       const items: { e: NEvent; sub: string; badge?: string }[] = [];
       for (const e of events) {
@@ -68,9 +129,8 @@ export class Agenda {
         className: `ag-day${i === 0 ? ' today' : ''}`,
         html: `<div class="ag-date">${label}</div><div class="ag-list">${rows.join('')}</div>`,
       });
-      shown++;
+      offsets.push(i);
     }
-    if (!shown) specs.push({ key: 'empty', className: 'ag-empty big', html: esc(t('noUpcoming')) });
-    reconcile(this.root, specs, { flip: true });
+    return { specs, offsets };
   }
 }

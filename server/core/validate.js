@@ -17,7 +17,11 @@ const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 /** Screen layouts (docs/ARCHITECTURE.md); the display, the admin and server/setup.js use the same ids. */
-export const LAYOUT_PRESETS = ['bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda', 'today', 'people', 'photoFrame', 'twoWeeks', 'board', 'bedside'];
+export const LAYOUT_PRESETS = ['bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda', 'today', 'people', 'photoFrame', 'twoWeeks', 'board', 'bedside', 'planner'];
+/** calendar.eventStyle: 'lines' (one-line chips, the original look) or 'cards' (time on top, title below). */
+export const EVENT_STYLES = ['lines', 'cards'];
+/** calendar.agendaDays: days the agenda view looks ahead, or 'auto' (fills the agenda with the next days that have events). */
+export const AGENDA_DAYS = ['auto', 7, 14, 30];
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,255}$/;
 
 export function isHttpUrl(s, protocols = ['http:', 'https:']) {
@@ -284,7 +288,8 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
   const calendar = {
     enabled: bool(ctx, `${p}.calendar.enabled`, ca.enabled, D.calendar.enabled),
     view: oneOf(ctx, `${p}.calendar.view`, ca.view, D.calendar.view, ['month', 'agenda', 'week']),
-    weeks: num(ctx, `${p}.calendar.weeks`, ca.weeks, D.calendar.weeks, 1, 8, true),
+    // a number of week rows, or 'auto': the display picks 2 to 6 rows so each day fits maxEventsPerDay events
+    weeks: ca.weeks === 'auto' ? 'auto' : num(ctx, `${p}.calendar.weeks`, ca.weeks, D.calendar.weeks, 1, 8, true),
     weekStart: num(ctx, `${p}.calendar.weekStart`, ca.weekStart, D.calendar.weekStart, 0, 6, true),
     showLocation: bool(ctx, `${p}.calendar.showLocation`, ca.showLocation, D.calendar.showLocation),
     showEndTime: bool(ctx, `${p}.calendar.showEndTime`, ca.showEndTime, D.calendar.showEndTime),
@@ -296,6 +301,11 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
     rotateBusyDays: bool(ctx, `${p}.calendar.rotateBusyDays`, ca.rotateBusyDays, D.calendar.rotateBusyDays),
     // screens saved before the option keep the look they had (new screens get it on from defaultConfig)
     compactBusyDays: bool(ctx, `${p}.calendar.compactBusyDays`, ca.compactBusyDays, false),
+    // how events look in the month / week grid: one-line chips (default, what every screen had) or stacked cards
+    eventStyle: oneOf(ctx, `${p}.calendar.eventStyle`, ca.eventStyle, D.calendar.eventStyle, EVENT_STYLES),
+    // how far the agenda view looks ahead: 7, 14 or 30 days, or 'auto' (the default for every screen: it only adds
+    // days with events where the agenda had empty room)
+    agendaDays: oneOf(ctx, `${p}.calendar.agendaDays`, ca.agendaDays, D.calendar.agendaDays, AGENDA_DAYS),
     sourceIds: ca.sourceIds === null || ca.sourceIds === undefined ? null : idList(ctx, `${p}.calendar.sourceIds`, ca.sourceIds),
   };
 

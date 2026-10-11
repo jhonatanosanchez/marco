@@ -27,6 +27,8 @@ const DEMO_LANG = (() => {
 })();
 /** ?empty=1: no events, no countdowns, no to-dos (empty states). */
 const EMPTY = new URLSearchParams(location.search).get('empty') === '1';
+/** ?sparse=1: a quiet calendar, a few events and most of them weeks away (to see how far the agenda looks ahead). */
+const SPARSE = new URLSearchParams(location.search).get('sparse') === '1';
 /** ?busy=1: a day with more events than fit, and long titles (to see the sliding titles and the busy-day pages). */
 const BUSY_Q = new URLSearchParams(location.search).get('busy');
 /** ?busy=2: the same, plus a whole month packed with events (compact busy days). */
@@ -48,7 +50,7 @@ export const MOCK_SOURCES: PublicCalendarSource[] = [
 
 export function mockConfig(): DisplayConfig {
   const q = new URLSearchParams(location.search);
-  return deepMerge(DEFAULT_CONFIG, {
+  const cfg = deepMerge(DEFAULT_CONFIG, {
     revision: 1,
     screenId: 's_main',
     slug: 'living-room',
@@ -79,6 +81,13 @@ export function mockConfig(): DisplayConfig {
     },
     message: { enabled: q.get('msg') === '1', text: L('Have a great weekend, everyone!', '¡Buen fin de semana, familia!', 'Bom fim de semana, família!'), emoji: '💛' },
   });
+  // ?planner=1: the Planner layout with what picking it in the admin sets (automatic weeks, cards)
+  if (q.get('planner') === '1') {
+    cfg.layout.preset = 'planner';
+    cfg.calendar.weeks = 'auto';
+    cfg.calendar.eventStyle = 'cards';
+  }
+  return cfg;
 }
 
 /**
@@ -310,8 +319,22 @@ export function mockEvents(now = new Date()): EventsResponse {
   out.sort((a, b) => (a.allDay === b.allDay ? sortKey(a).localeCompare(sortKey(b)) : a.allDay ? -1 : 1));
   // ?empty=1 → an empty week (to check the empty states)
   if (EMPTY) out.length = 0;
+  if (SPARSE) {
+    out.length = 0;
+    out.push(ev('c_fam', L('Dentist', 'Dentista', 'Dentista'), T, { at: [17, 30], dur: 45 }));
+    out.push(ev('c_kids', L('Swim club', 'Natación', 'Natação'), D(3), { at: [7, 30], dur: 60 }));
+    out.push(ev('c_bday', L('Grandpa Luis', 'Abuelo Luis', 'Avô Luis'), D(21), { age: 81 }));
+    out.push(ev('c_fam', L('Parents evening at school', 'Reunión de padres en el colegio', 'Reunião de pais na escola'), D(21), { at: [18, 30], dur: 90 }));
+    out.push(ev('c_work', L('Quarterly review', 'Revisión trimestral', 'Revisão trimestral'), D(24), { at: [10, 0], dur: 60 }));
+    out.push(ev('c_fam', L('Car service', 'Revisión del coche', 'Revisão do carro'), D(28), { at: [8, 45], dur: 120 }));
+    out.push(ev('c_kids', L('School trip', 'Excursión del colegio', 'Visita de estudo'), D(33)));
+    out.push(ev('c_fam', L('Flight to Madrid', 'Vuelo a Madrid', 'Voo para Madrid'), D(40), { at: [7, 40], dur: 150 }));
+    // and a weekly class from the third week on, so a tall agenda still runs out of room
+    for (let n = 15; n <= 55; n += 7) out.push(ev('c_kids', L('Piano lesson', 'Clase de piano', 'Aula de piano'), D(n), { at: [17, 0], dur: 45 }));
+  }
   const events = PRIVATE ? out.map(busyOf) : out;
-  return { generatedAt: new Date().toISOString(), hash: `mock-${T}${EMPTY ? '-empty' : ''}${PRIVATE ? '-p' : ''}`, events, errors: [] };
+  const tag = `${EMPTY ? '-empty' : ''}${SPARSE ? '-sparse' : ''}${PRIVATE ? '-p' : ''}`;
+  return { generatedAt: new Date().toISOString(), hash: `mock-${T}${tag}`, events, errors: [] };
 }
 
 /** Same rule as the server (server/core/privacy.js) with the default per kind: holidays and birthdays stay. */
