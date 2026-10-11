@@ -282,7 +282,7 @@ with a screen) or as a new `marco` system user (server only).
 
 ```
 ~/marco/                  (or /opt/marco)
-├── current -> releases/0.5.1   the running version, switched in one step on update
+├── current -> releases/0.5.2   the running version, switched in one step on update
 ├── releases/                   the current version and the previous one (for rollback)
 ├── data/                       config, secrets, photos, backups (kept on update and uninstall)
 └── .env                        port and other settings, see .env.example

@@ -5,10 +5,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-10-11
+
 ### Added
 - Admin: *Help and feedback* form on servers that offer it (`features.feedback`, Marco Cloud only), with a GitHub link.
 
 ### Changed
+- The admin sidebar shows the Marco logo and wordmark instead of "Family calendar".
+- Installer menu: *Server only* is option 1 and *All in one* option 2 (the default for a device with a desktop is still All in one).
 - **Long titles slide in more places**: timed chips in the month, Two weeks and week grids, the pills next to the
   clock ("In 23 min · …", check-outs, birthdays), countdowns, scheduled messages and the news headline. A chip title
   cut after a few lines in a month cell now scrolls up a line at a time, like film credits, and comes back; its box
