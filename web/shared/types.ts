@@ -132,6 +132,11 @@ export interface CalendarConfig<S = CalendarSource> {
   marquee: boolean;
   /** A day with more events than fit in the month grid pages through them every few seconds (default true). */
   rotateBusyDays: boolean;
+  /**
+   * Month / week grid: a day that cannot fit its events at normal size shows them as small one-line entries, and week
+   * rows share the height by how many events they have (on for new screens, off for screens saved before it).
+   */
+  compactBusyDays: boolean;
   /** v2, per screen: null = every enabled source (incl. 'local' + 'birthdays'); array = only these ids. */
   sourceIds?: string[] | null;
   sources: S[];
@@ -930,7 +935,7 @@ export interface ScreenProfile {
   screen: Omit<ScreenConfig, 'name'>;
   layout: LayoutConfig;
   background: BackgroundConfig;
-  calendar: Pick<CalendarConfig, 'enabled' | 'view' | 'weeks' | 'weekStart' | 'showLocation' | 'showEndTime' | 'showDayXofY' | 'showLegend' | 'hidePast' | 'maxEventsPerDay' | 'marquee' | 'rotateBusyDays'> & { sourceIds: string[] | null };
+  calendar: Pick<CalendarConfig, 'enabled' | 'view' | 'weeks' | 'weekStart' | 'showLocation' | 'showEndTime' | 'showDayXofY' | 'showLegend' | 'hidePast' | 'maxEventsPerDay' | 'marquee' | 'rotateBusyDays' | 'compactBusyDays'> & { sourceIds: string[] | null };
   datetime: Omit<DateTimeConfig, 'timezone'>;
   weather: Pick<WeatherConfig, 'enabled' | 'forecastDays' | 'showHourly' | 'showPrecipChance'>;
   news: { enabled: boolean; rotateSec: number };

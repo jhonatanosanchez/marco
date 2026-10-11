@@ -23,7 +23,7 @@ export const RESERVED_SOURCE_IDS = [LOCAL_SOURCE_ID, BIRTHDAYS_SOURCE_ID];
 
 /** Per-screen part of the keys that are split between global and per-screen ("merged sections"). */
 export const SCREEN_SPLIT_KEYS = {
-  calendar: ['enabled', 'view', 'weeks', 'weekStart', 'showLocation', 'showEndTime', 'showDayXofY', 'showLegend', 'hidePast', 'maxEventsPerDay', 'marquee', 'rotateBusyDays', 'sourceIds'],
+  calendar: ['enabled', 'view', 'weeks', 'weekStart', 'showLocation', 'showEndTime', 'showDayXofY', 'showLegend', 'hidePast', 'maxEventsPerDay', 'marquee', 'rotateBusyDays', 'compactBusyDays', 'sourceIds'],
   datetime: ['enabled', 'clock', 'format24', 'showSeconds', 'showAmPm', 'dateFormat', 'dateCustom'],
   weather: ['enabled', 'forecastDays', 'showHourly', 'showPrecipChance'],
   news: ['enabled', 'rotateSec'],
@@ -56,6 +56,9 @@ export function defaultScreenProfile({ id = 's_main', slug = 'living-room', name
       showDayXofY: true, showLegend: true, hidePast: false, maxEventsPerDay: 4,
       // marquee: titles cut short slide to show the rest; rotateBusyDays: a day with more events than fit pages through them
       marquee: true, rotateBusyDays: true,
+      // compactBusyDays: a month-grid day that cannot fit its events shows them as small one-line entries, and week
+      // rows share the height by how many events they have (on for new screens, off for screens saved before it)
+      compactBusyDays: true,
       sourceIds: null, // null = every enabled source (incl. local + birthdays); array = only these ids
     },
     datetime: { enabled: true, clock: 'digital', format24: true, showSeconds: true, showAmPm: false, dateFormat: 'weekday_d_month', dateCustom: '{dddd}, {d} {mmmm} {yyyy}' },

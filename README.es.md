@@ -91,6 +91,8 @@ color de la foto, transparencia, desenfoque y borde de luz:
 - **Calendario:** vistas de mes (con número de semanas configurable), agenda y semana; once diseños (*calendario
   grande*, *dos semanas*, *izquierda/derecha*, *arriba/abajo*, *agenda*, *hoy*, *por persona*, *tablero*, *hora
   grande*, *marco de fotos*, *mesilla*), en horizontal o vertical, y cada calendario con su propio color.
+- **Días llenos:** un día con más eventos de los que caben los muestra en líneas pequeñas, y las semanas con más
+  eventos ocupan más alto; lo que aun así no cabe se muestra por turnos.
 - **Un diseño para cada habitación:** *Hoy* muestra el día hora a hora con una línea de ahora, el próximo evento en
   grande y el tiempo de las próximas horas (la cocina por la mañana). *Por persona* da a cada calendario su columna
   con lo de hoy y lo de mañana (eliges hasta cinco en *Diseño*). *Tablero* es un tablón de organización familiar:
@@ -976,6 +978,7 @@ Haz copia de seguridad de toda la carpeta (o usa *Exportar*) para conservarlo to
 | `?demo=1&pair=1` `?demo=1&pair=invalid` `&pairLen=6\|8` | Muestra la pantalla de vinculación o la de “enlace ya no válido” con un código de ejemplo (sin servidor) |
 | `?empty=1` `?photos=0` | Con `?demo=1`: sin eventos, cuentas atrás ni tareas, o sin foto de fondo (para ver los estados vacíos) |
 | `?marquee=0\|1` `?rotate=0\|1` | Desactiva (o activa) los títulos largos que se deslizan (eventos del calendario, las píldoras junto al reloj, las cuentas atrás, el titular de las noticias; los de varias líneas suben línea a línea) y los días con muchos eventos que los muestran por turnos (*Calendarios → Vista del calendario*); con `?demo=1`, `&busy=1` añade un día lleno y títulos largos para probarlo |
+| `?compact=0\|1` `?weeks=1..8` | Desactiva (o activa) los días llenos en compacto: un día en el que no caben sus eventos los muestra en líneas pequeñas y las filas de semanas se reparten el alto según los eventos que tienen (*Calendarios → Vista del calendario*); `?weeks=` muestra ese número de semanas. Con `?demo=1`, `&busy=2` llena todo el mes |
 | `?client=<name>` | Nombre de este dispositivo en *Pantallas conectadas* (lo define el script del kiosco) |
 
 ## Seguridad

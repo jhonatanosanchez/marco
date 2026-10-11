@@ -728,6 +728,13 @@ export function CalendarsSection(props: SectionProps) {
               checked={c.rotateBusyDays !== false}
               onChange={(v) => set((d) => void (d.calendar.rotateBusyDays = v))}
             />
+            <ToggleRow
+              icon="🗜️"
+              label={t('Días llenos en compacto')}
+              hint={t('Si en un día no caben sus eventos, se muestran en líneas pequeñas, y las semanas con más eventos ocupan más alto. Lo que aun así no cabe se muestra por turnos o con “+N”.')}
+              checked={c.compactBusyDays === true}
+              onChange={(v) => set((d) => void (d.calendar.compactBusyDays = v))}
+            />
           </div>
         </div>
       </Card>
