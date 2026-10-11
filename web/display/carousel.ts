@@ -140,8 +140,9 @@ export class CarouselController {
   /** Start: keep the screen already on display, load the others in the background, then follow the clock. */
   start(): void {
     this.stopped = false;
-    // the off-schedule screen decides the night hold: load it first, then look again
-    void this.ensure(this.block.offScreenId).then(() => this.tick());
+    // the off-schedule screen decides the night hold: load it first, then look again (the screen on display is
+    // loaded by main.ts as usual)
+    if (this.block.offScreenId && this.block.offScreenId !== this.active) void this.ensure(this.block.offScreenId).then(() => this.tick());
     this.tick();
   }
 

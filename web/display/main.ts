@@ -1322,7 +1322,13 @@ const heartbeat = new Heartbeat(
   (now) => setServerNow(now),
 );
 // The admin's focal-point editor previews the photo with this display's real free band.
-photos.onFrameChange = () => heartbeat.soon(3000);
+// On a carousel the frame changes with every layout: report it at most every 5 minutes there.
+let frameSentAt = 0;
+photos.onFrameChange = () => {
+  if (carousel && Date.now() - frameSentAt < 5 * 60_000) return;
+  frameSentAt = Date.now();
+  heartbeat.soon(3000);
+};
 
 // Nightly soft reload (~04:00 local, page older than 12 h) to reclaim leaked renderer/browser memory on
 // long-running kiosks. Only when the server answers, so an offline display never reloads into a blank page.
