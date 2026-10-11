@@ -294,7 +294,7 @@ test('app: private titles never reach the display; admin and webhook endpoints',
     assert.equal((await call('GET', '/api/display/config?screen=kitchen')).json.privacy.active, false);
     // poll displays get the `privacy` command (the kitchen does not)
     const later = await call('GET', `/api/display/poll?screen=living-room&client=kiosk-p1&cursor=${poll.json.cursor}`);
-    assert.deepEqual(later.json.commands, [{ type: 'privacy', active: true }]);
+    assert.deepEqual(later.json.commands, [{ type: 'privacy', active: true, screenId: 's_main' }]);
     const kitchenLater = await call('GET', `/api/display/poll?screen=kitchen&client=kiosk-p2&cursor=${poll.json.cursor}`);
     assert.deepEqual(kitchenLater.json.commands, []);
 

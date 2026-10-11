@@ -128,7 +128,8 @@ export function dismiss(rings, screenIds, now = Date.now()) {
  * an uploaded snapshot can send a longer one).
  */
 export function ringPayload(r, { frames = Boolean(r.camera), refreshMs = FRAME_REFRESH_MS } = {}) {
-  return { id: r.id, startedAt: r.startedAt, updatedAt: r.updatedAt, expiresAt: r.expiresAt, sound: r.sound, frames, refreshMs };
+  // screenId: the screen that rings (a display on a carousel asks for that screen's frames)
+  return { id: r.id, screenId: r.screenId, startedAt: r.startedAt, updatedAt: r.updatedAt, expiresAt: r.expiresAt, sound: r.sound, frames, refreshMs };
 }
 
 /** Image types accepted from a camera (anything else is refused, never passed through). */

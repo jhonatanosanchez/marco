@@ -18,6 +18,7 @@ import { createDevice } from './displayAccess.js';
 import { getConfig } from './store.js';
 import { logActivityThrottled } from './activity.js';
 import { CODE_LENGTH, randomCode, normalizeCode } from './core/pairCore.js';
+import { isTargetId, targetInfo } from './core/carousels.js';
 
 export { CODE_ALPHABET, CODE_LENGTH, normalizeCode } from './core/pairCore.js';
 
@@ -116,7 +117,7 @@ export function claimPairing(req, body, now = Date.now()) {
     return { error: 'too many wrong codes, wait a few minutes', status: 429, code: 'rate_limited' };
   }
   const screenId = typeof body?.screenId === 'string' ? body.screenId : '';
-  if (!getConfig().screens.some((s) => s.id === screenId)) return { error: 'unknown screen', status: 400, code: 'unknown_screen' };
+  if (!isTargetId(getConfig(), screenId)) return { error: 'unknown screen', status: 400, code: 'unknown_screen' };
   const code = normalizeCode(body?.code);
   let hit = null;
   if (code) {
@@ -138,7 +139,7 @@ export function claimPairing(req, body, now = Date.now()) {
   // First step: only say which display is waiting (its address), so the owner confirms a code that came from a
   // link or a message really belongs to the screen in front of them. Nothing is paired until `confirm: true`.
   if (body?.confirm !== true) {
-    const screen = getConfig().screens.find((s) => s.id === screenId);
+    const screen = targetInfo(getConfig(), screenId);
     return { confirm: { where: displayAddress(hit.ip), screenId, screenName: screen?.name ?? '' } };
   }
   const r = createDevice({ name: body?.name, screenId, ip: hit.ip, userAgent: hit.userAgent }, { req });

@@ -157,7 +157,7 @@ function listSummary(d, noun, l) {
 
 /** Top-level keys that make up a v2 config (except version/revision). */
 export const IMPORT_SECTIONS = ['screens', 'defaultScreen', 'calendar', 'datetime', 'weather', 'news', 'todo', 'localEvents',
-  'birthdays', 'eventRules', 'countdowns', 'schedules', 'homeassistant', 'auth'];
+  'birthdays', 'eventRules', 'countdowns', 'schedules', 'carousels', 'homeassistant', 'auth'];
 
 /** Short localized summary of what changes per section (ImportPreview.sections); `l` = es | en | pt. */
 export function sectionSummaries(cur, next, l = 'en', absent = new Set()) {
@@ -275,7 +275,8 @@ export function importPreview(bundle, current, l = 'en', currentSecrets = null) 
 
 /**
  * Merge an imported (validated) config into the current one. `sections` limits which top-level keys are
- * taken (others kept). `screens` and `defaultScreen` travel together (a default id must exist).
+ * taken (others kept). `screens`, `defaultScreen` and `carousels` travel together (a default id must exist, and
+ * carousel steps point at screens).
  */
 export function mergeImport(current, imported, sections, absent = new Set()) {
   // sections the file does not carry are never taken from it (they would come back as defaults)
@@ -283,6 +284,8 @@ export function mergeImport(current, imported, sections, absent = new Set()) {
   if (all && !absent.size) return { ...structuredClone(imported), revision: current.revision };
   const take = new Set((all ? IMPORT_SECTIONS : sections).filter((s) => IMPORT_SECTIONS.includes(s) && !absent.has(s)));
   if (take.has('screens')) take.add('defaultScreen');
+  // carousels only make sense with the screens they show: they travel with them (unless the file has none)
+  if (take.has('screens') && !absent.has('carousels')) take.add('carousels');
   const out = structuredClone(current);
   for (const k of take) out[k] = structuredClone(imported[k]);
   if (!out.screens.some((s) => s.id === out.defaultScreen)) out.defaultScreen = out.screens[0].id;

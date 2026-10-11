@@ -88,5 +88,8 @@ export function alertsEnabled(cfg, screenId) {
   return s ? s.alerts?.enabled !== false : true;
 }
 
-/** Delivery filter for `announce`: clients of screens with alerts disabled never get it. */
-export const alertsFilter = (cfg) => (client) => alertsEnabled(cfg, client.screenId);
+/**
+ * Delivery filter for `announce`: clients of screens with alerts disabled never get it. A display on a carousel
+ * (`memberIds`) gets it when one of the carousel's screens has alerts on.
+ */
+export const alertsFilter = (cfg) => (client) => (Array.isArray(client.memberIds) && client.memberIds.length ? client.memberIds : [client.screenId]).some((id) => alertsEnabled(cfg, id));

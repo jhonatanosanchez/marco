@@ -11,14 +11,17 @@
 //
 // Credentials travel in the X-Marco-Key header (fetch) or ?k= (EventSource and <img>/WebGL photo URLs, where
 // headers are impossible). A credential always decides the screen (?screen= is ignored), so a key for the kitchen
-// never reads the living room. Comparisons are constant-time (sha256 digests + timingSafeEqual over every entry).
+// never reads the living room. A key or device bound to a carousel may read the carousel's screens, and only those. Comparisons are constant-time (sha256 digests + timingSafeEqual over every entry).
 import crypto from 'node:crypto';
 import { getConfig, getSecrets, updateSecrets, flushSecrets } from './store.js';
 import { sessionValid, isLanClient, authEvents, SESSION_MAX_AGE } from './auth.js';
 import { listClients, dropClient } from './sse.js';
 import { listPollers, dropPollers } from './pollHub.js';
 import { logActivity } from './activity.js';
-import { resolveScreen } from './core/screens.js';
+import { resolveScreen, defaultScreen } from './core/screens.js';
+import {
+  carouselList, carouselMembers, carouselScreenNow, findCarousel, findTarget, isTargetId, targetInfo,
+} from './core/carousels.js';
 
 export const KEY_HEADER = 'x-marco-key';
 /** Display key: a random UUIDv4 (122 random bits), lower-case. Upper-case input is accepted. */
@@ -45,12 +48,15 @@ function devices() {
 
 const newKey = () => ({ key: crypto.randomUUID(), createdAt: new Date().toISOString() });
 
+/** Ids a link or a device may be bound to: every screen and every carousel. */
+const targetIds = (cfg) => new Set([...cfg.screens.map((s) => s.id), ...carouselList(cfg).map((c) => c.id)]);
+
 /**
- * Keep secrets in step with the screens: every screen has a key, keys of deleted screens are dropped (their links
- * stop working), devices of deleted screens move to the default screen. Returns true when secrets changed.
+ * Keep secrets in step with the screens and carousels: each one has a key, keys of deleted ones are dropped (their
+ * links stop working), devices of deleted ones move to the default screen. Returns true when secrets changed.
  */
 export function syncDisplayKeys(cfg = getConfig()) {
-  const ids = new Set(cfg.screens.map((s) => s.id));
+  const ids = targetIds(cfg);
   const k = keys();
   let changed = false;
   for (const id of ids) {
@@ -63,20 +69,21 @@ export function syncDisplayKeys(cfg = getConfig()) {
   return changed;
 }
 
-/** The private-link key of a screen (created on demand). */
+/** The private-link key of a screen or carousel (created on demand). */
 export function displayKeyFor(screenId) {
   const cfg = getConfig();
-  if (!cfg.screens.some((s) => s.id === screenId)) return null;
+  if (!isTargetId(cfg, screenId)) return null;
   if (!keys()[screenId]) syncDisplayKeys(cfg);
   return keys()[screenId]?.key || null;
 }
 
-/** DisplayLink[] for the admin: one private link per saved screen. */
+/** DisplayLink[] for the admin: one private link per saved screen, then one per carousel (`screenId` = its id). */
 export function listDisplayLinks() {
   const cfg = getConfig();
   syncDisplayKeys(cfg);
   const k = keys();
-  return cfg.screens.map((s) => ({ screenId: s.id, slug: s.slug, name: s.name, key: k[s.id].key, path: `/d/${k[s.id].key}`, createdAt: k[s.id].createdAt }));
+  const row = (x, kind) => ({ screenId: x.id, kind, slug: x.slug, name: x.name, key: k[x.id].key, path: `/d/${k[x.id].key}`, createdAt: k[x.id].createdAt });
+  return [...cfg.screens.map((s) => row(s, 'screen')), ...carouselList(cfg).map((c) => row(c, 'carousel'))];
 }
 
 /** Screen id for a presented key, or null. Constant-time over every stored key. */
@@ -146,13 +153,38 @@ const ERRORS = {
 
 /**
  * The screen a display request is for: the one bound to its key / device token, else ?screen= (admin session,
- * open mode). Same shape as resolveScreen(): { screen, fallback }.
+ * open mode). Same shape as resolveScreen() plus `carousel` (the carousel the display runs, or null):
+ *   - bound to a screen: that screen (?screen= is ignored)
+ *   - bound to a carousel: ?screen= when it is one of the carousel's screens, else the screen it shows now; never
+ *     a screen outside the carousel
+ *   - not bound, ?screen=<carousel>: the screen it shows now; ?screen=<screen>&via=<carousel>: that screen, with
+ *     the carousel when the screen belongs to it
+ * @returns {{ screen: object, fallback: boolean, carousel: object | null }}
  */
 export function requestScreen(cfg, req) {
+  const q = req.query || {};
   const id = req.displayAccess?.screenId;
-  const bound = id && cfg.screens.find((s) => s.id === id);
-  if (bound) return { screen: bound, fallback: false };
-  return resolveScreen(cfg, req.query?.screen);
+  if (id) {
+    const bound = cfg.screens.find((s) => s.id === id);
+    if (bound) return { screen: bound, fallback: false, carousel: null };
+    const c = carouselList(cfg).find((x) => x.id === id);
+    if (c) return carouselRequest(cfg, c, q.screen);
+  }
+  const t = findTarget(cfg, q.screen);
+  if (t?.kind === 'carousel') return carouselRequest(cfg, t.carousel, '');
+  if (t?.kind === 'screen') {
+    const via = findCarousel(cfg, q.via);
+    return { screen: t.screen, fallback: false, carousel: via && carouselMembers(cfg, via).includes(t.id) ? via : null };
+  }
+  return { ...resolveScreen(cfg, q.screen), carousel: null };
+}
+
+/** A request for carousel `c`: the member `key` names, else the screen the carousel shows now. */
+function carouselRequest(cfg, c, key) {
+  const members = carouselMembers(cfg, c);
+  const hit = findTarget(cfg, key);
+  const id = hit?.kind === 'screen' && members.includes(hit.id) ? hit.id : carouselScreenNow(cfg, c);
+  return { screen: cfg.screens.find((s) => s.id === id) || defaultScreen(cfg), fallback: false, carousel: c };
 }
 
 /** Express middleware for the display JSON API: sets req.displayAccess or answers 401/403 (no data). */
@@ -182,10 +214,10 @@ export function mediaAuth(req, res, next) {
 // ---------------------------------------------------------------------------------------------------------------
 // Admin operations
 
-/** Replace a screen's key (the old private link stops working at once). Returns the new key or null. */
+/** Replace a screen's or carousel's key (the old private link stops working at once). Returns the new key or null. */
 export function regenerateKey(screenId, { req } = {}) {
   const cfg = getConfig();
-  const screen = cfg.screens.find((s) => s.id === screenId);
+  const screen = targetInfo(cfg, screenId);
   if (!screen) return null;
   const k = newKey();
   updateSecrets((s) => {
@@ -198,10 +230,10 @@ export function regenerateKey(screenId, { req } = {}) {
 }
 
 const deviceInfo = (d, cfg = getConfig()) => {
-  const s = cfg.screens.find((x) => x.id === d.screenId);
+  const s = targetInfo(cfg, d.screenId);
   const live = [...listClients(), ...listPollers()].filter((c) => c.access?.deviceId === d.id && !c.preview);
   return {
-    id: d.id, name: d.name, prefix: d.prefix, screenId: d.screenId, screenSlug: s?.slug || '', screenName: s?.name || '',
+    id: d.id, name: d.name, prefix: d.prefix, screenId: d.screenId, screenKind: s?.kind || 'screen', screenSlug: s?.slug || '', screenName: s?.name || '',
     createdAt: d.createdAt, lastSeenAt: d.lastSeenAt ?? null, lastIp: d.lastIp ?? null, userAgent: d.userAgent ?? '',
     connected: live.length > 0, clientIds: [...new Set(live.filter((c) => !c.anonymous).map((c) => c.clientId))],
   };
@@ -218,10 +250,10 @@ export function listDevices() {
 
 const cleanName = (v) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60) : '');
 
-/** Create a paired device bound to `screenId`. Returns { token, device } or { error, status }. */
+/** Create a paired device bound to `screenId` (a screen or a carousel). Returns { token, device } or { error, status }. */
 export function createDevice({ name, screenId, ip, userAgent }, { req } = {}) {
   const cfg = getConfig();
-  const screen = cfg.screens.find((s) => s.id === screenId);
+  const screen = targetInfo(cfg, screenId);
   if (!screen) return { error: 'unknown screen', status: 400 };
   if (devices().length >= MAX_DEVICES) return { error: `max ${MAX_DEVICES} paired devices: revoke one first`, status: 409 };
   const token = `md_${crypto.randomBytes(32).toString('base64url')}`;
@@ -255,7 +287,7 @@ export function updateDevice(id, body, { req } = {}) {
     patch.name = n;
   }
   if (body?.screenId !== undefined) {
-    if (!getConfig().screens.some((s) => s.id === body.screenId)) return { error: 'unknown screen', status: 400 };
+    if (!isTargetId(getConfig(), body.screenId)) return { error: 'unknown screen', status: 400 };
     patch.screenId = body.screenId;
   }
   const before = { name: d.name, screenId: d.screenId };
@@ -308,7 +340,7 @@ const sameHash = (hex, buf) => /^[a-f0-9]{64}$/.test(hex || '') && crypto.timing
  * Returns how many streams were closed.
  */
 export function revalidateStreams(cfg = getConfig()) {
-  const ids = new Set(cfg.screens.map((s) => s.id));
+  const ids = targetIds(cfg);
   const k = keys();
   const devs = new Map(devices().map((d) => [d.id, d]));
   const mode = displayAccessMode(cfg);

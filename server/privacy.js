@@ -74,7 +74,7 @@ export function syncPrivacy(now = new Date()) {
     told.set(s.id, active);
   }
   for (const id of told.keys()) if (!cfg.screens.some((s) => s.id === id)) told.delete(id);
-  for (const c of changed) publish('privacy', { active: c.active }, { screenIds: [c.id] });
+  for (const c of changed) publish('privacy', { active: c.active, screenId: c.id }, { screenIds: [c.id] });
   arm(now);
   return changed;
 }

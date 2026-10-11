@@ -117,6 +117,61 @@ export interface PrivacyRule {
   to: string; // HH:MM; `to < from` crosses midnight
 }
 
+/** One step of a carousel: a screen and how long it stays (10..3600 s). The same screen may come back later. */
+export interface CarouselStep {
+  screenId: string;
+  seconds: number;
+}
+
+export type CarouselTransition = 'fade' | 'none';
+
+/**
+ * A carousel (StoredConfig.carousels.items, server/core/carousels.js): screens shown one after another on the same
+ * TV, in a loop. Displays point at it like at a screen (slug, private link, paired device). Every TV on the same
+ * carousel changes screen at the same moment.
+ */
+export interface Carousel {
+  id: string; // "v_xxx"
+  enabled: boolean;
+  name: string; // ≤ 40
+  /** URL address (/?screen=<slug>); never the slug of a screen */
+  slug: string;
+  transition: CarouselTransition;
+  /** a doorbell ring or an announcement on screen keeps the current step until it is gone */
+  holdOnAlert: boolean;
+  /** night mode: keep rotating (each screen with its own night settings) or hold `offScreenId` (false) */
+  nightRotate: boolean;
+  /** shown outside the schedule and held at night; null = the first step's screen */
+  offScreenId: string | null;
+  /** when it rotates (same rule shape as privacy schedules); [] = always */
+  schedule: PrivacyRule[];
+  steps: CarouselStep[]; // ≤ 12
+}
+
+/** `carousel` of GET /api/display/config: valid steps only (with slug and name), off screen resolved. */
+export interface CarouselBlock {
+  id: string;
+  slug: string;
+  name: string;
+  enabled: boolean;
+  transition: CarouselTransition;
+  holdOnAlert: boolean;
+  nightRotate: boolean;
+  offScreenId: string;
+  schedule: PrivacyRule[];
+  steps: (CarouselStep & { slug: string; name: string })[];
+}
+
+export type DisplayTargetKind = 'screen' | 'carousel';
+
+/** What a display is bound to (DisplayConfig.target). */
+export interface DisplayTarget {
+  id: string;
+  kind: DisplayTargetKind;
+  slug: string;
+  name: string;
+}
+
 /** Per-screen privacy settings (ScreenProfile.privacy). */
 export interface ScreenPrivacyConfig {
   /** while private, the background and photo frame use stock photos only */
@@ -316,9 +371,12 @@ export interface SecurityConfig {
   displayAccess: DisplayAccessMode;
 }
 
-/** GET /api/admin/display-links item: one private link per saved screen. */
+/** GET /api/admin/display-links item: one private link per saved screen, then one per carousel. */
 export interface DisplayLink {
+  /** the screen's id, or the carousel's id for a carousel link */
   screenId: string;
+  /** absent on servers without carousels (= 'screen') */
+  kind?: DisplayTargetKind;
   slug: string;
   name: string;
   /** UUIDv4 */
@@ -344,7 +402,10 @@ export interface PairedDevice {
   name: string;
   /** first characters of the token ("md_abcd"), for recognising it */
   prefix: string;
+  /** screen or carousel id */
   screenId: string;
+  /** absent on servers without carousels (= 'screen') */
+  screenKind?: DisplayTargetKind;
   screenSlug: string;
   screenName: string;
   createdAt: string;
@@ -448,6 +509,8 @@ export interface AppConfig {
   auth: AuthConfig;
   security: SecurityConfig;
   privacy: ScreenPrivacyConfig;
+  /** global (servers without carousels leave it out) */
+  carousels?: { items: Carousel[] };
 }
 
 /** GET /api/display/config[?screen=<slug|id>] */
@@ -473,6 +536,10 @@ export interface DisplayConfig {
   message: MessageConfig;
   /** privacy mode of this screen (servers without it leave it out) */
   privacy?: DisplayPrivacy;
+  /** what the display is bound to: this screen, or a carousel this screen belongs to (older servers: absent) */
+  target?: DisplayTarget;
+  /** the carousel the display runs (null or absent: a plain screen) */
+  carousel?: CarouselBlock | null;
 }
 
 /** CalEvent from GET /api/events */
@@ -650,6 +717,8 @@ export interface Features {
   /** Doorbell frames are a live camera picture proxied from Home Assistant (self-hosted). Off: the frame URL returns
    *  the latest uploaded snapshot (absent = off). */
   doorbellLive: boolean;
+  /** Carousels: several screens in a loop on one TV (StoredConfig.carousels; absent = off). */
+  carousels: boolean;
 }
 
 export type FeatureName = keyof Features;
@@ -675,6 +744,7 @@ export interface Limits {
   localEvents?: number;
   birthdays?: number;
   countdowns?: number;
+  carousels?: number;
 }
 
 export interface HealthResponse {
@@ -799,7 +869,7 @@ export type StreamEvent =
   | { type: 'announce-clear'; id: string | null }
   | ({ type: 'identify' } & IdentifyPayload)
   | { type: 'night'; mode: NightCommand }
-  | { type: 'privacy'; active: boolean }
+  | { type: 'privacy'; active: boolean; screenId?: string }
   | ({ type: 'doorbell' } & DoorbellRing)
   | { type: 'doorbell-end'; id: string }
   | { type: 'ping'; t: number };
@@ -1190,6 +1260,8 @@ export interface StoredConfig {
   eventRules: { items: EventRule[] };
   countdowns: CountdownsConfig;
   schedules: { items: ScheduledMessage[] };
+  /** servers without carousels leave it out */
+  carousels?: { items: Carousel[] };
   homeassistant: HomeAssistantConfig;
   auth: AuthConfig;
   security: SecurityConfig;
@@ -1297,7 +1369,13 @@ export interface HeartbeatResponse {
 
 export interface DisplayInfo {
   clientId: string;
+  /** screen id, or the carousel id for a display on a carousel */
   screenId: string;
+  /** absent on servers without carousels (= 'screen') */
+  targetKind?: DisplayTargetKind;
+  /** a display on a carousel: the screen it reported last in its heartbeat */
+  showingScreenId?: string | null;
+  showingScreenName?: string | null;
   screenSlug: string;
   screenName: string;
   connected: boolean; // SSE stream open now
@@ -1342,7 +1420,9 @@ export interface DisplayCommandRequest {
 
 export interface StreamHello {
   revision: number;
+  /** the screen, or the carousel id for a display on a carousel */
   screenId: string;
+  targetKind?: DisplayTargetKind;
   slug: string;
   clientId: string | null;
   serverVersion: string;
@@ -1366,8 +1446,8 @@ export type DisplayCommand =
   | { type: 'photos'; hidden?: string[] }
   /** self-hosted only: calendar data changed */
   | { type: 'events'; hash: string }
-  /** privacy mode turned on or off: refetch config, events, countdowns and photos */
-  | { type: 'privacy'; active: boolean }
+  /** privacy mode turned on or off for `screenId`: refetch config, events, countdowns and photos */
+  | { type: 'privacy'; active: boolean; screenId?: string }
   | ({ type: 'doorbell' } & DoorbellRing)
   | { type: 'doorbell-end'; id: string };
 
@@ -1375,8 +1455,10 @@ export type DisplayCommand =
 export interface PollResponse {
   /** config revision; a different one makes the display refetch its config, events and countdowns */
   revision: number;
-  /** screen bound to this display now; a different one (device moved) reloads the page */
+  /** screen (or carousel) bound to this display now; a different one (device moved) reloads the page */
   screenId: string;
+  /** absent on servers without carousels (= 'screen') */
+  targetKind?: DisplayTargetKind;
   /** server ISO time (clock offset for announcement expiry) */
   now: string;
   serverVersion: string;
@@ -1406,6 +1488,8 @@ export interface DoorbellRing {
   frames: boolean;
   /** ms between two frame requests to GET /api/display/doorbell/frame */
   refreshMs: number;
+  /** the screen that rings (a display on a carousel asks for that screen's frames); older servers: absent */
+  screenId?: string;
 }
 
 /** POST /api/hooks/doorbell, POST /api/admin/doorbell. Omitted fields take homeassistant.doorbell. */
