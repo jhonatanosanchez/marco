@@ -5,6 +5,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-11
+
 ### Added
 - Private mode per screen, for when you have guests. While it is on, events of each calendar show as "Busy" (time,
   length and calendar colour only), are hidden, or stay as they are (*In private mode*, per calendar; holidays and
