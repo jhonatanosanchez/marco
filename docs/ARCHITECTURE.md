@@ -316,13 +316,19 @@ goes (link keys, `device.screenId`, the display registry); the `v_` prefix tells
   - `random` picks from fade, slide, zoom, wipe and dissolve by the switch number (step starts since the epoch,
     `switchNumber`) and the carousel id: shuffled blocks of five, fixed at the block edge so two switches in a row
     never repeat. Every TV on the carousel picks the same one, with no shared state.
-  - `prefers-reduced-motion`, `?lite=1` and low-power devices (ARM Linux Chromium such as a Raspberry Pi, or under
-    2 GB of memory) always get a 300 ms fade. A hidden tab or the boot fade switches without animation.
+  - `prefers-reduced-motion`, `?lite=1`, `?lowpower=1` and low-power devices always get a light 300 ms fade:
+    `#app` fades out, the new screen goes in and `#app` fades back in, with no copy of the page or of the GL frame.
+    Low power is an ARM Linux user agent, Linux on ARM in the client hints (recent Chromium says `Linux x86_64` on
+    ARM too), a VideoCore, V3D or Mali GPU in the WebGL renderer name, or under 2 GB of memory. A hidden tab or the
+    boot fade switches without animation.
   - A switch that arrives while one runs ends it at once (animations cancelled, overlay removed, GL dissolve
-    stopped); a timer removes the overlay even if an animation never reports its end.
+    stopped); a timer removes the overlay even if an animation never reports its end. When a switch ends the
+    marquee measures the titles again (during a slide they are off screen); it never looks inside the copy.
+  - `Engine.snapshot()` reuses one canvas for every switch.
 - **Debug:** `?step=<slug>` pins one step, `?carousel=0` stays on the first step; `?demo=1&carousel=1&stepSec=8`
   loops the demo screens (with `random`); `&tr=<transition>` and `&trSpeed=fast|normal|slow` force an animation on
-  any display. `?try=1` (the admin's *Probar* in the preview) goes to the next step every 4 s and leaves the clock.
+  any display. `?try=1` (the admin's *Probar* in the preview) goes to the next step every 4 s and leaves the clock;
+  with `random` each of those switches takes the next animation of the sequence.
 
 ## Immich source
 

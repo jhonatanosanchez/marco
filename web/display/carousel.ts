@@ -79,6 +79,10 @@ export class CarouselController {
   private loading = new Map<string, Promise<Bundle | null>>();
   /** tryNext() chose this screen: it stays until the next tryNext (the clock no longer decides) */
   private manual: string | null = null;
+  /** switches made by tryNext: with 'random' each one is the next of the sequence, not the clock's slot again */
+  private manualN = 0;
+  /** switchNumber at the first tryNext */
+  private manualBase: number | null = null;
   private setTimer: (fn: () => void, ms: number) => unknown;
   private clearTimer: (t: unknown) => void;
 
@@ -148,6 +152,8 @@ export class CarouselController {
     if (next === this.active) next = steps.find((s) => s.screenId !== this.active)?.screenId ?? next;
     if (next === this.active) return;
     this.manual = next;
+    this.manualBase ??= switchNumber(steps, this.d.now());
+    this.manualN++;
     void this.switchTo(next);
   }
 
@@ -316,7 +322,7 @@ export class CarouselController {
     this.d.show(screenId, b, {
       transition: this.block.transition || 'fade',
       speed: speedOf(this.block.transitionSpeed),
-      n: switchNumber(this.block.steps, this.d.now()),
+      n: this.manual && this.manualBase !== null ? this.manualBase + this.manualN : switchNumber(this.block.steps, this.d.now()),
       seed: this.block.id,
     });
   }

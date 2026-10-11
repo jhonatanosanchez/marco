@@ -27,6 +27,8 @@ export class Engine {
   private dead = false;
   /** keep the measured rects (a carousel switch moves #app with a transform; the canvas moves with it) */
   private hold = false;
+  /** the canvas snapshot() copies the frame into, kept between switches */
+  private shot: HTMLCanvasElement | null = null;
   onLost: (() => void) | null = null;
   fps = 30;
   /** cap when no layer is busy: Ken Burns drift is sub-pixel per frame, the aurora updates at 15 fps anyway */
@@ -129,17 +131,22 @@ export class Engine {
 
   /**
    * A copy of the frame as it is now (a fresh frame is drawn first: without preserveDrawingBuffer the buffer is
-   * only readable in the task that drew it). Null when the context is gone.
+   * only readable in the task that drew it). The same canvas comes back every time, so a caller is done with the
+   * copy before it asks again. Null when the context is gone.
    */
   snapshot(): HTMLCanvasElement | null {
     if (this.dead || !this.canvas.width || !this.canvas.height) return null;
     try {
       this.frame((performance.now() - this.t0) / 1000, 0);
-      const c = document.createElement('canvas');
-      c.width = this.canvas.width;
-      c.height = this.canvas.height;
+      // one canvas for every switch (a full-screen copy is several MB): the switch before is always over by now
+      const c = (this.shot ??= document.createElement('canvas'));
+      if (c.width !== this.canvas.width || c.height !== this.canvas.height) {
+        c.width = this.canvas.width;
+        c.height = this.canvas.height;
+      }
       const g = c.getContext('2d');
       if (!g) return null;
+      g.clearRect(0, 0, c.width, c.height);
       g.drawImage(this.canvas, 0, 0);
       return c;
     } catch (e) {
@@ -188,6 +195,7 @@ export class Engine {
     document.removeEventListener('visibilitychange', this.onVisibility);
     for (const l of this.layers) l.dispose();
     this.layers = [];
+    this.shot = null;
     this.renderer.dispose();
   }
 }

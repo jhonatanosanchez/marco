@@ -37,6 +37,8 @@ export interface SwitchEnv {
 export interface SwitchPlan {
   effect: SwitchEffect;
   ms: number;
+  /** a plain fade of #app, with no copy of the page (reduced motion, lite mode, a Raspberry Pi) */
+  light?: boolean;
 }
 
 /** The fade used where motion is unwelcome or too heavy (reduced motion, lite mode, Raspberry Pi). */
@@ -107,7 +109,7 @@ export function planSwitch(info: SwitchInfo, env: SwitchEnv): SwitchPlan {
   const name: CarouselTransition = forced ?? ((CAROUSEL_TRANSITIONS as readonly string[]).includes(info.transition) ? info.transition : 'fade');
   if (name === 'none') return { effect: 'none', ms: 0 };
   const ms = CAROUSEL_SPEEDS[speedOf(env.forceSpeed || info.speed)];
-  if (env.reduced || env.lowPower) return { effect: 'fade', ms: Math.min(ms, SHORT_FADE_MS) };
+  if (env.reduced || env.lowPower) return { effect: 'fade', ms: Math.min(ms, SHORT_FADE_MS), light: true };
   let effect: SwitchEffect = name === 'random' ? randomPick(info.n, info.seed) : name;
   if (effect === 'dissolve' && !env.gl) effect = 'fade';
   return { effect, ms };
@@ -115,10 +117,25 @@ export function planSwitch(info: SwitchInfo, env: SwitchEnv): SwitchPlan {
 
 /**
  * A Raspberry Pi or a similar small ARM board running desktop Chromium (Android phones and tablets are fine), or
- * a browser that says it has very little memory. `ua`, `mem` and `cores` come from navigator.
+ * a browser that says it has very little memory. `ua`, `mem` and `cores` come from navigator. Recent Chromium says
+ * "X11; Linux x86_64" on every Linux machine, ARM too, so the display also asks lowPowerHints() below.
  */
 export function isLowPower(ua: string, mem?: number, cores?: number): boolean {
   if (/Linux (armv\d+l?|aarch64)/i.test(ua) && !/Android/i.test(ua)) return true;
   if (typeof mem === 'number' && mem > 0 && mem < 2) return true;
   return typeof cores === 'number' && cores > 0 && cores < 2;
+}
+
+/** The GPU of a Raspberry Pi (VideoCore / V3D) or of a similar small ARM board (Mali), from the WebGL renderer name. */
+export function isLowPowerGPU(renderer: string | null | undefined): boolean {
+  return !!renderer && /V3D|VideoCore|Mali/i.test(renderer);
+}
+
+/**
+ * Desktop Linux on ARM (a Pi and the like) from the client hints (Chromium): `architecture` and `platform` of
+ * userAgentData. Macs and Windows on ARM are fast enough, and Android is not desktop Linux.
+ */
+export function isArmDesktop(architecture: string | null | undefined, platform: string | null | undefined, mobile?: boolean): boolean {
+  if (mobile || !/^Linux$/i.test(platform ?? '')) return false;
+  return /^arm/i.test(architecture ?? '');
 }

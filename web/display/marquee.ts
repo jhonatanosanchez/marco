@@ -196,7 +196,8 @@ function scan(): void {
       stop(el);
     }
   }
-  const els = Array.from(document.querySelectorAll<MqEl>(`${SLIDE},${SCROLL},${ONCE}`));
+  // not the still copy of the screen that leaves during a carousel switch (web/display/screenSwitch.ts)
+  const els = Array.from(document.querySelectorAll<MqEl>(`${SLIDE},${SCROLL},${ONCE}`)).filter((el) => !el.closest('.switch-shot'));
   const kinds = els.map(kindOf);
   const unit = parseFloat(getComputedStyle(document.documentElement).fontSize) || 10;
   const vw = window.innerWidth, vh = window.innerHeight;

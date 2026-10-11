@@ -9,6 +9,9 @@
 //    the GL dissolve layer (web/display/gl/dissolveLayer.ts) and crossfades the content above it.
 // 4. The overlay is removed. A switch that arrives while one runs finishes that one at once.
 //
+// A light plan (reduced motion, lite mode, a Raspberry Pi) skips all of that: #app fades out, the new screen goes
+// in and #app fades back in, with no copy of the page or of the GL frame.
+//
 // The ids of the clone are dropped, so the stylesheet rules that use ids (#app, #calendar, ...) get a second
 // selector for data-shot-id the first time a switch runs (shotSelectors). The added selector has the same
 // specificity, so the clone looks exactly like the screen it copies.
@@ -81,14 +84,18 @@ function shotSelectors(): void {
 }
 
 interface Running {
-  overlay: HTMLElement;
+  overlay: HTMLElement | null;
   anims: Animation[];
   timer: ReturnType<typeof setTimeout>;
   gl: SwitchGL | null;
+  /** the light fade only: the new screen, not rendered yet while #app fades out */
+  pending?: (() => void) | null;
 }
 
 export class ScreenSwitcher {
   private run: Running | null = null;
+  /** called when an animated switch ends (the new screen sits still where it belongs) */
+  onDone: (() => void) | null = null;
 
   constructor(private app: HTMLElement, private gl: () => SwitchGL | null) {}
 
@@ -96,6 +103,7 @@ export class ScreenSwitcher {
   switch(plan: SwitchPlan, apply: () => void): void {
     this.finish();
     if (plan.effect === 'none' || plan.ms <= 0 || document.hidden || typeof this.app.animate !== 'function') return apply();
+    if (plan.light) return this.fade(plan.ms, apply);
     let overlay: HTMLElement;
     let glShot: HTMLCanvasElement | null = null;
     const gl = this.glOn();
@@ -164,7 +172,7 @@ export class ScreenSwitcher {
     );
   }
 
-  /** End the running animation now (the new screen is already in place). */
+  /** End the running animation now (the new screen is put in place if it is not yet). */
   finish(): void {
     const r = this.run;
     if (!r) return;
@@ -175,11 +183,42 @@ export class ScreenSwitcher {
         a.cancel();
       } catch { /* ignore */ }
     }
-    r.overlay.remove();
+    r.overlay?.remove();
     if (r.gl) {
       r.gl.stopDissolve();
       r.gl.holdRects(false);
     }
+    const pending = r.pending;
+    r.pending = null;
+    try {
+      pending?.();
+    } finally {
+      this.onDone?.();
+    }
+  }
+
+  /** The light switch: #app fades out, the new screen goes in, #app fades back in (half of `ms` each). */
+  private fade(ms: number, apply: () => void): void {
+    const half = Math.max(1, Math.round(ms / 2));
+    const out = this.app.animate([{ opacity: 1 }, { opacity: 0 }], { duration: half, easing: 'ease-in', fill: 'forwards' });
+    const run: Running = { overlay: null, anims: [out], gl: null, pending: apply, timer: setTimeout(() => this.finish(), ms + 600) };
+    this.run = run;
+    void out.finished.then(() => {
+      if (this.run !== run) return;
+      const put = run.pending;
+      run.pending = null;
+      try {
+        put?.();
+      } catch (e) {
+        console.warn('[switch] render failed', e);
+      }
+      const back = this.app.animate([{ opacity: 0 }, { opacity: 1 }], { duration: half, easing: 'ease-out', fill: 'backwards' });
+      run.anims = [back];
+      try {
+        out.cancel();
+      } catch { /* ignore */ }
+      void back.finished.then(() => this.run === run && this.finish(), () => undefined);
+    }, () => undefined);
   }
 
   private glOn(): SwitchGL | null {

@@ -18,9 +18,9 @@ All notable changes to this project are documented here. The format is based on
   `?demo=1&carousel=1` for the demo screens in a loop.
 - *Animation between screens* for each carousel: fade (a true crossfade), slide, soft zoom, diagonal wipe, ink
   dissolve (WebGL, a fade without it), random (another one at each switch, the same on every TV) or none, at a fast,
-  normal or slow speed (0.4, 0.8 or 1.4 s). On a Raspberry Pi, with `?lite=1` or with *Reduce motion*, every switch
-  is a short fade. *Probar* plays it in the preview, saved or not. `&tr=<name>` and `&trSpeed=` force one on a display
-  for filming.
+  normal or slow speed (0.4, 0.8 or 1.4 s). On a Raspberry Pi, with `?lite=1`, with `?lowpower=1` or with *Reduce
+  motion*, every switch is a short fade of the screen, as before (with *Reduce motion* it used to be instant). *Probar*
+  plays it in the preview, saved or not. `&tr=<name>` and `&trSpeed=` force one on a display for filming.
 - Immich as a fourth background source, next to stock, the gallery and the mix. Set the server URL and an API key
   (scopes `album.read`, `asset.read`, `asset.view`) in the new *Integrations → Immich* page; *Test connection* shows
   the Immich version and any missing scope. Each screen picks one or more albums (merged, duplicates removed), with

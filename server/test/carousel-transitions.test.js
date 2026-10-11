@@ -9,7 +9,7 @@ import { carouselBlock, CAROUSEL_RANDOM_POOL, CAROUSEL_SPEEDS, CAROUSEL_TRANSITI
 import { loadWebModules } from './webModules.js';
 
 const [plan, sw, admin] = await loadWebModules('/web/display/switchPlan.ts', '/web/display/screenSwitch.ts', '/web/admin/sections/Carousels.tsx');
-const { randomPick, planSwitch, switchNumber, isLowPower, SHORT_FADE_MS } = plan;
+const { randomPick, planSwitch, switchNumber, isLowPower, isLowPowerGPU, isArmDesktop, SHORT_FADE_MS } = plan;
 
 function config(carousels) {
   const c = defaultConfig();
@@ -86,8 +86,8 @@ test('planSwitch: speeds, reduced motion and low power give a short fade, dissol
   assert.deepEqual(planSwitch(info('none'), env), { effect: 'none', ms: 0 });
   assert.deepEqual(planSwitch(info('spin'), env), { effect: 'fade', ms: 800 });
   for (const tr of ['slide', 'zoom', 'wipe', 'dissolve', 'random']) {
-    assert.deepEqual(planSwitch(info(tr, 'slow'), { ...env, reduced: true }), { effect: 'fade', ms: SHORT_FADE_MS });
-    assert.deepEqual(planSwitch(info(tr, 'slow'), { ...env, lowPower: true }), { effect: 'fade', ms: SHORT_FADE_MS });
+    assert.deepEqual(planSwitch(info(tr, 'slow'), { ...env, reduced: true }), { effect: 'fade', ms: SHORT_FADE_MS, light: true });
+    assert.deepEqual(planSwitch(info(tr, 'slow'), { ...env, lowPower: true }), { effect: 'fade', ms: SHORT_FADE_MS, light: true });
   }
   assert.equal(planSwitch(info('none'), { ...env, lowPower: true }).effect, 'none', 'off stays off');
   assert.equal(planSwitch(info('random', 'normal', 7), env).effect, randomPick(7, 'v_a'));
@@ -101,6 +101,19 @@ test('isLowPower: Raspberry Pi Chromium yes, desktops and Android no', () => {
   assert.equal(isLowPower('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36', 8, 8), false);
   assert.equal(isLowPower('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/126.0 Mobile Safari/537.36 aarch64'), false);
   assert.equal(isLowPower('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 1, 8), true, 'very little memory');
+});
+
+test('low power: the Pi GPU and ARM client hints (recent Chromium says x86_64 on ARM too)', () => {
+  assert.equal(isLowPowerGPU('V3D 4.2'), true);
+  assert.equal(isLowPowerGPU('ANGLE (Broadcom, V3D 7.1.7, OpenGL ES 3.1)'), true);
+  assert.equal(isLowPowerGPU('Mali-G52'), true);
+  assert.equal(isLowPowerGPU('ANGLE (Intel, Mesa Intel(R) UHD Graphics 620, OpenGL 4.6)'), false);
+  assert.equal(isLowPowerGPU(''), false);
+  assert.equal(isArmDesktop('arm', 'Linux', false), true);
+  assert.equal(isArmDesktop('x86', 'Linux', false), false);
+  assert.equal(isArmDesktop('arm', 'macOS', false), false, 'Apple silicon is fast enough');
+  assert.equal(isArmDesktop('arm', 'Windows', false), false);
+  assert.equal(isArmDesktop('arm', 'Android', true), false);
 });
 
 test('shotSelector: id rules get a data-shot-id twin with the same specificity', () => {

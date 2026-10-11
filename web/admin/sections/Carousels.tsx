@@ -135,10 +135,11 @@ function NowShowing({ full, c }: { full: StoredConfig; c: Carousel }) {
   );
 }
 
-function PreviewDialog({ url, openUrl, name, carousel, trying: tryAtStart, onClose }: { url: string | null; openUrl: string | null; name: string; carousel: Carousel; trying?: boolean; onClose: () => void }) {
+function PreviewDialog({ url, openUrl, name, carousel, savedSteps, trying: tryAtStart, onClose }: { url: string | null; openUrl: string | null; name: string; carousel: Carousel; savedSteps: number; trying?: boolean; onClose: () => void }) {
   const [trying, setTrying] = useState(!!tryAtStart);
   const [key, setKey] = useState(0);
-  const canTry = carousel.transition !== 'none' && carousel.steps.length > 1;
+  // the preview loads the saved carousel: the animation can be unsaved, the steps cannot
+  const canTry = carousel.transition !== 'none' && savedSteps > 1;
   const shown = url && trying && canTry ? tryUrl(url, carousel) : url;
   return (
     <Modal title={t('Vista previa')} icon="eye" size="xl" onClose={onClose} autoFocus={false}>
@@ -251,7 +252,8 @@ export function CarouselsSection({ full, setFull, saved, errors, go, dirty, save
             const err = (k: string) => errors[`car.${c.id}.${k}`];
             const total = cycleMs(c.steps.filter((st) => screens.some((s) => s.id === st.screenId))) / 1000;
             const link = links?.links.find((l) => l.screenId === c.id);
-            const savedSlug = saved.carousels?.items.find((x) => x.id === c.id)?.slug;
+            const savedC = saved.carousels?.items.find((x) => x.id === c.id);
+            const savedSlug = savedC?.slug;
             const url = openMode ? (savedSlug ? `${origin}/?screen=${savedSlug}` : '') : link ? `${origin}${link.path}` : '';
             const first = screens.find((s) => s.id === c.steps[0]?.screenId);
             const offOptions = [{ value: '', label: t('La primera del carrusel ({name})', { name: first?.name ?? '–' }) }, ...screenOptions];
@@ -382,11 +384,11 @@ export function CarouselsSection({ full, setFull, saved, errors, go, dirty, save
                           size="sm"
                           variant="ghost"
                           icon="play"
-                          disabled={isNew || c.transition === 'none' || c.steps.length < 2}
-                          title={isNew ? t('Guarda para previsualizar este carrusel') : undefined}
+                          disabled={isNew || c.transition === 'none' || (savedC?.steps.length ?? 0) < 2}
+                          title={isNew || (c.steps.length > 1 && (savedC?.steps.length ?? 0) < 2) ? t('Guarda para previsualizar este carrusel') : undefined}
                           onClick={() => setPreview({ id: c.id, trying: true })}
                         >
-                          {t('Probar')}
+                          {t('Probar la animación')}
                         </Button>
                       </div>
                     </Field>
@@ -518,6 +520,7 @@ export function CarouselsSection({ full, setFull, saved, errors, go, dirty, save
         <PreviewDialog
           name={previewing.name}
           carousel={previewing}
+          savedSteps={saved.carousels?.items.find((x) => x.id === previewing.id)?.steps.length ?? 0}
           trying={preview.trying}
           url={screenHref(saved, previewing.id, linkState, { preview: true })}
           openUrl={screenHref(saved, previewing.id, linkState)}

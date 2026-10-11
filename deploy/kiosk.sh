@@ -6,7 +6,8 @@
 #   KIOSK_URL        URL to show: the screen's private link, e.g. http://homeserver.lan:3000/d/<key>
 #                    (Admin → Screen → Settings → Private link). Default http://localhost:$PORT/: on an all-in-one
 #                    install the kiosk then opens the default screen's private link (read from the local data folder;
-#                    add ?screen=<slug> for another one). ?lite=1 disables the WebGL effects (slow Pis).
+#                    add ?screen=<slug> for another one). ?lite=1 disables the WebGL effects (slow Pis);
+#                    ?lowpower=1 keeps them but makes every carousel switch a short fade.
 #   KIOSK_CLIENT     Name of this display in the admin panel (default: hostname)
 #   PORT             Local server port (default: read from ../.env, else 3000)
 #   KIOSK_EXTRA_ARGS Extra Chromium flags, e.g. "--force-device-scale-factor=0.75" to fit more on a small screen

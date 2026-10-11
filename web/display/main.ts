@@ -20,7 +20,7 @@ import {
 } from './identity';
 import { CarouselController, type Bundle, type BundlePart } from './carousel';
 import { ScreenSwitcher, type SwitchGL } from './screenSwitch';
-import { isLowPower, planSwitch, type SwitchInfo } from './switchPlan';
+import { isArmDesktop, isLowPower, isLowPowerGPU, planSwitch, type SwitchInfo } from './switchPlan';
 import { $ } from './dom';
 import { type NEvent, normalizeEvents } from './eventModel';
 import type { AmbientLayer } from './gl/ambientLayer';
@@ -966,8 +966,35 @@ const switchGL = (): SwitchGL | null => {
   };
 };
 const switcher = new ScreenSwitcher(app, switchGL);
-/** ?lite=1, or a Raspberry Pi and the like: every switch is a short fade. */
-const lowPower = lite || isLowPower(navigator.userAgent, (navigator as { deviceMemory?: number }).deviceMemory, navigator.hardwareConcurrency);
+// the new screen sits still now: measure its titles again (they were off screen or moving during the switch)
+switcher.onDone = refreshMarquee;
+/** ?lite=1, ?lowpower=1, or a Raspberry Pi and the like: every switch is a short fade of #app. */
+let lowPower = lite || params.get('lowpower') === '1'
+  || isLowPower(navigator.userAgent, (navigator as { deviceMemory?: number }).deviceMemory, navigator.hardwareConcurrency);
+/** Recent Chromium says "Linux x86_64" on ARM too: ask the client hints and the GPU name. */
+function detectLowPower(): void {
+  if (lowPower) return;
+  const uad = (navigator as { userAgentData?: { mobile?: boolean; platform?: string; getHighEntropyValues?: (h: string[]) => Promise<{ architecture?: string }> } }).userAgentData;
+  void uad?.getHighEntropyValues?.(['architecture']).then(
+    (v) => {
+      if (isArmDesktop(v.architecture, uad.platform, uad.mobile)) lowPower = true;
+    },
+    () => undefined,
+  );
+}
+detectLowPower();
+/** The GL renderer name, read once the engine runs (no extra context just for this). */
+let gpuChecked = false;
+function checkGPU(): void {
+  if (lowPower || gpuChecked || !engine) return;
+  gpuChecked = true;
+  try {
+    const gl = engine.renderer.getContext();
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    const name = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+    if (isLowPowerGPU(String(name ?? ''))) lowPower = true;
+  } catch { /* no name: keep what we know */ }
+}
 
 /** Put one carousel screen on display from its bundle: no request, animated as the carousel says (switchPlan.ts). */
 function showScreen(id: string, b: Bundle, sw: SwitchInfo): void {
@@ -1000,6 +1027,7 @@ function showScreen(id: string, b: Bundle, sw: SwitchInfo): void {
     return apply();
   }
   // ?tr=<name> forces one animation and ?trSpeed= its speed (filming, the admin's "Probar")
+  checkGPU();
   const plan = planSwitch(sw, { reduced: reducedMotion(), lowPower, gl: !!dissolve && !!engine, force: params.get('tr'), forceSpeed: params.get('trSpeed') });
   switcher.switch(plan, apply);
 }
