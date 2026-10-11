@@ -95,3 +95,5 @@
 .preset-planner.portrait .hl-pill:nth-child(n + 2) { display: none; }
 .preset-planner.portrait .highlights { margin-top: 1.2rem; }
 .preset-planner.portrait .main { padding-top: 0.6rem; }
+/* the date stays on one line: the column is as wide as the clock and the date (the pills below never widen it) */
+.preset-planner.portrait .side-top .date { white-space: nowrap; }

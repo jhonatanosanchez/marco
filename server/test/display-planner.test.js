@@ -209,3 +209,16 @@ test('the planner has texts in Spanish, English and Portuguese, and the docs men
     assert.match(read(f), /eventStyle|planner|Planificador/i, f);
   }
 });
+
+test('portrait top band: the pills under the clock never widen its column (the weather card stays on screen)', () => {
+  // Regression: a long next-event title made the pill as wide as its text, which widened the clock column of
+  // the topBottom grid (Planner on a portrait screen) and pushed the weather card off the right edge. The pills
+  // take the width of the column (width 0, min-width 100%) and the title is cut with an ellipsis or slides.
+  // Checked visually with ?demo=1&busy=2&planner=1 at 1080x1920, Modern and Classic, dark and light.
+  const css = read('web/display/styles.css');
+  assert.match(css, /\.preset-topBottom \.highlights \{ width: 0; min-width: 100%; \}/);
+  assert.match(css, /\.preset-topBottom \.side \{ display: grid; grid-template-columns: 1fr auto;/);
+  assert.match(css, /\.hl-tt \{ overflow: hidden; text-overflow: ellipsis; min-width: 0;/);
+  assert.match(css, /\.hl-pill \{[^}]*max-width: 100%;/);
+  assert.match(read('web/display/marquee.ts'), /'\.hl-tt'/);
+});

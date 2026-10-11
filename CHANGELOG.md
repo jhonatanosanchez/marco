@@ -24,6 +24,11 @@ All notable changes to this project are documented here. The format is based on
 - *Calendars → Calendar view*: *Max. visible events per day* now explains what it does. With *Compact busy days* on it
   is the point where a day switches to short lines (3 or 4 keeps normal days large).
 
+### Fixed
+- Planner and top / bottom layouts on a portrait screen: a long title in the next-event pill under the clock no longer
+  widens the clock column and pushes the weather card off the screen. The pill now ends with an ellipsis (or slides,
+  with *Slide long titles*).
+
 ## [0.6.1] - 2026-10-11
 
 ### Added
