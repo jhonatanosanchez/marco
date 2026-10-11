@@ -47,8 +47,9 @@ failing source never breaks the others.
 | Path | Content |
 |---|---|
 | `config.json` | The whole configuration (schema v2 below). Bumped `revision` on every save. The admin sends the revision it loaded (`baseRevision`) and a stale one gets `409 conflict`, so only real saves may bump it: background work (calendar refresh, pairing, display links, commands) never writes `config.json`. |
-| `secrets.json` | Password hash (scrypt; absent on a fresh install → setup wizard, `server/setup.js`), `setupCompletedAt`, session secret/epoch, Google refresh tokens per account, Home Assistant token, API tokens (SHA-256 hashes), `displayKeys` (one private-link key per screen id), `devices` (paired devices: name, screen, SHA-256 of the token, last seen). Mode 600. Never sent to displays. |
+| `secrets.json` | Password hash (scrypt; absent on a fresh install → setup wizard, `server/setup.js`), `setupCompletedAt`, session secret/epoch, Google refresh tokens per account, Home Assistant token, Immich API key (`immich.apiKey`), API tokens (SHA-256 hashes), `displayKeys` (one private-link key per screen id), `devices` (paired devices: name, screen, SHA-256 of the token, last seen). Mode 600. Never sent to displays. |
 | `photos/` | Gallery images; `photos/.thumbs/` thumbnails (480 px); `photos/.meta.json` size + focal point per file |
+| `immich/` | Immich source (`server/immich.js`): `albums/<albumId>[-fav].json` (last good asset list per album, used for up to 24 h while Immich is down) and `cache/` (preview images, 500 MB LRU, `MARCO_IMMICH_CACHE_MB`). Not in backups |
 | `cache/` | Source and feed caches |
 | `backups/` | Rotating config backups (20 newest) + `config-v1-premigration.json` |
 | `activity.jsonl` | Activity log (≈ 5000 newest entries) |
@@ -83,6 +84,7 @@ The stored config has **global** sections shared by every screen and a list of *
                   "doorbell": { "camera": "", "seconds": 60, "screenIds": [], "sound": true } },
                   // doorbell: camera.* entity ('' = no picture), seconds 10..300, screenIds ([] = all; when every chosen
                   // screen is deleted it falls back to the default screen, never to all), door chime
+  "immich":     { "enabled": false, "url": "", "insecureTls": false },  // API key in secrets.json; url without /api
   "auth":       { "allowedGoogleEmails": [], "passwordLoginEnabled": true },
   "security":   { "displayAccess": "private" }      // "open" = legacy LAN mode (installs upgraded from 0.2)
 }
@@ -107,8 +109,11 @@ The stored config has **global** sections shared by every screen and a list of *
                   //   .preset-bigCalendar), people and board the top / bottom one (.preset-topBottom). twoWeeks is the month
                   //   grid with weeks = 2. Each view drops whole rows that do not fit (never a row cut in half).
   "background": { "enabled": true, "source": "stock", "stockTopic": "nature", "order": "random", "intervalSec": 120, "brightness": 0.85,
-                  "showMeta": false, "cover": true, "transition": "webgl", "ambient": "aurora", "panelBlur": 18, "panelShade": 0.5, "weatherFx": "simple" },
-                  // source: stock | gallery | mixed · order: random | newest | name · transition: webgl | fade | none · ambient: aurora | particles | none · weatherFx: off | simple | rich
+                  "showMeta": false, "cover": true, "transition": "webgl", "ambient": "aurora", "panelBlur": 18, "panelShade": 0.5, "weatherFx": "simple",
+                  "portraitFit": "auto", "immich": { "albumIds": [], "favoritesOnly": false } },
+                  // source: stock | gallery | mixed | immich · order: random | newest | name · transition: webgl | fade | none · ambient: aurora | particles | none · weatherFx: off | simple | rich
+                  // portraitFit: auto | blur | crop, for photos whose orientation differs from the screen (auto = blurred fill for Immich photos only)
+                  // immich: albums played with source immich (UUIDs, at most 20, merged without duplicates; [] = stock photos)
   "calendar":   { "enabled": true, "view": "month", "weeks": 5, "weekStart": 1, "showLocation": false, "showEndTime": false,
                   "showDayXofY": true, "showLegend": true, "hidePast": false, "maxEventsPerDay": 4,
                   "marquee": true, "rotateBusyDays": true, "compactBusyDays": true,
@@ -141,7 +146,7 @@ Global vs per-screen for the "split" sections:
 | news | feeds, maxItems | enabled, rotateSec |
 | todo | items | enabled |
 | countdowns | items + inclusion settings | enabled, max |
-| localEvents, birthdays, eventRules, schedules, homeassistant, auth | all | none |
+| localEvents, birthdays, eventRules, schedules, homeassistant, immich, auth | all | none |
 
 The display and most admin pages work on a **flat view of one screen** (`AppConfig`): global sections merged with
 one profile (`flatView()` in `server/core/screens.js`, `projectScreen()` / `applyScreen()` in `web/shared/screens.ts`,
@@ -217,6 +222,10 @@ flagged by a local event or a style rule (nearest occurrence per title), sorted 
   `dispatch` that both transports use, so every event is checked the same way.
 - Raspberry Pi friendly: WebGL capped at 30 fps and `devicePixelRatio ≤ 1`, paused when hidden; `?lite=1` or
   `ambient: none` + `transition: fade` disables three.js entirely; CSS transforms/opacity only.
+- Portrait photos on a landscape screen (or the other way round) with `background.portraitFit` blur (auto: Immich
+  photos only) are composed on a canvas in `web/display/widgets/photos.ts`: the whole photo over a blurred, darker copy
+  of itself, at the panel's size. The WebGL layer and the CSS layer (a blob URL) show that canvas like any other image,
+  and the tone measure reads it, so Ken Burns, transitions and the glass tint work unchanged.
 - Photos are cropped around their focal point; displays report the bands covered by the clock and weather cards in the
   heartbeat (`photoFrame`), and the crop keeps the subject in the largest free band (`web/shared/focus.ts`).
 - Adaptive legibility: panel blur/shade and text contrast adapt to the photo behind them; small screens get larger
@@ -243,6 +252,34 @@ flagged by a local event or a style rule (nearest occurrence per title), sorted 
   `/media/*` photo URLs carry it as `?k=`. The first config fetch happens before cached data is shown: `401` → pairing
   screen, `403` → "This link is no longer valid" (cached data is wiped; a revoked device token is forgotten). The SSE
   `revoked` event does the same while running. Paired → the token is stored and the page reloads at `/`.
+
+## Immich source
+
+`background.source: 'immich'` plays one or more Immich albums. Only the Marco server talks to Immich
+(`server/immich.js`, pure parts in `server/core/immichCore.js`):
+
+- **Key**: `secrets.immich.apiKey`, sent only as the `x-api-key` header. It never reaches a display, a URL or a log;
+  the admin sees `{ set, hint }`. Scopes needed: `album.read`, `asset.read`, `asset.view`.
+- **Versions**: `/api/server/version` (`/api/server-info/version` before 1.118), cached 10 minutes. From 1.135 an
+  album's assets come from `POST /api/search/metadata { albumIds, type: 'IMAGE', withExif, size: 1000, page }`
+  (pages followed with `nextPage`; one function, `searchAssets()`, holds that request shape); older servers use
+  `GET /api/albums/:id?withoutAssets=false`. Images only: videos, trashed, offline, hidden and locked assets are left
+  out, archived ones stay. At most 20000 assets per album.
+- **Lists**: cached per album for 30 minutes (stale while revalidating, one fetch at a time), failures for 60 s,
+  saved in `data/immich/albums/` and served for up to 24 h while Immich cannot be reached. An album that answers 404
+  is skipped and shown as not found in the admin. With nothing to show, the screen gets stock photos.
+- **Rotation**: the same picker as the gallery (`pickFrom` in `server/photos.js`), rotation key `<screen>|immich`;
+  `newest` = date taken, `name` = original file name (never shown). Captions (`showMeta`) are the place and the date
+  taken, formatted by the display in the screen's language.
+- **Images**: `GET /media/immich/<assetId>` (after `mediaAuth`) serves Immich's `preview` render from
+  `data/immich/cache/`, fetched on a miss (20 s timeout, 8 MB cap, JPEG, WebP, PNG or AVIF only, sniffed when Immich
+  says `octet-stream`, at most 3 fetches at once, one per image). Only assets of an album a screen plays are served; a
+  display key or device token only opens its own screen's albums, and nothing while that screen is private with
+  *hide photos*. The first 3 photos of each batch are fetched ahead. `?s=thumb` serves small album covers to an admin
+  session.
+- **Cloud**: Marco Cloud has no Immich (`features.immich` false). `validateConfig(c, { immichAvailable: false })`
+  refuses a screen with the Immich source.
+- Changing the server URL drops the lists and the image cache.
 
 ## Display access
 

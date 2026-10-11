@@ -77,13 +77,14 @@ saved without `security` (old admin builds, backups or exports from before 0.3) 
 | `GET /api/events?screen=&from=YYYY-MM-DD&to=YYYY-MM-DD` | `{ generatedAt, hash, events: CalEvent[], errors: [{ sourceId, message }] }`. While the screen is private, events are already filtered (busy blocks, hidden calendars) and `hash` starts with `p` |
 | `GET /api/weather?screen=` | `{ updatedAt, locationName, current, today, daily[], hourly[], indoor, source }` (localized descriptions). `source` = `{ provider, name, model, modelName, url, licence, licenceUrl, also? }`: where the data comes from, for the credit line. Values a source does not give are `null` (MET Norway: no chance of rain outside the Nordics; some Open-Meteo models: no UV). Cached per place for at least 10 minutes (15 for Pirate Weather, MET Norway's `Expires` when longer), the last answer is kept for 6 hours when the source fails |
 | `GET /api/news` | `{ updatedAt, items: [{ id, title, summary, source, date, image? }] }` (cache 15 min) |
-| `GET /api/photos?screen=&count=20&after=` | `{ photos: [{ url, author?, title?, source: "stock"\|"gallery", file?, focusX?, focusY? }] }`. Gallery photos follow the screen's `background.order` (`random` \| `newest` \| `name`); hidden photos are never returned. `after` = gallery `file` the display showed last: sequential orders continue right after it (wrapping around), `random` avoids starting with it. Without `after`, the server remembers where the previous batch for that screen ended. Falls back to stock when no gallery photo is in rotation |
+| `GET /api/photos?screen=&count=20&after=` | `{ photos: [{ url, author?, title?, source: "stock"\|"gallery"\|"immich", file?, focusX?, focusY?, id?, takenAt?, place? }] }`. Immich photos (`background.source: "immich"`) have `id` (asset id), `takenAt` (`YYYY-MM-DD`, local date taken) and `place` (`"City, Country"`) and their `url` is `/media/immich/<id>?v=`; `after` may be an Immich `id` too, and with no Immich photo to show (not set up, no albums, unreachable with nothing cached) the answer is stock photos. Gallery photos follow the screen's `background.order` (`random` \| `newest` \| `name`); hidden photos are never returned. `after` = gallery `file` the display showed last: sequential orders continue right after it (wrapping around), `random` avoids starting with it. Without `after`, the server remembers where the previous batch for that screen ended. Falls back to stock when no gallery photo is in rotation |
 | `GET /api/countdowns?screen=` | `{ generatedAt, today, hash, items: [{ id, title, emoji, color, date, days, origin, age? }] }`. An admin session is still accepted here in 0.5 for admin pages loaded before the update; the admin itself uses `GET /api/admin/countdowns` |
 | `POST /api/display/heartbeat` | Body `DisplayHeartbeat` (≤ 4 kB: clientId, screen, version, resolution, dpr, webgl, night state, photo frame…) → `HeartbeatResponse` |
 | `GET /api/stream?screen=&client=&k=` | Server-Sent Events, see below |
 | `GET /api/display/poll?screen=&client=&cursor=&rev=&hidden=&preview=` | `PollResponse`: the same events as commands, for displays without a stream. See below |
 | `GET /api/display/doorbell/frame?n=` | The doorbell camera picture for this display's screen (`image/jpeg`, `image/png`, `image/webp` or `image/gif`, `Cache-Control: private, no-store`), only while that screen rings. `n` is a counter the display adds so nothing caches it. `404 { code: "no_ring" }` when the screen is not ringing (also for open display access from outside the LAN), `404 { code: "no_camera" }` when the ring has no camera, `503 { code: "homeassistant_off" }`, `502 { code: "camera_unavailable" }` (Home Assistant failed, took more than 6 s, answered something that is not an image or more than 4 MB). See [Doorbell camera](#doorbell-camera) |
 | `GET /media/photos/<file>`, `GET /media/thumbs/<file>` | Gallery images and thumbnails |
+| `GET /media/immich/<assetId>?v=` | Immich preview image, proxied with the server's API key and cached on disk (`Cache-Control: private, max-age=2592000`). `404` for an id that is not in an album some screen plays (a display key or device token: its own screen's albums only), and while that screen is private with *hide photos*; `503` when Immich is not set up; `502` when Immich fails or answers something that is not an image of up to 8 MB. `?s=thumb`: album cover thumbnail, admin session only |
 
 ### Capabilities in `/api/health`
 
@@ -94,7 +95,7 @@ The admin and the display read these fields to decide which sections, actions an
 - `features`: one boolean per feature: `homeassistant`, `news`, `customCss`, `gallery`, `schedules`,
   `announcements`, `displayCommands`, `openDisplayAccess`, `insecureTls`, `googleCalendar`, `googleLogin`,
   `passwordLogin`, `apiTokens`, `webhooks`, `backups`, `importExport`, `includeSecrets`, `activity`, `setupWizard`,
-  `status`, `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`. A self-hosted server turns all of them on, except
+  `status`, `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`, `immich`. A self-hosted server turns all of them on, except
   `googleCalendar` and `googleLogin` (on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set),
   `microsoftCalendar` (Outlook and Microsoft 365 calendars, on when `MICROSOFT_CLIENT_ID` and
   `MICROSOFT_CLIENT_SECRET` are set), `accountMenu` and `feedback` (always off). `updates` is the update banner,
@@ -105,7 +106,8 @@ The admin and the display read these fields to decide which sections, actions an
   [Privacy mode](#privacy-mode)); a server that does not filter events for it leaves it out and the admin hides the
   controls. `doorbell` is the doorbell overlay, its webhook and the admin card; `doorbellLive` means the frames are a
   live camera picture proxied from Home Assistant. A server with `doorbell` and without `doorbellLive` answers the
-  frame URL with the latest snapshot it was given instead; the display works the same way with both.
+  frame URL with the latest snapshot it was given instead; the display works the same way with both. `immich` is
+  the Immich photo source and `/api/admin/immich/*` (Marco Cloud answers `false`).
 - `limits` (optional): plan limits such as `screens`, `sources` or `devices`. Absent means no limit beyond the
   config validator's own caps (12 screens, 50 calendars, 20 news feeds, 1000 local events, 500 birthdays,
   100 countdowns). The admin disables "add" at the limit and flags a config that goes over it.
@@ -121,9 +123,9 @@ The admin and the display read these fields to decide which sections, actions an
   `http://localhost` can say where other devices reach the admin.
 
 Clients treat a response with no `features` field (servers older than 0.5.0) as having every feature on, except
-`accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell` and `doorbellLive`. A key missing
-from `features` counts as off only when `edition` is not `'self-hosted'`, and a missing `accountMenu`,
-`microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell` or `doorbellLive` is always off.
+`accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive` and `immich`. A key
+missing from `features` counts as off only when `edition` is not `'self-hosted'`, and a missing `accountMenu`,
+`microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive` or `immich` is always off.
 
 ### Account mode
 
@@ -298,6 +300,13 @@ Rules for the mutating setup endpoints:
 | `GET /api/admin/homeassistant/entities?domain=sensor\|weather\|camera` | `[{ entity_id, name, state, unit }]` |
 | `POST /api/admin/doorbell` | Same body and answer as `POST /api/hooks/doorbell` (the *Test* button of *Home Assistant → Doorbell and camera*, with the values on screen). Logged with `via: "admin"` |
 | `PUT /api/admin/homeassistant/token` | `{ token }` |
+| `POST /api/admin/test/immich` | `{ url?, key?, insecureTls? }` (unsaved values; missing ones come from the saved settings) → `{ ok, version?, missingScopes?, error? }`. `missingScopes` lists what the key lacks of `album.read`, `asset.read`, `asset.view`. `error`: `not_configured`, `key_missing`, `invalid_url`, `invalid_key`, `missing_scope`, `not_found`, `unreachable`, `bad_response`, `http` (`features.immich`) |
+| `GET /api/admin/immich/key` | `{ set, hint }`: whether an Immich API key is stored and its last 4 characters. The key itself is never sent back |
+| `PUT /api/admin/immich/key` | `{ key }` (letters, digits, `-` and `_`, 10 to 128; `""` removes it). With a server URL saved, the key is tried first: `400 { error: "invalid_key" }` when Immich refuses it (nothing is stored); `{ set, hint, checked }` otherwise |
+| `GET /api/admin/immich/albums` | `ImmichAlbum[]`: `{ id, name, count, cover, shared, start, end }`, by name. `409 { error: "not_configured" }`, `502 { error }` when Immich fails |
+| `GET /api/admin/immich/status` | `ImmichStatus`: `{ usable, albums: [{ id, favoritesOnly, count, updatedAt, error, missing }], cache: { files, bytes } }` (albums some screen plays) |
+| `POST /api/admin/immich/refresh` | Fetch the albums in use again now, then tell the displays (live `photos` event) → `ImmichStatus` |
+| `DELETE /api/admin/immich/cache` | Empty the image cache → `{ ok, freed }` (bytes) |
 | `GET /api/admin/weather/key` | `{ set, hint }`: whether an API key for a weather source that needs one (Pirate Weather) is stored, and its last 4 characters. The key itself is never sent back |
 | `PUT /api/admin/weather/key` | `{ key }` (letters, digits, `-` and `_`, 8 to 128; `""` removes it). A new key is tried once at the configured place: `400 { error: "key_invalid" }` when the source refuses it (nothing is stored); `{ set, hint, checked }` otherwise (`checked: false` when the source could not be reached). Saving the config with `weather.provider: "pirate-weather"` while no key is stored answers `400` with `weather.apiKey` |
 
@@ -338,7 +347,7 @@ Rules for the mutating setup endpoints:
 |---|---|
 | `GET /api/admin/backups` · `POST /api/admin/backups` | List / create a manual backup |
 | `GET /api/admin/backups/:id` · `POST /api/admin/backups/:id/restore` · `DELETE /api/admin/backups/:id` | Download / restore (current config backed up first) / delete |
-| `POST /api/admin/export` | `{ includeSecrets }` → `marco-YYYY-MM-DD.json` (secrets = password hash, HA token, Google accounts, API tokens, display keys, paired devices (token hashes); never the session secret) |
+| `POST /api/admin/export` | `{ includeSecrets }` → `marco-YYYY-MM-DD.json` (secrets = password hash, HA token, Immich API key, Google accounts, API tokens, display keys, paired devices (token hashes); never the session secret) |
 | `POST /api/admin/import/preview` | `{ bundle, lang? }` (export bundle or a bare config) → per-section summary in `lang` (es/en/pt; default: `Accept-Language`, else English), `displayAccess` (the current mode, which the import keeps) and `secretsImpact: { linksChanged, devicesRemoved, devicesAdded } \| null` (what importing the bundle's secrets would change); nothing saved |
 | `POST /api/admin/import/apply` | `{ bundle, sections?, includeSecrets? }` → `{ ok, config, loggedOut? }`. `security.displayAccess` is never taken from the bundle (restores keep it too). Imported keys / devices close the streams of replaced keys and dropped devices |
 | `GET /api/admin/activity?type=&level=&q=&actor=&before=&limit=` | Newest first, paged with `before=<id>` |

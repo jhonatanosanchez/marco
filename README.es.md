@@ -123,9 +123,10 @@ color de la foto, transparencia, desenfoque y borde de luz:
   pequeña. También tu propia entidad de tiempo y sensores interiores de [Home Assistant](https://www.home-assistant.io/);
   lluvia/nieve animadas.
 - **Teletipo de noticias** desde cualquier fuente RSS/Atom, una lista de tareas y un mensaje del día.
-- **Fondo de fotos:** fotos de stock o tu propia galería, transiciones WebGL, zoom lento, un suave efecto ambiental de
-  "aurora" y **recorte inteligente** que mantiene al protagonista (caras, mascotas) en la parte de la pantalla que no
-  tapan el reloj ni el tiempo.
+- **Fondo de fotos:** fotos de stock, tu propia galería o álbumes de tu biblioteca de [Immich](https://immich.app/),
+  transiciones WebGL, zoom lento, un suave efecto ambiental de "aurora" y **recorte inteligente** que mantiene al
+  protagonista (caras, mascotas) en la parte de la pantalla que no tapan el reloj ni el tiempo. Las fotos verticales
+  se pueden ver enteras sobre una copia difuminada de sí mismas.
 - **Fácil de leer:** el desenfoque y el sombreado de los paneles se adaptan a la foto; las pantallas pequeñas usan un
   texto relativamente más grande; el modo noche atenúa la pantalla según un horario.
 - **Actualizaciones en directo:** los cambios guardados en la administración aparecen en un segundo mediante
