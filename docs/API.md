@@ -10,9 +10,14 @@ All endpoints speak JSON. TypeScript types for every request and response live i
   `Content-Type: application/json` (CSRF guard; photo uploads are the multipart exception).
 - **Webhooks** need `Authorization: Bearer <token>` (create tokens in *Admin → API & webhooks*).
 
-Without a key or device token, every display endpoint accepts `?screen=<slug|id>` (case-insensitive). Absent → default
-screen; unknown → default screen with `screenFallback: true` in the config. With a key or device token the screen is
-the one bound to it and `?screen=` is ignored.
+Without a key or device token, every display endpoint accepts `?screen=<slug|id>` (case-insensitive; a carousel's
+slug or id too). Absent or empty → default screen. Unknown (or given twice) → `404 { error: "screen_not_found", code:
+"screen_not_found" }` on every display endpoint (`/api/display/*` including poll, heartbeat and the doorbell frame,
+`/api/events`, `/api/weather`, `/api/news`, `/api/photos`, `/api/countdowns`, `/api/stream` and `/media/*`), never the
+default screen's data, and the body names no screen. An unknown screen's stream or poll is not registered as a display
+and gets no live events; a heartbeat whose `screen` names nothing answers the same 404. With a key or device token the
+screen is the one bound to it and `?screen=` is ignored, unknown or not. The display shows a plain "Screen not found"
+page for it (no data, no list of screens) and asks again every minute.
 
 ## Display access
 
@@ -168,7 +173,7 @@ calendar's.
 | `config` | `{ revision }` | config saved; the display refetches its config and re-renders without reloading |
 | `events` | `{ hash }` | calendar data changed (also refetch countdowns) |
 | `photos` | `{}` or `{ hidden: [file, …] }` | gallery changed (`hidden` lists photos just taken out of the rotation; a display showing one of them moves on right away) |
-| `reload` | `{}` | "Refresh displays", display command or webhook |
+| `reload` | `{}` | "Refresh displays", display command or webhook; also sent (then the stream is closed) when a config save leaves the stream's `?screen=` naming nothing |
 | `announce` | `Announcement` | announcement sent; replayed on connect while still active |
 | `announce-clear` | `{ id \| null }` | announcement removed early (`null` = all) |
 | `identify` | `{ name, slug, clientId, durationSec }` | show the screen name full-screen |

@@ -160,6 +160,7 @@ const ERRORS = {
  *   - not bound, ?screen=<carousel>: the screen it shows now; ?screen=<screen>&via=<carousel>: that screen, with
  *     the carousel when the screen belongs to it
  *   - a carousel with no screens left: a blank screen (core/carousels.js emptyCarouselScreen), `empty: true`
+ * An unknown ?screen= never reaches here over HTTP: displayAuth answers 404 screen_not_found first.
  * @returns {{ screen: object, fallback: boolean, carousel: object | null, empty?: boolean }}
  */
 export function requestScreen(cfg, req) {
@@ -192,7 +193,27 @@ function carouselRequest(cfg, c, key) {
   return { screen: cfg.screens.find((s) => s.id === id) || cfg.screens.find((s) => s.id === members[0]), fallback: false, carousel: c };
 }
 
-/** Express middleware for the display JSON API: sets req.displayAccess or answers 401/403 (no data). */
+/**
+ * True when the request asks for a screen or carousel that does not exist: ?screen= is given (not empty) and names
+ * nothing, and no credential binds the request to a saved screen or carousel (a binding always wins over ?screen=).
+ * Such a request gets 404 screen_not_found, never the default screen's data. No ?screen= (or an empty one) still
+ * means the default screen.
+ */
+export function unknownScreenRequest(cfg, req) {
+  const id = req.displayAccess?.screenId;
+  if (id && isTargetId(cfg, id)) return false;
+  const v = req.query?.screen;
+  if (v === undefined) return false;
+  if (typeof v !== 'string') return true; // ?screen=a&screen=b names no single screen
+  return Boolean(v.trim()) && !findTarget(cfg, v);
+}
+
+export const SCREEN_NOT_FOUND = { error: 'screen_not_found', code: 'screen_not_found' };
+
+/**
+ * Express middleware for the display JSON API: sets req.displayAccess or answers 401/403 (no data), and 404
+ * screen_not_found for an unknown ?screen= (unknownScreenRequest).
+ */
 export function displayAuth({ allowQuery = false } = {}) {
   return (req, res, next) => {
     const a = resolveDisplayAccess(req, { allowQuery });
@@ -200,6 +221,7 @@ export function displayAuth({ allowQuery = false } = {}) {
     res.set('cache-control', 'private, no-store');
     if (!a.ok) return res.status(a.status).json({ error: ERRORS[a.code], code: a.code });
     req.displayAccess = a;
+    if (unknownScreenRequest(getConfig(), req)) return res.status(404).json(SCREEN_NOT_FOUND);
     next();
   };
 }
@@ -212,6 +234,7 @@ export function mediaAuth(req, res, next) {
   const a = resolveDisplayAccess(req, { allowQuery: true });
   if (a.ok && (a.via !== 'open' || isLanClient(req))) {
     req.displayAccess = a; // the Immich proxy reads which screen the credential belongs to
+    if (unknownScreenRequest(getConfig(), req)) return res.status(404).set('cache-control', 'private, no-store').json(SCREEN_NOT_FOUND);
     return next();
   }
   if (a.ok) return res.status(404).type('text/plain').send('not found');

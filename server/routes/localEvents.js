@@ -122,7 +122,7 @@ export function eventsAdminRouter() {
 
 export function eventsPublicRouter() {
   const r = Router();
-  // docs/ARCHITECTURE.md: countdown chips for a screen (unknown ?screen → default screen).
+  // docs/ARCHITECTURE.md: countdown chips for a screen (unknown ?screen= → 404 screen_not_found, displayAuth).
   r.get('/countdowns', async (req, res, next) => {
     try {
       res.set('cache-control', 'private, no-store');

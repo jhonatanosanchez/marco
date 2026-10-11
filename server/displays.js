@@ -111,12 +111,16 @@ function screenMeta(cfg, screenId) {
 
 /**
  * What a display key (?screen= value or bound id) subscribes to: { screenId, memberIds }. A screen: its id, no
- * members. A carousel: the carousel id and its screens, so live events for any of them reach the display.
+ * members. A carousel: the carousel id and its screens, so live events for any of them reach the display. Empty key:
+ * the default screen. A key that names nothing: { screenId: '', memberIds: null, notFound: true } (never the default
+ * screen, so no screen's live events reach it).
  */
 export function subscriptionFor(cfg, key) {
   const t = findTarget(cfg, key);
   if (t?.kind === 'carousel') return { screenId: t.id, memberIds: carouselMembers(cfg, t.carousel) };
-  return { screenId: resolveScreen(cfg, key).screen.id, memberIds: null };
+  const r = resolveScreen(cfg, key);
+  if (r.fallback) return { screenId: '', memberIds: null, notFound: true };
+  return { screenId: r.screen.id, memberIds: null };
 }
 
 /** Screens behind a client: its carousel's screens, or its own screen. */
@@ -217,6 +221,8 @@ export function streamHello(client) {
 
 export function onStreamOpen(client) {
   load();
+  // an unknown screen (only reachable without displayAuth, which answers 404 first) is never registered
+  if (client.notFound) return;
   if (client.preview) {
     for (const a of activeOn(getConfig(), membersOf(client))) send(client, 'announce', a);
     replayDoorbell(client);
@@ -444,6 +450,12 @@ export function recordHeartbeat(body, req) {
   const hb = r.value;
   const cfg = getConfig();
   const nowIso = new Date().toISOString();
+  // Prefer the screen of the open stream; else resolve what the display says it asked for.
+  const stream = listClients().find((c) => c.clientId === hb.clientId);
+  const bound = boundScreen(cfg, req);
+  const sub = stream || bound ? null : subscriptionFor(cfg, hb.screen);
+  // a display on an unknown screen is not listed (and never under the default screen)
+  if (sub?.notFound) return { error: 'screen_not_found' };
   let d = registry.get(hb.clientId);
   if (!d) {
     if (registry.size >= MAX_DISPLAYS) prune();
@@ -451,10 +463,7 @@ export function recordHeartbeat(body, req) {
     d = blankEntry(hb.clientId, nowIso);
     registry.set(hb.clientId, d);
   }
-  // Prefer the screen of the open stream; else resolve what the display says it asked for.
-  const stream = listClients().find((c) => c.clientId === hb.clientId);
-  const bound = boundScreen(cfg, req);
-  const screenId = stream?.screenId || bound || subscriptionFor(cfg, hb.screen).screenId;
+  const screenId = stream?.screenId || bound || sub.screenId;
   const access = accessOf(req);
   Object.assign(d, {
     screenKey: stream ? stream.screenKey : bound || hb.screen,
@@ -588,8 +597,10 @@ export function reresolveDisplays(cfg) {
   load();
   let changed = false;
   for (const d of registry.values()) {
-    const id = subscriptionFor(cfg, d.screenKey || '').screenId;
-    if (id !== d.screenId) { d.screenId = id; changed = true; }
+    const sub = subscriptionFor(cfg, d.screenKey || '');
+    // its screen is gone: keep the old id (shown as unknown), never move it to the default screen
+    if (sub.notFound) continue;
+    if (sub.screenId !== d.screenId) { d.screenId = sub.screenId; changed = true; }
   }
   if (changed) scheduleSave();
 }

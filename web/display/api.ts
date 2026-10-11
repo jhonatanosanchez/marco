@@ -21,9 +21,10 @@ async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 1500
       ...init, signal: ctl.signal, cache: 'no-store', headers: { Accept: 'application/json', ...authHeaders(), ...(init.headers || {}) },
     });
     if (!r.ok) {
-      // 401 key_required / 403 invalid_key: the display shows the pairing / "link no longer valid" screen.
+      // 401 key_required / 403 invalid_key: the display shows the pairing / "link no longer valid" screen;
+      // 404 screen_not_found: the "Screen not found" page.
       let code = '';
-      if (r.status === 401 || r.status === 403) {
+      if (r.status === 401 || r.status === 403 || r.status === 404) {
         try {
           code = String(((await r.json()) as { code?: string }).code || '');
         } catch { /* not JSON */ }

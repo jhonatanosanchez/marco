@@ -77,7 +77,7 @@ export function screenSchedules(cfg, screen) {
  * `carousel` = the carousel this display runs (the screen is one of its members), else null: the payload then says
  * which carousel (`target`, `carousel`) so the display can rotate through its screens.
  */
-export function displayConfig(cfg, screen, { fallback = false, privacy = null, carousel = null } = {}) {
+export function displayConfig(cfg, screen, { privacy = null, carousel = null } = {}) {
   const f = flatView(cfg, screen);
   const priv = displayPrivacy(screen, privacy?.status, privacy?.next ?? null);
   const background = priv.active && screen.privacy?.hidePhotos && f.background.source !== 'stock' ? { ...f.background, source: 'stock' } : f.background;
@@ -87,7 +87,6 @@ export function displayConfig(cfg, screen, { fallback = false, privacy = null, c
     revision: cfg.revision,
     screenId: screen.id,
     slug: screen.slug,
-    screenFallback: fallback,
     screen: f.screen,
     layout: f.layout,
     background,

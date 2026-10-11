@@ -78,6 +78,7 @@ export function displayPublicRouter() {
   r.post('/display/heartbeat', (req, res) => {
     res.set('cache-control', 'no-store');
     const out = recordHeartbeat(req.body, req);
+    if (out.error === 'screen_not_found') return res.status(404).json({ error: out.error, code: out.error });
     if (out.error) return res.status(out.error === 'too many displays' ? 429 : 400).json({ error: out.error });
     res.json(out);
   });

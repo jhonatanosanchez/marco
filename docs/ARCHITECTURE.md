@@ -66,7 +66,7 @@ The stored config has **global** sections shared by every screen and a list of *
 ```jsonc
 {
   "version": 2, "revision": 1,
-  "defaultScreen": "s_main",                 // served when ?screen is absent or unknown
+  "defaultScreen": "s_main",                 // served when ?screen is absent (unknown → 404 screen_not_found)
   "screens": [ ScreenProfile ],              // 1..12
   // ---------- global ----------
   "calendar":   { "sources": [CalendarSource], "iconRules": [IconRule] },
@@ -374,6 +374,14 @@ goes (link keys, `device.screenId`, the display registry); the `v_` prefix tells
 | an unknown / revoked key or token | `403 invalid_key` | `403 invalid_key` |
 | an admin session cookie | any screen (`?screen=`) | any screen |
 | nothing | `401 key_required` | default screen / `?screen=` (as in 0.2) |
+
+Without a credential (admin session, open mode) a `?screen=` that names no screen or carousel answers
+`404 screen_not_found` on every display endpoint (`displayAccess.js` `unknownScreenRequest`, applied by `displayAuth`
+and `mediaAuth`); only an absent or empty `?screen=` means the default screen. A stream or poll for an unknown screen
+is never registered (no display under the default screen, no live events). When a config save leaves a connected
+stream's `?screen=` naming nothing, `reresolveClients` sends it `reload` and closes it; the display reloads and shows
+the "Screen not found" page (`web/display/widgets/screenMissing.ts`), which asks for the config again every 60 s and
+starts normally once the screen exists. A credential's own screen always wins over `?screen=`.
 
 - A credential always decides the screen; `?screen=` is ignored with it. `/media/*` follows the same rules (in open
   mode keyless media stays LAN-only). `/api/health`, `/api/setup/*`, `/api/pair/*` and the webhooks are outside it.

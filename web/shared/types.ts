@@ -588,8 +588,6 @@ export interface DisplayConfig {
   /** v2 fields below are always sent by the server; optional only because older cached payloads lack them. */
   screenId?: string;
   slug?: string;
-  /** true when ?screen= did not match any screen and the default screen was served instead */
-  screenFallback?: boolean;
   countdowns?: ScreenCountdownsConfig;
   alerts?: ScreenAlertsConfig;
   /** enabled scheduled messages targeting this screen (screenIds stripped) */

@@ -28,8 +28,8 @@ export function displayConfig(cfg, screenKey) {
 
 /** Display config for a request (screen or carousel bound to its key / device, else ?screen=). */
 function displayConfigFor(cfg, req) {
-  const { screen, fallback, carousel } = requestScreen(cfg, req);
-  return projectDisplayConfig(cfg, screen, { fallback, privacy: privacyOf(cfg, screen), carousel });
+  const { screen, carousel } = requestScreen(cfg, req);
+  return projectDisplayConfig(cfg, screen, { privacy: privacyOf(cfg, screen), carousel });
 }
 
 /**

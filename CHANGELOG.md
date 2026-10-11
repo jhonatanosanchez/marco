@@ -38,6 +38,12 @@ All notable changes to this project are documented here. The format is based on
   `immichAvailable: false` to refuse the Immich source on servers without it.
 
 ### Changed
+- Security: a display opened with `?screen=<address>` that names no screen or carousel no longer shows the default
+  screen. It shows a plain "Screen not found" page (no clock, weather, photos or events, and no list of screens) and
+  checks again every minute, starting normally once the screen exists. Every display endpoint answers
+  `404 screen_not_found` for it, and its stream or poll is not registered under the default screen. No `?screen=`
+  still means the default screen, and private links and paired devices keep their own screen as before. The small
+  "Screen «x» not found" notice and `screenFallback` in the display config are gone.
 - *Calendars → Calendar view*: *Max. visible events per day* now explains what it does. With *Compact busy days* on it
   is the point where a day switches to short lines (3 or 4 keeps normal days large).
 

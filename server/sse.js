@@ -126,13 +126,15 @@ export const listClients = () => [...clients];
 
 /**
  * Re-resolve every client's screen id (config saved: slugs may have changed, screens deleted). `resolve(screenKey)`
- * returns the screen id, or { screenId, memberIds } (a carousel: its id and its screens).
+ * returns the screen id, or { screenId, memberIds } (a carousel: its id and its screens), or { notFound: true } when
+ * the key names nothing any more: that stream gets 'reload' and is closed (the display then shows "screen not found").
  */
 export function reresolveClients(resolve) {
-  for (const c of clients) {
+  for (const c of [...clients]) {
     try {
       const r = resolve(c.screenKey);
-      if (typeof r === 'string' && r) c.screenId = r;
+      if (r && typeof r === 'object' && r.notFound) dropClient(c, { event: 'reload', data: {} });
+      else if (typeof r === 'string' && r) c.screenId = r;
       else if (r && typeof r === 'object' && r.screenId) {
         c.screenId = r.screenId;
         c.memberIds = r.memberIds ?? null;

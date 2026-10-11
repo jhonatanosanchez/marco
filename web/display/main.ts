@@ -7,7 +7,7 @@ import './styles.css';
 import './styles-views.css';
 import './styles-modern.css';
 import type {
-  Announcement, CountdownsResponse, DisplayConfig, EventsResponse, NewsResponse, NightCommand, PhotosResponse, StreamHello, WeatherResponse,
+  Announcement, CountdownsResponse, DisplayConfig, EventsResponse, Lang, NewsResponse, NightCommand, PhotosResponse, StreamHello, WeatherResponse,
 } from '../shared/types';
 import { addDays, startOfWeek } from '../shared/i18n';
 import { api, ApiError } from './api';
@@ -51,6 +51,7 @@ import { Weather } from './widgets/weather';
 import { VIEW_PRESETS, Views } from './widgets/views';
 import { checkSetup, showWelcome, waitForSetup } from './widgets/welcome';
 import { afterPairUrl, pairHealth, pairingLang, showPairing } from './widgets/pairing';
+import { showScreenMissing } from './widgets/screenMissing';
 import { healthOnce, loadEmojiWebFont } from './health';
 import { refreshMarquee } from './marquee';
 
@@ -101,7 +102,6 @@ const doorbell = new DoorbellOverlay($('#doorbell'), doorbellFrames, (on) => {
   if (!on) carousel?.tick();
 });
 const views = new Views($('#view'));
-const screenNote = $('#screen-note');
 const statusDot = $('#status');
 const night = $('#night');
 let customStyle: HTMLStyleElement | null = null;
@@ -370,7 +370,6 @@ function applyConfig(raw: DisplayConfig): void {
   photos.applyConfig();
 
   announcements.applyConfig(cfg);
-  renderScreenNote(raw);
   renderAll();
   revealApp(cfg);
 }
@@ -388,13 +387,6 @@ function revealApp(cfg: DisplayConfig): void {
   const show = () => app.classList.remove('booting');
   window.addEventListener('marco:photo-tone', show, { once: true });
   setTimeout(show, 1800);
-}
-
-/** Small unobtrusive notice when ?screen= did not match any screen (the default one is shown instead). */
-function renderScreenNote(raw: DisplayConfig): void {
-  const show = !!raw.screenFallback && !!screenKey && !state.demo;
-  screenNote.textContent = show ? ctx.t('screenNotFound', { s: screenKey }) : '';
-  screenNote.classList.toggle('show', show);
 }
 
 let glFailed = false;
@@ -656,25 +648,57 @@ function denyAccess(status: number): void {
     return;
   }
   if (status === 403 && credentialKind === 'device') clearDeviceToken();
+  // keep the language the screen was showing; the browser's language may differ
+  const deniedLang = stopDisplay();
+  showPairing(status === 403 ? 'invalid' : 'pair', deniedLang);
+}
+
+/** Stop timers, live channel, carousel and heartbeat and forget the data on screen. Returns the language to use next. */
+function stopDisplay(): Lang {
   intervals.forEach(clearInterval);
   intervals.length = 0;
   liveStream?.close();
   carousel?.stop();
   heartbeat.stop();
-  // keep the language the screen was showing; the browser's language may differ
-  const deniedLang = state.config ? ctx.lang : pairingLang(params);
+  const lang = state.config ? ctx.lang : pairingLang(params);
   for (const k of ['config', 'events', 'weather', 'news', 'photos', 'countdowns'] as const) state[k] = null;
-  showPairing(status === 403 ? 'invalid' : 'pair', deniedLang);
+  return lang;
 }
 
-/** True (and the access screen shown) when `e` is a 401 / 403 from the display API. */
+/**
+ * ?screen= names no screen or carousel (404 screen_not_found): a neutral "Screen not found" page, never the default
+ * screen. It checks again every minute and starts normally once the screen exists (widgets/screenMissing.ts).
+ */
+function screenMissing(): void {
+  if (accessDenied || state.demo) return;
+  accessDenied = true;
+  showScreenMissing(stopDisplay(), async () => {
+    try {
+      await api.config();
+      return true;
+    } catch (e) {
+      // access changed meanwhile: reload so the pairing / invalid-link screen takes over
+      return e instanceof ApiError && (e.status === 401 || e.status === 403);
+    }
+  });
+}
+
+/** True (and the access screen shown) when `e` is a 401 / 403, or a 404 screen_not_found, from the display API. */
 function deniedBy(e: unknown): boolean {
   if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
     denyAccess(e.status);
     return true;
   }
+  // On a carousel a 404 is about one of its screens (deleted meanwhile), not about what this display opened: the
+  // carousel goes on without it.
+  if (isScreenNotFound(e) && !getActiveScreen()) {
+    screenMissing();
+    return true;
+  }
   return false;
 }
+
+const isScreenNotFound = (e: unknown) => e instanceof ApiError && e.status === 404 && e.code === 'screen_not_found';
 
 // ---------------------------------------------------------------------------------------------
 // Data
@@ -777,7 +801,14 @@ async function fetchCountdowns(): Promise<void> {
 async function fetchConfig(): Promise<boolean> {
   try {
     const sid = getActiveScreen();
-    const c = await api.config();
+    let c: DisplayConfig;
+    try {
+      c = await api.config();
+    } catch (e) {
+      // a carousel screen deleted meanwhile: ask for the carousel itself (the screen it shows now)
+      if (!sid || !isScreenNotFound(e)) throw e;
+      c = await api.config('');
+    }
     setOnline(true);
     if (sid && c.target?.kind === 'carousel' && c.screenId === sid) carousel?.put(sid, 'config', c);
     if (sid && sid !== getActiveScreen()) return true; // kept for that screen; the one on display is not touched

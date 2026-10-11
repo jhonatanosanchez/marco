@@ -189,7 +189,7 @@ test('private mode: access matrix (no key 401, valid key, revoked key 403, devic
     // the key decides the screen; ?screen= cannot read another screen with it
     const cfg = await ctx.call('GET', '/api/display/config?screen=living-room', { headers: { 'x-marco-key': kitchenKey } });
     assert.equal(cfg.json.screenId, 's_kitchen');
-    assert.equal(cfg.json.screenFallback, false);
+    assert.equal('screenFallback' in cfg.json, false);
     assert.match(cfg.headers.get('cache-control'), /private/);
     assert.match(cfg.headers.get('cache-control'), /no-store/);
     assert.equal(cfg.headers.get('referrer-policy'), 'no-referrer');
@@ -812,5 +812,91 @@ test('admin CSRF: same-origin only, by Origin and Sec-Fetch-Site; works on the L
     assert.equal(await post({ host: '192.168.1.50:3100', origin: 'http://192.168.1.50:3101' }), 403, 'another port is another origin');
     // the display's own POSTs (no admin cookie) are outside the guard
     assert.notEqual((await ctx.call('POST', '/api/display/heartbeat', { body: { clientId: 'kiosk-x' }, headers: { 'sec-fetch-site': 'cross-site' } })).status, 403);
+  }, { mode: 'open' });
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// Unknown ?screen=: 404 screen_not_found everywhere, never the default screen's data (docs/API.md)
+
+const withScreen = (url, s) => `${url}${url.includes('?') ? '&' : '?'}screen=${encodeURIComponent(s)}`;
+const NOT_FOUND_ENDPOINTS = [
+  ...ENDPOINTS.filter((ep) => !ep.sse),
+  { name: 'doorbell frame', method: 'GET', url: '/api/display/doorbell/frame' },
+];
+
+/** { status, json } of one endpoint for ?screen=<s>. */
+async function hitScreen(ctx, ep, s, opts = {}) {
+  const r = await ctx.call(ep.method, withScreen(ep.url, s), { body: ep.body, ...opts });
+  return { status: r.status, json: r.json };
+}
+
+test('unknown ?screen= (open mode, admin session): every display endpoint answers 404 screen_not_found', async () => {
+  for (const mode of ['open', 'private']) {
+    await withServer(async (ctx) => {
+      const opts = mode === 'private' ? { cookie: await ctx.login() } : {};
+      for (const s of ['nope', 'NOPE', 's_nope', 'v_nope']) {
+        for (const ep of NOT_FOUND_ENDPOINTS) {
+          const r = await hitScreen(ctx, ep, s, opts);
+          assert.equal(r.status, 404, `${mode} ${ep.name} ?screen=${s}`);
+          assert.equal(r.json?.error, 'screen_not_found', `${mode} ${ep.name} ?screen=${s}`);
+          // nothing about the screens that exist
+          assert.deepEqual(Object.keys(r.json).sort(), ['code', 'error'], `${mode} ${ep.name}: no data`);
+        }
+      }
+      // ?screen=a&screen=b names no single screen
+      assert.equal((await ctx.call('GET', '/api/display/config?screen=kitchen&screen=main', opts)).json.error, 'screen_not_found');
+      // the stream is refused before it opens: not registered, no live events
+      const s = await ctx.stream('/api/stream?screen=nope&client=kiosk-ghost', opts);
+      assert.equal(s.status, 404);
+      assert.equal(listClients().length, 0);
+      assert.ok(!listDisplays().some((d) => d.clientId === 'kiosk-ghost'));
+      // a poll that is refused does not register a display either
+      assert.equal((await ctx.call('GET', '/api/display/poll?client=kiosk-ghost2&screen=nope', opts)).status, 404);
+      assert.ok(!listDisplays().some((d) => d.clientId === 'kiosk-ghost2'));
+    }, { mode });
+  }
+});
+
+test('no ?screen= (or an empty one) is still the default screen; known screens and carousels resolve as before', async () => {
+  await withServer(async (ctx) => {
+    for (const url of ['/api/display/config', '/api/display/config?screen=', '/api/display/config?screen=%20']) {
+      const r = await ctx.call('GET', url);
+      assert.equal(r.status, 200, url);
+      assert.equal(r.json.screenId, 's_main', url);
+    }
+    assert.equal((await ctx.call('GET', '/api/display/config?screen=KITCHEN')).json.screenId, 's_kitchen');
+    assert.equal((await ctx.call('GET', '/api/display/config?screen=s_kitchen')).json.screenId, 's_kitchen');
+    for (const ep of ENDPOINTS.filter((e) => !e.sse)) {
+      assert.ok(allowed(ep, await hit(ctx, ep)), `${ep.name}: no ?screen=`);
+      assert.ok(allowed(ep, (await hitScreen(ctx, ep, 'kitchen')).status), `${ep.name}: ?screen=kitchen`);
+    }
+    const s = await ctx.stream('/api/stream?client=kiosk-default');
+    assert.equal(s.status, 200);
+    assert.equal((await s.next('hello')).data.screenId, 's_main');
+    s.close();
+  }, { mode: 'open' });
+});
+
+test('unknown ?screen= with a credential: its bound screen wins as before', async () => {
+  await withServer(async (ctx) => {
+    const kitchenKey = keyOf('kitchen');
+    const r = await ctx.call('GET', '/api/display/config?screen=nope', { headers: { 'x-marco-key': kitchenKey } });
+    assert.equal(r.status, 200);
+    assert.equal(r.json.screenId, 's_kitchen');
+    const s = await ctx.stream(`/api/stream?screen=nope&client=kiosk-k&k=${kitchenKey}`);
+    assert.equal(s.status, 200);
+    assert.equal((await s.next('hello')).data.screenId, 's_kitchen');
+    s.close();
+  });
+});
+
+test('heartbeat for an unknown screen: 404, not listed, never under the default screen', async () => {
+  await withServer(async (ctx) => {
+    const r = await ctx.call('POST', '/api/display/heartbeat', { body: { clientId: 'kiosk-hb', screen: 'nope' } });
+    assert.equal(r.status, 404);
+    assert.equal(r.json.error, 'screen_not_found');
+    assert.ok(!listDisplays().some((d) => d.clientId === 'kiosk-hb'));
+    assert.equal((await ctx.call('POST', '/api/display/heartbeat', { body: { clientId: 'kiosk-hb', screen: 'kitchen' } })).status, 200);
+    assert.equal(listDisplays().find((d) => d.clientId === 'kiosk-hb').screenId, 's_kitchen');
   }, { mode: 'open' });
 });

@@ -7,10 +7,11 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import * as store from '../store.js';
 import { defaultConfig, defaultScreenProfile } from '../core/defaults.js';
-import { sseHandler, broadcast, closeAll, clientCount } from '../sse.js';
+import { sseHandler, broadcast, closeAll, clientCount, reresolveClients } from '../sse.js';
 import {
   streamInit, streamHello, onStreamOpen, onStreamClose, recordHeartbeat, sanitizeHeartbeat, listDisplays,
   forgetDisplay, runCommand, shortUserAgent, setServerVersion, flushDisplays, _resetDisplays, resolveScreenList,
+  subscriptionFor, reresolveDisplays,
 } from '../displays.js';
 import { sanitizeAnnounce, createAnnouncement, listAnnouncements, clearAnnouncements, activeFor, _resetAnnouncements } from '../announce.js';
 import { screenTemplate } from '../routes/screens.js';
@@ -58,7 +59,10 @@ test('sse: hello carries the resolved screen, clientId and server version; broad
   assert.equal(ha.data.clientId, 'kiosk-cocina');
   assert.equal(ha.data.serverVersion, '9.9.9');
   assert.ok(Date.parse(ha.data.now));
-  assert.equal(b.events()[0].data.screenId, 's_main'); // unknown → default
+  assert.equal(b.events()[0].data.screenId, ''); // unknown: no screen, never the default one
+  assert.equal(broadcast('reload', {}, { screenIds: ['s_main'] }), 1); // only c (no ?screen= = default screen)
+  assert.ok(!b.events().some((e) => e.event === 'reload'));
+  assert.ok(!listDisplays().some((d) => d.clientId === 'kiosk-salon')); // not registered as a display
   assert.equal(c.events()[0].data.clientId, null);
   assert.equal(clientCount(), 3);
 
@@ -67,7 +71,7 @@ test('sse: hello carries the resolved screen, clientId and server version; broad
   assert.equal(broadcast('reload', {}, { screenIds: ['s_cocina'], clientIds: ['kiosk-salon'] }), 2);
   assert.equal(broadcast('config', { revision: 1 }), 3);
   assert.deepEqual(a.events().map((e) => e.event), ['hello', 'reload', 'reload', 'config']);
-  assert.deepEqual(c.events().map((e) => e.event), ['hello', 'config']);
+  assert.deepEqual(c.events().map((e) => e.event), ['hello', 'reload', 'config']);
   a.close(); b.close(); c.close();
   assert.equal(clientCount(), 0);
   closeAll();
@@ -268,4 +272,24 @@ test('admin preview streams (?preview=1) get live events but are never registere
   req.emit('close');
   assert.equal(listDisplays().length, 0);
   closeAll();
+});
+
+test('screen deleted while displays are connected: their streams get reload and close, never the default screen', () => {
+  const dir = setup();
+  const a = connect({ screen: 'cocina', client: 'kiosk-cocina' });
+  const b = connect({ screen: 'entrada', client: 'kiosk-entrada' });
+  const cfg = structuredClone(store.getConfig());
+  cfg.screens = cfg.screens.filter((x) => x.id !== 's_cocina');
+  assert.deepEqual(subscriptionFor(cfg, 'cocina'), { screenId: '', memberIds: null, notFound: true });
+  assert.deepEqual(subscriptionFor(cfg, ''), { screenId: 's_main', memberIds: null });
+  reresolveClients((key) => subscriptionFor(cfg, key));
+  reresolveDisplays(cfg);
+  assert.deepEqual(a.events().map((e) => e.event), ['hello', 'reload']);
+  assert.equal(clientCount(), 1);
+  assert.equal(broadcast('reload', {}, { screenIds: ['s_main'] }), 0);
+  assert.equal(listDisplays().find((d) => d.clientId === 'kiosk-cocina').screenId, 's_cocina'); // not moved to s_main
+  assert.deepEqual(b.events().map((e) => e.event), ['hello']); // untouched
+  a.close(); b.close();
+  closeAll();
+  fs.rmSync(dir, { recursive: true, force: true });
 });

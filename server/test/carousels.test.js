@@ -387,7 +387,7 @@ test('open mode: /?screen=<carousel> and ?screen=<screen>&via=<carousel>', async
   await withServer(async ({ call }) => {
     const c = await call('GET', '/api/display/config?screen=loop');
     assert.equal(c.json.target.kind, 'carousel');
-    assert.equal(c.json.screenFallback, false);
+    assert.equal('screenFallback' in c.json, false);
     const m = await call('GET', '/api/display/config?screen=s_kitchen&via=loop');
     assert.equal(m.json.screenId, 's_kitchen');
     assert.equal(m.json.carousel.id, 'v_loop');
