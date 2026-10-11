@@ -5,6 +5,18 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- Carousels (*Carruseles*): several screens in a loop on the same TV, each for as long as you choose (10 s to 1 h),
+  in the order you set, with a fade or no transition. Every TV on the same carousel switches at the same moment. A
+  display opens it like a screen: `/?screen=<address>`, its own private link, or pairing (the pickers list carousels
+  after the screens).
+- A carousel can rotate only at certain times (the same days and from / to rules as private mode, overnight windows
+  too) and show one chosen screen the rest of the time. At night it stays on that screen so the dimming does not
+  change, unless *Keep rotating at night* is on. A doorbell ring or a large announcement pauses it.
+- The next screen's data is fetched a few seconds before it shows, so switching needs no request; *Connected screens*
+  shows which carousel a TV runs and what it shows now. For testing: `?step=<address>`, `?carousel=0`, and
+  `?demo=1&carousel=1` for the demo screens in a loop.
+
 ### Changed
 - *Calendars → Calendar view*: *Max. visible events per day* now explains what it does. With *Compact busy days* on it
   is the point where a day switches to short lines (3 or 4 keeps normal days large).

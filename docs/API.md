@@ -73,7 +73,7 @@ saved without `security` (old admin builds, backups or exports from before 0.3) 
 | Method & path | Response |
 |---|---|
 | `GET /api/health` | `HealthResponse`: `{ ok, uptime, version, live, edition, tenancy, runtime, pairCodeLength, features, limits?, displayOrigin?, adminOrigin?, lanAddresses? }` (see below). `live` is `'sse'` unless `MARCO_LIVE=poll` is set. A server that answers `'poll'` gets no `/api/stream` connection: the display polls `GET /api/display/poll` instead (see below). A server that answers `404` there gets a config check every 90 s, which refetches events and countdowns when `revision` changes. A missing field means `'sse'` |
-| `GET /api/display/config?screen=` | `DisplayConfig`: flat view of one screen; `calendar.sources` only as `{ id, name, color, emoji, kind }`; enabled `schedules` for this screen; `privacy: { active, until, lock, next }` (see [Privacy mode](#privacy-mode); while active with *hide photos*, `background.source` is `"stock"`) |
+| `GET /api/display/config?screen=&via=` | `DisplayConfig`: flat view of one screen; `calendar.sources` only as `{ id, name, color, emoji, kind }`; enabled `schedules` for this screen; `privacy: { active, until, lock, next }` (see [Privacy mode](#privacy-mode); while active with *hide photos*, `background.source` is `"stock"`); `target: { id, kind: "screen" \| "carousel", slug, name }` (what the display is bound to) and `carousel` (`null`, or `{ id, slug, name, enabled, transition, holdOnAlert, nightRotate, offScreenId, schedule[], steps: [{ screenId, slug, name, seconds }] }`). For a carousel (`?screen=<carousel slug>`, or a key or device bound to one) the answer is the screen the carousel shows now, or `?screen=<member id or slug>`; a screen outside the carousel is never served. In open mode a display asks for a member with `?screen=<member>&via=<carousel slug>`. See [Carousels](#carousels) |
 | `GET /api/events?screen=&from=YYYY-MM-DD&to=YYYY-MM-DD` | `{ generatedAt, hash, events: CalEvent[], errors: [{ sourceId, message }] }`. While the screen is private, events are already filtered (busy blocks, hidden calendars) and `hash` starts with `p` |
 | `GET /api/weather?screen=` | `{ updatedAt, locationName, current, today, daily[], hourly[], indoor, source }` (localized descriptions). `source` = `{ provider, name, model, modelName, url, licence, licenceUrl, also? }`: where the data comes from, for the credit line. Values a source does not give are `null` (MET Norway: no chance of rain outside the Nordics; some Open-Meteo models: no UV). Cached per place for at least 10 minutes (15 for Pirate Weather, MET Norway's `Expires` when longer), the last answer is kept for 6 hours when the source fails |
 | `GET /api/news` | `{ updatedAt, items: [{ id, title, summary, source, date, image? }] }` (cache 15 min) |
@@ -94,7 +94,8 @@ The admin and the display read these fields to decide which sections, actions an
 - `features`: one boolean per feature: `homeassistant`, `news`, `customCss`, `gallery`, `schedules`,
   `announcements`, `displayCommands`, `openDisplayAccess`, `insecureTls`, `googleCalendar`, `googleLogin`,
   `passwordLogin`, `apiTokens`, `webhooks`, `backups`, `importExport`, `includeSecrets`, `activity`, `setupWizard`,
-  `status`, `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`. A self-hosted server turns all of them on, except
+  `status`, `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`,
+  `carousels`. A self-hosted server turns all of them on, except
   `googleCalendar` and `googleLogin` (on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set),
   `microsoftCalendar` (Outlook and Microsoft 365 calendars, on when `MICROSOFT_CLIENT_ID` and
   `MICROSOFT_CLIENT_SECRET` are set), `accountMenu` and `feedback` (always off). `updates` is the update banner,
@@ -105,10 +106,11 @@ The admin and the display read these fields to decide which sections, actions an
   [Privacy mode](#privacy-mode)); a server that does not filter events for it leaves it out and the admin hides the
   controls. `doorbell` is the doorbell overlay, its webhook and the admin card; `doorbellLive` means the frames are a
   live camera picture proxied from Home Assistant. A server with `doorbell` and without `doorbellLive` answers the
-  frame URL with the latest snapshot it was given instead; the display works the same way with both.
+  frame URL with the latest snapshot it was given instead; the display works the same way with both. `carousels` is
+  the *Carousels* page and `config.carousels` (a server without it would drop the section on save).
 - `limits` (optional): plan limits such as `screens`, `sources` or `devices`. Absent means no limit beyond the
   config validator's own caps (12 screens, 50 calendars, 20 news feeds, 1000 local events, 500 birthdays,
-  100 countdowns). The admin disables "add" at the limit and flags a config that goes over it.
+  100 countdowns, 6 carousels). The admin disables "add" at the limit and flags a config that goes over it.
 - `displayOrigin` (optional): absolute origin that serves `/d/<key>` and `/pair`. Absent means the same origin. The
   admin opens screens (preview, *View screen*) at `<displayOrigin or its own origin>/d/<key>` when it has the private
   links (a server in private mode, or one without open display access), else at `/?screen=<slug>`. The preview adds
@@ -121,9 +123,9 @@ The admin and the display read these fields to decide which sections, actions an
   `http://localhost` can say where other devices reach the admin.
 
 Clients treat a response with no `features` field (servers older than 0.5.0) as having every feature on, except
-`accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell` and `doorbellLive`. A key missing
-from `features` counts as off only when `edition` is not `'self-hosted'`, and a missing `accountMenu`,
-`microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell` or `doorbellLive` is always off.
+`accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive` and `carousels`. A
+key missing from `features` counts as off only when `edition` is not `'self-hosted'`, and a missing `accountMenu`,
+`microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive` or `carousels` is always off.
 
 ### Account mode
 
@@ -159,7 +161,7 @@ calendar's.
 
 | Event | Data | When |
 |---|---|---|
-| `hello` | `{ revision, screenId, slug, clientId, serverVersion, now, activeAnnouncementIds, doorbellId }` | on connect. `doorbellId`: the ring on this screen or `null` (a display showing another one closes it) |
+| `hello` | `{ revision, screenId, targetKind, slug, clientId, serverVersion, now, activeAnnouncementIds, doorbellId }` | on connect. `doorbellId`: the ring on this screen or `null` (a display showing another one closes it). On a carousel `screenId` / `slug` are the carousel's, `targetKind` is `"carousel"`, and the announcements and ring cover all its screens |
 | `config` | `{ revision }` | config saved; the display refetches its config and re-renders without reloading |
 | `events` | `{ hash }` | calendar data changed (also refetch countdowns) |
 | `photos` | `{}` or `{ hidden: [file, …] }` | gallery changed (`hidden` lists photos just taken out of the rotation; a display showing one of them moves on right away) |
@@ -168,13 +170,14 @@ calendar's.
 | `announce-clear` | `{ id \| null }` | announcement removed early (`null` = all) |
 | `identify` | `{ name, slug, clientId, durationSec }` | show the screen name full-screen |
 | `night` | `{ mode: "on" \| "off" \| "auto" }` | night mode override |
-| `privacy` | `{ active }` | privacy mode of this screen turned on or off (admin, webhook, schedule, or a period that ended); the display refetches its config, events, countdowns and photos |
-| `doorbell` | `{ id, startedAt, updatedAt, expiresAt, sound, frames, refreshMs }` | someone rang; replayed on connect while it lasts. The same `id` again with a later `expiresAt` extends it. `frames: false` = no camera, `refreshMs` = time between two frame requests (750) |
+| `privacy` | `{ active, screenId }` | privacy mode of this screen turned on or off (admin, webhook, schedule, or a period that ended); the display refetches its config, events, countdowns and photos |
+| `doorbell` | `{ id, screenId, startedAt, updatedAt, expiresAt, sound, frames, refreshMs }` | someone rang (`screenId`: the ringing screen; a display on a carousel asks for its frames with `?screen=<screenId>`); replayed on connect while it lasts. The same `id` again with a later `expiresAt` extends it. `frames: false` = no camera, `refreshMs` = time between two frame requests (750) |
 | `doorbell-end` | `{ id }` | the ring was dismissed |
 | `ping` | `{ t }` | every 25 s |
 | `revoked` | `{ code: "invalid_key" \| "key_required" }` | the link was regenerated or replaced by an import, the device revoked or dropped by an import, the screen deleted, display access switched to private for a keyless display, or (`key_required`) the admin session a stream was opened with ended (logout, logout everywhere, password change); the server then closes the stream. Every stream's credential is re-checked after config saves, imports, session revocation and on each heartbeat |
 
-Displays whose screen has alerts disabled do not receive `announce`.
+Displays whose screen has alerts disabled do not receive `announce`. A display on a carousel receives the events of
+every screen in it (and of the carousel id, for display commands), and `announce` when one of them has alerts on.
 
 ### Poll channel (`/api/display/poll`)
 
@@ -190,7 +193,8 @@ so there is no `revoked` command).
 | `hidden` | `1` while the page is hidden |
 | `preview` | `1` for the admin preview: commands still arrive, but the poll is not listed as a display |
 
-Answer `{ revision, screenId, now, serverVersion, cursor, reset, commands, activeAnnouncementIds?, next }`:
+Answer `{ revision, screenId, targetKind, now, serverVersion, cursor, reset, commands, activeAnnouncementIds?, next }`
+(on a carousel `screenId` is the carousel's id, so a switch between its screens never reloads the page):
 
 - `commands`: in order and already filtered to this display. Each one is `{ type, ...payload }` with the SSE event
   names and payloads: `reload`, `night`, `identify` (filled in for this display), `announce`, `announce-clear`,
@@ -384,6 +388,22 @@ curl -H "Authorization: Bearer $TOKEN" http://192.168.1.50:3000/api/hooks/privac
 
 Privacy changes are logged in the activity log as `privacy.changed` (`{ mode, via: "admin"|"hook", screens?, active,
 until? }`).
+
+## Carousels
+
+`config.carousels.items` (see docs/ARCHITECTURE.md "Carousels"): saved with the rest of the config
+(`PUT /api/admin/config`), no endpoint of its own. Ids start with `v_`; the slug never matches a screen's
+(`400` at `carousels.items[i].slug`). Everything that binds a display takes a carousel id where it takes a screen id:
+
+- `GET /api/admin/display-links`: one link per screen, then one per carousel, each with `kind: "screen" | "carousel"`
+  (`screenId` holds the carousel id). `POST /api/admin/display-links/<carousel id>/regenerate` works too.
+- `POST /api/admin/pair/claim { screenId: <carousel id> }` and `PATCH /api/admin/devices/:id { screenId }`;
+  `PairedDevice.screenKind` says which.
+- `GET /api/admin/displays`: a display on a carousel has `screenId` = the carousel's id, `targetKind: "carousel"`, and
+  `showingScreenId` / `showingScreenName` from its last heartbeat (`DisplayHeartbeat.screenId` is the screen it shows).
+- `POST /api/admin/displays/command { screens: [<carousel id or slug>] }` reaches the displays of that carousel.
+
+Deleting a carousel drops its private link (its displays get `revoked`) and moves its devices to the default screen.
 
 ## Privacy mode
 
