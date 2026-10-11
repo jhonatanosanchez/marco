@@ -10,7 +10,7 @@ export function invalidateHaEntities() {
   for (const k of Object.keys(cache)) delete cache[k];
 }
 
-function load(domain: 'sensor' | 'weather') {
+function load(domain: 'sensor' | 'weather' | 'camera') {
   if (!cache[domain]) {
     cache[domain] = api.haEntities(domain).catch((e) => {
       delete cache[domain];
@@ -22,7 +22,7 @@ function load(domain: 'sensor' | 'weather') {
 
 /** Searchable entity picker (datalist) with live state of the selected entity. */
 export function HaEntityPicker(props: {
-  domain: 'sensor' | 'weather';
+  domain: 'sensor' | 'weather' | 'camera';
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;

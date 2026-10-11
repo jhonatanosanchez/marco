@@ -24,9 +24,9 @@ display and the server guarantee. The HTTP endpoints and event formats are in [A
 |---|---|
 | `server/` | API and logic: ICS + recurrences (`node-ical`, `rrule`), Google Calendar, weather, RSS, photos, auth, SSE and the poll channel (`pollHub.js`), backups, activity |
 | `server/app.js` | `createApp()`: the whole Express stack (host guard, sessions, CSRF, display access, routers, static files); `server/index.js` adds the store, listen and shutdown |
-| `server/core/` | Pure logic shared with Marco Cloud, which copies the folder as it is: config schema and validation (`validate.js`, `defaults.js`, `screens.js`, `iconRules.js`), backups and import (`backupsCore.js`), announcements (`announceCore.js`), feed parsing (`newsParse.js`), image headers and photo names (`imageInfo.js`), activity helpers (`activityCore.js`), pairing codes (`pairCore.js`), CSV, schedules and `lib/` (text, time zones, server strings). No Node built-ins, no store, SSE or HTTP modules (checked by `server/test/core-lint.test.js`); the files next to it (`backups.js`, `announce.js`, `photos.js`, `news.js`, `activity.js`, `pairing.js`) add the files, network and SSE |
+| `server/core/` | Pure logic shared with Marco Cloud, which copies the folder as it is: config schema and validation (`validate.js`, `defaults.js`, `screens.js`, `iconRules.js`), backups and import (`backupsCore.js`), announcements (`announceCore.js`), doorbell rings (`doorbellCore.js`), feed parsing (`newsParse.js`), image headers and photo names (`imageInfo.js`), activity helpers (`activityCore.js`), pairing codes (`pairCore.js`), CSV, schedules and `lib/` (text, time zones, server strings). No Node built-ins, no store, SSE or HTTP modules (checked by `server/test/core-lint.test.js`); the files next to it (`backups.js`, `announce.js`, `photos.js`, `news.js`, `activity.js`, `pairing.js`, `doorbell.js`) add the files, network and SSE |
 | `server/displayAccess.js`, `server/pairing.js` | Private display links, paired devices and pairing codes (see *Display access* below) |
-| `server/routes/` | Express routers: `public.js` (display API), `admin.js`, `screens.js`, `announce.js`, `hooks.js`, `system.js`, `localEvents.js`, `access.js` (links, devices, pairing), `updates.js` |
+| `server/routes/` | Express routers: `public.js` (display API), `admin.js`, `screens.js`, `announce.js`, `hooks.js`, `doorbell.js`, `system.js`, `localEvents.js`, `access.js` (links, devices, pairing), `updates.js` |
 | `server/updates.js` | Daily check for a newer release, update settings, the request read by `marco-update.path` (see *Updates* below) |
 | `server/test/` | `node --test` suites and fixtures |
 | `web/index.html`, `web/display/` | The display (vanilla TypeScript + three.js) |
@@ -78,7 +78,10 @@ The stored config has **global** sections shared by every screen and a list of *
   "eventRules": { "items": [EventRule] },
   "countdowns": { "items": [Countdown], "includeBirthdays": true, "birthdayDays": 30, "includeFlagged": true, "horizonDays": 365 },
   "schedules":  { "items": [ScheduledMessage] },
-  "homeassistant": { "enabled": false, "url": "http://homeassistant.local:8123" },   // token in secrets.json
+  "homeassistant": { "enabled": false, "url": "http://homeassistant.local:8123",    // token in secrets.json
+                  "doorbell": { "camera": "", "seconds": 60, "screenIds": [], "sound": true } },
+                  // doorbell: camera.* entity ('' = no picture), seconds 10..300, screenIds ([] = all; when every chosen
+                  // screen is deleted it falls back to the default screen, never to all), door chime
   "auth":       { "allowedGoogleEmails": [], "passwordLoginEnabled": true },
   "security":   { "displayAccess": "private" }      // "open" = legacy LAN mode (installs upgraded from 0.2)
 }
@@ -206,6 +209,15 @@ flagged by a local event or a style rule (nearest occurrence per title), sorted 
   relative type.
 - Announcements: animated cards (info / success / warning / urgent, ≤ 3 stacked), WebAudio chime (no audio files),
   remaining time corrected with the server clock. Scheduled messages show as a banner while their window is active.
+- Doorbell (`web/display/widgets/doorbell.ts`): the `doorbell` event puts the camera full screen (z-index above the
+  night layer, so it wakes a dimmed screen while it lasts), with a "Door" label, the time, a live dot, a progress bar
+  and a two-tone WebAudio door chime. Frames come from a `FrameSource` that asks `GET /api/display/doorbell/frame`
+  with a counter every `refreshMs` (the credential in `X-Marco-Key`, the answer turned into a blob URL), decodes the
+  next picture off screen and flips two `<img>` so it never flickers; an error keeps the last picture, `404` stops
+  asking. The overlay does not know whether the frame is live (self-hosted) or an uploaded snapshot. It ends at
+  `expiresAt`, on `doorbell-end`, or when `hello` / a poll reset names another ring. The server side lives in
+  `server/doorbell.js` (rings in memory, Home Assistant proxy with a 500 ms shared frame cache) and
+  `server/core/doorbellCore.js` (validation, ring / extend / dismiss, payload).
 - Identity: `clientId` from `?client=`, else `localStorage`, else generated. `deploy/kiosk.sh` appends
   `client=<hostname>` because the kiosk runs incognito. If the server version changes, the display reloads once.
 - Access (`web/display/identity.ts`): the credential is the key in the path (`/d/<key>`), else a paired-device token

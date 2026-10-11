@@ -3,7 +3,7 @@
 // display then polls GET /api/display/poll, which returns the same events as commands. A server that answers 404
 // there gets the older config revision check every 90 s.
 // No runtime imports on purpose: the module is unit-tested directly by node --test (server/test/display-live.test.js).
-import type { Announcement, IdentifyPayload, NightCommand, PollResponse, StreamHello } from '../shared/types';
+import type { Announcement, DoorbellRing, IdentifyPayload, NightCommand, PollResponse, StreamHello } from '../shared/types';
 
 export type LiveMode = 'sse' | 'poll';
 
@@ -90,6 +90,9 @@ export interface StreamHandlers {
   announceClear?: (d: { id: string | null }) => void;
   identify?: (d: IdentifyPayload) => void;
   night?: (d: { mode: NightCommand }) => void;
+  /** doorbell ring on this screen (a later one with the same id extends it) */
+  doorbell?: (d: DoorbellRing) => void;
+  doorbellEnd?: (d: { id: string | null }) => void;
   /** link regenerated / device revoked / display access switched to private */
   revoked?: (d: { code: string }) => void;
   open?: () => void;
@@ -113,6 +116,8 @@ export function dispatch(name: string, d: any, h: StreamHandlers): boolean {
     case 'announce-clear': h.announceClear?.({ id: typeof d?.id === 'string' ? d.id : null }); return true;
     case 'identify': h.identify?.(d); return true;
     case 'night': if (d?.mode === 'on' || d?.mode === 'off' || d?.mode === 'auto') h.night?.(d); return true;
+    case 'doorbell': if (d && typeof d.id === 'string' && typeof d.expiresAt === 'string') h.doorbell?.(d); return true;
+    case 'doorbell-end': h.doorbellEnd?.({ id: typeof d?.id === 'string' ? d.id : null }); return true;
     case 'revoked': h.revoked?.({ code: typeof d?.code === 'string' ? d.code : 'invalid_key' }); return true;
     default: return false;
   }

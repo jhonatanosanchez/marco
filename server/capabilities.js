@@ -11,11 +11,13 @@ export const FEATURE_KEYS = Object.freeze([
   'homeassistant', 'news', 'customCss', 'gallery', 'schedules', 'announcements', 'displayCommands',
   'openDisplayAccess', 'insecureTls', 'googleCalendar', 'googleLogin', 'passwordLogin', 'apiTokens',
   'webhooks', 'backups', 'importExport', 'includeSecrets', 'activity', 'setupWizard', 'status', 'accountMenu',
-  'microsoftCalendar', 'updates', 'feedback',
+  'microsoftCalendar', 'updates', 'feedback', 'doorbell', 'doorbellLive',
 ]);
 
 /** Feature flags of a self-hosted server: all on (`updates` too: the update banner and settings), Google and
- *  Microsoft follow their credentials, no account menu and no feedback form (that one reaches Marco Cloud's team). */
+ *  Microsoft follow their credentials, no account menu and no feedback form (that one reaches Marco Cloud's team).
+ *  `doorbell` is the ring overlay and its hook; `doorbellLive` says the frames are a live camera picture proxied
+ *  from Home Assistant (a server without it serves the latest uploaded snapshot instead). */
 export function selfHostedFeatures() {
   const google = googleConfigured();
   const out = {};

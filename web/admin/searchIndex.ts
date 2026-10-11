@@ -66,6 +66,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   // Integraciones
   { label: 'Galería de fotos', route: 'photos', keywords: 'photos upload subir galería' },
   { label: 'Conexión con Home Assistant', route: 'homeassistant', anchor: 'ha-conn', keywords: 'home assistant token url' },
+  { label: 'Timbre y cámara', route: 'homeassistant', anchor: 'ha-doorbell', keywords: 'doorbell timbre campainha camera cámara puerta door', feature: 'doorbell' },
   { label: 'Tokens de API', route: 'api', anchor: 'api-tokens', keywords: 'token api bearer webhook', feature: 'apiTokens' },
   { label: 'Ejemplo de Home Assistant (rest_command)', route: 'api', anchor: 'api-examples', keywords: 'yaml rest_command automation curl', feature: 'webhooks' },
   // Sistema

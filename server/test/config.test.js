@@ -172,7 +172,7 @@ test('migration v1 → v2 keeps every value (global vs screens[0])', async () =>
   assert.deepEqual(v.news, { feeds: V1.news.feeds, maxItems: 10 });
   assert.deepEqual(s.todo, { enabled: true });
   assert.deepEqual(v.todo, { items: V1.todo.items });
-  assert.deepEqual(v.homeassistant, V1.homeassistant);
+  assert.deepEqual(v.homeassistant, { ...V1.homeassistant, doorbell: { camera: '', seconds: 60, screenIds: [], sound: true } });
   assert.deepEqual(v.auth, V1.auth);
   // validateConfig also accepts v1 directly (old clients / imports)
   assert.deepEqual(validateConfig(structuredClone(V1)).value.screens[0].layout, { ...V1.layout, people: null, corner: 'br' });

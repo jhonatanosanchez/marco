@@ -17,9 +17,9 @@ const MAX_POLLERS = 200;
 /** Same cap as open streams per ip (sse.js MAX_STREAMS_PER_IP): more client ids from one address are not listed. */
 export const MAX_POLLERS_PER_IP = 24;
 
-/** How long a command stays deliverable. `announce` lives until its own expiresAt. */
-const TTL_MS = { reload: 600_000, night: 600_000, identify: 60_000, 'announce-clear': 600_000, photos: 600_000, events: 600_000 };
-export const POLL_EVENTS = Object.freeze(['reload', 'night', 'identify', 'announce', 'announce-clear', 'photos', 'events']);
+/** How long a command stays deliverable. `announce` and `doorbell` live until their own expiresAt. */
+const TTL_MS = { reload: 600_000, night: 600_000, identify: 60_000, 'announce-clear': 600_000, photos: 600_000, events: 600_000, 'doorbell-end': 600_000 };
+export const POLL_EVENTS = Object.freeze(['reload', 'night', 'identify', 'announce', 'announce-clear', 'photos', 'events', 'doorbell', 'doorbell-end']);
 
 let epoch = crypto.randomBytes(4).toString('hex');
 let seq = 0;
@@ -155,7 +155,7 @@ export function readSince(cursor, client, screenOf, now = Date.now()) {
   for (const e of ring) {
     if (e.seq <= c || !matches(client, e.target)) continue;
     if (e.filter && !e.filter(client)) continue;
-    if (e.event === 'announce') {
+    if (e.event === 'announce' || e.event === 'doorbell') {
       if (!(Date.parse(e.data.expiresAt) > now) || e.data.clearedAt) continue;
     } else if (now - e.at > (TTL_MS[e.event] ?? 0)) continue;
     if (e.event === 'identify') {

@@ -51,8 +51,8 @@ test('caps: old servers and self-hosted keep every feature on', () => {
   const old = oldServer();
   assert.equal(old.edition, 'self-hosted');
   assert.equal(old.features, null);
-  // accountMenu, microsoftCalendar, updates and feedback only exist on servers that say so
-  for (const k of FEATURE_KEYS) assert.equal(hasFeature(old, k), !['accountMenu', 'microsoftCalendar', 'updates', 'feedback'].includes(k), k);
+  // accountMenu, microsoftCalendar, updates, feedback and the doorbell only exist on servers that say so
+  for (const k of FEATURE_KEYS) assert.equal(hasFeature(old, k), !['accountMenu', 'microsoftCalendar', 'updates', 'feedback', 'doorbell', 'doorbellLive'].includes(k), k);
   assert.equal(old.pairCodeLength, 6);
   assert.equal(old.displayOrigin, null);
 
@@ -65,6 +65,9 @@ test('caps: old servers and self-hosted keep every feature on', () => {
   assert.equal(hasFeature(selfHosted(), 'updates'), true);
   assert.equal(hasFeature(sh, 'feedback'), false, 'the feedback form is never on unless the server says so');
   assert.equal(hasFeature(selfHosted(), 'feedback'), false, 'a self-hosted server has no feedback form');
+  assert.equal(hasFeature(selfHosted(), 'doorbell'), true);
+  assert.equal(hasFeature(selfHosted(), 'doorbellLive'), true);
+  assert.equal(hasFeature(sh, 'doorbell'), false, 'an older self-hosted server has no doorbell hook');
   const sh2 = capsFrom({ ok: true, uptime: 1, version: '0.5.0', edition: 'self-hosted', features: { news: false } });
   assert.equal(hasFeature(sh2, 'news'), false, 'an explicit false is off everywhere');
 });
@@ -124,12 +127,15 @@ test('navFilter: self-hosted defaults and old servers show everything', () => {
   assert.deepEqual(nav.filterNav(nav.NAV_ITEMS, oldServer()).map((n) => n.id), all);
   const routes = all;
   // every entry except the account ones (features.accountMenu, multi-tenant servers only), Microsoft calendars
-  // (features.microsoftCalendar) and updates (features.updates): an old server lists none of them
+  // (features.microsoftCalendar), updates (features.updates) and the doorbell (features.doorbell): an old server lists
+  // none of them
   const accountEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'accountMenu' || e.feature === 'microsoftCalendar').length;
   assert.equal(accountEntries, 3);
   const updateEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'updates').length;
   assert.equal(updateEntries, 1);
-  assert.equal(nav.filterSettings(search.SETTINGS_INDEX, oldServer(), routes).length, search.SETTINGS_INDEX.length - accountEntries - updateEntries);
+  const doorbellEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'doorbell').length;
+  assert.equal(doorbellEntries, 1);
+  assert.equal(nav.filterSettings(search.SETTINGS_INDEX, oldServer(), routes).length, search.SETTINGS_INDEX.length - accountEntries - updateEntries - doorbellEntries);
   // without Google credentials a self-hosted admin still lists the Google entries (with the setup hint)
   assert.equal(nav.filterSettings(search.SETTINGS_INDEX, selfHosted(), routes).length, search.SETTINGS_INDEX.length - accountEntries);
   // every action except the feedback form (Marco Cloud only)

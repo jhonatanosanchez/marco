@@ -5,6 +5,7 @@ import { isValidTimeZone } from './lib/tz.js';
 import { randomId, fold } from './lib/text.js';
 import { LANGS } from './lib/i18n.js';
 import { WEATHER_PROVIDER_IDS, OPEN_METEO_MODEL_IDS, KEY_PROVIDERS } from './weather.js';
+import { CAMERA_RE, DOORBELL_MIN_SEC, DOORBELL_MAX_SEC } from './doorbellCore.js';
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
@@ -585,9 +586,20 @@ export function validateConfig(input, opts = {}) {
   const ha = obj(ctx, 'homeassistant', c.homeassistant);
   const haUrl = str(ctx, 'homeassistant.url', ha.url, D.homeassistant.url, 512).trim().replace(/\/+$/, '');
   if (haUrl && !isHttpUrl(haUrl)) ctx.err('homeassistant.url', 'invalid URL');
+  // Doorbell camera (POST /api/hooks/doorbell): one camera entity, how long the picture stays, which screens, sound.
+  const db = obj(ctx, 'homeassistant.doorbell', ha.doorbell);
+  const DD = D.homeassistant.doorbell;
+  let camera = str(ctx, 'homeassistant.doorbell.camera', db.camera, DD.camera, 255).trim();
+  if (camera && !CAMERA_RE.test(camera)) { ctx.err('homeassistant.doorbell.camera', 'must be a camera entity id (camera.…)'); camera = ''; }
   const homeassistant = {
     enabled: bool(ctx, 'homeassistant.enabled', ha.enabled, D.homeassistant.enabled),
     url: haUrl,
+    doorbell: {
+      camera,
+      seconds: num(ctx, 'homeassistant.doorbell.seconds', db.seconds, DD.seconds, DOORBELL_MIN_SEC, DOORBELL_MAX_SEC, true),
+      screenIds: idList(ctx, 'homeassistant.doorbell.screenIds', db.screenIds, MAX_SCREENS),
+      sound: bool(ctx, 'homeassistant.doorbell.sound', db.sound, DD.sound),
+    },
   };
 
   const au = obj(ctx, 'auth', c.auth);
@@ -621,12 +633,18 @@ export function validateConfig(input, opts = {}) {
     if (m.screenIds.length && !keep.length) m.enabled = false;
     m.screenIds = keep;
   }
+  // Doorbell screens that were deleted are dropped; when none is left the ring goes to the default screen only
+  // (an empty list would mean every screen, and a camera picture should not spread to screens nobody chose).
+  const dbKeep = homeassistant.doorbell.screenIds.filter((x) => screenIds.has(x));
+  const dbLost = homeassistant.doorbell.screenIds.length && !dbKeep.length;
+  homeassistant.doorbell.screenIds = dbKeep;
   let defaultScreen = typeof c.defaultScreen === 'string' ? c.defaultScreen : screens[0].id;
   if (!screenIds.has(defaultScreen)) {
     if (c.defaultScreen !== undefined) ctx.err('defaultScreen', 'unknown screen id');
     defaultScreen = screens[0].id;
   }
 
+  if (dbLost) homeassistant.doorbell.screenIds = [defaultScreen];
   const revision = Number.isInteger(c.revision) && c.revision > 0 ? c.revision : 1;
   const value = {
     version: CONFIG_VERSION, revision, defaultScreen, screens,

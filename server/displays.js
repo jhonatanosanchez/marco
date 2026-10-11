@@ -7,6 +7,7 @@ import { listClients, send, matches } from './sse.js';
 import { publish, recordIdentify, readSince, trackPoller, isPolling, nextDelay, _resetPoll } from './pollHub.js';
 import { logActivityThrottled } from './activity.js';
 import { activeFor } from './announce.js';
+import { ringPayloadFor } from './doorbell.js';
 import { deviceName, requestScreen } from './displayAccess.js';
 
 export const MAX_DISPLAYS = 100;
@@ -170,6 +171,8 @@ export function streamHello(client) {
     now: new Date().toISOString(),
     // Lets a reconnecting display drop announcements cleared while it was offline (clear events aren't replayed).
     activeAnnouncementIds: s?.alerts.enabled === false ? [] : activeFor(client.screenId).map((a) => a.id),
+    // The doorbell ring on this screen (null = none): a display that missed `doorbell-end` while offline closes it.
+    doorbellId: ringPayloadFor(client.screenId)?.id ?? null,
   };
 }
 
@@ -178,6 +181,7 @@ export function onStreamOpen(client) {
   if (client.preview) {
     const s = getConfig().screens.find((x) => x.id === client.screenId);
     if (s?.alerts.enabled !== false) for (const a of activeFor(client.screenId)) send(client, 'announce', a);
+    replayDoorbell(client);
     return;
   }
   const nowIso = new Date().toISOString();
@@ -220,6 +224,13 @@ export function onStreamOpen(client) {
   const cfg = getConfig();
   const screen = cfg.screens.find((x) => x.id === client.screenId);
   if (screen?.alerts.enabled !== false) for (const a of activeFor(client.screenId)) send(client, 'announce', a);
+  replayDoorbell(client);
+}
+
+/** A display that connects while its screen rings gets the ring (the display dedupes by id). */
+function replayDoorbell(client) {
+  const d = ringPayloadFor(client.screenId);
+  if (d) send(client, 'doorbell', d);
 }
 
 // ---------- poll channel (GET /api/display/poll) ----------
@@ -299,7 +310,10 @@ export function pollDisplay(req, nowMs = Date.now()) {
   const alertsOn = screen.alerts.enabled !== false;
   const out = readSince(typeof q.cursor === 'string' ? q.cursor : '', client, (id) => cfg.screens.find((x) => x.id === id) || null, nowMs);
   const active = () => (alertsOn ? activeFor(screen.id) : []);
-  const commands = out.reset ? active().map((a) => ({ ...a, type: 'announce' })) : out.commands;
+  const ringing = out.reset ? ringPayloadFor(screen.id) : null;
+  const commands = out.reset
+    ? [...active().map((a) => ({ ...a, type: 'announce' })), ...(ringing ? [{ ...ringing, type: 'doorbell' }] : [])]
+    : out.commands;
   const res = {
     revision: cfg.revision,
     screenId: screen.id,
@@ -313,6 +327,7 @@ export function pollDisplay(req, nowMs = Date.now()) {
   if (out.reset || commands.some((c) => c.type === 'announce' || c.type === 'announce-clear')) {
     res.activeAnnouncementIds = active().map((a) => a.id);
   }
+  if (out.reset) res.doorbellId = ringing?.id ?? null;
   return res;
 }
 

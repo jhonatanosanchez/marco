@@ -38,6 +38,7 @@ const FEATURE_RULES = [
   [/^\/api\/(account\/|admin\/household$)/, 'accountMenu'],
   [/^\/api\/admin\/update(\/|$)/, 'updates'],
   [/^\/api\/admin\/feedback$/, 'feedback'],
+  [/^\/api\/admin\/doorbell$/, 'doorbell'],
 ];
 
 const featureFor = (path) => FEATURE_RULES.find(([re]) => re.test(path))?.[1] ?? null;

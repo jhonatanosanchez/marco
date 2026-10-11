@@ -102,6 +102,10 @@ export function describeActivity(e: ActivityEntry): { icon: IconName; text: stri
       const label = a === 'reload' ? t('recargar') : a === 'identify' ? t('identificar') : a === 'night' ? `${t('modo noche')} ${str(d.mode)}` : a;
       return { icon: 'monitor', text: t('Orden a pantallas: {action}', { action: label }) + (d.delivered != null ? ` · ${nScreens(Number(d.delivered))}` : '') };
     }
+    case 'display.doorbell': {
+      const text = d.action === 'dismiss' ? t('Timbre quitado de las pantallas') : d.extended ? t('Timbre: llamaron otra vez') : t('Timbre: llaman a la puerta');
+      return { icon: 'bell', text: text + (d.via === 'hook' ? ` · ${t('vía webhook')}` : '') + (d.delivered != null ? ` · ${nScreens(Number(d.delivered))}` : '') };
+    }
     case 'display.link_regenerated':
       return { icon: 'link', text: t('Enlace privado regenerado: {screen}', { screen: str(d.screen) }) + (Number(d.disconnected) ? ` · ${nScreens(Number(d.disconnected))}` : '') };
     case 'display.paired':

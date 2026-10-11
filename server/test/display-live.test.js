@@ -95,7 +95,7 @@ test('config poll refetches data only when the revision changes', opts, async ()
 function recorder() {
   const calls = [];
   const h = {};
-  for (const n of ['hello', 'config', 'events', 'photos', 'reload', 'announce', 'announceClear', 'identify', 'night', 'revoked', 'open', 'down']) {
+  for (const n of ['hello', 'config', 'events', 'photos', 'reload', 'announce', 'announceClear', 'identify', 'night', 'doorbell', 'doorbellEnd', 'revoked', 'open', 'down']) {
     h[n] = (d) => calls.push(d === undefined ? [n] : [n, d]);
   }
   return { h, calls };
@@ -127,6 +127,12 @@ const GUARD_CASES = [
   ['night', { mode: 'dim' }, []],
   ['night', {}, []],
   ['night', null, []],
+  ['doorbell', { id: 'd_1', expiresAt: '2026-01-01T10:01:00.000Z' }, [['doorbell', { id: 'd_1', expiresAt: '2026-01-01T10:01:00.000Z' }]]],
+  ['doorbell', { id: 'd_1' }, []],
+  ['doorbell', { id: 7, expiresAt: 'x' }, []],
+  ['doorbell', null, []],
+  ['doorbell-end', { id: 'd_1' }, [['doorbellEnd', { id: 'd_1' }]]],
+  ['doorbell-end', {}, [['doorbellEnd', { id: null }]]],
   ['revoked', { code: 'key_required' }, [['revoked', { code: 'key_required' }]]],
   ['revoked', { code: 9 }, [['revoked', { code: 'invalid_key' }]]],
   ['revoked', {}, [['revoked', { code: 'invalid_key' }]]],

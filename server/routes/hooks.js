@@ -4,11 +4,13 @@
 //   POST /announce    → { ok, announcement, delivered }
 //   POST /reload      → { ok, delivered }
 //   POST /night       → { ok, delivered }
+//   POST /doorbell    → { ok, action, delivered, screens, expiresAt? }  (routes/doorbell.js)
 import { Router } from 'express';
 import { findToken, checkRate, recordUse, recordRejection } from '../tokens.js';
 import { handleAnnounce } from './announce.js';
 import { runCommand } from '../displays.js';
 import { logActivity } from '../activity.js';
+import { handleDoorbell } from './doorbell.js';
 
 /** Bearer-token middleware: 401 (logged, throttled), 429 over 30 req/min, usage bookkeeping. */
 export function bearerAuth(req, res, next) {
@@ -60,6 +62,10 @@ export function hooksRouter() {
   });
   r.post('/reload', jsonOnly, (req, res) => command(req, res, 'reload'));
   r.post('/night', jsonOnly, (req, res) => command(req, res, 'night'));
+  r.post('/doorbell', jsonOnly, (req, res) => {
+    const [status, body] = handleDoorbell(req, 'hook');
+    res.status(status).json(body);
+  });
   r.use((req, res) => res.status(404).json({ error: 'not found' }));
   return r;
 }
