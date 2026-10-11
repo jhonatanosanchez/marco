@@ -135,14 +135,30 @@ test('navFilter: self-hosted defaults and old servers show everything', () => {
   const updateEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'updates' || e.feature === 'privacy').length;
   assert.equal(updateEntries, 2);
   const doorbellEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'doorbell').length;
-  assert.equal(doorbellEntries, 1);
+  assert.equal(doorbellEntries, 2);
   assert.equal(nav.filterSettings(search.SETTINGS_INDEX, oldServer(), routes).length, search.SETTINGS_INDEX.length - accountEntries - updateEntries - doorbellEntries);
-  // without Google credentials a self-hosted admin still lists the Google entries (with the setup hint)
-  assert.equal(nav.filterSettings(search.SETTINGS_INDEX, selfHosted(), routes).length, search.SETTINGS_INDEX.length - accountEntries);
+  // without Google credentials a self-hosted admin still lists the Google entries (with the setup hint); the doorbell
+  // card is on the Home Assistant page there, so the entry for API & webhooks (servers without a live camera) is out
+  const snapshotEntries = search.SETTINGS_INDEX.filter((e) => e.unless === 'doorbellLive').length;
+  assert.equal(snapshotEntries, 1);
+  assert.equal(nav.filterSettings(search.SETTINGS_INDEX, selfHosted(), routes).length, search.SETTINGS_INDEX.length - accountEntries - snapshotEntries);
   // every action except the feedback form (Marco Cloud only)
   const actions = Object.keys(nav.ACTION_FEATURES).map((id) => ({ id }));
   assert.deepEqual(nav.filterActions(actions, selfHosted()).map((a) => a.id), actions.map((a) => a.id).filter((id) => id !== 'a-feedback'));
   assert.ok(!nav.filterActions(actions, oldServer()).some((a) => a.id === 'a-feedback'));
+});
+
+test('doorbell search: a server without a live camera finds the card on API & webhooks', () => {
+  const h = cloudHealth();
+  Object.assign(h.features, { apiTokens: true, webhooks: true, doorbell: true, doorbellLive: false });
+  const c = capsFrom(h);
+  const routes = nav.filterNav(nav.NAV_ITEMS, c).map((n) => n.id);
+  assert.ok(!routes.includes('homeassistant'));
+  const found = nav.filterSettings(search.SETTINGS_INDEX, c, routes).filter((e) => e.feature === 'doorbell');
+  assert.deepEqual(found.map((e) => `${e.route}/${e.anchor}`), ['api/api-doorbell']);
+  // the same server with a live camera (self-hosted) keeps the card on the Home Assistant page
+  const sh = nav.filterSettings(search.SETTINGS_INDEX, selfHosted(), nav.NAV_ITEMS.map((n) => n.id)).filter((e) => e.feature === 'doorbell');
+  assert.deepEqual(sh.map((e) => `${e.route}/${e.anchor}`), ['homeassistant/ha-doorbell']);
 });
 
 test('feedback: self-hosted never offers it, the cloud does when it says so', () => {

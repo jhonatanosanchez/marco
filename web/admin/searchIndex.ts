@@ -1,6 +1,7 @@
 // Static index of individual settings for the command palette (Ctrl/Cmd+K).
 // label = Spanish source string (translated with t()), keywords = extra words in es/en/pt, anchor = element id.
 // feature = hidden when the server turns it off (navFilter.ts); the page's own feature applies too.
+// unless = hidden when the server turns this feature on (the setting lives on another page there).
 import type { FeatureName } from '../shared/types';
 
 export interface SettingEntry {
@@ -9,6 +10,7 @@ export interface SettingEntry {
   anchor?: string;
   keywords?: string;
   feature?: FeatureName | readonly FeatureName[];
+  unless?: FeatureName;
 }
 
 export const SETTINGS_INDEX: SettingEntry[] = [
@@ -67,6 +69,8 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { label: 'Galería de fotos', route: 'photos', keywords: 'photos upload subir galería' },
   { label: 'Conexión con Home Assistant', route: 'homeassistant', anchor: 'ha-conn', keywords: 'home assistant token url' },
   { label: 'Timbre y cámara', route: 'homeassistant', anchor: 'ha-doorbell', keywords: 'doorbell timbre campainha camera cámara puerta door', feature: 'doorbell' },
+  // servers without a live camera (Marco Cloud) have no Home Assistant page: the card is in API & webhooks
+  { label: 'Timbre', route: 'api', anchor: 'api-doorbell', keywords: 'doorbell timbre campainha camera cámara puerta door foto snapshot', feature: 'doorbell', unless: 'doorbellLive' },
   { label: 'Tokens de API', route: 'api', anchor: 'api-tokens', keywords: 'token api bearer webhook', feature: 'apiTokens' },
   { label: 'Ejemplo de Home Assistant (rest_command)', route: 'api', anchor: 'api-examples', keywords: 'yaml rest_command automation curl', feature: 'webhooks' },
   // Sistema

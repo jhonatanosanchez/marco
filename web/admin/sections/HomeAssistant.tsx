@@ -1,6 +1,7 @@
+import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 import type { TestHomeAssistantResponse } from '../../shared/types';
-import { api, ApiError } from '../api';
+import { api, ApiError, doorbellWithImage } from '../api';
 import { fetchErrorText } from '../apiErrors';
 import { toast } from '../components/feedback';
 import { HaEntityPicker, invalidateHaEntities } from '../components/HaEntityPicker';
@@ -16,7 +17,7 @@ export function HomeAssistantSection(props: SectionProps) {
   return (
     <>
       <HomeAssistantMain {...props} />
-      {has('doorbell') && <DoorbellCard {...props} />}
+      {has('doorbell') && has('doorbellLive') && <DoorbellCard {...props} />}
     </>
   );
 }
@@ -155,24 +156,34 @@ function HomeAssistantMain({ cfg, set, errors }: SectionProps) {
   );
 }
 
-/** Doorbell camera: which camera, how long, which screens, sound, and a test button that rings with these values. */
-function DoorbellCard({ cfg, set, errors, full }: SectionProps) {
+/**
+ * Doorbell camera: which camera, how long, which screens, sound, and a test button that rings with these values.
+ * `snapshot`: a server without a live camera (features.doorbellLive off, Marco Cloud) shows the picture Home Assistant
+ * sends with the ring. There is no camera to pick; the test can send a sample picture, and `example` (the Home
+ * Assistant setup) goes at the end. That server has no Home Assistant page: the API page shows this card.
+ */
+export function DoorbellCard({ cfg, set, errors, full, snapshot = false, example }: SectionProps & { snapshot?: boolean; example?: ComponentChildren }) {
   const ha = cfg.homeassistant;
   const db = ha.doorbell ?? { camera: '', seconds: 60, screenIds: [], sound: true };
-  const [busy, setBusy] = useState<'' | 'ring' | 'dismiss'>('');
+  const [busy, setBusy] = useState<'' | 'ring' | 'sample' | 'dismiss'>('');
   const upd = (fn: (d: typeof db) => void) => set((d) => {
     d.homeassistant.doorbell ??= { camera: '', seconds: 60, screenIds: [], sound: true };
     fn(d.homeassistant.doorbell);
   });
-  const run = async (action: 'ring' | 'dismiss') => {
+  const run = async (action: 'ring' | 'sample' | 'dismiss') => {
     setBusy(action);
     try {
       const secs = Math.min(300, Math.max(10, Math.round(Number(db.seconds) || 60)));
-      const r = await api.doorbell(
-        action === 'ring'
-          ? { action, seconds: secs, sound: db.sound, screens: db.screenIds, ...(db.camera ? { camera: db.camera } : {}) }
-          : { action },
-      );
+      const ring = { action: 'ring' as const, seconds: secs, sound: db.sound, screens: db.screenIds };
+      let r;
+      if (action === 'dismiss') r = await api.doorbell({ action });
+      else if (action === 'sample') {
+        // the drawn picture of the display demo, sent the way Home Assistant sends a snapshot
+        const { mockDoorbellFrame } = await import('../../display/mockDoorbell');
+        const image = await mockDoorbellFrame(1);
+        if (!image) throw new ApiError(0, t('No se pudo enviar'));
+        r = await doorbellWithImage(ring, image);
+      } else r = await api.doorbell(!snapshot && db.camera ? { ...ring, camera: db.camera } : ring);
       if (action === 'dismiss') toast(t('Timbre quitado de las pantallas'));
       else toast(r.delivered ? withPollNote(t('Timbre enviado a {n} pantallas', { n: r.delivered })) : t('Timbre enviado, pero no hay ninguna pantalla conectada'), r.delivered ? 'ok' : 'info');
     } catch (e) {
@@ -181,34 +192,51 @@ function DoorbellCard({ cfg, set, errors, full }: SectionProps) {
       setBusy('');
     }
   };
+  const timeField = (
+    <Field label={t('Tiempo en pantalla')} error={errors['homeassistant.doorbell.seconds']} hint={t('Entre 10 y 300 segundos. Si vuelven a llamar, se alarga.')}>
+      <NumberInput value={db.seconds} min={10} max={300} suffix="s" error={!!errors['homeassistant.doorbell.seconds']} onValue={(v) => upd((d) => void (d.seconds = v))} />
+    </Field>
+  );
   return (
-    <Card id="ha-doorbell" title={t('Timbre y cámara')} icon="bell">
+    <Card id={snapshot ? 'api-doorbell' : 'ha-doorbell'} title={snapshot ? t('Timbre') : t('Timbre y cámara')} icon="bell">
       <p class="muted small">
-        {t('Cuando llaman a la puerta, Home Assistant avisa a Marco y las pantallas muestran la cámara a pantalla completa durante unos segundos, con sonido de timbre. También despierta las pantallas en modo noche mientras dura.')}
+        {snapshot
+          ? t('Cuando llaman a la puerta, Home Assistant manda a Marco una foto de la cámara y las pantallas la muestran a pantalla completa durante unos segundos, con sonido de timbre. También despierta las pantallas en modo noche mientras dura.')
+          : t('Cuando llaman a la puerta, Home Assistant avisa a Marco y las pantallas muestran la cámara a pantalla completa durante unos segundos, con sonido de timbre. También despierta las pantallas en modo noche mientras dura.')}
       </p>
-      <div class="grid grid--2">
-        <Field label={t('Cámara (camera.*)')} error={errors['homeassistant.doorbell.camera']} hint={!ha.enabled ? undefined : t('Sin cámara, las pantallas muestran solo el aviso.')}>
-          <HaEntityPicker domain="camera" enabled={ha.enabled} value={db.camera} error={!!errors['homeassistant.doorbell.camera']} onChange={(v) => upd((d) => void (d.camera = v))} />
-        </Field>
-        <Field label={t('Tiempo en pantalla')} error={errors['homeassistant.doorbell.seconds']} hint={t('Entre 10 y 300 segundos. Si vuelven a llamar, se alarga.')}>
-          <NumberInput value={db.seconds} min={10} max={300} suffix="s" error={!!errors['homeassistant.doorbell.seconds']} onValue={(v) => upd((d) => void (d.seconds = v))} />
-        </Field>
-      </div>
+      {snapshot ? (
+        timeField
+      ) : (
+        <div class="grid grid--2">
+          <Field label={t('Cámara (camera.*)')} error={errors['homeassistant.doorbell.camera']} hint={!ha.enabled ? undefined : t('Sin cámara, las pantallas muestran solo el aviso.')}>
+            <HaEntityPicker domain="camera" enabled={ha.enabled} value={db.camera} error={!!errors['homeassistant.doorbell.camera']} onChange={(v) => upd((d) => void (d.camera = v))} />
+          </Field>
+          {timeField}
+        </div>
+      )}
       <Field label={t('Pantallas')}>
         <ScreenTargets screens={full.screens} value={db.screenIds} onChange={(v) => upd((d) => void (d.screenIds = v))} />
       </Field>
       <ToggleRow label={t('Sonido de timbre')} checked={db.sound} onChange={(v) => upd((d) => void (d.sound = v))} />
       <div class="row-actions">
         <Button icon="play" loading={busy === 'ring'} disabled={!!busy} onClick={() => run('ring')}>
-          {t('Probar')}
+          {snapshot ? t('Probar sin foto') : t('Probar')}
         </Button>
+        {snapshot && (
+          <Button icon="image" loading={busy === 'sample'} disabled={!!busy} onClick={() => run('sample')}>
+            {t('Probar con una foto de ejemplo')}
+          </Button>
+        )}
         <Button variant="ghost" icon="x" loading={busy === 'dismiss'} disabled={!!busy} onClick={() => run('dismiss')}>
           {t('Quitar de las pantallas')}
         </Button>
       </div>
       <Callout>
-        {t('Desde Home Assistant: POST /api/hooks/doorbell con un token de API («API y webhooks»). El ejemplo completo está en docs/API.md. La imagen pasa por este servidor: el token de Home Assistant nunca llega a las pantallas y no se guarda ninguna imagen.')}
+        {snapshot
+          ? t('Desde Home Assistant: POST /api/hooks/doorbell con un token de API y la foto de la cámara (JPEG, PNG o WebP, 2 MB como mucho). Marco guarda solo la última foto mientras suena el timbre, 10 minutos como mucho, y luego la borra. Solo la ven las pantallas que están sonando.')
+          : t('Desde Home Assistant: POST /api/hooks/doorbell con un token de API («API y webhooks»). El ejemplo completo está en docs/API.md. La imagen pasa por este servidor: el token de Home Assistant nunca llega a las pantallas y no se guarda ninguna imagen.')}
       </Callout>
+      {example}
     </Card>
   );
 }

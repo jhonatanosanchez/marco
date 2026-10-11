@@ -10,6 +10,7 @@ import { LimitNote } from '../components/LimitNote';
 import { relTime, t } from '../i18n';
 import { takeIntent } from '../intent';
 import type { SectionProps } from './common';
+import { DoorbellCard } from './HomeAssistant';
 
 /** True for hosts that are only reachable on the local network (private IPs, localhost, .local/.lan). */
 export function isLanHost(host: string): boolean {
@@ -120,7 +121,8 @@ function NewTokenDialog({ onClose, onCreated }: { onClose: () => void; onCreated
   );
 }
 
-export function ApiSection({ full }: SectionProps) {
+export function ApiSection(props: SectionProps) {
+  const { full } = props;
   const [tokens, setTokens] = useState<ApiTokenInfo[] | null>(null);
   const [err, setErr] = useState('');
   const [creating, setCreating] = useState(() => takeIntent('api', 'new'));
@@ -170,6 +172,8 @@ export function ApiSection({ full }: SectionProps) {
   const slugs = full.screens.map((s) => s.slug);
   const washer = t('La lavadora ha terminado');
   const priv = has('privacy');
+  // servers without a live camera (Marco Cloud): the ring carries a snapshot, and the doorbell card lives here
+  const snapshotBell = hooksOn && has('doorbell') && !has('doorbellLive');
   const yaml = `# ${t('configuration.yaml de Home Assistant')}
 rest_command:
   marco_alert:
@@ -232,7 +236,42 @@ curl -X POST ${base}/api/hooks/night \\
 # ${t('Modo privado 3 horas')}: on | off | toggle
 curl -X POST ${base}/api/hooks/privacy \\
   -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" \\
-  -d '{"mode":"on","hours":3}'` : ''}`;
+  -d '{"mode":"on","hours":3}'` : ''}${snapshotBell ? `
+
+# ${t('Timbre con la foto de la cámara')} (JPEG, PNG, WebP; 2 MB)
+curl -X POST ${base}/api/hooks/doorbell \\
+  -H "Authorization: Bearer ${token}" \\
+  -F image=@doorbell.jpg -F action=ring -F seconds=60
+
+# ${t('Quitar el timbre de las pantallas')}
+curl -X POST ${base}/api/hooks/doorbell \\
+  -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" \\
+  -d '{"action":"dismiss"}'` : ''}`;
+  // Home Assistant takes a snapshot of the camera and sends it with the ring; the file is removed right after, since
+  // Home Assistant serves www/ at /local/ without a sign in.
+  const bellYaml = `# ${t('configuration.yaml de Home Assistant')}
+shell_command:
+  marco_doorbell: >-
+    curl -s -X POST -H "Authorization: Bearer ${token}"
+    -F image=@/config/www/doorbell.jpg -F action=ring -F seconds=60
+    ${base}/api/hooks/doorbell
+  marco_doorbell_clean: rm -f /config/www/doorbell.jpg
+
+automation:
+  - alias: "${t('Timbre en las pantallas de Marco')}"
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.front_door_doorbell
+        to: "on"
+    actions:
+      - action: camera.snapshot
+        target:
+          entity_id: camera.front_door
+        data:
+          filename: /config/www/doorbell.jpg
+      - action: shell_command.marco_doorbell
+      - action: shell_command.marco_doorbell_clean
+    mode: single`;
 
   return (
     <>
@@ -337,7 +376,14 @@ curl -X POST ${base}/api/hooks/privacy \\
               )}
               {has('doorbell') && (
                 <li>
-                  <code>POST /api/hooks/doorbell</code>: <code>{'{ action: ring|dismiss, seconds?: 10..300, screens?: [slug], camera?: camera.x }'}</code>
+                  <code>POST /api/hooks/doorbell</code>:{' '}
+                  {snapshotBell ? (
+                    <>
+                      <code>{'{ action: ring|dismiss, seconds?: 10..300, screens?: [slug], sound? }'}</code> · {t('la foto como campo image (multipart) o como cuerpo image/jpeg con los campos en la URL')}
+                    </>
+                  ) : (
+                    <code>{'{ action: ring|dismiss, seconds?: 10..300, screens?: [slug], camera?: camera.x }'}</code>
+                  )}
                 </li>
               )}
             </ul>
@@ -348,6 +394,8 @@ curl -X POST ${base}/api/hooks/privacy \\
           </div>
         </Card>
       )}
+
+      {snapshotBell && <DoorbellCard {...props} snapshot example={<CodeBlock lang="yaml" code={bellYaml} />} />}
 
       {creating && tokensOn && (
         <NewTokenDialog
