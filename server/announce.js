@@ -52,8 +52,8 @@ function scheduleExpiry() {
   timer.unref?.();
 }
 
-/** Clients of screens with alerts disabled never get `announce`. */
-export const alertsFilter = (client) => alertsFilterFor(getConfig())(client);
+/** Clients of screens with alerts disabled never get `announce` (`screenIds` = the announcement's targets). */
+export const alertsFilter = (client, screenIds = []) => alertsFilterFor(getConfig(), screenIds)(client);
 
 /**
  * Create + broadcast an announcement. `value` = sanitised request. Returns { announcement, delivered }.
@@ -75,7 +75,7 @@ export function createAnnouncement(value, { via, by, now = new Date() }) {
   state.history = state.history.slice(0, HISTORY_MAX);
   save();
   scheduleExpiry();
-  const delivered = publish('announce', a, a.screenIds.length ? { screenIds: a.screenIds } : null, alertsFilter);
+  const delivered = publish('announce', a, a.screenIds.length ? { screenIds: a.screenIds } : null, (c) => alertsFilter(c, a.screenIds));
   return { announcement: a, delivered };
 }
 

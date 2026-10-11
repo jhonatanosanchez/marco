@@ -177,7 +177,8 @@ calendar's.
 | `revoked` | `{ code: "invalid_key" \| "key_required" }` | the link was regenerated or replaced by an import, the device revoked or dropped by an import, the screen deleted, display access switched to private for a keyless display, or (`key_required`) the admin session a stream was opened with ended (logout, logout everywhere, password change); the server then closes the stream. Every stream's credential is re-checked after config saves, imports, session revocation and on each heartbeat |
 
 Displays whose screen has alerts disabled do not receive `announce`. A display on a carousel receives the events of
-every screen in it (and of the carousel id, for display commands), and `announce` when one of them has alerts on.
+every screen in it (and of the carousel id, for display commands), and `announce` when one of the screens it targets
+has alerts on.
 
 ### Poll channel (`/api/display/poll`)
 
@@ -404,6 +405,9 @@ until? }`).
 - `POST /api/admin/displays/command { screens: [<carousel id or slug>] }` reaches the displays of that carousel.
 
 Deleting a carousel drops its private link (its displays get `revoked`) and moves its devices to the default screen.
+A carousel left with no screens keeps its link, but the link then reads a blank screen (`screenId` = the carousel
+id, no calendar, stock photos, no countdowns), never the default screen. Carousel ids always start with `v_` and
+never match a screen id; a saved id that does not follow this gets a new one.
 
 ## Privacy mode
 

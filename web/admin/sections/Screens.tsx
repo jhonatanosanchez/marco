@@ -24,11 +24,21 @@ function uniqueSlug(base: string, taken: Set<string>) {
   return s;
 }
 
-function NewScreenDialog({ screens, onClose, onCreate }: { screens: ScreenProfile[]; onClose: () => void; onCreate: (p: ScreenProfile) => void }) {
+function NewScreenDialog({
+  screens,
+  carouselSlugs,
+  onClose,
+  onCreate,
+}: {
+  screens: ScreenProfile[];
+  carouselSlugs: string[];
+  onClose: () => void;
+  onCreate: (p: ScreenProfile) => void;
+}) {
   const [name, setName] = useState('');
   const [from, setFrom] = useState<string>('');
   const [busy, setBusy] = useState(false);
-  const taken = new Set(screens.map((s) => s.slug));
+  const taken = new Set([...screens.map((s) => s.slug), ...carouselSlugs]);
   const slug = uniqueSlug(name || 'pantalla', taken);
   const SUGGEST = ['Cocina', 'Entrada', 'Oficina', 'Dormitorio', 'Habitación niños'];
   const create = async (e?: Event) => {
@@ -384,6 +394,7 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
       </Card>
       {creating && (
         <NewScreenDialog
+          carouselSlugs={carouselSlugs}
           screens={screens}
           onClose={() => setCreating(false)}
           onCreate={(p) => {

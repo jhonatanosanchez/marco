@@ -11,10 +11,12 @@ import { defaultConfig, defaultScreenProfile } from '../core/defaults.js';
 import { validateConfig, mergeDefaults } from '../core/validate.js';
 import {
   carouselSlot, carouselPhase, carouselBlock, carouselMembers, findTarget, isTargetId, offScreenOf, pruneCarousels, cycleMs,
+  targetInfo,
 } from '../core/carousels.js';
 import { matches } from '../sse.js';
 import { alertsFilter } from '../core/announceCore.js';
-import { mergeImport } from '../core/backupsCore.js';
+import { mergeImport, importPreview } from '../core/backupsCore.js';
+import { screenTemplate } from '../routes/screens.js';
 import { hashPassword, ensurePassword } from '../auth.js';
 import { createApp } from '../app.js';
 import { closeAll, broadcast } from '../sse.js';
@@ -185,6 +187,71 @@ test('import: carousels travel with the screens', () => {
   assert.equal(mergeImport(cur, imp, ['screens']).carousels.items.length, 1);
   assert.equal(mergeImport(cur, imp, ['calendar']).carousels.items.length, 0);
   assert.equal(mergeImport(cur, imp, ['screens'], new Set(['carousels'])).carousels.items.length, 0);
+});
+
+test('ids: a carousel id is always "v_" and never a screen id; a screen never takes "v_"', () => {
+  const r = validateConfig(config([{ ...LOOP, id: 's_main' }, { ...LOOP, id: 'plain', slug: 'loop2' }], (c) => {
+    c.screens[2].id = 'v_photos';
+  }));
+  const [a, b] = r.value.carousels.items;
+  const screenIds = r.value.screens.map((s) => s.id);
+  assert.match(a.id, /^v_/);
+  assert.match(b.id, /^v_/);
+  assert.ok(!screenIds.includes(a.id));
+  assert.ok(screenIds.every((id) => !id.startsWith('v_')), 'a screen with a v_ id gets a new one');
+  assert.equal(targetInfo(r.value, a.id).kind, 'carousel');
+  // ids that already follow the rules are kept
+  assert.equal(validateConfig(config([LOOP])).value.carousels.items[0].id, 'v_loop');
+});
+
+test('slugs: a new screen and an import never take a carousel address', () => {
+  const cfg = validateConfig(config([{ ...LOOP, name: 'Cocina', slug: 'cocina' }])).value;
+  const p = screenTemplate(cfg, 'Cocina');
+  assert.equal(p.slug, 'cocina-2');
+  cfg.screens.push(p);
+  assert.equal(validateConfig(cfg).ok, true);
+  // an older file without carousels: the current carousel keeps working under a free address
+  const imp = validateConfig(config([], (c) => { c.screens[1].slug = 'cocina'; })).value;
+  const out = mergeImport(cfg, imp, ['screens'], new Set(['carousels']));
+  assert.equal(out.carousels.items[0].slug, 'cocina-2');
+  const v = validateConfig(out);
+  assert.equal(v.ok, true, JSON.stringify(v.errors));
+});
+
+test('import preview: a carousel whose private link changes is listed', () => {
+  const cur = validateConfig(config([LOOP])).value;
+  const key = (k) => ({ key: k, createdAt: '2026-01-01T00:00:00.000Z' });
+  const bundle = {
+    format: 'marco-backup', config: cur,
+    secrets: { displayKeys: { v_loop: key('0b6c1f9e-3d2a-4c8b-9e7f-1a2b3c4d5e6f') } },
+  };
+  const pv = importPreview(bundle, cur, 'en', { displayKeys: { v_loop: key('1b6c1f9e-3d2a-4c8b-9e7f-1a2b3c4d5e6f') } });
+  assert.deepEqual(pv.secretsImpact.linksChanged, ['Loop']);
+});
+
+test('alerts filter: only the carousel screens the announcement targets count (same as the replay)', () => {
+  const cfg = validateConfig(config([], (c) => { c.screens[0].alerts.enabled = false; })).value;
+  const client = { clientId: 'tv-1', screenId: 'v_loop', memberIds: ['s_main', 's_kitchen'] };
+  assert.equal(alertsFilter(cfg, ['s_main'])(client), false, 'aimed at a screen with alerts off');
+  assert.equal(alertsFilter(cfg, ['s_kitchen'])(client), true);
+  assert.equal(alertsFilter(cfg, [])(client), true, 'every screen');
+  assert.equal(alertsFilter(cfg, ['v_loop'])(client), true, 'the carousel itself');
+});
+
+test('empty carousel: its link reads a blank screen, never the default one', () => {
+  const cfg = validateConfig(config([{ ...LOOP, steps: [{ screenId: 's_photos', seconds: 30 }] }], (c) => {
+    c.screens = c.screens.filter((s) => s.id !== 's_photos');
+  })).value;
+  const c = cfg.carousels.items[0];
+  assert.deepEqual(c.steps, []);
+  assert.equal(offScreenOf(cfg, c), '');
+  assert.deepEqual(carouselMembers(cfg, c), []);
+  const r = requestScreen(cfg, { displayAccess: { screenId: 'v_loop' }, query: { screen: 'living-room' } });
+  assert.equal(r.empty, true);
+  assert.equal(r.screen.id, 'v_loop');
+  assert.ok(!cfg.screens.some((s) => s.id === r.screen.id));
+  assert.equal(r.screen.calendar.enabled, false);
+  assert.equal(r.screen.background.source, 'stock');
 });
 
 // ---------------------------------------------------------------- over HTTP

@@ -18,9 +18,9 @@ import { sessionValid, isLanClient, authEvents, SESSION_MAX_AGE } from './auth.j
 import { listClients, dropClient } from './sse.js';
 import { listPollers, dropPollers } from './pollHub.js';
 import { logActivity } from './activity.js';
-import { resolveScreen, defaultScreen } from './core/screens.js';
+import { resolveScreen } from './core/screens.js';
 import {
-  carouselList, carouselMembers, carouselScreenNow, findCarousel, findTarget, isTargetId, targetInfo,
+  carouselList, carouselMembers, emptyCarouselScreen, carouselScreenNow, findCarousel, findTarget, isTargetId, targetInfo,
 } from './core/carousels.js';
 
 export const KEY_HEADER = 'x-marco-key';
@@ -159,7 +159,8 @@ const ERRORS = {
  *     a screen outside the carousel
  *   - not bound, ?screen=<carousel>: the screen it shows now; ?screen=<screen>&via=<carousel>: that screen, with
  *     the carousel when the screen belongs to it
- * @returns {{ screen: object, fallback: boolean, carousel: object | null }}
+ *   - a carousel with no screens left: a blank screen (core/carousels.js emptyCarouselScreen), `empty: true`
+ * @returns {{ screen: object, fallback: boolean, carousel: object | null, empty?: boolean }}
  */
 export function requestScreen(cfg, req) {
   const q = req.query || {};
@@ -179,12 +180,16 @@ export function requestScreen(cfg, req) {
   return { ...resolveScreen(cfg, q.screen), carousel: null };
 }
 
-/** A request for carousel `c`: the member `key` names, else the screen the carousel shows now. */
+/**
+ * A request for carousel `c`: the member `key` names, else the screen the carousel shows now. A carousel with no
+ * screens left answers with a blank screen under its own id (`empty: true`), never with the default screen.
+ */
 function carouselRequest(cfg, c, key) {
   const members = carouselMembers(cfg, c);
+  if (!members.length) return { screen: emptyCarouselScreen(cfg, c), fallback: false, carousel: c, empty: true };
   const hit = findTarget(cfg, key);
   const id = hit?.kind === 'screen' && members.includes(hit.id) ? hit.id : carouselScreenNow(cfg, c);
-  return { screen: cfg.screens.find((s) => s.id === id) || defaultScreen(cfg), fallback: false, carousel: c };
+  return { screen: cfg.screens.find((s) => s.id === id) || cfg.screens.find((s) => s.id === members[0]), fallback: false, carousel: c };
 }
 
 /** Express middleware for the display JSON API: sets req.displayAccess or answers 401/403 (no data). */

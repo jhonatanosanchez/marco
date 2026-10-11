@@ -7,6 +7,7 @@
 // from the Unix epoch and the server time (carouselSlot). An optional schedule (the rule shape of privacy schedules)
 // says when the carousel rotates; outside it the display shows one fixed screen (offScreenId).
 import { enabledWindows, windowState, nextWindowBoundary } from './schedules.js';
+import { defaultScreenProfile } from './defaults.js';
 
 export const CAROUSEL_PREFIX = 'v_';
 export const MAX_CAROUSELS = 6;
@@ -35,11 +36,33 @@ export function carouselSteps(cfg, c) {
   return (Array.isArray(c?.steps) ? c.steps : []).filter((st) => st && ids.has(st.screenId));
 }
 
-/** Screen shown outside the schedule (and held at night): offScreenId when it exists, else the first step's screen. */
+/**
+ * Screen shown outside the schedule (and held at night): offScreenId when it exists, else the first step's screen.
+ * '' when the carousel has neither: it never borrows the default screen (a link bound to the carousel would then
+ * read a screen that was never in it).
+ */
 export function offScreenOf(cfg, c) {
   const screens = cfg?.screens || [];
   if (c?.offScreenId && screens.some((s) => s.id === c.offScreenId)) return c.offScreenId;
-  return carouselSteps(cfg, c)[0]?.screenId || cfg?.defaultScreen || screens[0]?.id || '';
+  return carouselSteps(cfg, c)[0]?.screenId || '';
+}
+
+/**
+ * What a carousel with no screens left serves: a blank profile under the carousel's own id (no calendar, stock
+ * photos, no to-do list or message), with the look of the default screen. Nothing on it comes from any screen's
+ * data, so a link or device bound to the carousel reads nothing it was not given.
+ */
+export function emptyCarouselScreen(cfg, c) {
+  const p = defaultScreenProfile({ id: c.id, slug: c.slug, name: c.name });
+  const look = (cfg?.screens || []).find((s) => s.id === cfg?.defaultScreen) || cfg?.screens?.[0];
+  if (look?.screen) p.screen = { ...structuredClone(look.screen), customCss: '' };
+  p.calendar.enabled = false;
+  p.calendar.sourceIds = [];
+  p.background.source = 'stock';
+  p.todo.enabled = false;
+  p.message.enabled = false;
+  p.countdowns.enabled = false;
+  return p;
 }
 
 /** Unique screen ids a carousel can show (its steps and its off-schedule screen), in step order. */

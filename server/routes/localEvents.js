@@ -127,7 +127,9 @@ export function eventsPublicRouter() {
     try {
       res.set('cache-control', 'private, no-store');
       const cfg = getConfig();
-      const { screen } = requestScreen(cfg, req);
+      const { screen, empty } = requestScreen(cfg, req);
+      // a carousel with no screens left shows nothing (manual countdowns are shared by every screen, not by it)
+      if (empty) return res.json({ generatedAt: new Date().toISOString(), today: localDate(new Date(), cfg.datetime.timezone), hash: 'empty', items: [] });
       // While the screen is private, countdowns from busy / hidden calendars are left out (core/privacy.js).
       res.json(await getCountdowns({ screen, isPrivate: screenPrivacy(cfg, screen).active }));
     } catch (err) {

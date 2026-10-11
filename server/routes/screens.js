@@ -12,6 +12,7 @@ import { requireAuth } from '../auth.js';
 import { getConfig } from '../store.js';
 import { defaultScreenProfile } from '../core/defaults.js';
 import { slugify } from '../core/validate.js';
+import { carouselList } from '../core/carousels.js';
 import { listDisplays, runCommand, forgetDisplay, recordHeartbeat, getServerVersion } from '../displays.js';
 import { logActivity } from '../activity.js';
 import { markFast } from '../pollHub.js';
@@ -19,7 +20,8 @@ import { markFast } from '../pollHub.js';
 /** A fresh screen profile named `name` whose slug is not used by `cfg`. */
 export function screenTemplate(cfg, name) {
   const n = (typeof name === 'string' ? name.replace(/\s+/g, ' ').trim().slice(0, 60) : '') || 'Screen';
-  const used = new Set(cfg.screens.map((s) => s.slug));
+  // a carousel's address is taken too (validateConfig refuses a carousel slug that a screen uses)
+  const used = new Set([...cfg.screens.map((s) => s.slug), ...carouselList(cfg).map((c) => c.slug)]);
   const base = slugify(n) || 'screen';
   let slug = base;
   for (let i = 2; used.has(slug); i++) slug = `${base.slice(0, 29)}-${i}`;

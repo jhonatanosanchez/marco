@@ -46,6 +46,7 @@ export declare function findCarousel(cfg: CfgLike, key: string): Carousel | null
 export declare function carouselSteps(cfg: CfgLike, c: Carousel): CarouselStep[];
 export declare function offScreenOf(cfg: CfgLike, c: Carousel): string;
 export declare function carouselMembers(cfg: CfgLike, c: Carousel): string[];
+export declare function emptyCarouselScreen(cfg: CfgLike, c: Carousel): unknown;
 export declare function carouselBlock(cfg: CfgLike, c: Carousel): CarouselBlock;
 export declare function cycleMs(steps: CarouselStep[]): number;
 export declare function carouselSlot(steps: CarouselStep[], nowMs: number): CarouselSlot | null;

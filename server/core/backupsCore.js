@@ -5,6 +5,7 @@ import { validateConfig, mergeDefaults, isV1 } from './validate.js';
 import { RESERVED_SOURCE_IDS, defaultConfig, defaultScreenProfile } from './defaults.js';
 import { stableStringify } from './lib/text.js';
 import { countNoun, countChanged, summaryWord } from './lib/i18n.js';
+import { carouselList, targetInfo } from './carousels.js';
 
 /** Rotated backups kept per installation (or per household in the cloud). */
 export const KEEP_BACKUPS = 20;
@@ -216,11 +217,15 @@ export function orphanSchedules(current, imported) {
 function secretsImpact(raw, cur, current, imported) {
   const s = sanitizeImportedSecrets(raw);
   if (!s.displayKeys && !s.devices) return null;
-  const name = (id) => (imported.screens.find((x) => x.id === id) || current.screens.find((x) => x.id === id))?.name || id;
+  // screens and carousels both have a private link (displayKeys is keyed by either id)
+  const name = (id) => (targetInfo(imported, id) || targetInfo(current, id))?.name || id;
+  // current carousels count too: a file without carousels keeps them, and their keys are still merged
+  const known = (id) => imported.screens.some((x) => x.id === id) || carouselList(imported).some((x) => x.id === id)
+    || carouselList(current).some((x) => x.id === id);
   const curKeys = isObj(cur?.displayKeys) ? cur.displayKeys : {};
   const curDevices = Array.isArray(cur?.devices) ? cur.devices : [];
   const linksChanged = s.displayKeys
-    ? Object.keys(s.displayKeys).filter((id) => curKeys[id]?.key && curKeys[id].key !== s.displayKeys[id].key && imported.screens.some((x) => x.id === id)).map(name)
+    ? Object.keys(s.displayKeys).filter((id) => curKeys[id]?.key && curKeys[id].key !== s.displayKeys[id].key && known(id)).map(name)
     : [];
   const nextIds = new Set((s.devices || curDevices).map((d) => d.id));
   const prevIds = new Set(curDevices.map((d) => d.id));
@@ -289,6 +294,15 @@ export function mergeImport(current, imported, sections, absent = new Set()) {
   const out = structuredClone(current);
   for (const k of take) out[k] = structuredClone(imported[k]);
   if (!out.screens.some((s) => s.id === out.defaultScreen)) out.defaultScreen = out.screens[0].id;
+  // screens and carousels can come from different sides (an older file has no carousels, or only one of them was
+  // picked): a carousel whose address is now a screen's gets a free one, so the import is not refused on save
+  const used = new Set(out.screens.map((s) => s.slug));
+  for (const c of carouselList(out)) {
+    let slug = c.slug;
+    for (let i = 2; used.has(slug); i++) slug = `${c.slug.slice(0, 29)}-${i}`;
+    c.slug = slug;
+    used.add(slug);
+  }
   return out;
 }
 

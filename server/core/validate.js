@@ -8,7 +8,7 @@ import { WEATHER_PROVIDER_IDS, OPEN_METEO_MODEL_IDS, KEY_PROVIDERS } from './wea
 import { PRIVACY_MODES, MAX_PRIVACY_RULES, defaultSourcePrivacy } from './privacy.js';
 import { CAMERA_RE, DOORBELL_MIN_SEC, DOORBELL_MAX_SEC } from './doorbellCore.js';
 import {
-  MAX_CAROUSELS, MAX_CAROUSEL_STEPS, MIN_STEP_SEC, MAX_STEP_SEC, DEFAULT_STEP_SEC, CAROUSEL_TRANSITIONS, pruneCarousels,
+  CAROUSEL_PREFIX, MAX_CAROUSELS, MAX_CAROUSEL_STEPS, MIN_STEP_SEC, MAX_STEP_SEC, DEFAULT_STEP_SEC, CAROUSEL_TRANSITIONS, pruneCarousels,
 } from './carousels.js';
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -342,7 +342,8 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
   };
 
   return {
-    id: id(ctx, `${p}.id`, x.id, 's_', seenIds), slug, name,
+    // "v_" belongs to carousels (isCarouselId); a screen id with it gets a new one
+    id: id(ctx, `${p}.id`, typeof x.id === 'string' && x.id.startsWith(CAROUSEL_PREFIX) ? undefined : x.id, 's_', seenIds), slug, name,
     screen, layout, background, calendar, datetime, weather, news, todo, message, countdowns, alerts, privacy,
   };
 }
@@ -491,7 +492,8 @@ function sanitizeCarousel(ctx, p, x, seen, screenSlugs, seenSlugs) {
   const off = x.offScreenId === undefined || x.offScreenId === null || x.offScreenId === '' ? null : x.offScreenId;
   if (off !== null && (typeof off !== 'string' || !ID.test(off))) ctx.err(`${p}.offScreenId`, 'invalid screen id');
   return {
-    id: id(ctx, `${p}.id`, x.id, 'v_', seen),
+    // only "v_" ids (isCarouselId); `seen` already holds the screen ids, so a carousel never shares one with a screen
+    id: id(ctx, `${p}.id`, typeof x.id === 'string' && x.id.startsWith(CAROUSEL_PREFIX) ? x.id : undefined, CAROUSEL_PREFIX, seen),
     enabled: bool(ctx, `${p}.enabled`, x.enabled, true),
     name, slug,
     transition: oneOf(ctx, `${p}.transition`, x.transition, 'fade', CAROUSEL_TRANSITIONS),
@@ -717,7 +719,7 @@ export function validateConfig(input, opts = {}) {
 
   // ---- carousels (global; steps that point at deleted screens are dropped, an empty carousel is turned off)
   const ca2 = obj(ctx, 'carousels', c.carousels);
-  const carSeen = new Set();
+  const carSeen = new Set(screenIds);
   const carSlugs = new Set();
   const screenSlugs = new Set(screens.map((s) => s.slug));
   const carousels = {
