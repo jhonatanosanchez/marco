@@ -16,6 +16,7 @@ export const ACTIVITY_GROUPS: { value: string; label: string; icon: IconName }[]
   { value: 'announce', label: 'Avisos', icon: 'megaphone' },
   { value: 'token', label: 'API', icon: 'key' },
   { value: 'display', label: 'Pantallas', icon: 'monitor' },
+  { value: 'privacy', label: 'Modo privado', icon: 'lock' },
   { value: 'google', label: 'Google', icon: 'google' },
 ];
 
@@ -26,7 +27,7 @@ export function sectionLabel(key: string): string {
     calendar: 'Calendarios', datetime: 'Fecha y hora', weather: 'Tiempo', news: 'Noticias', todo: 'Tareas', localEvents: 'Eventos locales',
     birthdays: 'Cumpleaños', eventRules: 'Filtros', countdowns: 'Cuentas atrás', schedules: 'Mensajes programados', homeassistant: 'Home Assistant',
     auth: 'Seguridad', screens: 'Pantallas', defaultScreen: 'Pantalla predeterminada', screen: 'Ajustes', layout: 'Diseño', background: 'Fondo',
-    message: 'Mensaje', alerts: 'Avisos', security: 'Acceso a las pantallas',
+    message: 'Mensaje', alerts: 'Avisos', security: 'Acceso a las pantallas', privacy: 'Modo privado',
   };
   if (m) return `${m[1]}${m[2] ? ` › ${t(names[m[2]] ?? m[2])}` : ''}`;
   return t(names[key] ?? key);
@@ -97,6 +98,13 @@ export function describeActivity(e: ActivityEntry): { icon: IconName; text: stri
       return { icon: 'alert', text: t('Webhook rechazado (token no válido)') };
     case 'display.connected':
       return { icon: 'wifi', text: t('Pantalla conectada: {screen}', { screen: str(d.screenName ?? d.screen ?? d.slug ?? d.clientId ?? '') }) };
+    case 'privacy.changed': {
+      const where = Array.isArray(d.screens) && d.screens.length ? d.screens.map(str).join(', ') : t('todas las pantallas');
+      const text = d.mode === 'off' ? t('Modo privado desactivado: {screens}', { screens: where })
+        : d.mode === 'on' ? t('Modo privado activado: {screens}', { screens: where })
+          : t('Modo privado cambiado: {screens}', { screens: where });
+      return { icon: 'lock', text };
+    }
     case 'display.command': {
       const a = str(d.action);
       const label = a === 'reload' ? t('recargar') : a === 'identify' ? t('identificar') : a === 'night' ? `${t('modo noche')} ${str(d.mode)}` : a;

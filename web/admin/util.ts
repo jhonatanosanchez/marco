@@ -198,6 +198,9 @@ export function validateConfig(c: AppConfig, caps: Caps = currentCaps()): Errors
   });
   if (hasFeature(caps, 'passwordLogin') && !c.auth.passwordLoginEnabled && c.auth.allowedGoogleEmails.length === 0)
     e['auth.passwordLoginEnabled'] = 'Añade un email de Google permitido antes de desactivar la contraseña';
+  (c.privacy?.schedule ?? []).forEach((r) => {
+    if (r.from === r.to) e[`privacy.${r.id}.to`] = 'Debe ser distinta de la hora de inicio';
+  });
   const cssMax = caps.limits.customCssBytes;
   if (typeof cssMax === 'number' && hasFeature(caps, 'customCss') && cssBytes(s.customCss) > cssMax) e['screen.customCss'] = LIMIT_EXCEEDED;
   return e;
@@ -214,7 +217,7 @@ const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 export const daysInMonth = (m: number) => DAYS_IN_MONTH[m - 1] ?? 31;
 
 /** Keys produced by validateConfig() that belong to the selected screen (the rest are global). */
-const PER_SCREEN_KEY = /^(screen\.|background\.|layout\.|message\.|alerts\.|calendar\.(weeks|maxEventsPerDay)$|news\.rotateSec$|countdowns\.max$)/;
+const PER_SCREEN_KEY = /^(screen\.|background\.|layout\.|message\.|alerts\.|privacy\.|calendar\.(weeks|maxEventsPerDay)$|news\.rotateSec$|countdowns\.max$)/;
 export const isPerScreenKey = (k: string) => PER_SCREEN_KEY.test(k);
 
 /** Validation of the global v2 lists (local events, birthdays, rules, countdowns, schedules, screens). */
@@ -326,7 +329,7 @@ export function sectionForServerPath(path: string): { screenIndex: number | null
   const m = /^screens\[(\d+)\]\.?([a-zA-Z]+)?/.exec(path);
   if (m) {
     const sec = m[2] ?? '';
-    const map: Record<string, string> = { screen: 'screen', layout: 'layout', background: 'background', message: 'message', calendar: 'calendars', datetime: 'datetime', weather: 'weather', news: 'news', todo: 'todo', countdowns: 'countdowns', alerts: 'alerts' };
+    const map: Record<string, string> = { screen: 'screen', layout: 'layout', background: 'background', message: 'message', calendar: 'calendars', datetime: 'datetime', weather: 'weather', news: 'news', todo: 'todo', countdowns: 'countdowns', alerts: 'alerts', privacy: 'screen' };
     return { screenIndex: Number(m[1]), section: map[sec] ?? 'screens' };
   }
   const top = path.split(/[.[]/)[0];
@@ -344,7 +347,7 @@ const LIMIT_SECTION: Record<string, string> = { screens: 'screens', sources: 'ca
 
 export function sectionForError(key: string): string {
   if (key.startsWith('limit.')) return LIMIT_SECTION[key.slice(6)] ?? 'home';
-  if (key.startsWith('screen.')) return 'screen';
+  if (key.startsWith('screen.') || key.startsWith('privacy.')) return 'screen';
   if (key.startsWith('layout.')) return 'layout';
   if (key.startsWith('message.')) return 'message';
   if (key.startsWith('alerts.') || key.startsWith('sched.')) return 'alerts';

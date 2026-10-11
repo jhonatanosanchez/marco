@@ -10,6 +10,7 @@ import { Icon, type IconName } from './components/icons';
 import { ScreenSwitcher } from './components/ScreenSwitcher';
 import { openPairDialog, PairDialogHost } from './components/DisplayAccess';
 import { UpdateBanner, UpdateDialogHost, WhatsNewHost } from './components/Updates';
+import { PrivacyBanner } from './components/Privacy';
 import { FeedbackDialog } from './components/FeedbackDialog';
 import { feedbackMeta } from './feedbackForm';
 import { Button, setScopeScreenName } from './components/ui';
@@ -1022,6 +1023,7 @@ export function App() {
         </header>
 
         <UpdateBanner />
+        <PrivacyBanner tz={saved.datetime.timezone} go={go} />
         <div class="content-row">
           <main class={`content content--${route}`} ref={mainRef} key={`${route}`}>
             <Section {...sectionProps} />

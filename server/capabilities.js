@@ -11,7 +11,7 @@ export const FEATURE_KEYS = Object.freeze([
   'homeassistant', 'news', 'customCss', 'gallery', 'schedules', 'announcements', 'displayCommands',
   'openDisplayAccess', 'insecureTls', 'googleCalendar', 'googleLogin', 'passwordLogin', 'apiTokens',
   'webhooks', 'backups', 'importExport', 'includeSecrets', 'activity', 'setupWizard', 'status', 'accountMenu',
-  'microsoftCalendar', 'updates', 'feedback',
+  'microsoftCalendar', 'updates', 'feedback', 'privacy',
 ]);
 
 /** Feature flags of a self-hosted server: all on (`updates` too: the update banner and settings), Google and

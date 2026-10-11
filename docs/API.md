@@ -73,8 +73,8 @@ saved without `security` (old admin builds, backups or exports from before 0.3) 
 | Method & path | Response |
 |---|---|
 | `GET /api/health` | `HealthResponse`: `{ ok, uptime, version, live, edition, tenancy, runtime, pairCodeLength, features, limits?, displayOrigin?, adminOrigin?, lanAddresses? }` (see below). `live` is `'sse'` unless `MARCO_LIVE=poll` is set. A server that answers `'poll'` gets no `/api/stream` connection: the display polls `GET /api/display/poll` instead (see below). A server that answers `404` there gets a config check every 90 s, which refetches events and countdowns when `revision` changes. A missing field means `'sse'` |
-| `GET /api/display/config?screen=` | `DisplayConfig`: flat view of one screen; `calendar.sources` only as `{ id, name, color, emoji, kind }`; enabled `schedules` for this screen |
-| `GET /api/events?screen=&from=YYYY-MM-DD&to=YYYY-MM-DD` | `{ generatedAt, hash, events: CalEvent[], errors: [{ sourceId, message }] }` |
+| `GET /api/display/config?screen=` | `DisplayConfig`: flat view of one screen; `calendar.sources` only as `{ id, name, color, emoji, kind }`; enabled `schedules` for this screen; `privacy: { active, until, lock, next }` (see [Privacy mode](#privacy-mode); while active with *hide photos*, `background.source` is `"stock"`) |
+| `GET /api/events?screen=&from=YYYY-MM-DD&to=YYYY-MM-DD` | `{ generatedAt, hash, events: CalEvent[], errors: [{ sourceId, message }] }`. While the screen is private, events are already filtered (busy blocks, hidden calendars) and `hash` starts with `p` |
 | `GET /api/weather?screen=` | `{ updatedAt, locationName, current, today, daily[], hourly[], indoor, source }` (localized descriptions). `source` = `{ provider, name, model, modelName, url, licence, licenceUrl, also? }`: where the data comes from, for the credit line. Values a source does not give are `null` (MET Norway: no chance of rain outside the Nordics; some Open-Meteo models: no UV). Cached per place for at least 10 minutes (15 for Pirate Weather, MET Norway's `Expires` when longer), the last answer is kept for 6 hours when the source fails |
 | `GET /api/news` | `{ updatedAt, items: [{ id, title, summary, source, date, image? }] }` (cache 15 min) |
 | `GET /api/photos?screen=&count=20&after=` | `{ photos: [{ url, author?, title?, source: "stock"\|"gallery", file?, focusX?, focusY? }] }`. Gallery photos follow the screen's `background.order` (`random` \| `newest` \| `name`); hidden photos are never returned. `after` = gallery `file` the display showed last: sequential orders continue right after it (wrapping around), `random` avoids starting with it. Without `after`, the server remembers where the previous batch for that screen ended. Falls back to stock when no gallery photo is in rotation |
@@ -93,14 +93,16 @@ The admin and the display read these fields to decide which sections, actions an
 - `features`: one boolean per feature: `homeassistant`, `news`, `customCss`, `gallery`, `schedules`,
   `announcements`, `displayCommands`, `openDisplayAccess`, `insecureTls`, `googleCalendar`, `googleLogin`,
   `passwordLogin`, `apiTokens`, `webhooks`, `backups`, `importExport`, `includeSecrets`, `activity`, `setupWizard`,
-  `status`, `accountMenu`, `microsoftCalendar`, `updates`, `feedback`. A self-hosted server turns all of them on, except
+  `status`, `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`. A self-hosted server turns all of them on, except
   `googleCalendar` and `googleLogin` (on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set),
   `microsoftCalendar` (Outlook and Microsoft 365 calendars, on when `MICROSOFT_CLIENT_ID` and
   `MICROSOFT_CLIENT_SECRET` are set), `accountMenu` and `feedback` (always off). `updates` is the update banner,
   *Status → Updates* and `/api/admin/update*`; Marco Cloud answers `false` and shows the CHANGELOG section of a new
   version once instead. `feedback` is Marco Cloud's *Help and feedback* form (account menu, sidebar and command
   palette), which sends `POST /api/admin/feedback` with `{ kind: 'problem'|'idea'|'other', message, meta }` to the
-  people who run the service; a self-hosted admin never shows it.
+  people who run the service; a self-hosted admin never shows it. `privacy` is privacy mode (see
+  [Privacy mode](#privacy-mode)); a server that does not filter events for it leaves it out and the admin hides the
+  controls.
 - `limits` (optional): plan limits such as `screens`, `sources` or `devices`. Absent means no limit beyond the
   config validator's own caps (12 screens, 50 calendars, 20 news feeds, 1000 local events, 500 birthdays,
   100 countdowns). The admin disables "add" at the limit and flags a config that goes over it.
@@ -116,9 +118,9 @@ The admin and the display read these fields to decide which sections, actions an
   `http://localhost` can say where other devices reach the admin.
 
 Clients treat a response with no `features` field (servers older than 0.5.0) as having every feature on, except
-`accountMenu`, `microsoftCalendar`, `updates` and `feedback`. A key missing from `features` counts as off only when
-`edition` is not `'self-hosted'`, and a missing `accountMenu`, `microsoftCalendar`, `updates` or `feedback` is always
-off.
+`accountMenu`, `microsoftCalendar`, `updates`, `feedback` and `privacy`. A key missing from `features` counts as off
+only when `edition` is not `'self-hosted'`, and a missing `accountMenu`, `microsoftCalendar`, `updates`, `feedback`
+or `privacy` is always off.
 
 ### Account mode
 
@@ -145,8 +147,10 @@ Error codes the admin translates (`web/admin/apiErrors.ts`), read from `code` fi
 `rate_limited`, `screen_limit`, `limit_exceeded`, `feature_unavailable`, `conflict`, `photo_quota`, `readonly`. A
 `details[].message` with one of these codes is translated too. Any other error shows the server's own text.
 
-`CalEvent`: `{ id, sourceId, title, start, end, allDay, location, color, emoji, kind, multiDay, age? }`. `start`/`end`
-are ISO strings with offset, or `YYYY-MM-DD` for all-day events (`end` exclusive).
+`CalEvent`: `{ id, sourceId, title, start, end, allDay, location, color, emoji, kind, multiDay, age?, busy? }`.
+`start`/`end` are ISO strings with offset, or `YYYY-MM-DD` for all-day events (`end` exclusive). `busy: true` marks a
+privacy-mode block: `title` is "Busy" in the screen's language, `location` and `emoji` are empty, `color` is the
+calendar's.
 
 ### Server-Sent Events (`/api/stream`)
 
@@ -161,6 +165,7 @@ are ISO strings with offset, or `YYYY-MM-DD` for all-day events (`end` exclusive
 | `announce-clear` | `{ id \| null }` | announcement removed early (`null` = all) |
 | `identify` | `{ name, slug, clientId, durationSec }` | show the screen name full-screen |
 | `night` | `{ mode: "on" \| "off" \| "auto" }` | night mode override |
+| `privacy` | `{ active }` | privacy mode of this screen turned on or off (admin, webhook, schedule, or a period that ended); the display refetches its config, events, countdowns and photos |
 | `ping` | `{ t }` | every 25 s |
 | `revoked` | `{ code: "invalid_key" \| "key_required" }` | the link was regenerated or replaced by an import, the device revoked or dropped by an import, the screen deleted, display access switched to private for a keyless display, or (`key_required`) the admin session a stream was opened with ended (logout, logout everywhere, password change); the server then closes the stream. Every stream's credential is re-checked after config saves, imports, session revocation and on each heartbeat |
 
@@ -184,7 +189,7 @@ Answer `{ revision, screenId, now, serverVersion, cursor, reset, commands, activ
 
 - `commands`: in order and already filtered to this display. Each one is `{ type, ...payload }` with the SSE event
   names and payloads: `reload`, `night`, `identify` (filled in for this display), `announce`, `announce-clear`,
-  `photos` and `events`.
+  `photos`, `events` and `privacy`.
 - `reset: true` on the first poll, after a server restart, or for a cursor the server no longer knows. `commands` then
   only holds the announcements still active on this screen, like the replay on `/api/stream`, and old commands are
   never replayed.
@@ -311,6 +316,13 @@ Rules for the mutating setup endpoints:
 | `GET /api/admin/announcements` · `DELETE /api/admin/announcements[/:id]` | Active + history; clear one or all |
 | `GET /api/admin/tokens` · `POST /api/admin/tokens { name }` · `DELETE /api/admin/tokens/:id` | API tokens (the full token is returned once on creation; max 20) |
 
+**Privacy mode** (`features.privacy`; see [Privacy mode](#privacy-mode))
+
+| Method & path | Notes |
+|---|---|
+| `GET /api/admin/privacy` | `PrivacyResponse`: `{ screens: [{ screenId, slug, name, active, until, by, resumesAt, scheduled }] }` |
+| `POST /api/admin/privacy` | `PrivacyRequest` (same body as the webhook) → `{ ok, changed, screens }`. The admin's quick actions send `{ mode: "on", hours: 1 }`, `{ mode: "on", hours: 3 }`, `{ mode: "on", untilTime: "06:00" }` (until tomorrow), `{ mode: "on" }` (until turned off) and `{ mode: "off" }`, with `screens: [id]` for one screen |
+
 **Backups and activity**
 
 | Method & path | Notes |
@@ -344,6 +356,8 @@ Errors: `401` missing/invalid token, `400` invalid data (e.g. unknown screen), `
 | `POST /api/hooks/announce` | `title` (≤ 120) and/or `body` (≤ 500), `emoji`, `style` (`info`/`success`/`warning`/`urgent`), `durationSec` (5–86400, default 30), `sound`, `screens` (slugs or ids; omitted = all) | `{ ok, announcement, delivered }` |
 | `POST /api/hooks/reload` | `{ screens? }` | `{ ok, delivered }` |
 | `POST /api/hooks/night` | `{ mode: "on"\|"off"\|"auto", screens? }` | `{ ok, delivered }` |
+| `GET /api/hooks/privacy` | none | `{ screens: [{ screenId, slug, name, active, until, by, resumesAt, scheduled }] }` |
+| `POST /api/hooks/privacy` | `mode` (`on`/`off`/`toggle`), at most one of `hours` (0 to 744), `until` (ISO date and time) or `untilTime` (`HH:MM`, the next time it comes round in the configured time zone); none = until turned off. `screens` (slugs or ids; omitted = all) | `{ ok, changed, screens }` (`changed`: ids of the screens that turned on or off) |
 
 `delivered` = number of connected displays that received it. Active announcements survive server restarts.
 
@@ -353,4 +367,90 @@ curl -H "Authorization: Bearer $TOKEN" http://192.168.1.50:3000/api/hooks/ping
 curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"title":"Oven is on!","emoji":"🔥","style":"urgent","durationSec":600,"sound":true,"screens":["kitchen"]}' \
   http://192.168.1.50:3000/api/hooks/announce
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"mode":"on","hours":3,"screens":["living-room"]}' http://192.168.1.50:3000/api/hooks/privacy
+curl -H "Authorization: Bearer $TOKEN" http://192.168.1.50:3000/api/hooks/privacy
+```
+
+Privacy changes are logged in the activity log as `privacy.changed` (`{ mode, via: "admin"|"hook", screens?, active,
+until? }`).
+
+## Privacy mode
+
+Per screen, for when you have guests. The rules live in `server/core/privacy.js` (shared with Marco Cloud).
+
+**What changes while a screen is private.** Each calendar has `privacy`: `"busy"` (default), `"hide"` or `"keep"`
+(`calendar.sources[].privacy`; `localEvents.privacy` defaults to `"busy"`, `birthdays.privacy` and calendars of kind
+`holidays` or `birthdays` default to `"keep"`).
+
+- `busy`: the event keeps its id, start, end, all-day flag, kind and the calendar's colour; the title becomes "Busy"
+  in the screen's language (Busy / Ocupado / Ocupado); location, description, emoji and age are removed. A rental
+  checkout marker keeps its 🚪.
+- `hide`: the event is left out.
+- `keep`: unchanged.
+- Countdowns: manual ones stay; those from events or birthdays stay only when their calendar is `keep`.
+- Weather, news, announcements, scheduled messages, the to-do list and the message of the day do not change.
+- `screens[].privacy.hidePhotos`: the background and the photo frame use stock photos only (gallery file names are
+  not sent). `screens[].privacy.showLock` (default on): a small lock in the corner of the display.
+
+All of this happens on the server, in `/api/events`, `/api/countdowns`, `/api/display/config` and `/api/photos`,
+whatever the credential (the admin preview is a display too). The admin's own pages (Home, Countdowns, Filters
+preview) keep showing real data.
+
+**State.** Per screen `{ on, until, by, at }` in `data/privacy.json` (`until` = ISO time or `null` for "until turned
+off"; `by` = `admin` or `hook`). It survives restarts; a period that has ended is ignored and pruned.
+
+**Schedule.** `screens[].privacy.schedule`: up to 10 rules `{ id, enabled, days, from, to }` (`days`: 0 = Sunday,
+`[]` = every day; `to < from` crosses midnight and belongs to the day it starts). Back-to-back or overlapping rules
+count as one window.
+
+**Who wins.**
+
+1. A manual **on** (admin or webhook) lasts until its `until` (or until turned off), whatever the schedule says.
+   When it would end inside a schedule window, it goes on until that window ends.
+2. A manual **off** during a schedule window lasts until that window ends (the next schedule boundary), then the
+   schedule takes over again. Outside a window it only clears the manual state.
+3. Otherwise the screen is private while one of its rules is running (`by: "schedule"`).
+
+**Reaching the displays.** Every change sends the `privacy` event (SSE and poll channel) to that screen's displays.
+The server also keeps a timer for the next change (a period that ends, a rule that starts or ends) and sends the event
+then. `privacy.next` in the display config tells the display when to ask again on its own, in case it missed the
+event.
+
+### Home Assistant
+
+Create a token in *API & webhooks*, then in `configuration.yaml`:
+
+```yaml
+rest_command:
+  marco_privacy:
+    url: "http://192.168.1.50:3000/api/hooks/privacy"   # the address of your Marco server
+    method: POST
+    headers:
+      Authorization: "Bearer TOKEN"
+    content_type: "application/json"
+    payload: '{"mode": "{{ mode }}"{% if hours is defined %}, "hours": {{ hours }}{% endif %}}'
+
+automation:
+  - alias: "Marco: private mode while there are guests"
+    triggers:
+      - trigger: state
+        entity_id: input_boolean.guests
+    actions:
+      - action: rest_command.marco_privacy
+        data:
+          mode: "{{ 'on' if trigger.to_state.state == 'on' else 'off' }}"
+```
+
+`hours: 3` in `data` turns it on for three hours. To show the state in Home Assistant:
+
+```yaml
+sensor:
+  - platform: rest
+    name: "Marco private mode"
+    resource: "http://192.168.1.50:3000/api/hooks/privacy"
+    headers:
+      Authorization: "Bearer TOKEN"
+    value_template: "{{ 'on' if value_json.screens | selectattr('active') | list | count > 0 else 'off' }}"
+    scan_interval: 60
 ```

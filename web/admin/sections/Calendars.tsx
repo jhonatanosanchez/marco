@@ -24,6 +24,7 @@ import {
   useReorder,
 } from '../components/ui';
 import { atLimit, has, offers } from '../caps';
+import { defaultPrivacyOf, privacyModeOptions } from './Privacy';
 import { LimitNote } from '../components/LimitNote';
 import { t } from '../i18n';
 import { allSourceOptions, guessKind, HOLIDAY_PRESETS, isHttpUrl, KIND_EMOJI, moveItem, SWATCHES, uid } from '../util';
@@ -177,6 +178,14 @@ function SourceRow({
               <Select value={src.kind} options={KINDS.map((k) => ({ ...k, label: `${KIND_EMOJI[k.value] || '📅'} ${t(k.label)}` }))} onChange={(v) => update((s) => void (s.kind = v))} />
             </div>
           </label>
+          {has('privacy') && (
+            <label class="mini-field" title={t('Qué se ve de este calendario en las pantallas en modo privado')}>
+              <span>{t('En modo privado')}</span>
+              <div class="src__kind">
+                <Select value={src.privacy ?? defaultPrivacyOf(src.kind)} options={privacyModeOptions()} onChange={(v) => update((s) => void (s.privacy = v))} />
+              </div>
+            </label>
+          )}
           <label class="mini-field" title={t('Cada cuántos minutos se vuelve a descargar')}>
             <span>{t('Actualizar cada')}</span>
             <NumberInput value={src.refreshMin} min={1} max={1440} suffix="min" error={!!errors[`${p}.refreshMin`]} onValue={(v) => update((s) => void (s.refreshMin = v))} />

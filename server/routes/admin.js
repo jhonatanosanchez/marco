@@ -18,6 +18,7 @@ import { publish, connectedCount } from '../pollHub.js';
 import { isHttpUrl } from '../core/validate.js';
 import { logActivity } from '../activity.js';
 import { resolveScreenList } from '../displays.js';
+import { handlePrivacy, privacyResponse } from '../privacy.js';
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -236,6 +237,13 @@ export function adminRouter({ onConfigSaved } = {}) {
     const delivered = publish('reload', {}, scr.ids.length ? { screenIds: scr.ids } : null);
     logActivity('display.command', { req, data: { action: 'reload', ...(scr.ids.length ? { screens: scr.ids } : {}), delivered } });
     res.json({ ok: true, displays: connectedCount(), delivered });
+  });
+
+  // Privacy mode per screen (server/privacy.js): state of every screen, and the quick actions of the admin.
+  r.get('/privacy', (req, res) => res.json(privacyResponse()));
+  r.post('/privacy', (req, res) => {
+    const [status, body] = handlePrivacy(req, 'admin');
+    res.status(status).json(body);
   });
 
   r.get('/status', (req, res) => {

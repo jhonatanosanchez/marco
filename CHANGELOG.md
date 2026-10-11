@@ -5,6 +5,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- Private mode per screen, for when you have guests. While it is on, events of each calendar show as "Busy" (time,
+  length and calendar colour only), are hidden, or stay as they are (*In private mode*, per calendar; holidays and
+  birthdays stay by default). The server filters events and countdowns before they reach the display, so the screen
+  never receives the real titles, places or notes. Optional per screen: stock photos instead of the gallery, and a
+  small lock in the corner (on by default).
+- Turn it on from Home (1 h, 3 h, until tomorrow, until turned off; one screen or all), with a banner in the admin
+  while it is on, on a schedule per screen (days and times, may cross midnight), or from Home Assistant with
+  `POST /api/hooks/privacy` (`GET` reads the state). It turns off by itself when the time is up.
+
 ## [0.5.3] - 2026-10-11
 
 ### Fixed

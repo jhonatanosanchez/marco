@@ -24,7 +24,7 @@ display and the server guarantee. The HTTP endpoints and event formats are in [A
 |---|---|
 | `server/` | API and logic: ICS + recurrences (`node-ical`, `rrule`), Google Calendar, weather, RSS, photos, auth, SSE and the poll channel (`pollHub.js`), backups, activity |
 | `server/app.js` | `createApp()`: the whole Express stack (host guard, sessions, CSRF, display access, routers, static files); `server/index.js` adds the store, listen and shutdown |
-| `server/core/` | Pure logic shared with Marco Cloud, which copies the folder as it is: config schema and validation (`validate.js`, `defaults.js`, `screens.js`, `iconRules.js`), backups and import (`backupsCore.js`), announcements (`announceCore.js`), feed parsing (`newsParse.js`), image headers and photo names (`imageInfo.js`), activity helpers (`activityCore.js`), pairing codes (`pairCore.js`), CSV, schedules and `lib/` (text, time zones, server strings). No Node built-ins, no store, SSE or HTTP modules (checked by `server/test/core-lint.test.js`); the files next to it (`backups.js`, `announce.js`, `photos.js`, `news.js`, `activity.js`, `pairing.js`) add the files, network and SSE |
+| `server/core/` | Pure logic shared with Marco Cloud, which copies the folder as it is: config schema and validation (`validate.js`, `defaults.js`, `screens.js`, `iconRules.js`), backups and import (`backupsCore.js`), announcements (`announceCore.js`), feed parsing (`newsParse.js`), image headers and photo names (`imageInfo.js`), activity helpers (`activityCore.js`), pairing codes (`pairCore.js`), privacy mode (`privacy.js`), CSV, schedules and `lib/` (text, time zones, server strings). No Node built-ins, no store, SSE or HTTP modules (checked by `server/test/core-lint.test.js`); the files next to it (`backups.js`, `announce.js`, `photos.js`, `news.js`, `activity.js`, `pairing.js`) add the files, network and SSE |
 | `server/displayAccess.js`, `server/pairing.js` | Private display links, paired devices and pairing codes (see *Display access* below) |
 | `server/routes/` | Express routers: `public.js` (display API), `admin.js`, `screens.js`, `announce.js`, `hooks.js`, `system.js`, `localEvents.js`, `access.js` (links, devices, pairing), `updates.js` |
 | `server/updates.js` | Daily check for a newer release, update settings, the request read by `marco-update.path` (see *Updates* below) |
@@ -54,6 +54,7 @@ failing source never breaks the others.
 | `activity.jsonl` | Activity log (≈ 5000 newest entries) |
 | `announcements.json` | Active announcements + history (50) |
 | `displays.json` | Known displays registry (≤ 100, offline > 30 days pruned) |
+| `privacy.json` | Privacy mode state per screen: `{ screens: { [screenId]: { on, until, by, at } } }` (server/privacy.js) |
 | `update/` | `check.json` (last answer from GitHub, ETag), `settings.json`, `request` (while an update is asked for), `status.json` and `update.log` (last update) |
 
 ## Configuration schema (v2)
@@ -73,8 +74,8 @@ The stored config has **global** sections shared by every screen and a list of *
                   "units": "metric", "haWeatherEntity": "", "haIndoorTempEntity": "", "haIndoorHumidityEntity": "" },
   "news":       { "feeds": [{ "id", "name", "url", "enabled" }], "maxItems": 30 },
   "todo":       { "items": [{ "id", "text", "done" }] },
-  "localEvents":{ "enabled": true, "name": "Family", "color": "#e76f51", "emoji": "", "items": [LocalEvent] },
-  "birthdays":  { "enabled": true, "name": "Birthdays", "color": "#ff6f91", "emoji": "🎂", "showAge": true, "items": [Birthday] },
+  "localEvents":{ "enabled": true, "name": "Family", "color": "#e76f51", "emoji": "", "privacy": "busy", "items": [LocalEvent] },
+  "birthdays":  { "enabled": true, "name": "Birthdays", "color": "#ff6f91", "emoji": "🎂", "showAge": true, "privacy": "keep", "items": [Birthday] },
   "eventRules": { "items": [EventRule] },
   "countdowns": { "items": [Countdown], "includeBirthdays": true, "birthdayDays": 30, "includeFlagged": true, "horizonDays": 365 },
   "schedules":  { "items": [ScheduledMessage] },
@@ -117,14 +118,16 @@ The stored config has **global** sections shared by every screen and a list of *
   "todo":       { "enabled": false },
   "message":    { "enabled": false, "text": "", "emoji": "💬" },
   "countdowns": { "enabled": true, "max": 4 },
-  "alerts":     { "enabled": true, "sound": true, "volume": 0.6 } }
+  "alerts":     { "enabled": true, "sound": true, "volume": 0.6 },
+  "privacy":    { "hidePhotos": false, "showLock": true, "schedule": [{ "id", "enabled", "days", "from", "to" }] } }
+                  // privacy mode of this screen (docs/API.md "Privacy mode"); the on / off state is runtime data
 ```
 
 Global vs per-screen for the "split" sections:
 
 | Section | Global part | Per-screen part |
 |---|---|---|
-| screen, layout, background, message, alerts | none | all |
+| screen, layout, background, message, alerts, privacy | none | all |
 | calendar | sources, iconRules | view settings + `sourceIds` |
 | datetime | timezone | clock and date format, enabled |
 | weather | provider, model, location, units, HA entities | enabled, forecastDays, showHourly, showPrecipChance |
@@ -142,8 +145,9 @@ Item schemas (ids generated by the server when missing; prefixes in brackets):
 - **CalendarSource** `[c_]`: `type` `ics|google|microsoft`, `name`, `url` (ics; `webcal://` accepted), `googleCalendarId` +
   `googleAccount` (google), `microsoftCalendarId` + `microsoftAccount` (microsoft: Outlook.com, Hotmail and Microsoft
   365 calendars through Microsoft Graph, with the server's own Entra app on a self-hosted server), `color`, `emoji`, `kind` `generic|airbnb|birthdays|holidays`, `enabled`, `refreshMin`,
-  `insecureTls` (accept self-signed certificates for this feed only). Ids `local` and `birthdays` are reserved for the
-  built-in pseudo-sources.
+  `insecureTls` (accept self-signed certificates for this feed only), `privacy` `busy|hide|keep` (what privacy mode does
+  to its events; missing = `busy`, or `keep` for kinds `holidays` and `birthdays`). Ids `local` and `birthdays` are
+  reserved for the built-in pseudo-sources.
 - **IconRule**: `match` (keywords, case/accent-insensitive substring of title + description), `emoji`, `color|null`.
   First match wins.
 - **LocalEvent** `[l_]`: `title`, `emoji`, `color|null`, `location`, `notes`, `allDay`, `date`, `endDate` (inclusive),
@@ -183,6 +187,12 @@ Older single-screen (v1) configs are migrated automatically on load; the origina
    ALL-CAPS titles are tidied, birthdays get `age`.
 6. Sort (all-day first, then start) and a stable `hash` so displays skip re-rendering unchanged data.
 
+**Privacy mode** is applied after the pipeline, on the display endpoints only (`displayEvents` in
+`server/routes/public.js`, `privatizeEvents` in `server/core/privacy.js`): busy blocks keep time, length and the
+calendar's colour, hidden calendars are dropped, and the hash changes. Countdowns from busy or hidden calendars are left
+out (`computeCountdowns(..., { isPrivate })`). The admin's own lists keep the real events. See docs/API.md
+*Privacy mode*.
+
 **Countdowns** (`/api/countdowns`) merge manual countdowns, upcoming birthdays (within `birthdayDays`) and events
 flagged by a local event or a style rule (nearest occurrence per title), sorted by date.
 
@@ -204,6 +214,10 @@ flagged by a local event or a style rule (nearest occurrence per title), sorted 
   heartbeat (`photoFrame`), and the crop keeps the subject in the largest free band (`web/shared/focus.ts`).
 - Adaptive legibility: panel blur/shade and text contrast adapt to the photo behind them; small screens get larger
   relative type.
+- Privacy mode: the display gets already filtered events and only shows a small lock (`#privacy-lock`) from
+  `config.privacy`. The `privacy` live event refetches config, events, countdowns and photos; a timer at
+  `privacy.next` / `privacy.until` does the same in case the event was missed. `server/privacy.js` keeps a timer for
+  the next change of any screen (period ended, schedule rule started or ended) and publishes the event then.
 - Announcements: animated cards (info / success / warning / urgent, ≤ 3 stacked), WebAudio chime (no audio files),
   remaining time corrected with the server clock. Scheduled messages show as a banner while their window is active.
 - Identity: `clientId` from `?client=`, else `localStorage`, else generated. `deploy/kiosk.sh` appends

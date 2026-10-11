@@ -8,6 +8,7 @@ import { getDetailedEvents } from './calendars.js';
 import { yearlyDate } from './localEvents.js';
 import { normKey } from './eventRules.js';
 import { LOCAL_SOURCE_ID, BIRTHDAYS_SOURCE_ID } from './core/defaults.js';
+import { countdownSourceAllowed } from './core/privacy.js';
 
 export const MAX_COUNTDOWNS = 30;
 /** Flagged events are looked up at most this far ahead (bounds recurrence expansion / Google windows). */
@@ -29,11 +30,12 @@ const eventDate = (e, tz) => (e.allDay ? e.start : localDate(new Date(e.start), 
 /**
  * @param {object} cfg stored v2 config
  * @param {object} screen screen profile
- * @param {{ today: string, tz: string, events?: object[] }} ctx `events` = detailed events (see calendars.js
- *   getDetailedEvents) covering [today, today + horizon] for the sources that can produce countdowns.
+ * @param {{ today: string, tz: string, events?: object[], isPrivate?: boolean }} ctx `events` = detailed events (see
+ *   calendars.js getDetailedEvents) covering [today, today + horizon] for the sources that can produce countdowns.
+ *   `isPrivate`: the screen is in privacy mode, so only sources set to 'keep' give countdowns (manual ones stay).
  * @returns {Array} CountdownItem[]
  */
-export function computeCountdowns(cfg, screen, { today, tz, events = [] }) {
+export function computeCountdowns(cfg, screen, { today, tz, events = [], isPrivate = false }) {
   const cd = cfg.countdowns;
   const horizon = cd.horizonDays;
   const limit = addDays(today, horizon);
@@ -51,6 +53,7 @@ export function computeCountdowns(cfg, screen, { today, tz, events = [] }) {
   const bdayLimit = addDays(today, Math.min(cd.birthdayDays, horizon));
   for (const e of events) {
     if (e.hidden || !visible.has(e.sourceId)) continue;
+    if (isPrivate && !countdownSourceAllowed(cfg, e.sourceId)) continue;
     const date = eventDate(e, tz);
     if (date < today) continue;
     if (e.sourceId === BIRTHDAYS_SOURCE_ID) {
@@ -101,7 +104,7 @@ function sourcesToScan(cfg, screen) {
 }
 
 /** GET /api/countdowns payload. `screen` = ScreenProfile or null (default screen). */
-export async function getCountdowns({ screen = null } = {}) {
+export async function getCountdowns({ screen = null, isPrivate = false } = {}) {
   const cfg = getConfig();
   const scr = screen || defaultScreen(cfg);
   const tz = cfg.datetime.timezone;
@@ -118,6 +121,6 @@ export async function getCountdowns({ screen = null } = {}) {
       console.warn('[countdowns] events scan failed:', err.message);
     }
   }
-  const items = computeCountdowns(cfg, scr, { today, tz, events });
+  const items = computeCountdowns(cfg, scr, { today, tz, events, isPrivate });
   return { generatedAt: new Date().toISOString(), today, hash: hash(items), items };
 }

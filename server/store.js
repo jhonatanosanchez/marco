@@ -29,6 +29,7 @@ export function initStore(dataDir = process.env.DATA_DIR || path.join(ROOT, 'dat
   paths.activity = path.join(paths.data, 'activity.jsonl'); // activity log
   paths.announcements = path.join(paths.data, 'announcements.json'); // active + history
   paths.displays = path.join(paths.data, 'displays.json'); // known displays registry
+  paths.privacy = path.join(paths.data, 'privacy.json'); // privacy mode state per screen (server/privacy.js)
   migratedOnLoad = null;
   for (const d of [paths.data, paths.photos, paths.cache, paths.backups]) fs.mkdirSync(d, { recursive: true });
   config = loadConfig();

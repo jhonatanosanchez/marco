@@ -99,6 +99,81 @@ export interface CalendarSource {
   kind: SourceKind;
   enabled: boolean;
   refreshMin: number;
+  /** what privacy mode does to its events (missing = 'busy', or 'keep' for holidays and birthdays) */
+  privacy?: PrivacyMode;
+}
+
+/** Per calendar, while a screen is private: 'busy' = shown as "Busy" (time and colour only), 'hide' = left out,
+ *  'keep' = shown as it is. */
+export type PrivacyMode = 'busy' | 'hide' | 'keep';
+
+/** A rule that turns privacy mode on by itself (same days / from / to rules as scheduled messages). */
+export interface PrivacyRule {
+  id: string; // "p_xxx"
+  enabled: boolean;
+  /** 0 = Sunday … 6; [] = every day. A window that crosses midnight belongs to the day it starts. */
+  days: number[];
+  from: string; // HH:MM
+  to: string; // HH:MM; `to < from` crosses midnight
+}
+
+/** Per-screen privacy settings (ScreenProfile.privacy). */
+export interface ScreenPrivacyConfig {
+  /** while private, the background and photo frame use stock photos only */
+  hidePhotos: boolean;
+  /** small lock on the display while private */
+  showLock: boolean;
+  schedule: PrivacyRule[];
+}
+
+/** `privacy` of GET /api/display/config. */
+export interface DisplayPrivacy {
+  active: boolean;
+  /** when it ends (ISO); null while active = until someone turns it off */
+  until: string | null;
+  /** show the lock */
+  lock: boolean;
+  /** ask again at this time even without a live event (a period ends, a rule starts); null = nothing planned */
+  next: string | null;
+}
+
+/** One screen in GET /api/admin/privacy (and /api/hooks/privacy). */
+export interface PrivacyScreenState {
+  screenId: string;
+  slug: string;
+  name: string;
+  active: boolean;
+  until: string | null;
+  /** who turned it on (or paused the schedule): 'admin', 'hook', 'schedule'; null when off and nothing set */
+  by: 'admin' | 'hook' | 'schedule' | null;
+  /** a manual "off" pauses the schedule until then */
+  resumesAt: string | null;
+  /** the screen has schedule rules */
+  scheduled: boolean;
+}
+
+export interface PrivacyResponse {
+  screens: PrivacyScreenState[];
+}
+
+/** POST /api/admin/privacy and /api/hooks/privacy. Use at most one of hours, until and untilTime; none = until
+ *  turned off. */
+export interface PrivacyRequest {
+  mode: 'on' | 'off' | 'toggle';
+  hours?: number;
+  /** ISO date and time */
+  until?: string;
+  /** HH:MM: the next time it comes round in the configured time zone */
+  untilTime?: string;
+  /** slugs or ids; omitted or [] = every screen */
+  screens?: string[];
+}
+
+export interface PrivacyChangeResponse {
+  ok: boolean;
+  /** screens whose privacy turned on or off */
+  changed: string[];
+  screens: PrivacyScreenState[];
 }
 
 /** Public projection of a source sent to the display (no urls / account info). */
@@ -354,6 +429,7 @@ export interface AppConfig {
   homeassistant: HomeAssistantConfig;
   auth: AuthConfig;
   security: SecurityConfig;
+  privacy: ScreenPrivacyConfig;
 }
 
 /** GET /api/display/config[?screen=<slug|id>] */
@@ -377,6 +453,8 @@ export interface DisplayConfig {
   news: { enabled: boolean; rotateSec: number };
   todo: TodoConfig;
   message: MessageConfig;
+  /** privacy mode of this screen (servers without it leave it out) */
+  privacy?: DisplayPrivacy;
 }
 
 /** CalEvent from GET /api/events */
@@ -397,6 +475,8 @@ export interface CalEvent {
   description?: string | null;
   /** F2: birthdays with a known birth year (and birthdays.showAge) → age turned on that day. Display: "🎂 María (34)" */
   age?: number | null;
+  /** privacy mode: a "Busy" block (title already in the screen's language, no location, emoji or description) */
+  busy?: boolean;
 }
 
 export interface EventsResponse {
@@ -545,6 +625,8 @@ export interface Features {
   updates: boolean;
   /** Help and feedback form that reaches the people who run the server (Marco Cloud only; absent = off). */
   feedback: boolean;
+  /** Privacy mode per screen (/api/admin/privacy, /api/hooks/privacy). Absent = off. */
+  privacy: boolean;
 }
 
 export type FeatureName = keyof Features;
@@ -694,6 +776,7 @@ export type StreamEvent =
   | { type: 'announce-clear'; id: string | null }
   | ({ type: 'identify' } & IdentifyPayload)
   | { type: 'night'; mode: NightCommand }
+  | { type: 'privacy'; active: boolean }
   | { type: 'ping'; t: number };
 
 // ---- Admin API ----
@@ -938,6 +1021,7 @@ export interface ScreenProfile {
   message: MessageConfig;
   countdowns: ScreenCountdownsConfig;
   alerts: ScreenAlertsConfig;
+  privacy: ScreenPrivacyConfig;
 }
 
 export type RepeatFreq = 'none' | 'weekly' | 'monthly' | 'yearly';
@@ -972,6 +1056,8 @@ export interface LocalEventsConfig {
   name: string; // legend name of the 'local' source
   color: string;
   emoji: string;
+  /** privacy mode for local events (default 'busy') */
+  privacy?: PrivacyMode;
   items: LocalEvent[];
 }
 
@@ -991,6 +1077,8 @@ export interface BirthdaysConfig {
   color: string;
   emoji: string;
   showAge: boolean;
+  /** privacy mode for birthdays (default 'keep') */
+  privacy?: PrivacyMode;
   items: Birthday[];
 }
 
@@ -1250,7 +1338,9 @@ export type DisplayCommand =
   | { type: 'announce-clear'; id: string | null }
   | { type: 'photos'; hidden?: string[] }
   /** self-hosted only: calendar data changed */
-  | { type: 'events'; hash: string };
+  | { type: 'events'; hash: string }
+  /** privacy mode turned on or off: refetch config, events, countdowns and photos */
+  | { type: 'privacy'; active: boolean };
 
 /** GET /api/display/poll?client=&cursor=&rev=&hidden=&preview= (docs/API.md) */
 export interface PollResponse {
@@ -1447,6 +1537,7 @@ export type ActivityType =
   | 'token.rejected'
   | 'display.connected'
   | 'display.command'
+  | 'privacy.changed'
   | 'display.link_regenerated'
   | 'display.paired'
   | 'display.pair_failed'

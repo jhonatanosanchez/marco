@@ -11,6 +11,7 @@ import { screenHref, useDisplayLinks } from '../displayLinks';
 import { formatDuration, relTime, nScreens, t } from '../i18n';
 import { withPollNote } from '../liveNote';
 import type { SectionProps } from './common';
+import { PrivacyMenu, usePrivacy } from '../components/Privacy';
 
 function NightMenu({ value, onPick, busy }: { value: NightCommand | null; onPick: (m: NightCommand) => void; busy?: boolean }) {
   const opts: { v: NightCommand; icon: 'moon' | 'sun' | 'clock'; label: string }[] = [
@@ -198,6 +199,9 @@ export function DisplaysSection({ saved, go }: SectionProps) {
   // Filter pills list SAVED screens only: commands resolve screen ids against the saved config.
   const target = filter && saved.screens.some((s) => s.id === filter) ? { screens: [filter] } : {};
   const onlineHere = online.filter((d) => !filter || d.screenId === filter);
+  const privacy = usePrivacy();
+  const privRows = (privacy ?? []).filter((r) => !target.screens || r.screenId === filter);
+  const privRow = privRows.length ? { active: privRows.some((r) => r.active), until: privRows.find((r) => r.active)?.until ?? null } : undefined;
 
   return (
     <>
@@ -252,6 +256,12 @@ export function DisplaysSection({ saved, go }: SectionProps) {
           <span class="muted small">{filter ? t('Noche en esta pantalla') : t('Noche en todas')}</span>
           <NightMenu value={null} busy={busy._all?.startsWith('night')} onPick={(m) => run('_all', { action: 'night', mode: m, ...target }, label('night', m))} />
         </div>
+        {has('privacy') && (
+          <div class="toolbar__night">
+            <span class="muted small">{target.screens ? t('Privado en esta pantalla') : t('Privado en todas')}</span>
+            <PrivacyMenu screenId={target.screens ? filter : ''} row={privRow} tz={saved.datetime.timezone} />
+          </div>
+        )}
       </div>
 
       {err && !data ? (

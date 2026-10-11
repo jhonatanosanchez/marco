@@ -52,7 +52,7 @@ test('caps: old servers and self-hosted keep every feature on', () => {
   assert.equal(old.edition, 'self-hosted');
   assert.equal(old.features, null);
   // accountMenu, microsoftCalendar, updates and feedback only exist on servers that say so
-  for (const k of FEATURE_KEYS) assert.equal(hasFeature(old, k), !['accountMenu', 'microsoftCalendar', 'updates', 'feedback'].includes(k), k);
+  for (const k of FEATURE_KEYS) assert.equal(hasFeature(old, k), !['accountMenu', 'microsoftCalendar', 'updates', 'feedback', 'privacy'].includes(k), k);
   assert.equal(old.pairCodeLength, 6);
   assert.equal(old.displayOrigin, null);
 
@@ -127,8 +127,9 @@ test('navFilter: self-hosted defaults and old servers show everything', () => {
   // (features.microsoftCalendar) and updates (features.updates): an old server lists none of them
   const accountEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'accountMenu' || e.feature === 'microsoftCalendar').length;
   assert.equal(accountEntries, 3);
-  const updateEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'updates').length;
-  assert.equal(updateEntries, 1);
+  // updates and privacy mode are opt-in too (features.updates, features.privacy)
+  const updateEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'updates' || e.feature === 'privacy').length;
+  assert.equal(updateEntries, 2);
   assert.equal(nav.filterSettings(search.SETTINGS_INDEX, oldServer(), routes).length, search.SETTINGS_INDEX.length - accountEntries - updateEntries);
   // without Google credentials a self-hosted admin still lists the Google entries (with the setup hint)
   assert.equal(nav.filterSettings(search.SETTINGS_INDEX, selfHosted(), routes).length, search.SETTINGS_INDEX.length - accountEntries);

@@ -4,11 +4,14 @@
 //   POST /announce    → { ok, announcement, delivered }
 //   POST /reload      → { ok, delivered }
 //   POST /night       → { ok, delivered }
+//   GET  /privacy     → { screens }
+//   POST /privacy     → { ok, changed, screens }
 import { Router } from 'express';
 import { findToken, checkRate, recordUse, recordRejection } from '../tokens.js';
 import { handleAnnounce } from './announce.js';
 import { runCommand } from '../displays.js';
 import { logActivity } from '../activity.js';
+import { handlePrivacy, privacyResponse } from '../privacy.js';
 
 /** Bearer-token middleware: 401 (logged, throttled), 429 over 30 req/min, usage bookkeeping. */
 export function bearerAuth(req, res, next) {
@@ -60,6 +63,11 @@ export function hooksRouter() {
   });
   r.post('/reload', jsonOnly, (req, res) => command(req, res, 'reload'));
   r.post('/night', jsonOnly, (req, res) => command(req, res, 'night'));
+  r.get('/privacy', (req, res) => res.json(privacyResponse()));
+  r.post('/privacy', jsonOnly, (req, res) => {
+    const [status, body] = handlePrivacy(req, 'hook');
+    res.status(status).json(body);
+  });
   r.use((req, res) => res.status(404).json({ error: 'not found' }));
   return r;
 }

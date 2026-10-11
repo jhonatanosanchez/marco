@@ -901,6 +901,38 @@
       ]
     },
     {
+      "method": "GET",
+      "path": "/api/admin/privacy",
+      "query": [],
+      "feature": "privacy",
+      "callers": [
+        "privacy"
+      ],
+      "request": null,
+      "response": "PrivacyResponse",
+      "responseArray": false,
+      "responseKeys": [
+        "screens"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/privacy",
+      "query": [],
+      "feature": "privacy",
+      "callers": [
+        "setPrivacy"
+      ],
+      "request": "PrivacyRequest",
+      "response": "PrivacyChangeResponse",
+      "responseArray": false,
+      "responseKeys": [
+        "ok",
+        "changed",
+        "screens"
+      ]
+    },
+    {
       "method": "POST",
       "path": "/api/admin/refresh-displays",
       "query": [],
@@ -940,7 +972,8 @@
         "todo",
         "message",
         "countdowns",
-        "alerts"
+        "alerts",
+        "privacy"
       ]
     },
     {

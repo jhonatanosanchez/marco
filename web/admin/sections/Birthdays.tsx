@@ -6,7 +6,8 @@ import { Icon } from '../components/icons';
 import { Button, Callout, Card, ColorPicker, EmojiPicker, Empty, Modal, PageHeader, SearchInput, Segmented, Textarea, TextInput, ToggleRow } from '../components/ui';
 import { fmtDay, monthNames, nextBirthday, relDays, todayIn } from '../dates';
 import { t } from '../i18n';
-import { atLimit, limit } from '../caps';
+import { atLimit, has, limit } from '../caps';
+import { PrivacyModeField } from './Privacy';
 import { LimitNote } from '../components/LimitNote';
 import { takeIntent } from '../intent';
 import { daysInMonth, normalize, uid } from '../util';
@@ -247,6 +248,7 @@ export function BirthdaysSection({ full, setFull, errors, cfg }: SectionProps) {
             <span class="muted small">{t('Nombre en la leyenda')}</span>
           </div>
           <ToggleRow icon="🔢" label={t('Mostrar la edad')} hint={t('Solo si conoces el año de nacimiento')} checked={bd.showAge} onChange={(v) => setFull((d) => void (d.birthdays.showAge = v))} />
+          {has('privacy') && <PrivacyModeField value={bd.privacy ?? 'keep'} onChange={(v) => setFull((d) => void (d.birthdays.privacy = v))} />}
         </div>
       </Card>
 

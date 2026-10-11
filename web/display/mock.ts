@@ -29,6 +29,8 @@ const DEMO_LANG = (() => {
 const EMPTY = new URLSearchParams(location.search).get('empty') === '1';
 /** ?busy=1: a day with more events than fit, and long titles (to see the sliding titles and the busy-day pages). */
 const BUSY = new URLSearchParams(location.search).get('busy') === '1';
+/** ?private=1: privacy mode on (what the server sends then: "Busy" blocks, holidays and birthdays as they are). */
+const PRIVATE = new URLSearchParams(location.search).get('private') === '1';
 /** Pick the demo string for the current language: L('English', 'Español', 'Português'). */
 const L = (en: string, es: string, pt: string) => (DEMO_LANG === 'es' ? es : DEMO_LANG === 'pt' ? pt : en);
 
@@ -52,6 +54,7 @@ export function mockConfig(): DisplayConfig {
     // ?photos=0 → no background photo
     ...(q.get('photos') === '0' ? { background: { enabled: false } } : {}),
     datetime: { timezone: TZ },
+    ...(PRIVATE ? { privacy: { active: true, until: new Date(Date.now() + 3 * 3600_000).toISOString(), lock: true, next: null } } : {}),
     countdowns: { enabled: q.get('countdowns') !== '0', max: Number(q.get('cdmax')) || 4 },
     // ?sched=1 → a scheduled message whose window is open right now
     schedules: q.get('sched') === '1'
@@ -225,7 +228,18 @@ export function mockEvents(now = new Date()): EventsResponse {
   out.sort((a, b) => (a.allDay === b.allDay ? sortKey(a).localeCompare(sortKey(b)) : a.allDay ? -1 : 1));
   // ?empty=1 → an empty week (to check the empty states)
   if (EMPTY) out.length = 0;
-  return { generatedAt: new Date().toISOString(), hash: `mock-${T}${EMPTY ? '-empty' : ''}`, events: out, errors: [] };
+  const events = PRIVATE ? out.map(busyOf) : out;
+  return { generatedAt: new Date().toISOString(), hash: `mock-${T}${EMPTY ? '-empty' : ''}${PRIVATE ? '-p' : ''}`, events, errors: [] };
+}
+
+/** Same rule as the server (server/core/privacy.js) with the default per kind: holidays and birthdays stay. */
+function busyOf(e: CalEvent): CalEvent {
+  if (e.kind === 'holidays' || e.kind === 'birthdays') return e;
+  const src = MOCK_SOURCES.find((s) => s.id === e.sourceId);
+  return {
+    id: e.id, sourceId: e.sourceId, title: L('Busy', 'Ocupado', 'Ocupado'), start: e.start, end: e.end, allDay: e.allDay,
+    location: '', color: src?.color ?? e.color, emoji: '', kind: e.kind, multiDay: e.multiDay, busy: true,
+  };
 }
 
 function sortKey(e: CalEvent) {
@@ -355,6 +369,7 @@ export function mockCountdowns(now = new Date()): CountdownsResponse {
   ];
   items.sort((a, b) => a.date.localeCompare(b.date));
   if (EMPTY) items.length = 0;
+  if (PRIVATE) return { generatedAt: now.toISOString(), today: T, hash: `mock-cd-${T}-p`, items: items.filter((x) => x.origin !== 'event') };
   return { generatedAt: now.toISOString(), today: T, hash: `mock-cd-${T}`, items };
 }
 

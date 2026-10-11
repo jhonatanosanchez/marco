@@ -15,6 +15,7 @@ import { requestScreen } from '../displayAccess.js';
 import { validateConfig, isValidDate } from '../core/validate.js';
 import { previewEvents } from '../calendars.js';
 import { getCountdowns } from '../countdowns.js';
+import { screenPrivacy } from '../privacy.js';
 import { parseBirthdayCsv, MAX_CSV_BYTES } from '../core/csv.js';
 import { addDays, localDate } from '../core/lib/tz.js';
 
@@ -125,8 +126,10 @@ export function eventsPublicRouter() {
   r.get('/countdowns', async (req, res, next) => {
     try {
       res.set('cache-control', 'private, no-store');
-      const { screen } = requestScreen(getConfig(), req);
-      res.json(await getCountdowns({ screen }));
+      const cfg = getConfig();
+      const { screen } = requestScreen(cfg, req);
+      // While the screen is private, countdowns from busy / hidden calendars are left out (core/privacy.js).
+      res.json(await getCountdowns({ screen, isPrivate: screenPrivacy(cfg, screen).active }));
     } catch (err) {
       next(err);
     }

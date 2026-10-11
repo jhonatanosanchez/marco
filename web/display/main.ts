@@ -734,15 +734,46 @@ async function fetchConfig(): Promise<boolean> {
 }
 
 let photoSig = '';
+let privateSig = '';
 on('config', (s) => {
   if (!s.config) return;
   applyConfig(s.config);
-  // photo source changed in the admin → fetch a fresh list right away
+  const priv = s.config.privacy;
+  const privSig = priv?.active ? 'on' : 'off';
+  const privChanged = privateSig !== '' && privSig !== privateSig;
+  privateSig = privSig;
+  applyPrivacy(priv);
+  // photo source changed in the admin → fetch a fresh list right away; privacy mode with "hide photos" also
+  // replaces the photo on screen at once
   const b = ctx.cfg.background;
   const sig = `${b.enabled}|${b.source}|${b.stockTopic}|${b.order ?? 'random'}`;
-  if (photoSig && sig !== photoSig) void fetchPhotos();
+  if (photoSig && sig !== photoSig) void fetchPhotos().then(() => (privChanged ? photos.next() : undefined));
   photoSig = sig;
 });
+
+// ---------------------------------------------------------------------------------------------
+// Privacy mode: the server already filtered the events; the display shows a small lock and asks again when the
+// period ends (or a schedule rule starts) in case the live event is missed (offline, poll delay).
+// ---------------------------------------------------------------------------------------------
+const privacyLock = $('#privacy-lock');
+let privacyTimer: ReturnType<typeof setTimeout> | null = null;
+function applyPrivacy(p: DisplayConfig['privacy']): void {
+  const on = !!p?.active;
+  document.documentElement.classList.toggle('is-private', on);
+  privacyLock.classList.toggle('show', on && p?.lock !== false);
+  privacyLock.title = on ? ctx.t('privateMode') : '';
+  if (privacyTimer) clearTimeout(privacyTimer);
+  privacyTimer = null;
+  if (state.demo) return;
+  const at = [p?.next, on ? p?.until : null].map((x) => (x ? Date.parse(x) : NaN)).filter((x) => Number.isFinite(x));
+  if (!at.length) return;
+  // a few seconds after the boundary, at most a day ahead (setTimeout limits, clock changes)
+  const ms = Math.min(Math.max(Math.min(...at) - Date.now() + 3000, 3000), 24 * 3600_000);
+  privacyTimer = setTimeout(() => refreshForPrivacy(), ms);
+}
+function refreshForPrivacy(): void {
+  void fetchConfig().then((ok) => (ok ? Promise.all([fetchEvents(), fetchCountdowns()]) : undefined));
+}
 on('events', () => {
   renderCalendar(current());
   renderCountdowns(current());
@@ -1026,6 +1057,8 @@ const liveHandlers: StreamHandlers = {
     setNightCommand(d.mode);
     heartbeat.soon();
   },
+  // privacy mode turned on or off: new config (lock, photo source), filtered events and countdowns
+  privacy: () => refreshForPrivacy(),
   // Link regenerated / device revoked → "no longer valid"; switched to private without a key → pairing.
   revoked: (d) => denyAccess(d.code === 'key_required' ? 401 : 403),
   open: () => setOnline(true),

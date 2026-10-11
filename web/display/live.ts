@@ -90,6 +90,8 @@ export interface StreamHandlers {
   announceClear?: (d: { id: string | null }) => void;
   identify?: (d: IdentifyPayload) => void;
   night?: (d: { mode: NightCommand }) => void;
+  /** privacy mode turned on or off for this screen: refetch config, events, countdowns and photos */
+  privacy?: (d: { active: boolean }) => void;
   /** link regenerated / device revoked / display access switched to private */
   revoked?: (d: { code: string }) => void;
   open?: () => void;
@@ -113,6 +115,7 @@ export function dispatch(name: string, d: any, h: StreamHandlers): boolean {
     case 'announce-clear': h.announceClear?.({ id: typeof d?.id === 'string' ? d.id : null }); return true;
     case 'identify': h.identify?.(d); return true;
     case 'night': if (d?.mode === 'on' || d?.mode === 'off' || d?.mode === 'auto') h.night?.(d); return true;
+    case 'privacy': h.privacy?.({ active: d?.active === true }); return true;
     case 'revoked': h.revoked?.({ code: typeof d?.code === 'string' ? d.code : 'invalid_key' }); return true;
     default: return false;
   }

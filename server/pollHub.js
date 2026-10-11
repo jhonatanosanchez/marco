@@ -18,8 +18,8 @@ const MAX_POLLERS = 200;
 export const MAX_POLLERS_PER_IP = 24;
 
 /** How long a command stays deliverable. `announce` lives until its own expiresAt. */
-const TTL_MS = { reload: 600_000, night: 600_000, identify: 60_000, 'announce-clear': 600_000, photos: 600_000, events: 600_000 };
-export const POLL_EVENTS = Object.freeze(['reload', 'night', 'identify', 'announce', 'announce-clear', 'photos', 'events']);
+const TTL_MS = { reload: 600_000, night: 600_000, identify: 60_000, 'announce-clear': 600_000, photos: 600_000, events: 600_000, privacy: 600_000 };
+export const POLL_EVENTS = Object.freeze(['reload', 'night', 'identify', 'announce', 'announce-clear', 'photos', 'events', 'privacy']);
 
 let epoch = crypto.randomBytes(4).toString('hex');
 let seq = 0;

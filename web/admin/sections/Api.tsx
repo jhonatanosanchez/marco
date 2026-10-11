@@ -169,6 +169,7 @@ export function ApiSection({ full }: SectionProps) {
   const token = fresh || 'cs_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX';
   const slugs = full.screens.map((s) => s.slug);
   const washer = t('La lavadora ha terminado');
+  const priv = has('privacy');
   const yaml = `# ${t('configuration.yaml de Home Assistant')}
 rest_command:
   marco_alert:
@@ -180,7 +181,14 @@ rest_command:
     payload: >-
       {"title": {{ title | tojson }}, "body": {{ (body | default('')) | tojson }},
        "emoji": {{ (emoji | default('🔔')) | tojson }}, "style": "{{ style | default('info') }}",
-       "durationSec": {{ duration | default(120) }}, "sound": true}
+       "durationSec": {{ duration | default(120) }}, "sound": true}${priv ? `
+  marco_privacy:
+    url: "${base}/api/hooks/privacy"
+    method: POST
+    headers:
+      Authorization: "Bearer ${token}"
+    content_type: "application/json"
+    payload: '{"mode": "{{ mode }}"}'` : ''}
 
 automation:
   - alias: "${t('Aviso: lavadora terminada')}"
@@ -194,7 +202,15 @@ automation:
           title: "${washer} 🧺"
           emoji: "🧺"
           style: "success"
-          duration: 300`;
+          duration: 300${priv ? `
+  - alias: "${t('Modo privado con invitados')}"
+    triggers:
+      - trigger: state
+        entity_id: input_boolean.guests
+    actions:
+      - action: rest_command.marco_privacy
+        data:
+          mode: "{{ 'on' if trigger.to_state.state == 'on' else 'off' }}"` : ''}`;
   const curl = `# ${t('Comprobar el token')}
 curl -H "Authorization: Bearer ${token}" ${base}/api/hooks/ping
 
@@ -211,7 +227,12 @@ curl -X POST ${base}/api/hooks/reload \\
 # ${t('Modo noche')}: on | off | auto
 curl -X POST ${base}/api/hooks/night \\
   -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" \\
-  -d '{"mode":"on"}'`;
+  -d '{"mode":"on"}'${priv ? `
+
+# ${t('Modo privado 3 horas')}: on | off | toggle
+curl -X POST ${base}/api/hooks/privacy \\
+  -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" \\
+  -d '{"mode":"on","hours":3}'` : ''}`;
 
   return (
     <>
@@ -309,6 +330,11 @@ curl -X POST ${base}/api/hooks/night \\
               <li>
                 <code>POST /api/hooks/night</code>: <code>{'{ mode: on|off|auto, screens?: [slug] }'}</code>
               </li>
+              {has('privacy') && (
+                <li>
+                  <code>POST /api/hooks/privacy</code>: <code>{'{ mode: on|off|toggle, hours?, until?, untilTime?: "HH:MM", screens?: [slug] }'}</code> · <code>GET /api/hooks/privacy</code>
+                </li>
+              )}
             </ul>
             <p class="muted small">
               {t('Pantallas disponibles')}: {slugs.map((s) => <code class="slug-code">{s}</code>)} · {t('Límite: 30 peticiones por minuto y token.')}

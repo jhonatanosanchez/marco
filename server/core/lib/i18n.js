@@ -57,6 +57,7 @@ export function windDirLabel(deg, l) {
 
 const STRINGS = {
   reservation: { es: 'Reserva', en: 'Reservation', pt: 'Reserva' },
+  busy: { es: 'Ocupado', en: 'Busy', pt: 'Ocupado' },
   blocked: { es: 'No disponible', en: 'Not available', pt: 'Indisponível' },
   untitled: { es: '(Sin título)', en: '(No title)', pt: '(Sem título)' },
 };

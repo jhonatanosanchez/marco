@@ -126,6 +126,8 @@ transparency, blur and a light edge:
   in place without reloading the page, and the screen keeps showing the last data if the server goes away.
 - **Announcements:** full-screen cards with a chime ("🧺 The washing machine is done"), and **scheduled
   messages** ("🗑️ Take out the bins", Tue and Fri 20:00 to 22:00).
+- **Private mode** per screen for when you have guests: events show as "Busy" (or are hidden), by hand, on a
+  schedule or from Home Assistant, and the server filters them before they reach the screen.
 - **Built for the Pi:** 30 fps cap, pauses when hidden, `?lite=1` turns off WebGL entirely.
 
 <br clear="right">

@@ -70,6 +70,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { label: 'Ejemplo de Home Assistant (rest_command)', route: 'api', anchor: 'api-examples', keywords: 'yaml rest_command automation curl', feature: 'webhooks' },
   // Sistema
   { label: 'Pantallas (crear, duplicar, predeterminada)', route: 'screens', anchor: 'scr-list', keywords: 'screens profiles salón cocina slug' },
+  { label: 'Modo privado (invitados)', route: 'screen', anchor: 'scr-privacy', keywords: 'privacy private guests busy ocupado invitados convidados privado lock candado horario schedule', feature: 'privacy' },
   { label: 'Pantallas conectadas', route: 'displays', keywords: 'displays connected kiosk raspberry ip resolución' },
   { label: 'Dispositivos vinculados', route: 'displays', anchor: 'disp-paired', keywords: 'paired devices pair code revoke revocar vincular emparelhar' },
   { label: 'Acceso a las pantallas', route: 'security', anchor: 'sec-display', keywords: 'display access private open privado abierto aberto key clave enlace', feature: 'openDisplayAccess' },

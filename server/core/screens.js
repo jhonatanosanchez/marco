@@ -2,6 +2,7 @@
 // (and the legacy single-screen code paths) understand. Pure functions. See docs/API.md and docs/ARCHITECTURE.md.
 // Mirror for the admin panel: web/shared/screens.ts (keep both in sync).
 import { SCREEN_SPLIT_KEYS, SCREEN_ONLY_KEYS, LOCAL_SOURCE_ID, BIRTHDAYS_SOURCE_ID } from './defaults.js';
+import { displayPrivacy } from './privacy.js';
 
 /** Default screen profile (cfg.defaultScreen, falling back to the first one). */
 export function defaultScreen(cfg) {
@@ -68,9 +69,15 @@ export function screenSchedules(cfg, screen) {
   return cfg.schedules.items.filter((m) => m.enabled && (!m.screenIds.length || m.screenIds.includes(screen.id)));
 }
 
-/** GET /api/display/config payload for one screen (no secrets, no URLs, no HA entity ids). */
-export function displayConfig(cfg, screen, { fallback = false } = {}) {
+/**
+ * GET /api/display/config payload for one screen (no secrets, no URLs, no HA entity ids).
+ * `privacy` = { status, next } from core/privacy.js (privacyStatus, privacyNextChange); absent = not private.
+ * While private with `hidePhotos`, the background only uses stock photos.
+ */
+export function displayConfig(cfg, screen, { fallback = false, privacy = null } = {}) {
   const f = flatView(cfg, screen);
+  const priv = displayPrivacy(screen, privacy?.status, privacy?.next ?? null);
+  const background = priv.active && screen.privacy?.hidePhotos && f.background.source !== 'stock' ? { ...f.background, source: 'stock' } : f.background;
   const { sources, sourceIds, ...cal } = f.calendar;
   const { haWeatherEntity, haIndoorTempEntity, haIndoorHumidityEntity, ...weather } = f.weather;
   return {
@@ -80,7 +87,7 @@ export function displayConfig(cfg, screen, { fallback = false } = {}) {
     screenFallback: fallback,
     screen: f.screen,
     layout: f.layout,
-    background: f.background,
+    background,
     calendar: { ...cal, sources: publicSources(cfg, screen) },
     datetime: f.datetime,
     weather,
@@ -90,5 +97,6 @@ export function displayConfig(cfg, screen, { fallback = false } = {}) {
     countdowns: { enabled: f.countdowns.enabled, max: f.countdowns.max },
     alerts: f.alerts,
     schedules: screenSchedules(cfg, screen).map(({ screenIds, ...m }) => m),
+    privacy: priv,
   };
 }

@@ -16,6 +16,7 @@ import { flushTokenUsage } from './tokens.js';
 import { logSetupHint } from './setup.js';
 import { invalidateIcsParsing } from './calendars.js';
 import { serverUpdater } from './routes/updates.js';
+import { onPrivacyConfig, syncPrivacy, stopPrivacy } from './privacy.js';
 
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 
@@ -55,6 +56,7 @@ storeEvents.on('config', (cfg, prev, { reason, req } = {}) => {
   reresolveDisplays(cfg);
   pruneScreens(cfg);
   broadcast('config', { revision: cfg.revision });
+  onPrivacyConfig();
   runRefresh().catch(() => {});
   if (reason !== 'restore' && reason !== 'import') {
     logActivity('config.saved', { req, ...(req ? {} : { actor: 'system' }), data: { revision: cfg.revision, sections: changedSections(prev, cfg), ...(reason && reason !== 'admin' ? { reason } : {}) } });
@@ -71,6 +73,8 @@ const server = app.listen(PORT, process.env.HOST || '0.0.0.0', (err) => {
   console.log(`[server] Marco v${pkg.version} on http://localhost:${PORT} (data: ${paths.data})`);
   logSetupHint(PORT);
   startRefresher();
+  // Privacy periods that end and schedule rules that start while the server runs (server/privacy.js)
+  syncPrivacy();
   // Daily check for a newer release (MARCO_UPDATE_CHECK=0 or the admin switch turn it off); server/updates.js
   serverUpdater(pkg.version).start();
 });
@@ -78,6 +82,7 @@ const server = app.listen(PORT, process.env.HOST || '0.0.0.0', (err) => {
 function shutdown(sig) {
   console.log(`[server] ${sig}, shutting down`);
   stopRefresher();
+  stopPrivacy();
   serverUpdater(pkg.version).stop();
   try { flushDisplays(); flushTokenUsage(); } catch { /* ignore */ }
   closeAll();

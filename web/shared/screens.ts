@@ -13,7 +13,7 @@ export const SCREEN_SPLIT_KEYS = {
   countdowns: ['enabled', 'max'],
 } as const;
 /** Sections that live entirely in the screen profile. */
-export const SCREEN_ONLY_KEYS = ['screen', 'layout', 'background', 'message', 'alerts'] as const;
+export const SCREEN_ONLY_KEYS = ['screen', 'layout', 'background', 'message', 'alerts', 'privacy'] as const;
 
 type AnyObj = Record<string, any>;
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v));

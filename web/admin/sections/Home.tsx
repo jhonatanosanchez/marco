@@ -7,6 +7,7 @@ import { AnnounceForm } from '../components/AnnounceForm';
 import { toast } from '../components/feedback';
 import { Icon } from '../components/icons';
 import { WelcomeCard } from '../components/WelcomeCard';
+import { PrivacyActions, PrivacyMenu, privacyUntilText, usePrivacy } from '../components/Privacy';
 import { Button, Callout, Card, Empty, StatusDot } from '../components/ui';
 import { daysBetween, eventDay, eventTimeLabel, fmtDay, relDays, todayIn } from '../dates';
 import { has, runtime } from '../caps';
@@ -45,6 +46,8 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
   const [busy, setBusy] = useState('');
   const cmdsOn = has('displayCommands');
   const annOn = has('announcements');
+  const privOn = has('privacy');
+  const privacy = usePrivacy();
   const links = useDisplayLinks(saved);
   const [, tick] = useState(0);
   const [welcome, setWelcome] = useState(false);
@@ -140,7 +143,7 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
         );
       })}
 
-      {(cmdsOn || annOn) && (
+      {(cmdsOn || annOn || privOn) && (
         <Card title={t('Acciones rápidas')} icon="zap">
           {cmdsOn && (
             <>
@@ -162,6 +165,19 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
                     {t('Auto')}
                   </Button>
                 </div>
+              </div>
+              {(annOn || privOn) && <div class="divider-line" />}
+            </>
+          )}
+          {privOn && (
+            <>
+              <div class="quick-privacy">
+                <div class="quick-privacy__label">
+                  <Icon name="lock" size={15} />
+                  <strong>{t('Modo privado')}</strong>
+                  <span class="muted small">{full.screens.length > 1 ? t('en todas las pantallas') : t('en la pantalla')}</span>
+                </div>
+                <PrivacyActions active={!!privacy?.some((r) => r.active)} />
               </div>
               {annOn && <div class="divider-line" />}
             </>
@@ -187,6 +203,7 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
                 const prof = full.screens.find((p) => p.id === s.id);
                 const ds = d?.displays.filter((x) => x.screenId === s.id) ?? [];
                 const on = ds.filter((x) => x.connected).length;
+                const priv = privacy?.find((r) => r.screenId === s.id);
                 return (
                   <li>
                     <span class="dash-screens__sw" style={{ background: prof?.screen.accent ?? 'var(--accent)' }} />
@@ -195,10 +212,16 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
                         {s.name} {s.isDefault && <span class="star" title={t('Pantalla predeterminada')}>★</span>}
                       </strong>
                       {saved.security?.displayAccess === 'open' && <span class="muted small mono">?screen={s.slug}</span>}
+                      {priv?.active && (
+                        <span class="privacy-pill" title={privacyUntilText(priv, tz)}>
+                          <Icon name="lock" size={12} /> {t('Privado')}
+                        </span>
+                      )}
                     </div>
                     <span class={`online-pill ${on ? 'is-on' : ''}`}>
                       <StatusDot state={on ? 'ok' : 'idle'} /> {on ? t('{n} en línea', { n: on }) : t('sin conexión')}
                     </span>
+                    <PrivacyMenu screenId={s.id} row={priv} tz={tz} />
                     <button
                       type="button"
                       class="icon-btn"

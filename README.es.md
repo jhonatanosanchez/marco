@@ -131,6 +131,8 @@ color de la foto, transparencia, desenfoque y borde de luz:
   mostrando los últimos datos.
 - **Avisos:** tarjetas a pantalla completa con un sonido ("🧺 La lavadora ha terminado") y **mensajes
   programados** ("🗑️ Sacar la basura", mar. y vie. de 20:00 a 22:00).
+- **Modo privado** por pantalla para cuando hay invitados: los eventos se ven como "Ocupado" (o se ocultan), a mano,
+  con horario o desde Home Assistant, y el servidor los filtra antes de que lleguen a la pantalla.
 - **Pensado para la Pi:** límite de 30 fps, se pausa cuando está oculta y `?lite=1` desactiva WebGL por completo.
 
 <br clear="right">

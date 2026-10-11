@@ -9,6 +9,7 @@ import { locale, t } from '../i18n';
 import { cssBytes, EMAIL_RE } from '../util';
 import { MIN_PASSWORD, passwordProblem } from '../../shared/password';
 import type { SectionProps } from './common';
+import { PrivacyCard } from './Privacy';
 
 const kb = (n: number) => (Math.round((n / 1024) * 10) / 10).toLocaleString(locale());
 
@@ -86,6 +87,7 @@ export function ScreenSection({ cfg, set, errors, screenId, saved, go }: Section
           </Field>
         </div>
       </Card>
+      {has('privacy') && <PrivacyCard cfg={cfg} set={set} errors={errors} go={go} />}
       {has('customCss') && (
         <Card id="scr-css" scope="screen" title={t('CSS personalizado')} icon="wand" desc={t('Para usuarios avanzados: se inyecta en la pantalla.')}>
           <Field error={errors['screen.customCss']} hint={cssMax != null ? t('{used} de {max} KB', { used: kb(cssBytes(s.customCss)), max: kb(cssMax) }) : undefined}>

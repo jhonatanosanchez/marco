@@ -9,7 +9,7 @@ export const DEFAULT_SOURCES = [
   {
     id: 'c_holidays', type: 'ics', name: 'Public holidays',
     url: 'https://calendar.google.com/calendar/ical/en.portuguese%23holiday%40group.v.calendar.google.com/public/basic.ics',
-    color: '#f4a261', emoji: '🎉', kind: 'holidays', enabled: true, refreshMin: 360, insecureTls: false,
+    color: '#f4a261', emoji: '🎉', kind: 'holidays', enabled: true, refreshMin: 360, insecureTls: false, privacy: 'keep',
   },
 ];
 
@@ -31,7 +31,7 @@ export const SCREEN_SPLIT_KEYS = {
   countdowns: ['enabled', 'max'],
 };
 /** Keys that only exist per screen (whole object lives in the screen profile). */
-export const SCREEN_ONLY_KEYS = ['screen', 'layout', 'background', 'message', 'alerts'];
+export const SCREEN_ONLY_KEYS = ['screen', 'layout', 'background', 'message', 'alerts', 'privacy'];
 
 /** A complete screen profile with default values (screen.name lives in profile.name). */
 export function defaultScreenProfile({ id = 's_main', slug = 'living-room', name = 'Living room' } = {}) {
@@ -65,6 +65,9 @@ export function defaultScreenProfile({ id = 's_main', slug = 'living-room', name
     message: { enabled: false, text: '', emoji: '💬' },
     countdowns: { enabled: true, max: 4 },
     alerts: { enabled: true, sound: true, volume: 0.6 },
+    // privacy mode (server/core/privacy.js): photos replaced by stock ones while private, a small lock on screen,
+    // and rules that turn it on by themselves ({ id, enabled, days, from, to }, `to < from` crosses midnight)
+    privacy: { hidePhotos: false, showLock: true, schedule: [] },
   });
 }
 
@@ -87,8 +90,8 @@ export function defaultConfig() {
       maxItems: 30,
     },
     todo: { items: [] },
-    localEvents: { enabled: true, name: 'Family', color: '#e76f51', emoji: '', items: [] },
-    birthdays: { enabled: true, name: 'Birthdays', color: '#ff6f91', emoji: '🎂', showAge: true, items: [] },
+    localEvents: { enabled: true, name: 'Family', color: '#e76f51', emoji: '', privacy: 'busy', items: [] },
+    birthdays: { enabled: true, name: 'Birthdays', color: '#ff6f91', emoji: '🎂', showAge: true, privacy: 'keep', items: [] },
     eventRules: { items: [] },
     countdowns: { items: [], includeBirthdays: true, birthdayDays: 30, includeFlagged: true, horizonDays: 365 },
     schedules: { items: [] },

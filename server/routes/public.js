@@ -14,17 +14,34 @@ import { addDays, localDate, isDateStr, daysBetween } from '../core/lib/tz.js';
 import { healthBody } from '../capabilities.js';
 import { lanAddresses } from '../setup.js';
 import { hostAllowed, hostnameOf, untrustedProxy } from '../lib/net.js';
+import { screenPrivacy, screenPrivacyNext } from '../privacy.js';
+import { privatizeEvents } from '../core/privacy.js';
+import { hash } from '../lib/text.js';
+
+/** Privacy of a screen as displayConfig() takes it ({ status, next }). */
+const privacyOf = (cfg, screen) => ({ status: screenPrivacy(cfg, screen), next: screenPrivacyNext(cfg, screen) });
 
 /** GET /api/display/config payload for `screenKey` (slug or id; empty → default screen). */
 export function displayConfig(cfg, screenKey) {
   const { screen, fallback } = resolveScreen(cfg, screenKey);
-  return projectDisplayConfig(cfg, screen, { fallback });
+  return projectDisplayConfig(cfg, screen, { fallback, privacy: privacyOf(cfg, screen) });
 }
 
 /** Display config for a request (screen bound to its key / device, else ?screen=). */
 function displayConfigFor(cfg, req) {
   const { screen, fallback } = requestScreen(cfg, req);
-  return projectDisplayConfig(cfg, screen, { fallback });
+  return projectDisplayConfig(cfg, screen, { fallback, privacy: privacyOf(cfg, screen) });
+}
+
+/**
+ * Events as the display may see them: while the screen is private, busy / hidden calendars are filtered here,
+ * before anything leaves the server (core/privacy.js). The admin preview iframe is a display, so it sees the same.
+ */
+export async function displayEvents(cfg, screen, { from, to }) {
+  const r = await getEvents({ from, to, screen });
+  if (!screenPrivacy(cfg, screen).active) return r;
+  const events = privatizeEvents(r.events, cfg, screen.screen.language);
+  return { ...r, events, hash: `p${hash(events)}` };
 }
 
 /** The request comes from this machine (loopback, not relayed by an untrusted proxy) under an allowed host name. */
@@ -60,7 +77,8 @@ export function publicRouter({ version }) {
       if (from > maxDate) from = maxDate;
       if (to < from) to = from;
       if (daysBetween(from, to) > 400) to = addDays(from, 400);
-      res.json(await getEvents({ from, to, screen: requestScreen(getConfig(), req).screen }));
+      const cfg = getConfig();
+      res.json(await displayEvents(cfg, requestScreen(cfg, req).screen, { from, to }));
     } catch (err) {
       next(err);
     }
@@ -84,9 +102,13 @@ export function publicRouter({ version }) {
 
   r.get('/photos', async (req, res, next) => {
     try {
-      const { screen } = requestScreen(getConfig(), req);
+      const cfg = getConfig();
+      const { screen } = requestScreen(cfg, req);
       const after = typeof req.query.after === 'string' ? req.query.after : '';
-      res.json({ photos: await getPhotos(Number(req.query.count) || 20, screen.background, { key: screen.id, after }) });
+      // Privacy mode with "hide photos": stock photos only, gallery file names never reach the display.
+      const hide = screen.privacy?.hidePhotos && screenPrivacy(cfg, screen).active;
+      const background = hide ? { ...screen.background, source: 'stock' } : screen.background;
+      res.json({ photos: await getPhotos(Number(req.query.count) || 20, background, { key: hide ? `${screen.id}|private` : screen.id, after: hide ? '' : after }) });
     } catch (err) {
       next(err);
     }

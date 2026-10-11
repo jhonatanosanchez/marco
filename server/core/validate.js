@@ -5,6 +5,7 @@ import { isValidTimeZone } from './lib/tz.js';
 import { randomId, fold } from './lib/text.js';
 import { LANGS } from './lib/i18n.js';
 import { WEATHER_PROVIDER_IDS, OPEN_METEO_MODEL_IDS, KEY_PROVIDERS } from './weather.js';
+import { PRIVACY_MODES, MAX_PRIVACY_RULES, defaultSourcePrivacy } from './privacy.js';
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
@@ -109,6 +110,8 @@ function sanitizeSource(ctx, path, s, seen) {
     enabled: bool(ctx, `${path}.enabled`, s.enabled, true),
     refreshMin: num(ctx, `${path}.refreshMin`, s.refreshMin, 5, 1, 1440, true),
   };
+  // what privacy mode does to its events: 'busy' (default), 'hide', 'keep' (holidays and birthdays default to keep)
+  out.privacy = oneOf(ctx, `${path}.privacy`, s.privacy, defaultSourcePrivacy(out.kind), PRIVACY_MODES);
   if (type === 'ics') {
     const url = str(ctx, `${path}.url`, s.url, '', 2048).trim();
     if (!isHttpUrl(url, ['http:', 'https:', 'webcal:', 'webcals:'])) ctx.err(`${path}.url`, 'invalid URL');
@@ -325,10 +328,31 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
     volume: num(ctx, `${p}.alerts.volume`, al.volume, D.alerts.volume, 0, 1),
   };
 
+  const pv = obj(ctx, `${p}.privacy`, x.privacy);
+  const privacy = {
+    hidePhotos: bool(ctx, `${p}.privacy.hidePhotos`, pv.hidePhotos, D.privacy.hidePhotos),
+    showLock: bool(ctx, `${p}.privacy.showLock`, pv.showLock, D.privacy.showLock),
+    schedule: list(ctx, `${p}.privacy.schedule`, pv.schedule, [], MAX_PRIVACY_RULES, sanitizePrivacyRule),
+  };
+
   return {
     id: id(ctx, `${p}.id`, x.id, 's_', seenIds), slug, name,
-    screen, layout, background, calendar, datetime, weather, news, todo, message, countdowns, alerts,
+    screen, layout, background, calendar, datetime, weather, news, todo, message, countdowns, alerts, privacy,
   };
+}
+
+/** A privacy schedule rule: days (0 = Sunday, [] = every day) and a from/to window (`to < from` crosses midnight). */
+function sanitizePrivacyRule(ctx, p, x, seen) {
+  if (!isObj(x)) { ctx.err(p, 'expected object'); return null; }
+  const out = {
+    id: id(ctx, `${p}.id`, x.id, 'p_', seen),
+    enabled: bool(ctx, `${p}.enabled`, x.enabled, true),
+    days: weekdays(ctx, `${p}.days`, x.days),
+    from: hhmm(ctx, `${p}.from`, x.from, '22:00'),
+    to: hhmm(ctx, `${p}.to`, x.to, '07:00'),
+  };
+  if (out.from === out.to) ctx.err(`${p}.to`, 'must differ from `from`');
+  return out;
 }
 
 function sanitizeLocalEvent(ctx, p, x, seen) {
@@ -552,6 +576,7 @@ export function validateConfig(input, opts = {}) {
     name: str(ctx, 'localEvents.name', le.name, D.localEvents.name, 80).trim() || D.localEvents.name,
     color: color(ctx, 'localEvents.color', le.color, D.localEvents.color),
     emoji: emoji(ctx, 'localEvents.emoji', le.emoji, D.localEvents.emoji),
+    privacy: oneOf(ctx, 'localEvents.privacy', le.privacy, D.localEvents.privacy, PRIVACY_MODES),
     items: list(ctx, 'localEvents.items', le.items, [], 1000, sanitizeLocalEvent),
   };
   const bd = obj(ctx, 'birthdays', c.birthdays);
@@ -561,6 +586,7 @@ export function validateConfig(input, opts = {}) {
     color: color(ctx, 'birthdays.color', bd.color, D.birthdays.color),
     emoji: emoji(ctx, 'birthdays.emoji', bd.emoji, D.birthdays.emoji),
     showAge: bool(ctx, 'birthdays.showAge', bd.showAge, D.birthdays.showAge),
+    privacy: oneOf(ctx, 'birthdays.privacy', bd.privacy, D.birthdays.privacy, PRIVACY_MODES),
     items: list(ctx, 'birthdays.items', bd.items, [], 500, sanitizeBirthday),
   };
 

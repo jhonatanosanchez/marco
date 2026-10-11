@@ -1,4 +1,7 @@
 import type {
+  PrivacyChangeResponse,
+  PrivacyRequest,
+  PrivacyResponse,
   ActivityResponse,
   AdminPhoto,
   PhotoConflictPolicy,
@@ -191,6 +194,9 @@ export const api = {
   updateApply: () => request<UpdateInfo>('POST', '/api/admin/update/apply'),
   screenTemplate: (name: string) => request<ScreenProfile>('GET', `/api/admin/screens/template${q({ name })}`),
   displays: () => request<DisplaysResponse>('GET', '/api/admin/displays'),
+  // privacy mode per screen (features.privacy; docs/API.md)
+  privacy: () => request<PrivacyResponse>('GET', '/api/admin/privacy'),
+  setPrivacy: (body: PrivacyRequest) => request<PrivacyChangeResponse>('POST', '/api/admin/privacy', body),
   displayCommand: (body: DisplayCommandRequest) => request<{ ok: true; delivered: number }>('POST', '/api/admin/displays/command', body),
   forgetDisplay: (clientId: string) => request<{ ok: true }>('DELETE', `/api/admin/displays/${encodeURIComponent(clientId)}`),
 

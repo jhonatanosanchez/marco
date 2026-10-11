@@ -5,7 +5,8 @@ import { Icon } from '../components/icons';
 import { Button, Card, ColorPicker, EmojiPicker, Empty, Field, Modal, NumberInput, PageHeader, SearchInput, Segmented, Textarea, TextInput, Toggle, ToggleRow, WeekdayPicker } from '../components/ui';
 import { addDays, daysBetween, fmtDay, relDays, todayIn, weekdayNames, weekdayOf } from '../dates';
 import { t } from '../i18n';
-import { atLimit, limit } from '../caps';
+import { atLimit, has, limit } from '../caps';
+import { PrivacyModeField } from './Privacy';
 import { LimitNote } from '../components/LimitNote';
 import { takeIntent } from '../intent';
 import { clone, HEX_RE, isValidDate, normalize, TIME_RE, uid } from '../util';
@@ -436,6 +437,7 @@ export function LocalEventsSection({ full, setFull, errors, cfg }: SectionProps)
           <TextInput value={le.name} maxLength={60} placeholder={t('Familia')} onValue={(v) => setFull((d) => void (d.localEvents.name = v))} />
           <span class="muted small">{t('Nombre en la leyenda')}</span>
         </div>
+        {has('privacy') && <PrivacyModeField value={le.privacy ?? 'busy'} onChange={(v) => setFull((d) => void (d.localEvents.privacy = v))} />}
       </Card>
 
       <Card
