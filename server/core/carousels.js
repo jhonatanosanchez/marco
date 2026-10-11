@@ -15,7 +15,16 @@ export const MAX_CAROUSEL_STEPS = 12;
 export const MIN_STEP_SEC = 10;
 export const MAX_STEP_SEC = 3600;
 export const DEFAULT_STEP_SEC = 30;
-export const CAROUSEL_TRANSITIONS = Object.freeze(['fade', 'none']);
+/** Animation between two screens. 'random' picks one of CAROUSEL_RANDOM_POOL at every switch (the display). */
+export const CAROUSEL_TRANSITIONS = Object.freeze(['fade', 'slide', 'zoom', 'wipe', 'dissolve', 'random', 'none']);
+/** What 'random' picks from. */
+export const CAROUSEL_RANDOM_POOL = Object.freeze(['fade', 'slide', 'zoom', 'wipe', 'dissolve']);
+/** How long the animation lasts (ms) for each speed. */
+export const CAROUSEL_SPEEDS = Object.freeze({ fast: 400, normal: 800, slow: 1400 });
+export const DEFAULT_TRANSITION = 'fade';
+export const DEFAULT_SPEED = 'normal';
+/** A speed the server knows, else the default (configs saved before speeds existed have none). */
+export const speedOf = (v) => (Object.hasOwn(CAROUSEL_SPEEDS, v) ? v : DEFAULT_SPEED);
 
 /** True for a carousel id ("v_…"); screen ids never use that prefix. */
 export const isCarouselId = (id) => typeof id === 'string' && id.startsWith(CAROUSEL_PREFIX);
@@ -89,7 +98,8 @@ export function carouselBlock(cfg, c) {
     slug: c.slug,
     name: c.name,
     enabled: c.enabled !== false,
-    transition: CAROUSEL_TRANSITIONS.includes(c.transition) ? c.transition : 'fade',
+    transition: CAROUSEL_TRANSITIONS.includes(c.transition) ? c.transition : DEFAULT_TRANSITION,
+    transitionSpeed: speedOf(c.transitionSpeed),
     holdOnAlert: c.holdOnAlert !== false,
     nightRotate: c.nightRotate === true,
     offScreenId: offScreenOf(cfg, c),

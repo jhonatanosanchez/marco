@@ -137,7 +137,10 @@ export interface CarouselStep {
   seconds: number;
 }
 
-export type CarouselTransition = 'fade' | 'none';
+/** Animation between two screens of a carousel; 'random' picks another one at each switch, the same on every TV. */
+export type CarouselTransition = 'fade' | 'slide' | 'zoom' | 'wipe' | 'dissolve' | 'random' | 'none';
+/** How long that animation lasts: fast 400 ms, normal 800 ms, slow 1400 ms. */
+export type CarouselSpeed = 'fast' | 'normal' | 'slow';
 
 /**
  * A carousel (StoredConfig.carousels.items, server/core/carousels.js): screens shown one after another on the same
@@ -151,6 +154,8 @@ export interface Carousel {
   /** URL address (/?screen=<slug>); never the slug of a screen */
   slug: string;
   transition: CarouselTransition;
+  /** absent in configs saved before speeds existed (= 'normal') */
+  transitionSpeed?: CarouselSpeed;
   /** a doorbell ring or an announcement on screen keeps the current step until it is gone */
   holdOnAlert: boolean;
   /** night mode: keep rotating (each screen with its own night settings) or hold `offScreenId` (false) */
@@ -169,6 +174,8 @@ export interface CarouselBlock {
   name: string;
   enabled: boolean;
   transition: CarouselTransition;
+  /** absent from servers older than 0.7 (= 'normal') */
+  transitionSpeed?: CarouselSpeed;
   holdOnAlert: boolean;
   nightRotate: boolean;
   offScreenId: string;

@@ -25,6 +25,8 @@ export class Engine {
   private rects = new Map<GLLayer, Rect | null>();
   private clear = new Color(0, 0, 0);
   private dead = false;
+  /** keep the measured rects (a carousel switch moves #app with a transform; the canvas moves with it) */
+  private hold = false;
   onLost: (() => void) | null = null;
   fps = 30;
   /** cap when no layer is busy: Ken Burns drift is sub-pixel per frame, the aurora updates at 15 fps anyway */
@@ -116,8 +118,38 @@ export class Engine {
     this.raf = 0;
   }
 
+  /** Measure every layer now and keep those rects until holdRects(false). */
+  holdRects(on: boolean): void {
+    this.hold = false;
+    this.invalidate();
+    if (!on) return;
+    for (const l of this.layers) this.rectOf(l);
+    this.hold = true;
+  }
+
+  /**
+   * A copy of the frame as it is now (a fresh frame is drawn first: without preserveDrawingBuffer the buffer is
+   * only readable in the task that drew it). Null when the context is gone.
+   */
+  snapshot(): HTMLCanvasElement | null {
+    if (this.dead || !this.canvas.width || !this.canvas.height) return null;
+    try {
+      this.frame((performance.now() - this.t0) / 1000, 0);
+      const c = document.createElement('canvas');
+      c.width = this.canvas.width;
+      c.height = this.canvas.height;
+      const g = c.getContext('2d');
+      if (!g) return null;
+      g.drawImage(this.canvas, 0, 0);
+      return c;
+    } catch (e) {
+      console.warn('[gl] snapshot failed', e);
+      return null;
+    }
+  }
+
   private rectOf(l: GLLayer): Rect | null {
-    if (this.frameN % 15 === 0 || !this.rects.has(l)) {
+    if ((!this.hold && this.frameN % 15 === 0) || !this.rects.has(l)) {
       const el = l.target();
       if (!el) this.rects.set(l, null);
       else {

@@ -1,7 +1,7 @@
 // Built-in realistic demo dataset (used with ?demo=1 or when /api is unreachable in dev).
 // Everything is generated relative to "today" so screenshots always look populated.
 import type {
-  AlertStyle, Announcement, CalEvent, CountdownItem, CountdownsResponse, DisplayConfig, EventsResponse, NewsResponse,
+  AlertStyle, Announcement, CalEvent, CarouselTransition, CountdownItem, CountdownsResponse, DisplayConfig, EventsResponse, NewsResponse,
   PhotosResponse, PublicCalendarSource, SourceKind, WeatherResponse,
 } from '../shared/types';
 import { DEFAULT_ICON_RULES, resolveEventStyle } from '../shared/emoji';
@@ -82,7 +82,8 @@ export function mockConfig(): DisplayConfig {
 }
 
 /**
- * ?demo=1&carousel=1: a carousel of four demo screens with different layouts (&stepSec= seconds each, default 8),
+ * ?demo=1&carousel=1: a carousel of four demo screens with different layouts (&stepSec= seconds each, default 8, &tr=<name>
+ * and &trSpeed=fast|normal|slow to film one animation),
  * for filming the rotation. Every config carries the same carousel block, as the server sends it.
  */
 export function mockCarouselConfigs(): DisplayConfig[] {
@@ -96,7 +97,9 @@ export function mockCarouselConfigs(): DisplayConfig[] {
   ];
   const carousel = {
     id: 'v_demo', slug: 'demo-loop', name: L('Living room loop', 'Bucle del salón', 'Ciclo da sala'),
-    enabled: true, transition: (q.get('fade') === '0' ? 'none' : 'fade') as 'fade' | 'none', holdOnAlert: true, nightRotate: false,
+    // a different animation at each switch (&tr=<name> forces one, &fade=0 turns them off)
+    enabled: true, transition: (q.get('fade') === '0' ? 'none' : 'random') as CarouselTransition, transitionSpeed: 'normal' as const,
+    holdOnAlert: true, nightRotate: false,
     offScreenId: 's_main', schedule: [],
     steps: screens.map(([screenId, slug, name]) => ({ screenId, slug, name, seconds: sec })),
   };

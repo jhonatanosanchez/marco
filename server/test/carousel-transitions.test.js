@@ -1,0 +1,123 @@
+// Carousel animations: validation of transition and transitionSpeed (old configs keep working), the 'random' pick
+// (same on every TV, never the same twice in a row), the switch plan (reduced motion, lite / Raspberry Pi, no
+// WebGL, ?tr= forcing) and the selector rewrite that styles the still copy of the screen.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { defaultConfig, defaultScreenProfile } from '../core/defaults.js';
+import { validateConfig } from '../core/validate.js';
+import { carouselBlock, CAROUSEL_RANDOM_POOL, CAROUSEL_SPEEDS, CAROUSEL_TRANSITIONS } from '../core/carousels.js';
+import { loadWebModules } from './webModules.js';
+
+const [plan, sw, admin] = await loadWebModules('/web/display/switchPlan.ts', '/web/display/screenSwitch.ts', '/web/admin/sections/Carousels.tsx');
+const { randomPick, planSwitch, switchNumber, isLowPower, SHORT_FADE_MS } = plan;
+
+function config(carousels) {
+  const c = defaultConfig();
+  c.calendar.sources = [];
+  c.news.feeds = [];
+  c.screens.push(defaultScreenProfile({ id: 's_kitchen', slug: 'kitchen', name: 'Kitchen' }));
+  c.carousels = { items: carousels };
+  return c;
+}
+const steps = [{ screenId: 's_main', seconds: 30 }, { screenId: 's_kitchen', seconds: 30 }];
+
+test('validation: every transition and speed is kept, unknown ones are errors, old configs get fade / normal', () => {
+  for (const tr of CAROUSEL_TRANSITIONS) {
+    for (const speed of Object.keys(CAROUSEL_SPEEDS)) {
+      const r = validateConfig(config([{ name: 'L', steps, transition: tr, transitionSpeed: speed }]));
+      assert.deepEqual(r.errors, []);
+      assert.equal(r.value.carousels.items[0].transition, tr);
+      assert.equal(r.value.carousels.items[0].transitionSpeed, speed);
+    }
+  }
+  const old = validateConfig(config([{ name: 'Old', steps, transition: 'fade' }]));
+  assert.deepEqual(old.errors, []);
+  assert.equal(old.value.carousels.items[0].transitionSpeed, 'normal');
+  const none = validateConfig(config([{ name: 'Bare', steps }]));
+  assert.equal(none.value.carousels.items[0].transition, 'fade');
+  const bad = validateConfig(config([{ name: 'Bad', steps, transition: 'spin', transitionSpeed: 'warp' }]));
+  assert.deepEqual(bad.errors.map((e) => e.path).sort(), ['carousels.items[0].transition', 'carousels.items[0].transitionSpeed']);
+  const num = validateConfig(config([{ name: 'Num', steps, transitionSpeed: 800 }]));
+  assert.deepEqual(num.errors.map((e) => e.path), ['carousels.items[0].transitionSpeed']);
+});
+
+test('carouselBlock: the display gets the speed, with a default for carousels saved before speeds', () => {
+  const cfg = config([]);
+  assert.equal(carouselBlock(cfg, { id: 'v_a', slug: 'a', name: 'A', transition: 'wipe', transitionSpeed: 'slow', steps }).transitionSpeed, 'slow');
+  const b = carouselBlock(cfg, { id: 'v_a', slug: 'a', name: 'A', transition: 'fade', steps });
+  assert.equal(b.transitionSpeed, 'normal');
+  assert.equal(carouselBlock(cfg, { id: 'v_a', slug: 'a', name: 'A', transition: 'spin', steps }).transition, 'fade');
+});
+
+test('random: deterministic, never the same twice in a row, every animation shows', () => {
+  const seq = Array.from({ length: 2000 }, (_, i) => randomPick(i - 1000, 'v_loop'));
+  assert.deepEqual(seq, Array.from({ length: 2000 }, (_, i) => randomPick(i - 1000, 'v_loop')), 'same answer on every TV');
+  for (let i = 1; i < seq.length; i++) assert.notEqual(seq[i], seq[i - 1], `switch ${i - 1000} repeats`);
+  for (const e of CAROUSEL_RANDOM_POOL) assert.ok(seq.includes(e), e);
+  // each window of pool-size switches is spread out: no animation more than twice
+  const counts = {};
+  for (const e of seq.slice(0, 10)) counts[e] = (counts[e] || 0) + 1;
+  assert.ok(Object.values(counts).every((n) => n <= 3));
+  const other = Array.from({ length: 50 }, (_, i) => randomPick(i, 'v_other'));
+  assert.notDeepEqual(other, seq.slice(1000, 1050), 'another carousel has its own sequence');
+  assert.ok(CAROUSEL_RANDOM_POOL.includes(randomPick(NaN)));
+});
+
+test('switchNumber: one more at every step start, the same within a step', () => {
+  const t = Date.UTC(2026, 9, 11, 10, 0, 0);
+  const n0 = switchNumber(steps, t);
+  assert.equal(switchNumber(steps, t + 1000), n0);
+  const slot = 30_000 - (t % 30_000);
+  assert.equal(switchNumber(steps, t + slot), n0 + 1);
+  assert.equal(switchNumber(steps, t + slot + 30_000), n0 + 2);
+  assert.equal(switchNumber(steps, t + slot + 60_000), n0 + 3, 'continues across loops');
+  assert.equal(typeof switchNumber([], t), 'number');
+});
+
+test('planSwitch: speeds, reduced motion and low power give a short fade, dissolve needs GL, ?tr= forces', () => {
+  const env = { reduced: false, lowPower: false, gl: true };
+  const info = (transition, speed = 'normal', n = 0) => ({ transition, speed, n, seed: 'v_a' });
+  assert.deepEqual(planSwitch(info('slide', 'fast'), env), { effect: 'slide', ms: 400 });
+  assert.deepEqual(planSwitch(info('zoom'), env), { effect: 'zoom', ms: 800 });
+  assert.deepEqual(planSwitch(info('wipe', 'slow'), env), { effect: 'wipe', ms: 1400 });
+  assert.deepEqual(planSwitch(info('wipe', 'bogus'), env), { effect: 'wipe', ms: 800 });
+  assert.deepEqual(planSwitch(info('dissolve'), env), { effect: 'dissolve', ms: 800 });
+  assert.deepEqual(planSwitch(info('dissolve'), { ...env, gl: false }), { effect: 'fade', ms: 800 });
+  assert.deepEqual(planSwitch(info('none'), env), { effect: 'none', ms: 0 });
+  assert.deepEqual(planSwitch(info('spin'), env), { effect: 'fade', ms: 800 });
+  for (const tr of ['slide', 'zoom', 'wipe', 'dissolve', 'random']) {
+    assert.deepEqual(planSwitch(info(tr, 'slow'), { ...env, reduced: true }), { effect: 'fade', ms: SHORT_FADE_MS });
+    assert.deepEqual(planSwitch(info(tr, 'slow'), { ...env, lowPower: true }), { effect: 'fade', ms: SHORT_FADE_MS });
+  }
+  assert.equal(planSwitch(info('none'), { ...env, lowPower: true }).effect, 'none', 'off stays off');
+  assert.equal(planSwitch(info('random', 'normal', 7), env).effect, randomPick(7, 'v_a'));
+  assert.deepEqual(planSwitch(info('fade'), { ...env, force: 'wipe', forceSpeed: 'fast' }), { effect: 'wipe', ms: 400 });
+  assert.deepEqual(planSwitch(info('slide'), { ...env, force: 'nonsense' }), { effect: 'slide', ms: 800 });
+});
+
+test('isLowPower: Raspberry Pi Chromium yes, desktops and Android no', () => {
+  assert.equal(isLowPower('Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'), true);
+  assert.equal(isLowPower('Mozilla/5.0 (X11; Linux armv7l) AppleWebKit/537.36 Chrome/120.0 Safari/537.36'), true);
+  assert.equal(isLowPower('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36', 8, 8), false);
+  assert.equal(isLowPower('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/126.0 Mobile Safari/537.36 aarch64'), false);
+  assert.equal(isLowPower('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 1, 8), true, 'very little memory');
+});
+
+test('shotSelector: id rules get a data-shot-id twin with the same specificity', () => {
+  const { shotSelector } = sw;
+  assert.equal(shotSelector('.side .x'), null);
+  assert.equal(shotSelector('#app.side-right'), '#app.side-right, :is([data-shot-id="app"],#__marco-shot-never).side-right');
+  assert.equal(
+    shotSelector('html.lite #app .card, #news'),
+    'html.lite #app .card, #news, html.lite :is([data-shot-id="app"],#__marco-shot-never) .card, :is([data-shot-id="news"],#__marco-shot-never)',
+  );
+  assert.equal(shotSelector('a[href="#top"]'), null, 'a # inside a string is not an id');
+  const once = shotSelector('#app');
+  assert.equal(shotSelector(once), null, 'never twice');
+});
+
+test('admin "Probar": the preview address carries the animation chosen now', () => {
+  const { tryUrl } = admin;
+  assert.equal(tryUrl('/?screen=loop&preview=1', { transition: 'wipe', transitionSpeed: 'slow' }), '/?screen=loop&preview=1&try=1&tr=wipe&trSpeed=slow');
+  assert.equal(tryUrl('https://d.example/d/abc', { transition: 'random' }), 'https://d.example/d/abc?try=1&tr=random&trSpeed=normal');
+});

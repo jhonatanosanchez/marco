@@ -90,10 +90,17 @@ body {
   transition: opacity 1.4s var(--ease);
 }
 #app.booting { opacity: 0; }
-/* carousel: a short fade between two screens (web/display/main.ts showScreen) */
-html.has-carousel #app { transition: opacity 0.25s ease; }
-#app.is-switching { opacity: 0; }
-@media (prefers-reduced-motion: reduce) { html.has-carousel #app { transition: none; } }
+/* carousel: the still copy of the screen that leaves, animated over the new one (web/display/screenSwitch.ts) */
+.switch-shot { position: fixed; inset: 0; z-index: 2; overflow: hidden; pointer-events: none; contain: strict; }
+.switch-shot__shell, .switch-shot__inner { position: absolute; inset: 0; will-change: transform, opacity; }
+/* transform: fixed children (the copy of #app) are placed inside this box, not on the viewport */
+.switch-shot__inner { transform: translateZ(0); overflow: hidden; }
+.switch-shot__gl { position: absolute; inset: 0; width: 100%; height: 100%; }
+.switch-shot__shell.is-wipe {
+  -webkit-mask-image: linear-gradient(104deg, transparent calc(50% - var(--feather, 120px)), #000 calc(50% + var(--feather, 120px)));
+  mask-image: linear-gradient(104deg, transparent calc(50% - var(--feather, 120px)), #000 calc(50% + var(--feather, 120px)));
+}
+.switch-shot *, .switch-shot *::before, .switch-shot *::after { animation: none !important; transition: none !important; }
 
 .photo-area, .side { grid-row: 1; grid-column: 1; min-width: 0; min-height: 0; }
 .main { grid-row: 1; grid-column: 2; min-width: 0; min-height: 0; }

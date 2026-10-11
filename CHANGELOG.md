@@ -7,7 +7,7 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 - Carousels (*Carruseles*): several screens in a loop on the same TV, each for as long as you choose (10 s to 1 h),
-  in the order you set, with a fade or no transition. Every TV on the same carousel switches at the same moment. A
+  in the order you set. Every TV on the same carousel switches at the same moment. A
   display opens it like a screen: `/?screen=<address>`, its own private link, or pairing (the pickers list carousels
   after the screens).
 - A carousel can rotate only at certain times (the same days and from / to rules as private mode, overnight windows
@@ -16,6 +16,11 @@ All notable changes to this project are documented here. The format is based on
 - The next screen's data is fetched a few seconds before it shows, so switching needs no request; *Connected screens*
   shows which carousel a TV runs and what it shows now. For testing: `?step=<address>`, `?carousel=0`, and
   `?demo=1&carousel=1` for the demo screens in a loop.
+- *Animation between screens* for each carousel: fade (a true crossfade), slide, soft zoom, diagonal wipe, ink
+  dissolve (WebGL, a fade without it), random (another one at each switch, the same on every TV) or none, at a fast,
+  normal or slow speed (0.4, 0.8 or 1.4 s). On a Raspberry Pi, with `?lite=1` or with *Reduce motion*, every switch
+  is a short fade. *Probar* plays it in the preview, saved or not. `&tr=<name>` and `&trSpeed=` force one on a display
+  for filming.
 - Immich as a fourth background source, next to stock, the gallery and the mix. Set the server URL and an API key
   (scopes `album.read`, `asset.read`, `asset.view`) in the new *Integrations → Immich* page; *Test connection* shows
   the Immich version and any missing scope. Each screen picks one or more albums (merged, duplicates removed), with

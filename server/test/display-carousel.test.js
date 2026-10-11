@@ -175,3 +175,47 @@ test('?step= pins one screen, ?carousel=0 stays on the first step', async () => 
   assert.deepEqual(frozen.shown, []);
   frozen.c.stop();
 });
+
+test('show() gets the animation settings and a switch number every TV agrees on', async () => {
+  const infos = [];
+  const block = { ...BLOCK, transition: 'random', transitionSpeed: 'slow' };
+  const { c, clock } = setup({ block });
+  // wrap show to see the third argument
+  const orig = c['d'].show;
+  c['d'].show = (id, b, info) => {
+    infos.push([id, info]);
+    orig(id, b, info);
+  };
+  c.start();
+  await clock.advance(60_100);
+  await clock.advance(20_000);
+  assert.deepEqual(infos.map(([id]) => id), ['b', 'a']);
+  const [first, second] = infos.map(([, i]) => i);
+  assert.equal(first.transition, 'random');
+  assert.equal(first.speed, 'slow');
+  assert.equal(first.seed, 'v_loop');
+  assert.equal(second.n, first.n + 1);
+  c.stop();
+  const plain = setup({ block: { ...BLOCK, transitionSpeed: undefined } });
+  const got = [];
+  plain.c['d'].show = (_id, _b, info) => got.push(info);
+  plain.c.start();
+  await plain.clock.advance(60_100);
+  assert.equal(got[0].speed, 'normal', 'a block from an older server');
+  plain.c.stop();
+});
+
+test('tryNext (the admin "Probar"): next step at once, then the clock no longer moves it', async () => {
+  const { c, clock, shown } = setup();
+  c.start();
+  c.tryNext();
+  await clock.advance(10);
+  assert.deepEqual(shown.map((s) => s[0]), ['b']);
+  await clock.advance(200_000);
+  assert.deepEqual(shown.map((s) => s[0]), ['b'], 'stays on the screen it went to');
+  c.tryNext();
+  await clock.advance(10);
+  assert.deepEqual(shown.map((s) => s[0]), ['b', 'a']);
+  c.stop();
+  assert.equal(clock.pending(), 0);
+});

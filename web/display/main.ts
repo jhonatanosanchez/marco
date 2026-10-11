@@ -19,9 +19,12 @@ import {
   authHeaders, clearDeviceToken, clientId, credential, credentialKind, getActiveScreen, screenKey, setActiveScreen, storedDeviceToken, withScreen,
 } from './identity';
 import { CarouselController, type Bundle, type BundlePart } from './carousel';
+import { ScreenSwitcher, type SwitchGL } from './screenSwitch';
+import { isLowPower, planSwitch, type SwitchInfo } from './switchPlan';
 import { $ } from './dom';
 import { type NEvent, normalizeEvents } from './eventModel';
 import type { AmbientLayer } from './gl/ambientLayer';
+import type { DissolveLayer } from './gl/dissolveLayer';
 import type { Engine } from './gl/engine';
 import type { PhotoLayer } from './gl/photoLayer';
 import type { PrecipLayer } from './gl/precipLayer';
@@ -114,6 +117,7 @@ let photoLayer: PhotoLayer | null = null;
 let ambient: AmbientLayer | null = null;
 let precip: PrecipLayer | null = null;
 let wxfx: WeatherFxLayer | null = null;
+let dissolve: DissolveLayer | null = null;
 
 let glLoading: Promise<void> | null = null;
 /** three.js is loaded lazily so ?lite=1 / no-WebGL screens never download or parse it. */
@@ -122,8 +126,9 @@ function initGL(): Promise<void> {
   if (glLoading) return glLoading;
   glLoading = (async () => {
   try {
-    const [{ Engine }, { PhotoLayer }, { PrecipLayer }, { AmbientLayer }, { WeatherFxLayer }] = await Promise.all([
+    const [{ Engine }, { PhotoLayer }, { PrecipLayer }, { AmbientLayer }, { WeatherFxLayer }, { DissolveLayer }] = await Promise.all([
       import('./gl/engine'), import('./gl/photoLayer'), import('./gl/precipLayer'), import('./gl/ambientLayer'), import('./gl/weatherFxLayer'),
+      import('./gl/dissolveLayer'),
     ]);
     engine = Engine.create($('#gl') as HTMLCanvasElement);
     if (!engine) throw new Error('no webgl2');
@@ -136,6 +141,9 @@ function initGL(): Promise<void> {
     engine.add(photoLayer);
     engine.add(precip);
     engine.add(wxfx);
+    // last: the carousel dissolve draws over everything else on the canvas
+    dissolve = new DissolveLayer(() => engine?.canvas ?? null);
+    engine.add(dissolve);
     engine.onLost = () => {
       disableGL();
       scheduleGLRetry();
@@ -178,6 +186,7 @@ function disableGL(): void {
   ambient = null;
   precip = null;
   wxfx = null;
+  dissolve = null;
   document.documentElement.classList.remove('gl', 'gl-ambient');
   photos.setGL(null);
   photos.applyConfig();
@@ -874,7 +883,15 @@ function syncCarousel(c: DisplayConfig): void {
     }
   }
   carousel.start();
+  // ?try=1 (the admin's "Probar" in the preview): a switch every few seconds, so the animation can be seen
+  if (params.get('try') === '1' && !tryTimer) {
+    tryTimer = setInterval(() => {
+      if (!app.classList.contains('booting')) carousel?.tryNext();
+    }, TRY_EVERY_MS);
+  }
 }
+const TRY_EVERY_MS = 4000;
+let tryTimer: ReturnType<typeof setInterval> | null = null;
 
 /** Fetch parts of one carousel screen's data (a prefetch, or a screen shown without data yet). */
 async function fetchBundle(id: string, parts: BundlePart[], known: DisplayConfig | null): Promise<Partial<Pick<Bundle, BundlePart>>> {
@@ -932,8 +949,28 @@ function saveShown(b: Bundle): void {
   if (b.countdowns) saveCache('countdowns', b.countdowns);
 }
 
-/** Put one carousel screen on display from its bundle: no request, a short fade unless turned off. */
-function showScreen(id: string, b: Bundle, transition: 'fade' | 'none'): void {
+/** The GL side of a carousel switch (null without WebGL). */
+const switchGL = (): SwitchGL | null => {
+  const e = engine;
+  if (!e) return null;
+  return {
+    canvas: e.canvas,
+    snapshot: () => e.snapshot(),
+    dissolve: (from, ms) => {
+      if (!dissolve || engine !== e) return false;
+      dissolve.run(from, ms);
+      return true;
+    },
+    stopDissolve: () => dissolve?.stop(),
+    holdRects: (on) => e.holdRects(on),
+  };
+};
+const switcher = new ScreenSwitcher(app, switchGL);
+/** ?lite=1, or a Raspberry Pi and the like: every switch is a short fade. */
+const lowPower = lite || isLowPower(navigator.userAgent, (navigator as { deviceMemory?: number }).deviceMemory, navigator.hardwareConcurrency);
+
+/** Put one carousel screen on display from its bundle: no request, animated as the carousel says (switchPlan.ts). */
+function showScreen(id: string, b: Bundle, sw: SwitchInfo): void {
   // from now on, answers for the screen that leaves are kept for it and never shown
   setActiveScreen(id);
   const apply = () => {
@@ -957,11 +994,14 @@ function showScreen(id: string, b: Bundle, transition: 'fade' | 'none'): void {
       } else void fetchPhotos();
     }
     if (!weatherByLang.has(ctx.lang)) void fetchWeather();
-    app.classList.remove('is-switching');
   };
-  if (transition === 'none' || reducedMotion() || app.classList.contains('booting')) return apply();
-  app.classList.add('is-switching');
-  setTimeout(apply, 250);
+  if (app.classList.contains('booting')) {
+    switcher.finish();
+    return apply();
+  }
+  // ?tr=<name> forces one animation and ?trSpeed= its speed (filming, the admin's "Probar")
+  const plan = planSwitch(sw, { reduced: reducedMotion(), lowPower, gl: !!dissolve && !!engine, force: params.get('tr'), forceSpeed: params.get('trSpeed') });
+  switcher.switch(plan, apply);
 }
 
 // ---------------------------------------------------------------------------------------------

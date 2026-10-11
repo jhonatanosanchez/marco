@@ -12,7 +12,8 @@
 // The controller does no DOM work and no fetches itself: main.ts passes them in (CarouselDeps), so it is tested
 // with a fake clock (server/test/display-carousel.test.js).
 import type { CarouselBlock, CountdownsResponse, DisplayConfig, EventsResponse, PhotosResponse } from '../shared/types';
-import { carouselPhase, type CarouselPhase } from '../shared/carousels';
+import { carouselPhase, speedOf, type CarouselPhase } from '../shared/carousels';
+import { switchNumber, type SwitchInfo } from './switchPlan';
 
 /** Everything one screen needs on the display, fetched for that screen. */
 export interface Bundle {
@@ -39,8 +40,8 @@ export interface CarouselDeps {
   alertOn: () => boolean;
   /** fetch these parts for `screenId`; resolves with what came back (missing = failed) */
   fetch: (screenId: string, parts: BundlePart[], cfg: DisplayConfig | null) => Promise<Partial<Pick<Bundle, BundlePart>>>;
-  /** put `screenId` on screen with its bundle */
-  show: (screenId: string, b: Bundle, transition: 'fade' | 'none') => void;
+  /** put `screenId` on screen with its bundle; `sw` says how to animate it (web/display/switchPlan.ts) */
+  show: (screenId: string, b: Bundle, sw: SwitchInfo) => void;
   /** the screen's data was refreshed while it is on screen */
   refreshed?: (screenId: string, b: Bundle, parts: BundlePart[]) => void;
   /** debug: ?step=<slug> pins one screen, ?carousel=0 freezes on the first step */
@@ -76,6 +77,8 @@ export class CarouselController {
   private prefetchTimer: unknown = null;
   private stopped = false;
   private loading = new Map<string, Promise<Bundle | null>>();
+  /** tryNext() chose this screen: it stays until the next tryNext (the clock no longer decides) */
+  private manual: string | null = null;
   private setTimer: (fn: () => void, ms: number) => unknown;
   private clearTimer: (t: unknown) => void;
 
@@ -124,12 +127,28 @@ export class CarouselController {
   /** The screen that should be on: the pinned one, the first step while frozen, else the clock's. */
   wanted(nowMs = this.d.now()): string {
     const steps = this.block.steps;
+    if (this.manual && steps.some((s) => s.screenId === this.manual)) return this.manual;
     if (this.d.pin) {
       const hit = steps.find((s) => s.slug === this.d.pin || s.screenId === this.d.pin);
       if (hit) return hit.screenId;
     }
     if (this.d.frozen && steps.length) return steps[0].screenId;
     return this.phase(nowMs).screenId || this.active;
+  }
+
+  /**
+   * The admin's "Probar" (?try=1): go to the step after the one on screen now, with the carousel's animation. From
+   * then on the clock no longer moves the display; only the next tryNext does.
+   */
+  tryNext(): void {
+    const steps = this.block.steps;
+    if (this.stopped || steps.length < 2) return;
+    const i = steps.findIndex((s) => s.screenId === this.active);
+    let next = steps[(i + 1) % steps.length].screenId;
+    if (next === this.active) next = steps.find((s) => s.screenId !== this.active)?.screenId ?? next;
+    if (next === this.active) return;
+    this.manual = next;
+    void this.switchTo(next);
   }
 
   /** The display shows `screenId` without the controller asking (the server answered with it). */
@@ -294,6 +313,11 @@ export class CarouselController {
   private show(screenId: string, b: Bundle): void {
     if (screenId === this.active) return;
     this.active = screenId;
-    this.d.show(screenId, b, this.block.transition === 'none' ? 'none' : 'fade');
+    this.d.show(screenId, b, {
+      transition: this.block.transition || 'fade',
+      speed: speedOf(this.block.transitionSpeed),
+      n: switchNumber(this.block.steps, this.d.now()),
+      seed: this.block.id,
+    });
   }
 }

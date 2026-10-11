@@ -8,7 +8,7 @@ import { WEATHER_PROVIDER_IDS, OPEN_METEO_MODEL_IDS, KEY_PROVIDERS } from './wea
 import { PRIVACY_MODES, MAX_PRIVACY_RULES, defaultSourcePrivacy } from './privacy.js';
 import { CAMERA_RE, DOORBELL_MIN_SEC, DOORBELL_MAX_SEC } from './doorbellCore.js';
 import {
-  CAROUSEL_PREFIX, MAX_CAROUSELS, MAX_CAROUSEL_STEPS, MIN_STEP_SEC, MAX_STEP_SEC, DEFAULT_STEP_SEC, CAROUSEL_TRANSITIONS, pruneCarousels,
+  CAROUSEL_PREFIX, MAX_CAROUSELS, MAX_CAROUSEL_STEPS, MIN_STEP_SEC, MAX_STEP_SEC, DEFAULT_STEP_SEC, CAROUSEL_TRANSITIONS, CAROUSEL_SPEEDS, DEFAULT_TRANSITION, DEFAULT_SPEED, pruneCarousels,
 } from './carousels.js';
 import { IMMICH_ID_RE, MAX_IMMICH_ALBUMS, PORTRAIT_FITS, normalizeImmichUrl } from './immichCore.js';
 
@@ -505,7 +505,8 @@ function sanitizeCarousel(ctx, p, x, seen, screenSlugs, seenSlugs) {
     id: id(ctx, `${p}.id`, typeof x.id === 'string' && x.id.startsWith(CAROUSEL_PREFIX) ? x.id : undefined, CAROUSEL_PREFIX, seen),
     enabled: bool(ctx, `${p}.enabled`, x.enabled, true),
     name, slug,
-    transition: oneOf(ctx, `${p}.transition`, x.transition, 'fade', CAROUSEL_TRANSITIONS),
+    transition: oneOf(ctx, `${p}.transition`, x.transition, DEFAULT_TRANSITION, CAROUSEL_TRANSITIONS),
+    transitionSpeed: oneOf(ctx, `${p}.transitionSpeed`, x.transitionSpeed, DEFAULT_SPEED, Object.keys(CAROUSEL_SPEEDS)),
     // a doorbell ring or an announcement on screen keeps the current step until it is gone
     holdOnAlert: bool(ctx, `${p}.holdOnAlert`, x.holdOnAlert, true),
     // night mode: keep rotating (true) or hold the off-schedule screen so the dimming does not change (false)
