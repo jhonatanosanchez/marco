@@ -5,11 +5,23 @@ import { fetchErrorText } from '../apiErrors';
 import { toast } from '../components/feedback';
 import { HaEntityPicker, invalidateHaEntities } from '../components/HaEntityPicker';
 import { Icon } from '../components/icons';
-import { Button, Callout, Card, Field, PageHeader, TextInput, ToggleRow } from '../components/ui';
+import { ScreenTargets } from '../components/AnnounceForm';
+import { Button, Callout, Card, Field, NumberInput, PageHeader, TextInput, ToggleRow } from '../components/ui';
+import { has } from '../caps';
 import { t } from '../i18n';
+import { withPollNote } from '../liveNote';
 import type { SectionProps } from './common';
 
-export function HomeAssistantSection({ cfg, set, errors }: SectionProps) {
+export function HomeAssistantSection(props: SectionProps) {
+  return (
+    <>
+      <HomeAssistantMain {...props} />
+      {has('doorbell') && <DoorbellCard {...props} />}
+    </>
+  );
+}
+
+function HomeAssistantMain({ cfg, set, errors }: SectionProps) {
   const ha = cfg.homeassistant;
   const w = cfg.weather;
   const [token, setToken] = useState('');
@@ -140,5 +152,63 @@ export function HomeAssistantSection({ cfg, set, errors }: SectionProps) {
         </div>
       </Card>
     </>
+  );
+}
+
+/** Doorbell camera: which camera, how long, which screens, sound, and a test button that rings with these values. */
+function DoorbellCard({ cfg, set, errors, full }: SectionProps) {
+  const ha = cfg.homeassistant;
+  const db = ha.doorbell ?? { camera: '', seconds: 60, screenIds: [], sound: true };
+  const [busy, setBusy] = useState<'' | 'ring' | 'dismiss'>('');
+  const upd = (fn: (d: typeof db) => void) => set((d) => {
+    d.homeassistant.doorbell ??= { camera: '', seconds: 60, screenIds: [], sound: true };
+    fn(d.homeassistant.doorbell);
+  });
+  const run = async (action: 'ring' | 'dismiss') => {
+    setBusy(action);
+    try {
+      const secs = Math.min(300, Math.max(10, Math.round(Number(db.seconds) || 60)));
+      const r = await api.doorbell(
+        action === 'ring'
+          ? { action, seconds: secs, sound: db.sound, screens: db.screenIds, ...(db.camera ? { camera: db.camera } : {}) }
+          : { action },
+      );
+      if (action === 'dismiss') toast(t('Timbre quitado de las pantallas'));
+      else toast(r.delivered ? withPollNote(t('Timbre enviado a {n} pantallas', { n: r.delivered })) : t('Timbre enviado, pero no hay ninguna pantalla conectada'), r.delivered ? 'ok' : 'info');
+    } catch (e) {
+      toast(fetchErrorText((e as ApiError).message) || t('No se pudo enviar'), 'error');
+    } finally {
+      setBusy('');
+    }
+  };
+  return (
+    <Card id="ha-doorbell" title={t('Timbre y cámara')} icon="bell">
+      <p class="muted small">
+        {t('Cuando llaman a la puerta, Home Assistant avisa a Marco y las pantallas muestran la cámara a pantalla completa durante unos segundos, con sonido de timbre. También despierta las pantallas en modo noche mientras dura.')}
+      </p>
+      <div class="grid grid--2">
+        <Field label={t('Cámara (camera.*)')} error={errors['homeassistant.doorbell.camera']} hint={!ha.enabled ? undefined : t('Sin cámara, las pantallas muestran solo el aviso.')}>
+          <HaEntityPicker domain="camera" enabled={ha.enabled} value={db.camera} error={!!errors['homeassistant.doorbell.camera']} onChange={(v) => upd((d) => void (d.camera = v))} />
+        </Field>
+        <Field label={t('Tiempo en pantalla')} error={errors['homeassistant.doorbell.seconds']} hint={t('Entre 10 y 300 segundos. Si vuelven a llamar, se alarga.')}>
+          <NumberInput value={db.seconds} min={10} max={300} suffix="s" error={!!errors['homeassistant.doorbell.seconds']} onValue={(v) => upd((d) => void (d.seconds = v))} />
+        </Field>
+      </div>
+      <Field label={t('Pantallas')}>
+        <ScreenTargets screens={full.screens} value={db.screenIds} onChange={(v) => upd((d) => void (d.screenIds = v))} />
+      </Field>
+      <ToggleRow label={t('Sonido de timbre')} checked={db.sound} onChange={(v) => upd((d) => void (d.sound = v))} />
+      <div class="row-actions">
+        <Button icon="play" loading={busy === 'ring'} disabled={!!busy} onClick={() => run('ring')}>
+          {t('Probar')}
+        </Button>
+        <Button variant="ghost" icon="x" loading={busy === 'dismiss'} disabled={!!busy} onClick={() => run('dismiss')}>
+          {t('Quitar de las pantallas')}
+        </Button>
+      </div>
+      <Callout>
+        {t('Desde Home Assistant: POST /api/hooks/doorbell con un token de API («API y webhooks»). El ejemplo completo está en docs/API.md. La imagen pasa por este servidor: el token de Home Assistant nunca llega a las pantallas y no se guarda ninguna imagen.')}
+      </Callout>
+    </Card>
   );
 }

@@ -15,6 +15,7 @@ import { systemRouter } from './routes/system.js';
 import { updatesRouter } from './routes/updates.js';
 import { eventsAdminRouter, eventsPublicRouter } from './routes/localEvents.js';
 import { accessAdminRouter, pairPublicRouter } from './routes/access.js';
+import { doorbellAdminRouter, doorbellPublicRouter } from './routes/doorbell.js';
 import { setupRouter } from './setup.js';
 import { geocodeRouter } from './geocode.js';
 import { hostGuard } from './lib/net.js';
@@ -80,13 +81,13 @@ export function createApp({ version, dist = path.join(ROOT, 'dist'), updater = n
   // Admin routers: each one applies requireAuth; unmatched paths fall through to the next one.
   app.use('/api/admin', adminRouter());
   app.use('/api/admin', updatesRouter({ version, updater }));
-  app.use('/api/admin', screensAdminRouter(), announceRouter(), systemRouter({ version }), eventsAdminRouter(), accessAdminRouter());
+  app.use('/api/admin', screensAdminRouter(), announceRouter(), systemRouter({ version }), eventsAdminRouter(), accessAdminRouter(), doorbellAdminRouter());
   // Display access (private links / paired devices / admin session; open mode = legacy LAN). displayAccess.js
   app.use(DISPLAY_API_PATHS, displayAuth());
   app.use('/api/stream', displayAuth({ allowQuery: true }));
   // Pairing (unauthenticated, rate-limited) and the public (display) routers.
   app.use('/api', pairPublicRouter());
-  app.use('/api', displayPublicRouter(), eventsPublicRouter());
+  app.use('/api', displayPublicRouter(), eventsPublicRouter(), doorbellPublicRouter());
   app.use('/api', publicRouter({ version }));
   app.use('/api', (req, res) => res.status(404).json({ error: 'not found' }));
 

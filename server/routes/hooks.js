@@ -6,12 +6,14 @@
 //   POST /night       → { ok, delivered }
 //   GET  /privacy     → { screens }
 //   POST /privacy     → { ok, changed, screens }
+//   POST /doorbell    → { ok, action, delivered, screens, expiresAt? }  (routes/doorbell.js)
 import { Router } from 'express';
 import { findToken, checkRate, recordUse, recordRejection } from '../tokens.js';
 import { handleAnnounce } from './announce.js';
 import { runCommand } from '../displays.js';
 import { logActivity } from '../activity.js';
 import { handlePrivacy, privacyResponse } from '../privacy.js';
+import { handleDoorbell } from './doorbell.js';
 
 /** Bearer-token middleware: 401 (logged, throttled), 429 over 30 req/min, usage bookkeeping. */
 export function bearerAuth(req, res, next) {
@@ -66,6 +68,10 @@ export function hooksRouter() {
   r.get('/privacy', (req, res) => res.json(privacyResponse()));
   r.post('/privacy', jsonOnly, (req, res) => {
     const [status, body] = handlePrivacy(req, 'hook');
+    res.status(status).json(body);
+  });
+  r.post('/doorbell', jsonOnly, (req, res) => {
+    const [status, body] = handleDoorbell(req, 'hook');
     res.status(status).json(body);
   });
   r.use((req, res) => res.status(404).json({ error: 'not found' }));

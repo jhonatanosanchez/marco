@@ -17,7 +17,7 @@ export function setServerNow(iso: string | undefined): void {
   const t = iso ? Date.parse(iso) : NaN;
   if (Number.isFinite(t)) serverOffset = t - Date.now();
 }
-const serverNow = () => Date.now() + serverOffset;
+export const serverNow = () => Date.now() + serverOffset;
 
 // ---------------------------------------------------------------------------------------------
 // Announcements

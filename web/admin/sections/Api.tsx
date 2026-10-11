@@ -335,6 +335,11 @@ curl -X POST ${base}/api/hooks/privacy \\
                   <code>POST /api/hooks/privacy</code>: <code>{'{ mode: on|off|toggle, hours?, until?, untilTime?: "HH:MM", screens?: [slug] }'}</code> · <code>GET /api/hooks/privacy</code>
                 </li>
               )}
+              {has('doorbell') && (
+                <li>
+                  <code>POST /api/hooks/doorbell</code>: <code>{'{ action: ring|dismiss, seconds?: 10..300, screens?: [slug], camera?: camera.x }'}</code>
+                </li>
+              )}
             </ul>
             <p class="muted small">
               {t('Pantallas disponibles')}: {slugs.map((s) => <code class="slug-code">{s}</code>)} · {t('Límite: 30 peticiones por minuto y token.')}

@@ -281,6 +281,19 @@ export interface MessageConfig {
 export interface HomeAssistantConfig {
   enabled: boolean;
   url: string;
+  /** Doorbell camera settings (POST /api/hooks/doorbell). */
+  doorbell: DoorbellSettings;
+}
+
+export interface DoorbellSettings {
+  /** camera.* entity whose picture is shown; '' = no picture, only the label and the chime */
+  camera: string;
+  /** how long a ring stays on screen, 10..300 */
+  seconds: number;
+  /** screens that show it; [] = every screen */
+  screenIds: string[];
+  /** door chime on the displays */
+  sound: boolean;
 }
 
 export interface AuthConfig {
@@ -627,6 +640,11 @@ export interface Features {
   feedback: boolean;
   /** Privacy mode per screen (/api/admin/privacy, /api/hooks/privacy). Absent = off. */
   privacy: boolean;
+  /** Doorbell ring overlay, POST /api/hooks/doorbell and the admin card (absent = off). */
+  doorbell: boolean;
+  /** Doorbell frames are a live camera picture proxied from Home Assistant (self-hosted). Off: the frame URL returns
+   *  the latest uploaded snapshot (absent = off). */
+  doorbellLive: boolean;
 }
 
 export type FeatureName = keyof Features;
@@ -777,6 +795,8 @@ export type StreamEvent =
   | ({ type: 'identify' } & IdentifyPayload)
   | { type: 'night'; mode: NightCommand }
   | { type: 'privacy'; active: boolean }
+  | ({ type: 'doorbell' } & DoorbellRing)
+  | { type: 'doorbell-end'; id: string }
   | { type: 'ping'; t: number };
 
 // ---- Admin API ----
@@ -1324,6 +1344,8 @@ export interface StreamHello {
   now: string; // server ISO time (clock-offset for announcement expiry)
   /** announcements still active for this screen; the display drops any other it is showing (missed clears) */
   activeAnnouncementIds: string[];
+  /** doorbell ring on this screen right now, null = none (older servers: absent) */
+  doorbellId?: string | null;
 }
 
 /**
@@ -1340,7 +1362,9 @@ export type DisplayCommand =
   /** self-hosted only: calendar data changed */
   | { type: 'events'; hash: string }
   /** privacy mode turned on or off: refetch config, events, countdowns and photos */
-  | { type: 'privacy'; active: boolean };
+  | { type: 'privacy'; active: boolean }
+  | ({ type: 'doorbell' } & DoorbellRing)
+  | { type: 'doorbell-end'; id: string };
 
 /** GET /api/display/poll?client=&cursor=&rev=&hidden=&preview= (docs/API.md) */
 export interface PollResponse {
@@ -1359,8 +1383,46 @@ export interface PollResponse {
   commands: DisplayCommand[];
   /** present on a reset and whenever `commands` holds announce or announce-clear */
   activeAnnouncementIds?: string[];
+  /** present on a reset: the doorbell ring on this screen, null = none */
+  doorbellId?: string | null;
   /** ms until the next poll, chosen by the server */
   next: number;
+}
+
+/** SSE `doorbell` / poll command: a ring on this screen (a later one with the same id extends it). */
+export interface DoorbellRing {
+  id: string;
+  startedAt: string;
+  updatedAt: string;
+  expiresAt: string;
+  /** play the door chime */
+  sound: boolean;
+  /** false: no camera picture (no camera chosen), only the label and the time */
+  frames: boolean;
+  /** ms between two frame requests to GET /api/display/doorbell/frame */
+  refreshMs: number;
+}
+
+/** POST /api/hooks/doorbell, POST /api/admin/doorbell. Omitted fields take homeassistant.doorbell. */
+export interface DoorbellRequest {
+  action?: 'ring' | 'dismiss';
+  /** 10..300 (clamped) */
+  seconds?: number;
+  /** slugs or ids; omitted = the configured screens (ring) or every ringing screen (dismiss) */
+  screens?: string[];
+  /** camera.* entity for this ring only */
+  camera?: string;
+  sound?: boolean;
+}
+
+export interface DoorbellResponse {
+  ok: true;
+  action: 'ring' | 'dismiss';
+  delivered: number;
+  /** slugs of the screens it reached */
+  screens: string[];
+  /** ring only: when the last of the rings ends */
+  expiresAt?: string | null;
 }
 
 export interface IdentifyPayload {
@@ -1543,6 +1605,7 @@ export type ActivityType =
   | 'display.pair_failed'
   | 'display.device_updated'
   | 'display.device_revoked'
+  | 'display.doorbell'
   | 'activity.cleared'
   | 'update.requested'
   | 'update.finished'

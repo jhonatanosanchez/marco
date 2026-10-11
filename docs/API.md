@@ -82,6 +82,7 @@ saved without `security` (old admin builds, backups or exports from before 0.3) 
 | `POST /api/display/heartbeat` | Body `DisplayHeartbeat` (≤ 4 kB: clientId, screen, version, resolution, dpr, webgl, night state, photo frame…) → `HeartbeatResponse` |
 | `GET /api/stream?screen=&client=&k=` | Server-Sent Events, see below |
 | `GET /api/display/poll?screen=&client=&cursor=&rev=&hidden=&preview=` | `PollResponse`: the same events as commands, for displays without a stream. See below |
+| `GET /api/display/doorbell/frame?n=` | The doorbell camera picture for this display's screen (`image/jpeg`, `image/png`, `image/webp` or `image/gif`, `Cache-Control: private, no-store`), only while that screen rings. `n` is a counter the display adds so nothing caches it. `404 { code: "no_ring" }` when the screen is not ringing (also for open display access from outside the LAN), `404 { code: "no_camera" }` when the ring has no camera, `503 { code: "homeassistant_off" }`, `502 { code: "camera_unavailable" }` (Home Assistant failed, took more than 6 s, answered something that is not an image or more than 4 MB). See [Doorbell camera](#doorbell-camera) |
 | `GET /media/photos/<file>`, `GET /media/thumbs/<file>` | Gallery images and thumbnails |
 
 ### Capabilities in `/api/health`
@@ -93,7 +94,7 @@ The admin and the display read these fields to decide which sections, actions an
 - `features`: one boolean per feature: `homeassistant`, `news`, `customCss`, `gallery`, `schedules`,
   `announcements`, `displayCommands`, `openDisplayAccess`, `insecureTls`, `googleCalendar`, `googleLogin`,
   `passwordLogin`, `apiTokens`, `webhooks`, `backups`, `importExport`, `includeSecrets`, `activity`, `setupWizard`,
-  `status`, `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`. A self-hosted server turns all of them on, except
+  `status`, `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`. A self-hosted server turns all of them on, except
   `googleCalendar` and `googleLogin` (on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set),
   `microsoftCalendar` (Outlook and Microsoft 365 calendars, on when `MICROSOFT_CLIENT_ID` and
   `MICROSOFT_CLIENT_SECRET` are set), `accountMenu` and `feedback` (always off). `updates` is the update banner,
@@ -102,7 +103,9 @@ The admin and the display read these fields to decide which sections, actions an
   palette), which sends `POST /api/admin/feedback` with `{ kind: 'problem'|'idea'|'other', message, meta }` to the
   people who run the service; a self-hosted admin never shows it. `privacy` is privacy mode (see
   [Privacy mode](#privacy-mode)); a server that does not filter events for it leaves it out and the admin hides the
-  controls.
+  controls. `doorbell` is the doorbell overlay, its webhook and the admin card; `doorbellLive` means the frames are a
+  live camera picture proxied from Home Assistant. A server with `doorbell` and without `doorbellLive` answers the
+  frame URL with the latest snapshot it was given instead; the display works the same way with both.
 - `limits` (optional): plan limits such as `screens`, `sources` or `devices`. Absent means no limit beyond the
   config validator's own caps (12 screens, 50 calendars, 20 news feeds, 1000 local events, 500 birthdays,
   100 countdowns). The admin disables "add" at the limit and flags a config that goes over it.
@@ -118,9 +121,9 @@ The admin and the display read these fields to decide which sections, actions an
   `http://localhost` can say where other devices reach the admin.
 
 Clients treat a response with no `features` field (servers older than 0.5.0) as having every feature on, except
-`accountMenu`, `microsoftCalendar`, `updates`, `feedback` and `privacy`. A key missing from `features` counts as off
-only when `edition` is not `'self-hosted'`, and a missing `accountMenu`, `microsoftCalendar`, `updates`, `feedback`
-or `privacy` is always off.
+`accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell` and `doorbellLive`. A key missing
+from `features` counts as off only when `edition` is not `'self-hosted'`, and a missing `accountMenu`,
+`microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell` or `doorbellLive` is always off.
 
 ### Account mode
 
@@ -156,7 +159,7 @@ calendar's.
 
 | Event | Data | When |
 |---|---|---|
-| `hello` | `{ revision, screenId, slug, clientId, serverVersion, now }` | on connect |
+| `hello` | `{ revision, screenId, slug, clientId, serverVersion, now, activeAnnouncementIds, doorbellId }` | on connect. `doorbellId`: the ring on this screen or `null` (a display showing another one closes it) |
 | `config` | `{ revision }` | config saved; the display refetches its config and re-renders without reloading |
 | `events` | `{ hash }` | calendar data changed (also refetch countdowns) |
 | `photos` | `{}` or `{ hidden: [file, …] }` | gallery changed (`hidden` lists photos just taken out of the rotation; a display showing one of them moves on right away) |
@@ -166,6 +169,8 @@ calendar's.
 | `identify` | `{ name, slug, clientId, durationSec }` | show the screen name full-screen |
 | `night` | `{ mode: "on" \| "off" \| "auto" }` | night mode override |
 | `privacy` | `{ active }` | privacy mode of this screen turned on or off (admin, webhook, schedule, or a period that ended); the display refetches its config, events, countdowns and photos |
+| `doorbell` | `{ id, startedAt, updatedAt, expiresAt, sound, frames, refreshMs }` | someone rang; replayed on connect while it lasts. The same `id` again with a later `expiresAt` extends it. `frames: false` = no camera, `refreshMs` = time between two frame requests (750) |
+| `doorbell-end` | `{ id }` | the ring was dismissed |
 | `ping` | `{ t }` | every 25 s |
 | `revoked` | `{ code: "invalid_key" \| "key_required" }` | the link was regenerated or replaced by an import, the device revoked or dropped by an import, the screen deleted, display access switched to private for a keyless display, or (`key_required`) the admin session a stream was opened with ended (logout, logout everywhere, password change); the server then closes the stream. Every stream's credential is re-checked after config saves, imports, session revocation and on each heartbeat |
 
@@ -189,19 +194,22 @@ Answer `{ revision, screenId, now, serverVersion, cursor, reset, commands, activ
 
 - `commands`: in order and already filtered to this display. Each one is `{ type, ...payload }` with the SSE event
   names and payloads: `reload`, `night`, `identify` (filled in for this display), `announce`, `announce-clear`,
-  `photos`, `events` and `privacy`.
+  `photos`, `events`, `privacy`, `doorbell` and `doorbell-end`.
 - `reset: true` on the first poll, after a server restart, or for a cursor the server no longer knows. `commands` then
   only holds the announcements still active on this screen, like the replay on `/api/stream`, and old commands are
   never replayed.
 - `activeAnnouncementIds`: present on a reset and whenever `commands` holds `announce` or `announce-clear`.
+- `doorbellId`: present on a reset, the ring on this screen or `null`. A reset also replays that ring as a `doorbell`
+  command.
 - `revision`: the display refetches its config, events and countdowns when it differs from its own. `screenId`: a
   different one (the paired device was moved) reloads the page. `serverVersion`: a newer server reloads the page once.
 - `next`: milliseconds until the next poll. Self-hosted answers 30 s, 3 min while hidden, and 5 s while someone has
   *Connected screens* open or just sent a command. The display adds ±10 % and keeps it between 3 s and 15 min; on
   errors it waits 5 s, doubling up to 5 min.
 
-The self-hosted server keeps the last 500 events in memory. Commands expire: `identify` after 60 s, `announce` at
-its `expiresAt`, the others after 10 min. A display that polled in the last 4 minutes is listed as connected and
+The self-hosted server keeps the last 500 events in memory. Commands expire: `identify` after 60 s, `announce` and
+`doorbell` at their `expiresAt`, the others after 10 min. Over the poll channel a ring reaches a display on its next
+poll (5 s for 3 minutes after any command, else up to 30 s), so a doorbell is only immediate with SSE. A display that polled in the last 4 minutes is listed as connected and
 counts in `delivered` (at most 24 client ids per address, as for streams). A new private link, a revoked device or
 a switch to private access takes its pollers off the list at once; their next poll gets `401` / `403`.
 
@@ -287,7 +295,8 @@ Rules for the mutating setup endpoints:
 | `POST /api/admin/test/ics` | `{ url, insecureTls? }` → `{ ok, count, sample, error? }` |
 | `POST /api/admin/test/rss` | `{ url }` → `{ ok, title, count, error? }` |
 | `POST /api/admin/test/homeassistant` | `{ url, token? }` → `{ ok, version?, error? }` |
-| `GET /api/admin/homeassistant/entities?domain=sensor\|weather` | `[{ entity_id, name, state, unit }]` |
+| `GET /api/admin/homeassistant/entities?domain=sensor\|weather\|camera` | `[{ entity_id, name, state, unit }]` |
+| `POST /api/admin/doorbell` | Same body and answer as `POST /api/hooks/doorbell` (the *Test* button of *Home Assistant → Doorbell and camera*, with the values on screen). Logged with `via: "admin"` |
 | `PUT /api/admin/homeassistant/token` | `{ token }` |
 | `GET /api/admin/weather/key` | `{ set, hint }`: whether an API key for a weather source that needs one (Pirate Weather) is stored, and its last 4 characters. The key itself is never sent back |
 | `PUT /api/admin/weather/key` | `{ key }` (letters, digits, `-` and `_`, 8 to 128; `""` removes it). A new key is tried once at the configured place: `400 { error: "key_invalid" }` when the source refuses it (nothing is stored); `{ set, hint, checked }` otherwise (`checked: false` when the source could not be reached). Saving the config with `weather.provider: "pirate-weather"` while no key is stored answers `400` with `weather.apiKey` |
@@ -358,6 +367,7 @@ Errors: `401` missing/invalid token, `400` invalid data (e.g. unknown screen), `
 | `POST /api/hooks/night` | `{ mode: "on"\|"off"\|"auto", screens? }` | `{ ok, delivered }` |
 | `GET /api/hooks/privacy` | none | `{ screens: [{ screenId, slug, name, active, until, by, resumesAt, scheduled }] }` |
 | `POST /api/hooks/privacy` | `mode` (`on`/`off`/`toggle`), at most one of `hours` (0 to 744), `until` (ISO date and time) or `untilTime` (`HH:MM`, the next time it comes round in the configured time zone); none = until turned off. `screens` (slugs or ids; omitted = all) | `{ ok, changed, screens }` (`changed`: ids of the screens that turned on or off) |
+| `POST /api/hooks/doorbell` | `{ action?: "ring"\|"dismiss", seconds?, screens?, camera?, sound? }`, see [Doorbell camera](#doorbell-camera) | `{ ok, action, delivered, screens, expiresAt? }` |
 
 `delivered` = number of connected displays that received it. Active announcements survive server restarts.
 
@@ -454,3 +464,80 @@ sensor:
     value_template: "{{ 'on' if value_json.screens | selectattr('active') | list | count > 0 else 'off' }}"
     scan_interval: 60
 ```
+
+### Doorbell camera
+
+`POST /api/hooks/doorbell` puts the doorbell camera full screen on the screens for a while. Omitted fields take the
+values of *Admin → Home Assistant → Doorbell and camera* (`homeassistant.doorbell` in the config).
+
+| Field | Meaning |
+|---|---|
+| `action` | `"ring"` (default) or `"dismiss"` |
+| `seconds` | how long the picture stays, clamped to 10 to 300 (default: the setting, 60) |
+| `screens` | slugs or ids. Ring: omitted = the screens of the setting (all by default). Dismiss: omitted = every ringing screen |
+| `camera` | a `camera.*` entity for this ring only (default: the setting). Anything else is `400` |
+| `sound` | door chime on the screens (default: the setting, on) |
+
+- A ring while the screen is already ringing keeps the same ring and moves its end to the later of the two times
+  (it never gets shorter), and the screens chime again.
+- `{ ok, action: "ring", delivered, screens: [slug], expiresAt }`; `{ ok, action: "dismiss", delivered, screens }`
+  lists the screens that were ringing. Each call is logged in *Activity* (`display.doorbell`).
+- The screens fetch `GET /api/display/doorbell/frame` 1 to 2 times a second while the ring lasts. Marco asks Home
+  Assistant for `/api/camera_proxy/<camera>` with the stored token and hands the picture to the screen; displays that
+  ask within 500 ms share one picture, so Home Assistant gets about two requests a second whatever the number of
+  screens. Pictures are kept in memory only for those 500 ms and never written to disk. The token and the camera
+  entity never reach a screen. Rings are kept in memory: after a server restart nothing rings.
+- The overlay shows above night mode: a dimmed screen is fully lit while it rings and goes back to night mode when the
+  ring ends. A screen turned off by an HDMI schedule (`deploy/screen-schedule.sh`) stays off.
+- The chime uses the screen's alert volume (*Alerts*). The kiosk (`deploy/kiosk.sh`) starts Chromium with
+  `--autoplay-policy=no-user-gesture-required`, so it plays without a tap; other browsers may stay silent until
+  someone has touched the page once.
+- Without a camera (`camera: ""`) the screens show a bell and "Someone is at the door".
+
+Home Assistant example (`configuration.yaml`; replace `marco.local`, the token and the entity ids with your own):
+
+```yaml
+rest_command:
+  marco_doorbell:
+    url: "http://marco.local:3000/api/hooks/doorbell"
+    method: POST
+    headers:
+      Authorization: "Bearer cs_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    content_type: "application/json"
+    payload: '{"action":"{{ action | default(''ring'') }}","seconds":{{ seconds | default(60) }}}'
+
+automation:
+  - alias: "Doorbell on the Marco screens"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.front_door_doorbell
+        to: "on"
+    action:
+      - service: rest_command.marco_doorbell
+        data:
+          action: ring
+          seconds: 90
+    mode: single
+
+  - alias: "Front door opened: take the camera off the screens"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.front_door_contact
+        to: "on"
+    action:
+      - service: rest_command.marco_doorbell
+        data:
+          action: dismiss
+```
+
+With curl:
+
+```bash
+TOKEN=cs_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"action":"ring","seconds":60,"screens":["kitchen"],"camera":"camera.front_door"}' \
+  http://marco.local:3000/api/hooks/doorbell
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"action":"dismiss"}' http://marco.local:3000/api/hooks/doorbell
+```
+

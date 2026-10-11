@@ -15,7 +15,7 @@ import { parseColor, toHex } from './color';
 import { ctx, setCtxConfig } from './ctx';
 import { normalizeConfig } from './defaults';
 import { Heartbeat, noteError } from './heartbeat';
-import { clearDeviceToken, clientId, credential, credentialKind, screenKey, storedDeviceToken } from './identity';
+import { authHeaders, clearDeviceToken, clientId, credential, credentialKind, screenKey, storedDeviceToken, withScreen } from './identity';
 import { $ } from './dom';
 import { type NEvent, normalizeEvents } from './eventModel';
 import type { AmbientLayer } from './gl/ambientLayer';
@@ -32,6 +32,8 @@ import { current, onTick, setClockOffset, setTimezone, startTicker, type Tick } 
 import { Agenda } from './widgets/agenda';
 import { Announcements, IdentifyOverlay, ScheduleBanners, setServerNow } from './widgets/alerts';
 import { Countdowns } from './widgets/countdowns';
+import { DoorbellOverlay, type FrameSource } from './widgets/doorbell';
+import { mockDoorbellFrame, mockDoorbellRing } from './mockDoorbell';
 import { MonthCalendar } from './widgets/calendar';
 import { Clock } from './widgets/clock';
 import { renderMessage, renderTodo } from './widgets/extras';
@@ -77,6 +79,16 @@ const countdowns = new Countdowns($('#countdowns'), $('#cd-strip'));
 const schedules = new ScheduleBanners($('#sched'), $('#sched-strip'));
 const announcements = new Announcements($('#alerts'));
 const identify = new IdentifyOverlay($('#identify'));
+/** Doorbell frames: GET /api/display/doorbell/frame (a counter keeps every answer fresh), drawn ones in the demo.
+ *  404 and lost access mean there is nothing more to show for this ring. */
+const doorbellFrames: FrameSource = async (n, signal) => {
+  if (state.demo) return mockDoorbellFrame(n);
+  const r = await fetch(withScreen(`/api/display/doorbell/frame?n=${n}`), { headers: authHeaders(), cache: 'no-store', signal });
+  if (r.status === 404 || r.status === 401 || r.status === 403) return null;
+  if (!r.ok || !(r.headers.get('content-type') || '').startsWith('image/')) throw new Error(`frame: HTTP ${r.status}`);
+  return r.blob();
+};
+const doorbell = new DoorbellOverlay($('#doorbell'), doorbellFrames);
 const views = new Views($('#view'));
 const screenNote = $('#screen-note');
 const statusDot = $('#status');
@@ -878,6 +890,9 @@ function enterDemo(): void {
   if (params.get('identify') === '1') {
     setTimeout(() => identify.show({ durationSec: 600 }, { name: ctx.cfg.screen.name, slug: ctx.cfg.slug || 'living-room', clientId }), 900);
   }
+  // &doorbell=1 → doorbell ring with a drawn camera picture; &doorbell=nocam → a ring without a picture
+  const db = params.get('doorbell');
+  if (db) setTimeout(() => doorbell.show(mockDoorbellRing(db)), 900);
 }
 
 async function boot(): Promise<void> {
@@ -1025,6 +1040,7 @@ function onHello(d: Partial<StreamHello>): void {
   setOnline(true);
   setServerNow(d.now);
   if (Array.isArray(d.activeAnnouncementIds)) announcements.sync(d.activeAnnouncementIds);
+  doorbell.sync(d.doorbellId);
   if (typeof d.revision === 'number' && d.revision !== state.config?.revision) void fetchConfig();
   void fetchEvents();
   void fetchCountdowns();
@@ -1059,6 +1075,9 @@ const liveHandlers: StreamHandlers = {
   },
   // privacy mode turned on or off: new config (lock, photo source), filtered events and countdowns
   privacy: () => refreshForPrivacy(),
+  // Doorbell: full screen above the night layer while it lasts (it wakes a dimmed screen, see widgets/doorbell.ts).
+  doorbell: (d) => doorbell.show(d),
+  doorbellEnd: (d) => doorbell.end(d.id),
   // Link regenerated / device revoked → "no longer valid"; switched to private without a key → pairing.
   revoked: (d) => denyAccess(d.code === 'key_required' ? 401 : 403),
   open: () => setOnline(true),

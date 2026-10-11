@@ -69,3 +69,23 @@ export function chime(style: AlertStyle, volume: number): void {
     console.warn('[chime]', e);
   }
 }
+
+/** Door chime: a classic two-tone "ding-dong" (E5 then C5, long decay), twice. Never throws. */
+export function doorChime(volume: number): void {
+  const v = Math.min(1, Math.max(0, Number(volume) || 0));
+  if (v <= 0) return;
+  const ctx = audio();
+  if (!ctx) return;
+  try {
+    const master = ctx.createGain();
+    master.gain.value = 0.6 * v;
+    master.connect(ctx.destination);
+    const t0 = ctx.currentTime + 0.05;
+    for (const at of [0, 1.9]) {
+      note(ctx, master, 659.25, t0 + at, 1.8, 0.9);
+      note(ctx, master, 523.25, t0 + at + 0.6, 2.2, 0.85);
+    }
+  } catch (e) {
+    console.warn('[chime]', e);
+  }
+}

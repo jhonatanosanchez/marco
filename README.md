@@ -156,6 +156,8 @@ transparency, blur and a light edge:
 - **Private display links and pairing:** every screen has an unguessable link (`/d/<key>`, QR code, one-click
   regenerate) and new devices can be paired with a 6-character code; paired devices can be renamed or revoked.
 - **Alerts:** send now or schedule; **API tokens and webhooks** for Home Assistant and scripts.
+- **Doorbell camera:** when someone rings, Home Assistant tells Marco and the screens show the camera full screen for
+  a while, with a door chime (it also wakes screens in night mode).
 - **Backups** (automatic, export/import with preview), **activity log**, **command palette** (Ctrl/Cmd + K),
   phone-friendly layout, English / Spanish / Portuguese.
 

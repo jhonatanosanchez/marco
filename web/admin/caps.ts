@@ -3,7 +3,8 @@
 //
 // Rules:
 // - No `features` field at all (servers older than 0.5.0): every feature is on, except the account menu,
-//   which no server before 0.5.0 had, and the OPT_IN features below (Microsoft calendars, updates, feedback).
+//   which no server before 0.5.0 had, and the OPT_IN features below (Microsoft calendars, updates, feedback,
+//   doorbell).
 // - A key missing from `features` is off only when the edition is not 'self-hosted' (OPT_IN keys: always off).
 // - No `limits` field: the only limits are the config validator's own caps (BUILTIN_LIMITS).
 import type { FeatureName, Features, HealthResponse, Limits } from '../shared/types';
@@ -75,8 +76,9 @@ export function capsFrom(health: Partial<HealthResponse> | null | undefined): Ca
 /** Features that only exist on servers that say so in `features`; off when the field or the key is missing.
  *  microsoftCalendar: Marco Cloud, or a self-hosted server with its own Entra app; updates: self-hosted servers
  *  that have the update endpoints; feedback: Marco Cloud's help and feedback form; privacy: privacy mode (servers
- *  that filter events for it, see /api/admin/privacy). */
-const OPT_IN: readonly FeatureName[] = ['accountMenu', 'microsoftCalendar', 'updates', 'feedback', 'privacy'];
+ *  that filter events for it, see /api/admin/privacy); doorbell, doorbellLive: servers with POST /api/hooks/doorbell
+ *  (live = frames proxied from Home Assistant). */
+const OPT_IN: readonly FeatureName[] = ['accountMenu', 'microsoftCalendar', 'updates', 'feedback', 'privacy', 'doorbell', 'doorbellLive'];
 
 export function hasFeature(caps: Caps, feature: FeatureName): boolean {
   if (!caps.features) return !OPT_IN.includes(feature);

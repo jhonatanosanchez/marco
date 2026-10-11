@@ -12,6 +12,7 @@ import { logActivity, changedSections } from './activity.js';
 import { resolveScreen } from './core/screens.js';
 import { setServerVersion, flushDisplays, reresolveDisplays } from './displays.js';
 import { pruneScreens } from './announce.js';
+import { pruneDoorbellScreens } from './doorbell.js';
 import { flushTokenUsage } from './tokens.js';
 import { logSetupHint } from './setup.js';
 import { invalidateIcsParsing } from './calendars.js';
@@ -55,6 +56,7 @@ storeEvents.on('config', (cfg, prev, { reason, req } = {}) => {
   onDisplayAccessConfig(cfg, prev);
   reresolveDisplays(cfg);
   pruneScreens(cfg);
+  pruneDoorbellScreens(cfg);
   broadcast('config', { revision: cfg.revision });
   onPrivacyConfig();
   runRefresh().catch(() => {});

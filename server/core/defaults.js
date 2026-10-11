@@ -95,7 +95,11 @@ export function defaultConfig() {
     eventRules: { items: [] },
     countdowns: { items: [], includeBirthdays: true, birthdayDays: 30, includeFlagged: true, horizonDays: 365 },
     schedules: { items: [] },
-    homeassistant: { enabled: false, url: 'http://homeassistant.local:8123' },
+    // doorbell: camera entity (camera.*), seconds on screen (10..300), screenIds ([] = all), door chime on/off
+    homeassistant: {
+      enabled: false, url: 'http://homeassistant.local:8123',
+      doorbell: { camera: '', seconds: 60, screenIds: [], sound: true },
+    },
     auth: { allowedGoogleEmails: [], passwordLoginEnabled: true },
     // 'private': every display needs its private link (/d/<key>) or a paired-device token (server/displayAccess.js).
     // 'open': legacy LAN mode (/ and /?screen= work without a key). Configs saved before 0.3 load as 'open'.

@@ -63,6 +63,9 @@ const es: Dict = {
   screenNotFound: 'Pantalla «{s}» no encontrada',
   identifyScreen: 'Pantalla',
   identifyDevice: 'Dispositivo',
+  doorbell: 'Puerta',
+  doorbellRinging: 'Llaman a la puerta',
+  doorbellNoPicture: 'Cámara no disponible',
   until: 'hasta las {t}',
   nightOn: 'Modo noche',
 };
@@ -124,6 +127,9 @@ const en: Dict = {
   screenNotFound: 'Screen “{s}” not found',
   identifyScreen: 'Screen',
   identifyDevice: 'Device',
+  doorbell: 'Door',
+  doorbellRinging: 'Someone is at the door',
+  doorbellNoPicture: 'Camera unavailable',
   until: 'until {t}',
   nightOn: 'Night mode',
 };
@@ -185,6 +191,9 @@ const pt: Dict = {
   screenNotFound: 'Ecrã «{s}» não encontrado',
   identifyScreen: 'Ecrã',
   identifyDevice: 'Dispositivo',
+  doorbell: 'Porta',
+  doorbellRinging: 'Está alguém à porta',
+  doorbellNoPicture: 'Câmara indisponível',
   until: 'até às {t}',
   nightOn: 'Modo noite',
 };

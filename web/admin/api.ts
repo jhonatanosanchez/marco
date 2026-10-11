@@ -11,6 +11,8 @@ import type {
   AnnounceRequest,
   AnnounceResponse,
   AnnouncementsResponse,
+  DoorbellRequest,
+  DoorbellResponse,
   ApiTokenCreated,
   ApiTokenInfo,
   AuthMeResponse,
@@ -166,9 +168,11 @@ export const api = {
   testRss: (url: string) => request<TestRssResponse>('POST', '/api/admin/test/rss', { url }),
   testHomeAssistant: (url: string, token?: string) =>
     request<TestHomeAssistantResponse>('POST', '/api/admin/test/homeassistant', token ? { url, token } : { url }),
-  haEntities: (domain: 'sensor' | 'weather') =>
+  haEntities: (domain: 'sensor' | 'weather' | 'camera') =>
     request<HaEntity[]>('GET', `/api/admin/homeassistant/entities?domain=${domain}`),
   setHaToken: (token: string) => request<unknown>('PUT', '/api/admin/homeassistant/token', { token }),
+  /** Test ring (or dismiss) with the draft settings: the screens show the camera as the webhook would. */
+  doorbell: (body: DoorbellRequest) => request<DoorbellResponse>('POST', '/api/admin/doorbell', body),
   weatherKey: () => request<WeatherKeyStatus>('GET', '/api/admin/weather/key'),
   /** '' removes the key; a key the provider refuses answers 400 key_invalid */
   setWeatherKey: (key: string) => request<WeatherKeyStatus>('PUT', '/api/admin/weather/key', { key }),

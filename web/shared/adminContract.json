@@ -461,6 +461,25 @@
     },
     {
       "method": "POST",
+      "path": "/api/admin/doorbell",
+      "query": [],
+      "feature": "doorbell",
+      "callers": [
+        "doorbell"
+      ],
+      "request": "DoorbellRequest",
+      "response": "DoorbellResponse",
+      "responseArray": false,
+      "responseKeys": [
+        "ok",
+        "action",
+        "delivered",
+        "screens",
+        "expiresAt?"
+      ]
+    },
+    {
+      "method": "POST",
       "path": "/api/admin/events/preview",
       "query": [],
       "feature": null,
