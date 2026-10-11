@@ -5,6 +5,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-11
+
+### Added
+- Doorbell on servers without a live camera (`features.doorbellLive` off, Marco Cloud): the ring carries a snapshot
+  from Home Assistant (multipart `image` or a raw image body), and the admin shows the doorbell card on *API &
+  webhooks* with a Home Assistant example and a test with a sample picture.
+
+### Fixed
+- Doorbell: when the picture arrives after the ring has started, screens that are already ringing now show it.
+
 ## [0.6.0] - 2026-10-11
 
 ### Added
@@ -29,10 +39,6 @@ All notable changes to this project are documented here. The format is based on
   all-day colour, title) below its multi-day bars. Week rows share the height by how many events they have, with
   room for the dates and one event in every row; rows stay equal while every week fits. Only what still does not fit
   takes turns (*Rotate busy days*) or shows "+N". On for new screens, off for existing ones.
-- Doorbell on servers without a live camera (`features.doorbellLive` off, Marco Cloud): the ring carries a snapshot
-  from Home Assistant (multipart `image` or a raw image body), the admin shows the doorbell card on *API & webhooks*
-  with a Home Assistant example and a test with a sample picture, and a picture that arrives after the ring started
-  shows on screens that were already ringing.
 - `features.privacy`, `features.doorbell` and `features.doorbellLive` in `/api/health`.
 - Display demo: `?demo=1` with `&private=1` (private mode), `&doorbell=1` or `&doorbell=nocam` (a ring with a drawn
   camera picture, or without one) and `&busy=2` (a whole month packed with events). They can be combined. Also
