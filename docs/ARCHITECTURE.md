@@ -324,8 +324,8 @@ goes (link keys, `device.screenId`, the display registry); the `v_` prefix tells
 - **Images**: `GET /media/immich/<assetId>` (after `mediaAuth`) serves Immich's `preview` render from
   `data/immich/cache/`, fetched on a miss (20 s timeout, 8 MB cap, JPEG, WebP, PNG or AVIF only, sniffed when Immich
   says `octet-stream`, at most 3 fetches at once, one per image). Only assets of an album a screen plays are served; a
-  display key or device token only opens its own screen's albums, and nothing while that screen is private with
-  *hide photos*. The first 3 photos of each batch are fetched ahead. `?s=thumb` serves small album covers to an admin
+  display key or device token only opens its own screen's albums (bound to a carousel: the albums of the carousel's
+  screens), and nothing of a screen while it is private with *hide photos*. The first 3 photos of each batch are fetched ahead. `?s=thumb` serves small album covers to an admin
   session.
 - **Cloud**: Marco Cloud has no Immich (`features.immich` false). `validateConfig(c, { immichAvailable: false })`
   refuses a screen with the Immich source.

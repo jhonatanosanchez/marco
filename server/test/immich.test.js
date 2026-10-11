@@ -513,3 +513,56 @@ test('display: blurred fill only for photos in the other orientation, caption wi
   assert.equal(fit.immichCaption({ takenAt: '2019-08-12' }, 'en'), 'August 12, 2019');
   assert.equal(fit.immichCaption({}, 'en'), '');
 });
+
+test('carousel: a step screen with Immich photos, the carousel link reads only its screens\' albums', async () => {
+  await withApp(async ({ call, photos, k }) => {
+    const ck = displayKeyFor('v_loop');
+    assert.ok(ck);
+    // the carousel credential asks for its Immich step by address
+    const list = await photos('&screen=living-room', ck);
+    assert.ok(list.length > 0 && list.every((x) => x.source === 'immich'));
+    await settle();
+    const ok = await call('GET', `${list[0].url}&k=${ck}`);
+    assert.equal(ok.status, 200);
+    assert.deepEqual(ok.buf, JPEG);
+    // the kitchen step plays stock photos
+    assert.ok((await photos('&screen=kitchen', ck)).every((x) => x.source === 'stock'));
+    // a screen outside the carousel: its album stays closed to the carousel link
+    const den = await photos('', displayKeyFor('s_den'));
+    const onlyB = den.find((x) => x.id === assetId(20));
+    assert.ok(onlyB, 'album B photo in the den batch');
+    await settle();
+    assert.equal((await call('GET', `${onlyB.url}&k=${ck}`)).status, 404);
+    assert.equal((await call('GET', `${onlyB.url}&k=${k}`)).status, 404);
+    assert.equal((await call('GET', `${onlyB.url}&k=${displayKeyFor('s_den')}`)).status, 200);
+  }, {
+    mutate: (c) => {
+      const den = defaultScreenProfile({ id: 's_den', slug: 'den', name: 'Den' });
+      den.background.source = 'immich';
+      den.background.immich = { albumIds: [ALBUM_B], favoritesOnly: false };
+      c.screens.push(den);
+      c.carousels = { items: [{ id: 'v_loop', slug: 'loop', name: 'Loop', enabled: true, transition: 'fade', holdOnAlert: true, nightRotate: false,
+        steps: [{ screenId: 's_kitchen', seconds: 20 }, { screenId: 's_main', seconds: 20 }] }] };
+    },
+  });
+});
+
+test('carousel: a step screen private with hide photos closes its photos to the carousel link', async () => {
+  await withApp(async ({ call, photos, login }) => {
+    const ck = displayKeyFor('v_loop');
+    const [p] = await photos('&screen=living-room', ck);
+    assert.equal(p.source, 'immich');
+    await settle();
+    assert.equal((await call('GET', `${p.url}&k=${ck}`)).status, 200);
+    const cookie = await login();
+    assert.equal((await call('POST', '/api/admin/privacy', { body: { mode: 'on', screens: ['s_main'] }, cookie })).status, 200);
+    assert.equal((await call('GET', `${p.url}&k=${ck}`)).status, 404);
+    assert.ok((await photos('&screen=living-room', ck)).every((x) => x.source === 'stock'));
+  }, {
+    mutate: (c) => {
+      c.screens[0].privacy = { hidePhotos: true, showLock: true, schedule: [] };
+      c.carousels = { items: [{ id: 'v_loop', slug: 'loop', name: 'Loop', enabled: true, transition: 'fade', holdOnAlert: true, nightRotate: false,
+        steps: [{ screenId: 's_kitchen', seconds: 20 }, { screenId: 's_main', seconds: 20 }] }] };
+    },
+  });
+});

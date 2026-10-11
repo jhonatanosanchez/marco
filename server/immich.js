@@ -10,6 +10,7 @@ import { requestBuffer } from './lib/http.js';
 import { events, getConfig, getSecrets, paths, writeFileAtomic } from './store.js';
 import { publish } from './pollHub.js';
 import { screenPrivacy } from './privacy.js';
+import { carouselList, carouselMembers } from './core/carousels.js';
 import {
   IMMICH_ID_RE, IMMICH_IMAGE_TYPES, MAX_IMMICH_ALBUMS, compactAsset, errorCodeFor, mapAlbum, mergeItems, missingScopes,
   normalizeImmichUrl, parseVersion, showableAsset, sniffImageType, usesSearch, versionText,
@@ -288,10 +289,10 @@ function selections(cfg = getConfig()) {
   return out;
 }
 
-/** Version of an asset that belongs to a selection in use (of `screen` only, when given), or null. */
-function assetVersion(id, screen = null) {
+/** Version of an asset that belongs to a selection in use (of the screens in `screens` only, when given), or null. */
+function assetVersion(id, screens = null) {
   for (const sel of selections()) {
-    if (screen && sel.screenId !== screen.id) continue;
+    if (screens && !screens.some((sc) => sc.id === sel.screenId)) continue;
     // listEntry: after a restart the list comes back from disk (no fetch), so displays keep their current batch
     const v = listEntry(sel.albumId, sel.fav).byId.get(id);
     if (v !== undefined) return v;
@@ -484,8 +485,8 @@ export function clearCache() {
 
 /**
  * GET /media/immich/:id (after mediaAuth). Only assets of an album some screen plays are served, so this is never
- * an open door into the library; a display bound to a screen only gets that screen's photos, and none while the
- * screen is private with "hide photos". ?s=thumb = small album covers for the admin picker (admin session only).
+ * an open door into the library; a display bound to a screen only gets that screen's photos (bound to a carousel:
+ * the photos of the carousel's screens), and none of a screen while it is private with "hide photos". ?s=thumb = small album covers for the admin picker (admin session only).
  */
 export async function immichMedia(req, res) {
   const id = String(req.params.id || '').toLowerCase();
@@ -500,13 +501,18 @@ export async function immichMedia(req, res) {
     v = coverIds.has(id) ? 'c' : assetVersion(id);
   } else {
     const cfg = getConfig();
-    let screen = null;
+    let screens = null;
     if (access.screenId) {
-      screen = cfg.screens.find((s) => s.id === access.screenId);
-      if (!screen) return fail(404, 'not found');
-      if (screen.privacy?.hidePhotos && screenPrivacy(cfg, screen).active) return fail(404, 'not found');
+      // a credential bound to a carousel reads the photos of the carousel's screens, and only those
+      const bound = cfg.screens.find((s) => s.id === access.screenId);
+      const c = bound ? null : carouselList(cfg).find((x) => x.id === access.screenId);
+      const ids = bound ? [bound.id] : c ? carouselMembers(cfg, c) : [];
+      // a screen that is private with "hide photos" serves none of its photos
+      screens = ids.map((sid) => cfg.screens.find((s) => s.id === sid))
+        .filter((sc) => sc && !(sc.privacy?.hidePhotos && screenPrivacy(cfg, sc).active));
+      if (!screens.length) return fail(404, 'not found');
     }
-    v = assetVersion(id, screen);
+    v = assetVersion(id, screens);
   }
   if (v === null || v === undefined) return fail(404, 'not found');
   if (!immichUsable()) return fail(503, 'immich not configured');

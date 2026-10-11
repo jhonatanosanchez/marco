@@ -24,6 +24,8 @@ All notable changes to this project are documented here. The format is based on
   to reach Immich. When Immich is down, the photos already in that cache keep playing for up to a day (the album
   lists are kept that long); with nothing to show, the screen uses stock photos. A deleted or unshared album is
   skipped and flagged on the Immich page. Captions show the place and the date taken. Works with Immich 1.1xx, 2.x and 3.x.
+- A carousel step can be a screen with the Immich source. The carousel's link or paired device reads the photos of
+  the carousel's screens only.
 - *Background → Portrait photos*: a portrait photo on a landscape screen (or the other way round) can be shown whole
   over a blurred copy of itself (*Blurred fill*), or cropped as before. *Automatic*, the default, uses the blurred fill
   for Immich photos only, so gallery and stock photos look as they did.
