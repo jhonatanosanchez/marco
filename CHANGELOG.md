@@ -24,6 +24,13 @@ All notable changes to this project are documented here. The format is based on
   screen and no picture is stored. Rings are logged in *Activity*.
 - `features.doorbell` and `features.doorbellLive` in `/api/health`.
 - Display demo: `?demo=1&doorbell=1` (or `doorbell=nocam`) shows the overlay with a drawn camera picture.
+- **Compact busy days** (`calendar.compactBusyDays`, per screen, *Calendars → Calendar view*): in the month, Two
+  weeks and week grids, a day that cannot fit its events at normal size lists them as small one-line entries (emoji,
+  time or all-day colour, title) below its multi-day bars. Week rows share the height by how many events they have,
+  with room for the dates and one event in every row; rows stay equal while every week fits. Only what still does not
+  fit pages through (*Rotate busy days*) or shows "+N". On for new screens, off for existing ones.
+- Display: `?compact=0|1` and `?weeks=1..8` to try it; with `?demo=1`, `&busy=2` fills the whole month (most days
+  four to ten events).
 
 ## [0.5.3] - 2026-10-11
 

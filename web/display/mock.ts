@@ -28,7 +28,10 @@ const DEMO_LANG = (() => {
 /** ?empty=1: no events, no countdowns, no to-dos (empty states). */
 const EMPTY = new URLSearchParams(location.search).get('empty') === '1';
 /** ?busy=1: a day with more events than fit, and long titles (to see the sliding titles and the busy-day pages). */
-const BUSY = new URLSearchParams(location.search).get('busy') === '1';
+const BUSY_Q = new URLSearchParams(location.search).get('busy');
+/** ?busy=2: the same, plus a whole month packed with events (compact busy days). */
+const BUSY_MONTH = BUSY_Q === '2';
+const BUSY = BUSY_Q === '1' || BUSY_MONTH;
 /** ?private=1: privacy mode on (what the server sends then: "Busy" blocks, holidays and birthdays as they are). */
 const PRIVATE = new URLSearchParams(location.search).get('private') === '1';
 /** Pick the demo string for the current language: L('English', 'Español', 'Português'). */
@@ -64,7 +67,8 @@ export function mockConfig(): DisplayConfig {
           days: [], from: '00:00', to: '23:59', startDate: null, endDate: null, sound: false,
         }]
       : [],
-    calendar: { sources: MOCK_SOURCES, iconRules: DEFAULT_ICON_RULES },
+    // the demo is a new screen: compact busy days on (?compact=0 shows the grid without them)
+    calendar: { sources: MOCK_SOURCES, iconRules: DEFAULT_ICON_RULES, compactBusyDays: true },
     todo: {
       enabled: q.get('todo') === '1',
       items: EMPTY ? [] : [
@@ -222,6 +226,50 @@ export function mockEvents(now = new Date()): EventsResponse {
       'Vuelo de vuelta de la conferencia de Lyon con escala en Barcelona, recoger el coche en el aparcamiento de larga estancia',
       'Voo de regresso da conferência em Lyon com escala em Barcelona, levantar o carro no parque de longa duração',
     ), free, { at: [21, 45], dur: 60 }));
+  }
+
+  // ?busy=2: a whole month as packed as a big family's (most days 4 to 10 events), for the compact busy days
+  if (BUSY_MONTH) {
+    const pool: [string, string, string, number, number, string][] = [
+      ['Swim club', 'Club de natación', 'Clube de natação', 7, 30, 'c_kids'],
+      ['School run', 'Llevar al cole', 'Levar à escola', 8, 15, 'c_kids'],
+      ['Team stand-up', 'Daily del equipo', 'Daily da equipa', 9, 0, 'c_work'],
+      ['Grocery delivery', 'Entrega del súper', 'Entrega do supermercado', 10, 30, 'c_fam'],
+      ['Physio', 'Fisio', 'Fisioterapia', 11, 0, 'c_fam'],
+      ['Lunch with Ana', 'Comida con Ana', 'Almoço com a Ana', 12, 30, 'c_fam'],
+      ['Design review', 'Revisión de diseño', 'Revisão de design', 13, 30, 'c_work'],
+      ['Pick up Lucía', 'Recoger a Lucía', 'Ir buscar a Lucía', 15, 0, 'c_kids'],
+      ['Piano lesson', 'Clase de piano', 'Aula de piano', 16, 0, 'c_kids'],
+      ['Homework club', 'Refuerzo escolar', 'Explicações', 16, 30, 'c_kids'],
+      ['Ballet', 'Ballet', 'Ballet', 17, 0, 'c_kids'],
+      ['Scouts', 'Scouts', 'Escuteiros', 17, 45, 'c_kids'],
+      ['Gym', 'Gimnasio', 'Ginásio', 18, 30, 'c_fam'],
+      ["Dinner at grandma's", 'Cena en casa de la abuela', 'Jantar em casa da avó', 19, 0, 'c_fam'],
+      ['Book club', 'Club de lectura', 'Clube de leitura', 19, 30, 'c_fam'],
+      ['Call with Dad', 'Llamada con papá', 'Chamada com o pai', 20, 0, 'c_fam'],
+      ['Yoga', 'Yoga', 'Ioga', 20, 30, 'c_fam'],
+      ['Movie night', 'Noche de pelis', 'Noite de cinema', 21, 0, 'c_fam'],
+    ];
+    const allDay: [string, string, string, string][] = [
+      ['Pyjama day at school', 'Día del pijama en el cole', 'Dia do pijama na escola', 'c_kids'],
+      ['Library books due', 'Devolver libros de la biblioteca', 'Devolver livros à biblioteca', 'c_kids'],
+      ['Bin day', 'Día de sacar la basura', 'Dia do lixo', 'c_fam'],
+    ];
+    // events per day over five weeks from this Monday (the recurring ones above add one or two more)
+    const counts = [3, 8, 5, 9, 4, 7, 2, 6, 9, 3, 8, 7, 5, 1, 8, 4, 7, 3, 9, 6, 2, 5, 8, 9, 4, 7, 3, 0, 7, 4, 8, 6, 3, 9, 4];
+    counts.forEach((n, i) => {
+      const k = addDays(W, i);
+      const picks = new Set<number>();
+      for (let j = 0; picks.size < Math.min(n, pool.length); j++) picks.add((i * 7 + j * 5) % pool.length);
+      for (const p of [...picks].sort((a, b) => a - b)) {
+        const [en, es, pt, h, m, src] = pool[p];
+        out.push(ev(src, L(en, es, pt), k, { at: [h, m], dur: 45 }));
+      }
+      if (n >= 7 && i % 3 === 0) {
+        const [en, es, pt, src] = allDay[i % allDay.length];
+        out.push(ev(src, L(en, es, pt), k));
+      }
+    });
   }
 
   // Sort: allDay first, then start

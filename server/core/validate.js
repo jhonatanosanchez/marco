@@ -282,6 +282,8 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
     maxEventsPerDay: num(ctx, `${p}.calendar.maxEventsPerDay`, ca.maxEventsPerDay, D.calendar.maxEventsPerDay, 1, 20, true),
     marquee: bool(ctx, `${p}.calendar.marquee`, ca.marquee, D.calendar.marquee),
     rotateBusyDays: bool(ctx, `${p}.calendar.rotateBusyDays`, ca.rotateBusyDays, D.calendar.rotateBusyDays),
+    // screens saved before the option keep the look they had (new screens get it on from defaultConfig)
+    compactBusyDays: bool(ctx, `${p}.calendar.compactBusyDays`, ca.compactBusyDays, false),
     sourceIds: ca.sourceIds === null || ca.sourceIds === undefined ? null : idList(ctx, `${p}.calendar.sourceIds`, ca.sourceIds),
   };
 
@@ -696,7 +698,9 @@ export function mergeDefaults(stored) {
   if (Array.isArray(src.screens) && src.screens.length) {
     // a screen saved before display styles existed keeps the Classic look; only new screens start Modern
     const keepStyle = (s) => (isObj(s.screen) && 'style' in s.screen ? s : { ...s, screen: { ...(isObj(s.screen) ? s.screen : {}), style: 'classic' } });
-    out.screens = src.screens.map((s) => (isObj(s) ? merge(defaultScreenProfile({ id: s.id, slug: s.slug, name: s.name }), keepStyle(s)) : s));
+    // the same for compact busy days: screens saved before the option keep the month grid they had
+    const keepGrid = (s) => (isObj(s.calendar) && 'compactBusyDays' in s.calendar ? s : { ...s, calendar: { ...(isObj(s.calendar) ? s.calendar : {}), compactBusyDays: false } });
+    out.screens = src.screens.map((s) => (isObj(s) ? merge(defaultScreenProfile({ id: s.id, slug: s.slug, name: s.name }), keepGrid(keepStyle(s))) : s));
   }
   return out;
 }

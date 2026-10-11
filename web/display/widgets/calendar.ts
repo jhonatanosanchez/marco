@@ -6,7 +6,35 @@ import { esc, reconcile, setHTML, type Spec } from '../dom';
 import { type NEvent, sortForDay, timeLabel } from '../eventModel';
 import { refreshMarquee } from '../marquee';
 import { PAGE_MS, pageAt, pageLabel, planPages, wrapLineCap } from '../motion';
+import {
+  COMPACT_FONT, COMPACT_GAP_U, COMPACT_LINE, COMPACT_PAD_U, type CompactDay, laneHeight, linesThatFit, shareRows, weekNeed,
+} from '../compact';
 import type { Tick } from '../time';
+
+/** Grid metrics in px, read from the calendar's CSS variables (see lanesFor / planCompact). */
+interface Metrics {
+  /** height of the whole weeks area */
+  h: number;
+  rem: number;
+  numH: number;
+  laneH: number;
+  laneMin: number;
+  gap: number;
+  /** compact entries: font size, height of one line, space between lines, space kept below the last one */
+  lineFs: number;
+  lineH: number;
+  lineGap: number;
+  pad: number;
+}
+
+/** A busy day drawn as a column of compact one-line entries (calendar.compactBusyDays). */
+interface Stack {
+  d: number;
+  /** lanes kept by bars that also cover other days: the column starts below them */
+  top: number;
+  /** the entries shown, by page (more than one page only when the day rotates, calendar.rotateBusyDays) */
+  pages: Placed[][];
+}
 
 interface Placed {
   e: NEvent;
@@ -73,7 +101,9 @@ export class MonthCalendar {
     const nWeeks = isWeek ? 1 : c.weeks;
     const wantL = Math.max(1, isWeek ? Math.min(14, c.maxEventsPerDay * 3) : c.maxEventsPerDay);
     this.root.classList.toggle('is-week', isWeek);
-    const L = Math.max(1, Math.min(wantL, this.lanesThatFit(nWeeks)));
+    const compact = c.compactBusyDays === true;
+    const m = this.metrics();
+    const L = Math.max(1, Math.min(wantL, m ? this.lanesFor(m.h / nWeeks - 1, m) : 99));
     const today = tick.dayKey;
     const nowMs = tick.now.getTime();
     const gridStart = startOfWeek(today, c.weekStart);
@@ -121,10 +151,26 @@ export class MonthCalendar {
     const rowEls = Array.from(this.weeks.children).filter((x) => !(x as any).__leaving) as HTMLElement[];
 
     this.geom = this.measureGeom();
+    const layouts = weekRows.map((row) => this.layoutWeek(row.start, list));
+    // Compact busy days: rows share the height by what their events need (equal rows while every week fits)
+    let rowHs: number[] | null = null;
+    if (compact && m && nWeeks > 1) {
+      const needs = layouts.map((segs) => {
+        const { days, normal } = this.daySummary(segs, wantL);
+        return weekNeed(days, normal, wantL, m);
+      });
+      const minRow = m.numH + m.gap + m.laneH + m.gap;
+      rowHs = shareRows(needs, m.h - nWeeks, minRow).map((x) => x + 1);
+    }
+    const rows = rowHs ? rowHs.map((x) => `minmax(0, ${x.toFixed(1)}fr)`).join(' ') : '';
+    if (this.weeks.style.gridTemplateRows !== rows) this.weeks.style.gridTemplateRows = rows;
     weekRows.forEach((row, w) => {
       const el = rowEls[w];
       if (!el) return;
-      reconcile(el, this.weekSpecs(row.start, list, L, today, nowMs, t, tz, isWeek), { flip: true });
+      const rowH = rowHs ? rowHs[w] - 1 : m ? m.h / nWeeks - 1 : 0;
+      const Lw = rowHs && m ? Math.max(1, Math.min(wantL, this.lanesFor(rowH, m))) : L;
+      el.style.setProperty('--lanes', String(Lw));
+      reconcile(el, this.weekSpecs(row.start, layouts[w], Lw, today, nowMs, t, tz, isWeek, compact ? m : null, rowH), { flip: true });
     });
     this.applyPages();
   }
@@ -295,11 +341,10 @@ export class MonthCalendar {
    * other days keep their lanes so they stay lined up; the day's own events (and a one-day piece of any bar that did
    * not fit) take turns in the lanes left free. Returns the extra pieces to draw; marks paged chips with their page.
    */
-  private planBusyDays(ws: string, segs: Placed[], hidden: Set<Placed>, moreCount: number[], L: number): Placed[] {
+  private planBusyDays(ws: string, segs: Placed[], hidden: Set<Placed>, moreCount: number[], L: number, skip: Set<number>): Placed[] {
     const pieces: Placed[] = [];
-    for (let d = 0; d < 7; d++) this.busyPages.delete(addDays(ws, d));
     for (let d = 0; d < 7; d++) {
-      if (!moreCount[d]) continue;
+      if (!moreCount[d] || skip.has(d)) continue;
       const key = addDays(ws, d);
       const a = 2 * d, b = 2 * d + 2;
       const inDay = (sg: Placed) => sg.s < b && a < sg.eSlot;
@@ -350,10 +395,10 @@ export class MonthCalendar {
     return pieces;
   }
 
-  /** How many event lanes fit in a week row without squashing chips (measured, rem-based CSS vars). */
-  private lanesThatFit(nWeeks: number): number {
+  /** Grid metrics in px (null while the grid is not laid out yet). */
+  private metrics(): Metrics | null {
     const h = this.weeks.clientHeight;
-    if (!h) return 99;
+    if (!h) return null;
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 10;
     const cs = getComputedStyle(this.root);
     const v = (name: string, def: number) => {
@@ -362,39 +407,30 @@ export class MonthCalendar {
       if (!Number.isFinite(n)) return def * rem;
       return raw.endsWith('px') ? n : n * rem;
     };
-    const rowH = h / nWeeks - 1;
-    const numH = v('--num-h', 5.8);
-    const laneH = v('--lane-min', 2.45);
-    const gap = v('--lane-gap', 0.42);
-    return Math.floor((rowH - numH - gap) / (laneH + gap));
+    const lineFs = v('--chip-fs', 1.68) * COMPACT_FONT;
+    const lineH = Math.round(lineFs * COMPACT_LINE);
+    // the CSS draws the compact entries with these sizes, so what is planned is what shows
+    const set = (k: string, px: number) => {
+      const val = `${px.toFixed(2)}px`;
+      if (this.root.style.getPropertyValue(k) !== val) this.root.style.setProperty(k, val);
+    };
+    set('--cline-fs', lineFs);
+    set('--cline-h', lineH);
+    set('--cline-gap', Math.round(COMPACT_GAP_U * rem));
+    return {
+      h, rem, numH: v('--num-h', 5.8), laneH: v('--lane-h', 2.9), laneMin: v('--lane-min', 2.45), gap: v('--lane-gap', 0.42),
+      lineFs, lineH, lineGap: Math.round(COMPACT_GAP_U * rem), pad: COMPACT_PAD_U * rem,
+    };
   }
 
-  private weekSpecs(
-    ws: string, events: NEvent[], L: number, today: string, nowMs: number, t: Ctx['t'], tz: string, isWeek: boolean,
-  ): Spec[] {
-    const { cfg, lang } = ctx;
-    const c = cfg.calendar;
+  /** How many event lanes fit in a week row of `rowH` px without squashing chips. */
+  private lanesFor(rowH: number, m: Metrics): number {
+    return Math.floor((rowH - m.numH - m.gap) / (m.laneMin + m.gap));
+  }
+
+  /** Segments of the events overlapping the week starting `ws`, with lanes given greedily (bars first). */
+  private layoutWeek(ws: string, events: NEvent[]): Placed[] {
     const we = addDays(ws, 6);
-    const specs: Spec[] = [];
-
-    // Day cells + numbers
-    for (let d = 0; d < 7; d++) {
-      const key = addDays(ws, d);
-      const wd = weekdayOfKey(key);
-      const dayNum = +key.slice(8, 10);
-      const past = key < today;
-      const isToday = key === today;
-      const first = dayNum === 1;
-      const col = `grid-column:${2 * d + 1} / span 2`;
-      const cls = `${past ? ' past' : ''}${isToday ? ' today' : ''}${wd === 0 || wd === 6 ? ' we' : ''}${first ? ' m1' : ''}`;
-      specs.push({ key: `b${key}`, className: `cell${cls}`, style: col, html: '' });
-      let label = first ? esc(monthName(lang, +key.slice(5, 7), 'short')) : String(dayNum);
-      if (isWeek && !first) label = `${dayNum}`;
-      const numHtml = isToday ? `<span class="dot"><span>${label}</span></span>` : `<span>${label}</span>`;
-      specs.push({ key: `n${key}`, className: `num${cls}`, style: `${col};grid-row:1`, html: numHtml });
-    }
-
-    // Collect segments overlapping this week
     const segs: Placed[] = [];
     for (const e of events) {
       if (e.spanLast < ws || e.spanFirst > we) continue;
@@ -417,8 +453,6 @@ export class MonthCalendar {
       }
       return sortForDay(a.e, b.e);
     });
-
-    // Greedy lane allocation on half-day slots
     const occ: boolean[][] = [];
     for (const sg of segs) {
       let lane = 0;
@@ -432,6 +466,115 @@ export class MonthCalendar {
         }
       }
       sg.lane = lane;
+    }
+    return segs;
+  }
+
+  /**
+   * Per day of a laid out week: the lanes its bars keep, how many entries it would list in compact form, and how
+   * many lanes it takes at normal size (a day with a single event keeps the usual behaviour: it never goes compact).
+   */
+  private daySummary(segs: Placed[], L: number): { days: CompactDay[]; normal: number[] } {
+    const days: CompactDay[] = [];
+    const normal: number[] = [];
+    for (let d = 0; d < 7; d++) {
+      const a = 2 * d, b = 2 * d + 2;
+      let top = 0, items = 0, lanes = 0, locals = 0;
+      for (const sg of segs) {
+        if (!(sg.s < b && a < sg.eSlot)) continue;
+        lanes = Math.max(lanes, sg.lane + 1);
+        if (sg.s >= a && sg.eSlot <= b) { items++; locals++; } else if (sg.lane >= L) items++;
+        else top = Math.max(top, sg.lane + 1);
+      }
+      days.push({ top, items });
+      normal.push(locals < 2 ? Math.min(lanes, L) : lanes);
+    }
+    return { days, normal };
+  }
+
+  /**
+   * Compact busy days: a day whose own events do not all get a lane lists them (and a one-day piece of any bar that
+   * did not get one) as small one-line entries, in a column below the bars that also cover other days. Only when the
+   * entries show more than the lanes would; when even they do not fit, the column pages through them (rotateBusyDays)
+   * or the day shows "+N". Days handled here are added to `done` (planBusyDays leaves them alone).
+   */
+  private planCompact(
+    ws: string, segs: Placed[], hidden: Set<Placed>, moreCount: number[], L: number, m: Metrics, rowH: number, done: Set<number>,
+  ): Stack[] {
+    const stacks: Stack[] = [];
+    const rotate = ctx.cfg.calendar.rotateBusyDays !== false;
+    const lane = laneHeight(rowH, m.numH, L, m.laneH, m.laneMin, m.gap);
+    for (let d = 0; d < 7; d++) {
+      const a = 2 * d, b = 2 * d + 2;
+      const inDay = (sg: Placed) => sg.s < b && a < sg.eSlot;
+      const local = (sg: Placed) => sg.s >= a && sg.eSlot <= b;
+      const all = segs.filter(local);
+      if (all.length < 2 || !all.some((sg) => hidden.has(sg))) continue;
+      const fixed = segs.filter((sg) => inDay(sg) && !local(sg) && !hidden.has(sg));
+      const top = fixed.reduce((n, f) => Math.max(n, f.lane + (f.span ?? 1)), 0);
+      if (top >= L) continue;
+      // events that got a lane above the bars (a gap left by bars of other days) keep it
+      const own = all.filter((sg) => hidden.has(sg) || sg.lane >= top);
+      const space = rowH - m.numH - m.gap - top * (lane + m.gap) - m.pad;
+      const fit = linesThatFit(space, m.lineH, m.lineGap);
+      if (!fit || fit < L - top) continue; // small entries would show fewer events than the lanes do
+      const key = addDays(ws, d);
+      const cut: Placed[] = segs.filter((sg) => hidden.has(sg) && inDay(sg) && !local(sg)).map((sg) => ({
+        e: sg.e, s: Math.max(sg.s, a), eSlot: Math.min(sg.eSlot, b), lane: -1,
+        contL: sg.contL || sg.s < a, contR: sg.contR || sg.eSlot > b, piece: true, day: key,
+      }));
+      const items = [...own, ...cut].sort((x, y) => sortForDay(x.e, y.e));
+      for (const sg of own) hidden.add(sg);
+      // the same paging as the normal busy days, with a line for a lane
+      const plan = planPages(rotate ? items : items.slice(0, fit), Array.from({ length: fit }, (_, i) => i))!;
+      const pages: Placed[][] = Array.from({ length: plan.pages }, () => []);
+      for (const { item, page } of plan.placed) pages[page].push(item);
+      moreCount[d] = plan.pages > 1 ? 1 : items.length - pages[0].length;
+      if (plan.pages > 1) this.busyPages.set(key, plan.pages);
+      stacks.push({ d, top, pages });
+      done.add(d);
+    }
+    return stacks;
+  }
+
+  /** One compact entry: emoji, time (none for all-day events), title; the colour shows as for a normal chip. */
+  private lineHtml(sg: Placed, today: string, nowMs: number, tz: string): string {
+    const { cfg } = ctx;
+    const e = sg.e;
+    const col = chipColors(e.color);
+    const allDay = !e.timed;
+    const pastEv = e.timed ? e.endMs <= nowMs : e.spanLast < today;
+    const ongoing = e.timed && e.startMs <= nowMs && e.endMs > nowMs;
+    const cls = ['ev', 'cl', allDay ? 'bar single' : 'timed', pastEv ? 'past' : '', ongoing ? 'ongoing' : ''].filter(Boolean).join(' ');
+    let html = e.emoji ? `<span class="em">${esc(e.emoji)}</span>` : '';
+    if (e.timed) html += `<span class="tm">${esc(timeLabel(e, tz, cfg.datetime.format24, cfg.datetime.showAmPm, false, true))}</span>`;
+    html += `<span class="tt">${esc(e.title)}</span>`;
+    return `<div class="${cls}" style="--c:${col.base};--on:${col.onSolid};--tint:${col.tint};--shade:${col.shade}">${html}</div>`;
+  }
+
+  private weekSpecs(
+    ws: string, segs: Placed[], L: number, today: string, nowMs: number, t: Ctx['t'], tz: string, isWeek: boolean,
+    compact: Metrics | null, rowH: number,
+  ): Spec[] {
+    const { cfg, lang } = ctx;
+    const c = cfg.calendar;
+    const specs: Spec[] = [];
+
+    // Day cells + numbers
+    for (let d = 0; d < 7; d++) {
+      const key = addDays(ws, d);
+      const wd = weekdayOfKey(key);
+      const dayNum = +key.slice(8, 10);
+      const past = key < today;
+      const isToday = key === today;
+      const first = dayNum === 1;
+      const col = `grid-column:${2 * d + 1} / span 2`;
+      const cls = `${past ? ' past' : ''}${isToday ? ' today' : ''}${wd === 0 || wd === 6 ? ' we' : ''}${first ? ' m1' : ''}`;
+      specs.push({ key: `b${key}`, className: `cell${cls}`, style: col, html: '' });
+      let label = first ? esc(monthName(lang, +key.slice(5, 7), 'short')) : String(dayNum);
+      if (isWeek && !first) label = `${dayNum}`;
+      const numHtml = isToday ? `<span class="dot"><span>${label}</span></span>` : `<span>${label}</span>`;
+      specs.push({ key: `n${key}`, className: `num${cls}`, style: `${col};grid-row:1`, html: numHtml });
     }
 
     // Overflow: days with items beyond L lanes show "+N" in the last lane.
@@ -460,7 +603,10 @@ export class MonthCalendar {
     // Rotation off (it can be turned off while the screen runs): forget the pages, or the "+N" cells would keep a
     // stale page indicator.
     if (c.rotateBusyDays === false) this.busyPages.clear();
-    const pieces = c.rotateBusyDays === false ? [] : this.planBusyDays(ws, segs, hidden, moreCount, L);
+    for (let d = 0; d < 7; d++) this.busyPages.delete(addDays(ws, d));
+    const done = new Set<number>();
+    const stacks = compact && rowH > 0 ? this.planCompact(ws, segs, hidden, moreCount, L, compact, rowH, done) : [];
+    const pieces = c.rotateBusyDays === false ? [] : this.planBusyDays(ws, segs, hidden, moreCount, L, done);
     for (const sg of [...segs, ...pieces]) {
       if (hidden.has(sg)) continue;
       const e = sg.e;
@@ -507,6 +653,21 @@ export class MonthCalendar {
         style: `grid-column:${sg.s + 1} / ${sg.eSlot + 1};grid-row:${row};--c:${col.base};--on:${col.onSolid};--tint:${col.tint};--shade:${col.shade}`,
         html,
         data: sg.pages ? { day: sg.day!, pg: String(sg.page), pgs: String(sg.pages) } : undefined,
+      });
+    }
+    for (const st of stacks) {
+      const key = addDays(ws, st.d);
+      const n = st.pages.length;
+      const lines = (items: Placed[]) => items.map((sg) => this.lineHtml(sg, today, nowMs, tz)).join('');
+      // pages are stacked in the same place; applyPages() shows one at a time, like the busy days' chips
+      const html = n > 1
+        ? st.pages.map((items, p) => `<div class="cpg" data-day="${key}" data-pg="${p}" data-pgs="${n}">${lines(items)}</div>`).join('')
+        : lines(st.pages[0]);
+      specs.push({
+        key: `c${key}`,
+        className: `cstack${n > 1 ? ' paged' : ''}`,
+        style: `grid-column:${2 * st.d + 1} / span 2;grid-row:${st.top + 2} / -1`,
+        html,
       });
     }
     for (let d = 0; d < 7; d++) {

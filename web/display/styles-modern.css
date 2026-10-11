@@ -553,6 +553,22 @@
   transform: none;
 }
 .style-modern.theme-light .cal.is-week .ev.timed { background: rgb(var(--c) / 0.16); }
+/* compact busy days: a small dot (or the emoji) instead of the stripe, also in the week view */
+.style-modern .cal .cstack .ev.cl.timed,
+.style-modern .cal .cstack .ev.cl.timed:has(> .em) { background: none; padding-left: 1.45rem; border-radius: 0.55rem; }
+.style-modern .cal .cstack .ev.cl.timed:has(> .em) { padding-left: 0.6rem; }
+.style-modern .cal .cstack .ev.cl.timed::before {
+  display: block;
+  left: 0.5rem;
+  top: 50%;
+  bottom: auto;
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 50%;
+  transform: translateY(-50%);
+}
+.style-modern .cal .cstack .ev.cl.timed:has(> .em)::before { display: none; }
+.style-modern .cal .cstack .ev.cl.ongoing { background: rgb(var(--c) / 0.18); }
 .style-modern .preset-topBottom .cal { --num-h: 3.8rem; }
 .style-modern .preset-topBottom .num { padding-top: 0.6rem; font-size: 2.4rem; }
 .style-modern .preset-topBottom .cal-head { padding-bottom: 0.8rem; }

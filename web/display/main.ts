@@ -283,6 +283,11 @@ function applyConfig(raw: DisplayConfig): void {
   if (pm === '0' || pm === '1') cfg.calendar.marquee = pm === '1';
   const pr = params.get('rotate');
   if (pr === '0' || pr === '1') cfg.calendar.rotateBusyDays = pr === '1';
+  // ?compact=0|1 (busy days as small one-line entries, rows sized by their events) and ?weeks=1..8
+  const pcp = params.get('compact');
+  if (pcp === '0' || pcp === '1') cfg.calendar.compactBusyDays = pcp === '1';
+  const pw = Number(params.get('weeks'));
+  if (Number.isInteger(pw) && pw >= 1 && pw <= 8) cfg.calendar.weeks = pw;
   const pa = params.get('ambient');
   if (pa === 'aurora' || pa === 'particles' || pa === 'none') cfg.background.ambient = pa;
   const ptr = params.get('transition');
