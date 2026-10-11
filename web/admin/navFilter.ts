@@ -3,7 +3,7 @@
 // section components by id.
 import type { AppConfig, FeatureName } from '../shared/types';
 import type { IconName } from './components/icons';
-import { offersAny, type Caps } from './caps';
+import { hasFeature, offersAny, type Caps } from './caps';
 
 /** One feature, or several (shown when at least one is on). */
 export type Gate = FeatureName | readonly FeatureName[];
@@ -76,10 +76,10 @@ export function filterActions<T extends { id: string }>(items: readonly T[], cap
   return items.filter((i) => allowed(caps, ACTION_FEATURES[i.id]));
 }
 
-/** Settings search entries: the page must be visible and the entry's own feature (if any) on. */
-export function filterSettings<T extends { route: string; feature?: Gate }>(entries: readonly T[], caps: Caps, visibleRoutes: Iterable<string>): T[] {
+/** Settings search entries: the page must be visible, the entry's own feature (if any) on and its `unless` off. */
+export function filterSettings<T extends { route: string; feature?: Gate; unless?: FeatureName }>(entries: readonly T[], caps: Caps, visibleRoutes: Iterable<string>): T[] {
   const routes = new Set(visibleRoutes);
-  return entries.filter((e) => routes.has(e.route) && allowed(caps, e.feature));
+  return entries.filter((e) => routes.has(e.route) && allowed(caps, e.feature) && !(e.unless && hasFeature(caps, e.unless)));
 }
 
 /** Route id for a hash: the requested page when visible, else home. */

@@ -26,4 +26,26 @@ export const ROWS_DOORBELL: [string, string, string][] = [
   ],
   ['Timbre: llaman a la puerta', 'Doorbell: someone is at the door', 'Campainha: está alguém à porta'],
   ['Timbre: llamaron otra vez', 'Doorbell: rang again', 'Campainha: tocaram outra vez'],
+  // servers that show the snapshot Home Assistant sends (Marco Cloud): the card in API & webhooks
+  ['Timbre', 'Doorbell', 'Campainha'],
+  [
+    'Cuando llaman a la puerta, Home Assistant manda a Marco una foto de la cámara y las pantallas la muestran a pantalla completa durante unos segundos, con sonido de timbre. También despierta las pantallas en modo noche mientras dura.',
+    'When someone rings, Home Assistant sends Marco a picture from the camera and the screens show it full screen for a few seconds, with a door chime. It also wakes screens in night mode while it lasts.',
+    'Quando tocam à porta, o Home Assistant manda ao Marco uma foto da câmara e os ecrãs mostram-na em ecrã inteiro durante uns segundos, com som de campainha. Também acorda os ecrãs em modo noite enquanto dura.',
+  ],
+  ['Probar sin foto', 'Test without a picture', 'Testar sem foto'],
+  ['Probar con una foto de ejemplo', 'Test with a sample picture', 'Testar com uma foto de exemplo'],
+  [
+    'Desde Home Assistant: POST /api/hooks/doorbell con un token de API y la foto de la cámara (JPEG, PNG o WebP, 2 MB como mucho). Marco guarda solo la última foto mientras suena el timbre, 10 minutos como mucho, y luego la borra. Solo la ven las pantallas que están sonando.',
+    'From Home Assistant: POST /api/hooks/doorbell with an API token and the camera picture (JPEG, PNG or WebP, 2 MB at most). Marco keeps only the latest picture while the doorbell rings, 10 minutes at most, and then deletes it. Only the screens that are ringing see it.',
+    'A partir do Home Assistant: POST /api/hooks/doorbell com um token de API e a foto da câmara (JPEG, PNG ou WebP, 2 MB no máximo). O Marco guarda só a última foto enquanto a campainha toca, 10 minutos no máximo, e depois apaga-a. Só a veem os ecrãs que estão a tocar.',
+  ],
+  ['Timbre con la foto de la cámara', 'Doorbell with the camera picture', 'Campainha com a foto da câmara'],
+  ['Quitar el timbre de las pantallas', 'Take the doorbell off the screens', 'Tirar a campainha dos ecrãs'],
+  ['Timbre en las pantallas de Marco', 'Doorbell on the Marco screens', 'Campainha nos ecrãs do Marco'],
+  [
+    'la foto como campo image (multipart) o como cuerpo image/jpeg con los campos en la URL',
+    'the picture as an image field (multipart) or as an image/jpeg body with the fields in the URL',
+    'a foto como campo image (multipart) ou como corpo image/jpeg com os campos no URL',
+  ],
 ];

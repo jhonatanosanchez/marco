@@ -73,7 +73,16 @@ export class DoorbellOverlay {
     this.maybeChime(r);
     this.arm();
     this.progress();
-    if (same) return;
+    if (same) {
+      // A server that serves uploaded snapshots can get the first picture after the ring started: the same ring
+      // comes again with frames on, and the overlay starts asking for it.
+      if (r.frames && this.stopped) {
+        this.stopped = false;
+        this.failed = false;
+        this.schedule(0);
+      }
+      return;
+    }
     this.root.querySelector('.db-label')!.textContent = ctx.t('doorbell');
     this.stopped = !r.frames;
     this.failed = false;

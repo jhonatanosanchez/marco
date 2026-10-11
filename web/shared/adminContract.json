@@ -465,9 +465,10 @@
       "query": [],
       "feature": "doorbell",
       "callers": [
-        "doorbell"
+        "doorbell",
+        "doorbellWithImage"
       ],
-      "request": "DoorbellRequest",
+      "request": "DoorbellRequest | multipart/form-data",
       "response": "DoorbellResponse",
       "responseArray": false,
       "responseKeys": [
@@ -475,7 +476,8 @@
         "action",
         "delivered",
         "screens",
-        "expiresAt?"
+        "expiresAt?",
+        "picture?"
       ]
     },
     {

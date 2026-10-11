@@ -1428,6 +1428,8 @@ export interface DoorbellResponse {
   screens: string[];
   /** ring only: when the last of the rings ends */
   expiresAt?: string | null;
+  /** servers that show uploaded snapshots (features.doorbellLive off): the ring has a picture */
+  picture?: boolean;
 }
 
 export interface IdentifyPayload {

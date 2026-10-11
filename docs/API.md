@@ -494,6 +494,18 @@ values of *Admin → Home Assistant → Doorbell and camera* (`homeassistant.doo
   someone has touched the page once.
 - Without a camera (`camera: ""`) the screens show a bell and "Someone is at the door".
 
+**Servers with snapshots instead of a live camera** (`features.doorbell` on, `features.doorbellLive` off: Marco Cloud,
+which cannot reach Home Assistant) take the picture with the ring. `POST /api/hooks/doorbell` then also accepts
+`multipart/form-data` with an `image` file and the same fields as form fields (`screens` comma separated), or a raw
+`image/jpeg`, `image/png` or `image/webp` body with the fields in the query (`?seconds=60&screens=hall`). The picture is
+checked by its first bytes and may be 2 MB at most (`413`, `415` otherwise). Only the latest picture of the household is
+kept, only while a screen rings and 10 minutes at most, and `GET /api/display/doorbell/frame` returns it to screens
+that ring (`404 { code: "no_camera" }` when there is none, `refreshMs` is a few seconds). A picture sent without
+`action` while the screens already ring replaces the one they show and makes the ring last longer, without a second
+chime (with `action: "ring"` it rings again). A new ring without a picture never shows the picture of an earlier
+one. `camera` is refused there. The admin shows the doorbell card on the *API & webhooks* page, with a test that sends a sample
+picture (`POST /api/admin/doorbell` takes the same multipart form).
+
 Home Assistant example (`configuration.yaml`; replace `marco.local`, the token and the entity ids with your own):
 
 ```yaml
