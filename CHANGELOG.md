@@ -5,6 +5,10 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- *Calendars → Calendar view*: *Max. visible events per day* now explains what it does. With *Compact busy days* on it
+  is the point where a day switches to short lines (3 or 4 keeps normal days large).
+
 ## [0.6.1] - 2026-10-11
 
 ### Added

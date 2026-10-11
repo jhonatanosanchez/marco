@@ -713,7 +713,15 @@ export function CalendarsSection(props: SectionProps) {
             <Field label={t('Semanas a mostrar')} error={errors['calendar.weeks']}>
               <Segmented full value={c.weeks} options={[1, 2, 3, 4, 5, 6].map((n) => ({ value: n, label: String(n) }))} onChange={(v) => set((d) => void (d.calendar.weeks = v))} />
             </Field>
-            <Field label={t('Máx. eventos visibles por día')} error={errors['calendar.maxEventsPerDay']}>
+            <Field
+              label={t('Máx. eventos visibles por día')}
+              hint={
+                c.compactBusyDays === true
+                  ? t('Los días con más eventos pasan a líneas cortas y los muestran todos. Con 3 o 4, los días normales se ven grandes.')
+                  : t('Los eventos que no caben se muestran por turnos o con “+N”.')
+              }
+              error={errors['calendar.maxEventsPerDay']}
+            >
               <Slider value={c.maxEventsPerDay} min={1} max={8} step={1} onChange={(v) => set((d) => void (d.calendar.maxEventsPerDay = v))} />
             </Field>
           </div>

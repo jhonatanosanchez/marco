@@ -7,4 +7,14 @@ export const ROWS_COMPACT: [string, string, string][] = [
     'When a day cannot fit its events, they show as small one-line entries, and weeks with more events get more height. What still does not fit takes turns or shows “+N”.',
     'Se num dia não cabem os eventos, aparecem em linhas pequenas, e as semanas com mais eventos ocupam mais altura. O que mesmo assim não cabe aparece à vez ou com “+N”.',
   ],
+  [
+    'Los días con más eventos pasan a líneas cortas y los muestran todos. Con 3 o 4, los días normales se ven grandes.',
+    'Days with more events switch to short lines and show them all. With 3 or 4, normal days stay large.',
+    'Os dias com mais eventos passam a linhas curtas e mostram-nos todos. Com 3 ou 4, os dias normais ficam grandes.',
+  ],
+  [
+    'Los eventos que no caben se muestran por turnos o con “+N”.',
+    'Events that do not fit take turns or show “+N”.',
+    'Os eventos que não cabem aparecem à vez ou com “+N”.',
+  ],
 ];
