@@ -62,9 +62,21 @@ export interface LayoutConfig {
   corner?: FrameCorner;
 }
 
+/** Albums a screen plays when its background source is 'immich'. */
+export interface ImmichBackground {
+  /** Immich album ids (UUIDs), at most 20; [] = stock photos */
+  albumIds: string[];
+  /** only photos marked as favourite in Immich */
+  favoritesOnly: boolean;
+}
+
+/** Photos whose orientation differs from the screen: blurred copy behind the whole photo, or the usual crop.
+ *  'auto' = blurred fill for Immich photos, crop for the gallery and stock (the look screens had before). */
+export type PortraitFit = 'auto' | 'blur' | 'crop';
+
 export interface BackgroundConfig {
   enabled: boolean;
-  source: 'stock' | 'gallery' | 'mixed';
+  source: 'stock' | 'gallery' | 'mixed' | 'immich';
   stockTopic: string;
   /** gallery rotation order: shuffled (no immediate repeats), newest upload first, or by file name */
   order?: 'random' | 'newest' | 'name';
@@ -79,6 +91,8 @@ export interface BackgroundConfig {
   panelShade?: number;
   /** effect over the photo for the current weather: none, light rain/snow particles, or drops on the glass with sun rays */
   weatherFx?: 'off' | 'simple' | 'rich';
+  portraitFit?: PortraitFit;
+  immich?: ImmichBackground;
 }
 
 export interface CalendarSource {
@@ -338,6 +352,53 @@ export interface MessageConfig {
   emoji: string;
 }
 
+/** Immich photo library (one server per install). The API key is stored on the server only. */
+export interface ImmichConfig {
+  enabled: boolean;
+  /** e.g. http://immich.local:2283 (no trailing /api) */
+  url: string;
+  /** accept a self-signed HTTPS certificate */
+  insecureTls: boolean;
+}
+
+/** POST /api/admin/test/immich. `error`: not_configured, key_missing, invalid_url, invalid_key, missing_scope,
+ *  not_found, unreachable, bad_response, http. */
+export interface TestImmichResponse {
+  ok: boolean;
+  version?: string;
+  /** required scopes the key lacks (album.read, asset.read, asset.view) */
+  missingScopes?: string[];
+  error?: string;
+}
+
+/** GET /api/admin/immich/albums item. */
+export interface ImmichAlbum {
+  id: string;
+  name: string;
+  count: number;
+  /** cover asset id (thumbnail at /media/immich/<cover>?s=thumb, admin session only) */
+  cover: string | null;
+  shared: boolean;
+  start: string | null;
+  end: string | null;
+}
+
+/** GET /api/admin/immich/status (also the answer of POST /api/admin/immich/refresh). */
+export interface ImmichStatus {
+  usable: boolean;
+  /** albums some screen plays: photos cached (null = not fetched yet), last fetch, last error code, deleted / unshared */
+  albums: { id: string; favoritesOnly: boolean; count: number | null; updatedAt: string | null; error: string | null; missing: boolean }[];
+  cache: { files: number; bytes: number };
+}
+
+/** GET/PUT /api/admin/immich/key: the key itself is never sent back. */
+export interface ImmichKeyStatus {
+  set: boolean;
+  hint: string;
+  /** PUT only: Immich accepted the key on a test call */
+  checked?: boolean;
+}
+
 export interface HomeAssistantConfig {
   enabled: boolean;
   url: string;
@@ -506,6 +567,7 @@ export interface AppConfig {
   eventRules: { items: EventRule[] };
   schedules: { items: ScheduledMessage[] };
   homeassistant: HomeAssistantConfig;
+  immich: ImmichConfig;
   auth: AuthConfig;
   security: SecurityConfig;
   privacy: ScreenPrivacyConfig;
@@ -667,9 +729,14 @@ export interface Photo {
   url: string;
   author?: string;
   title?: string;
-  source: 'stock' | 'gallery';
+  source: 'stock' | 'gallery' | 'immich';
   /** gallery file name (gallery photos only) */
   file?: string;
+  /** Immich asset id (Immich photos only) */
+  id?: string;
+  /** Immich: local date taken (YYYY-MM-DD) and place ("City, Country") for the caption */
+  takenAt?: string;
+  place?: string;
   /** Focal point (0..1 of width / height, from the top-left) the cover crop is kept around. Gallery only. */
   focusX?: number;
   focusY?: number;
@@ -719,6 +786,8 @@ export interface Features {
   doorbellLive: boolean;
   /** Carousels: several screens in a loop on one TV (StoredConfig.carousels; absent = off). */
   carousels: boolean;
+  /** Immich albums as a background source, proxied by this server (self-hosted; absent = off). */
+  immich: boolean;
 }
 
 export type FeatureName = keyof Features;
@@ -1263,6 +1332,7 @@ export interface StoredConfig {
   /** servers without carousels leave it out */
   carousels?: { items: Carousel[] };
   homeassistant: HomeAssistantConfig;
+  immich: ImmichConfig;
   auth: AuthConfig;
   security: SecurityConfig;
 }
@@ -1599,6 +1669,7 @@ export interface ExportSecrets {
   homeassistant?: { token?: string };
   /** API key of a weather source that needs one (Pirate Weather) */
   weather?: { apiKey?: string };
+  immich?: { apiKey?: string };
   google?: { accounts: Record<string, unknown> };
   apiTokens?: unknown[];
 }

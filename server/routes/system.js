@@ -142,6 +142,7 @@ export function systemRouter({ version = getServerVersion() } = {}) {
       updateSecrets((x) => {
         if (s.haToken !== undefined) { x.homeassistant.token = s.haToken; applied.push('homeassistant'); }
         if (s.weatherKey !== undefined) { x.weather = { ...(x.weather || {}), apiKey: s.weatherKey }; applied.push('weather'); }
+        if (s.immichKey !== undefined) { x.immich = { ...(x.immich || {}), apiKey: s.immichKey }; applied.push('immich'); }
         if (s.googleAccounts) { x.google.accounts = s.googleAccounts; applied.push('google'); }
         if (s.microsoftAccounts) { x.microsoft = { accounts: s.microsoftAccounts }; applied.push('microsoft'); }
         if (s.apiTokens) { x.apiTokens = s.apiTokens; applied.push('apiTokens'); }

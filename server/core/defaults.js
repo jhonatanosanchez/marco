@@ -50,6 +50,10 @@ export function defaultScreenProfile({ id = 's_main', slug = 'living-room', name
       enabled: true, source: 'stock', stockTopic: 'nature', order: 'random', intervalSec: 120, brightness: 0.85, showMeta: false,
       cover: true, transition: 'webgl', ambient: 'aurora',
       panelBlur: 18, panelShade: 0.5, weatherFx: 'simple',
+      // portraitFit: photos whose orientation differs from the screen ('auto' = blurred fill for Immich photos only);
+      // immich: the albums played when source is 'immich' (server/immich.js)
+      portraitFit: 'auto',
+      immich: { albumIds: [], favoritesOnly: false },
     },
     calendar: {
       enabled: true, view: 'month', weeks: 5, weekStart: 1, showLocation: false, showEndTime: false,
@@ -107,6 +111,8 @@ export function defaultConfig() {
       enabled: false, url: 'http://homeassistant.local:8123',
       doorbell: { camera: '', seconds: 60, screenIds: [], sound: true },
     },
+    // Immich photo library (server/immich.js): the API key is in secrets.json, never in the config
+    immich: { enabled: false, url: '', insecureTls: false },
     auth: { allowedGoogleEmails: [], passwordLoginEnabled: true },
     // 'private': every display needs its private link (/d/<key>) or a paired-device token (server/displayAccess.js).
     // 'open': legacy LAN mode (/ and /?screen= work without a key). Configs saved before 0.3 load as 'open'.

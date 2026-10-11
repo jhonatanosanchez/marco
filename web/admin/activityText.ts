@@ -25,7 +25,7 @@ export function sectionLabel(key: string): string {
   const m = /^screens:([^.]+)\.?(.*)$/.exec(key);
   const names: Record<string, string> = {
     calendar: 'Calendarios', datetime: 'Fecha y hora', weather: 'Tiempo', news: 'Noticias', todo: 'Tareas', localEvents: 'Eventos locales',
-    birthdays: 'Cumpleaños', eventRules: 'Filtros', countdowns: 'Cuentas atrás', schedules: 'Mensajes programados', homeassistant: 'Home Assistant',
+    birthdays: 'Cumpleaños', eventRules: 'Filtros', countdowns: 'Cuentas atrás', schedules: 'Mensajes programados', homeassistant: 'Home Assistant', immich: 'Immich',
     auth: 'Seguridad', screens: 'Pantallas', defaultScreen: 'Pantalla predeterminada', screen: 'Ajustes', layout: 'Diseño', background: 'Fondo',
     message: 'Mensaje', alerts: 'Avisos', security: 'Acceso a las pantallas', privacy: 'Modo privado', carousels: 'Carruseles',
   };

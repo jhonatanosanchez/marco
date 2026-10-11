@@ -210,7 +210,10 @@ export function displayAuth({ allowQuery = false } = {}) {
  */
 export function mediaAuth(req, res, next) {
   const a = resolveDisplayAccess(req, { allowQuery: true });
-  if (a.ok && (a.via !== 'open' || isLanClient(req))) return next();
+  if (a.ok && (a.via !== 'open' || isLanClient(req))) {
+    req.displayAccess = a; // the Immich proxy reads which screen the credential belongs to
+    return next();
+  }
   if (a.ok) return res.status(404).type('text/plain').send('not found');
   res.set('cache-control', 'private, no-store');
   res.status(a.status).type('text/plain').send(ERRORS[a.code]);

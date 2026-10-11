@@ -119,9 +119,10 @@ transparency, blur and a light edge:
   Add your own [Home Assistant](https://www.home-assistant.io/) weather entity and indoor sensors; animated rain/snow, or an optional
   realistic effect with drops on the glass, layered snow and sun rays on clear days (the photo is never blurred).
 - **News ticker** from any RSS/Atom feed, a to-do list and a message of the day.
-- **Photo background:** stock photos or your own gallery, WebGL transitions, slow zoom, a soft "aurora" ambient
-  effect, and **smart cropping** that keeps the subject (faces, pets) in the part of the screen not covered by the
-  clock or the weather.
+- **Photo background:** stock photos, your own gallery or albums from your [Immich](https://immich.app/) library,
+  WebGL transitions, slow zoom, a soft "aurora" ambient effect, and **smart cropping** that keeps the subject (faces,
+  pets) in the part of the screen not covered by the clock or the weather. Portrait photos can be shown whole over a
+  blurred copy of themselves.
 - **Easy to read:** panel blur and shade adapt to the photo; small screens get larger relative type; night mode dims
   the screen on a schedule.
 - **Live updates:** changes saved in the admin appear within a second through Server-Sent Events; data refreshes

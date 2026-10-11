@@ -193,6 +193,7 @@ export function validateConfig(c: AppConfig, caps: Caps = currentCaps()): Errors
   if (!(c.news.rotateSec >= 3)) e['news.rotateSec'] = 'Mínimo 3 s';
   if (!(c.news.maxItems >= 1 && c.news.maxItems <= 200)) e['news.maxItems'] = 'Entre 1 y 200';
   if (ha && c.homeassistant.enabled && !isHttpUrl(c.homeassistant.url)) e['homeassistant.url'] = 'URL no válida';
+  if (hasFeature(caps, 'immich') && c.immich?.enabled && !isHttpUrl(c.immich.url)) e['immich.url'] = 'URL no válida';
   c.auth.allowedGoogleEmails.forEach((m, i) => {
     if (!EMAIL_RE.test(m)) e[`auth.allowedGoogleEmails.${i}`] = 'Email no válido';
   });
@@ -355,7 +356,7 @@ export function sectionForServerPath(path: string): { screenIndex: number | null
   const map: Record<string, string> = {
     calendar: path.includes('iconRules') ? 'icons' : 'calendars',
     datetime: 'datetime', weather: 'weather', news: 'news', todo: 'todo', localEvents: 'local', birthdays: 'birthdays',
-    eventRules: 'filters', countdowns: 'countdowns', schedules: 'alerts', homeassistant: 'homeassistant', auth: 'security',
+    eventRules: 'filters', countdowns: 'countdowns', schedules: 'alerts', homeassistant: 'homeassistant', immich: 'immich', auth: 'security',
     screens: 'screens', defaultScreen: 'screens', carousels: 'carousels',
   };
   return { screenIndex: null, section: map[top] ?? 'home' };
@@ -383,6 +384,7 @@ export function sectionForError(key: string): string {
   if (key.startsWith('weather.')) return 'weather';
   if (key.startsWith('feed.') || key.startsWith('news.')) return 'news';
   if (key.startsWith('homeassistant.')) return 'homeassistant';
+  if (key.startsWith('immich.')) return 'immich';
   if (key.startsWith('auth.')) return 'security';
   return 'screen';
 }

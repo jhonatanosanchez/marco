@@ -16,6 +16,19 @@ All notable changes to this project are documented here. The format is based on
 - The next screen's data is fetched a few seconds before it shows, so switching needs no request; *Connected screens*
   shows which carousel a TV runs and what it shows now. For testing: `?step=<address>`, `?carousel=0`, and
   `?demo=1&carousel=1` for the demo screens in a loop.
+- Immich as a fourth background source, next to stock, the gallery and the mix. Set the server URL and an API key
+  (scopes `album.read`, `asset.read`, `asset.view`) in the new *Integrations → Immich* page; *Test connection* shows
+  the Immich version and any missing scope. Each screen picks one or more albums (merged, duplicates removed), with
+  an optional *Favorites only*, and the usual orders (newest = date taken). Only photos are shown. The Marco server
+  fetches the images and keeps them in a disk cache, so the API key never reaches a screen and the screens do not need
+  to reach Immich. When Immich is down, the photos already in that cache keep playing for up to a day (the album
+  lists are kept that long); with nothing to show, the screen uses stock photos. A deleted or unshared album is
+  skipped and flagged on the Immich page. Captions show the place and the date taken. Works with Immich 1.1xx, 2.x and 3.x.
+- *Background → Portrait photos*: a portrait photo on a landscape screen (or the other way round) can be shown whole
+  over a blurred copy of itself (*Blurred fill*), or cropped as before. *Automatic*, the default, uses the blurred fill
+  for Immich photos only, so gallery and stock photos look as they did.
+- `features.immich` in `/api/health` (off when missing, and on Marco Cloud). `validateConfig` takes
+  `immichAvailable: false` to refuse the Immich source on servers without it.
 
 ### Changed
 - *Calendars → Calendar view*: *Max. visible events per day* now explains what it does. With *Compact busy days* on it

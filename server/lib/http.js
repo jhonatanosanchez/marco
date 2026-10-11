@@ -180,3 +180,56 @@ function nodeRequest(url, { method, headers, body, timeout, insecure, guard = fa
     req.end();
   });
 }
+
+/**
+ * Binary-safe request for LAN services that answer images as well as JSON (server/immich.js). node:http(s) only,
+ * so `insecureTls` can skip the certificate check for this one request. Redirects are not followed (a redirect
+ * would carry the API key header to another host). Returns { status, headers, buffer }; throws HttpError on a
+ * network error, the timeout or a body over `maxBytes`.
+ */
+export function requestBuffer(url, { method = 'GET', headers = {}, body, insecureTls = false, maxBytes = MAX_BODY, timeout = DEFAULT_TIMEOUT } = {}) {
+  return new Promise((resolve, reject) => {
+    let u;
+    try { u = new URL(url); } catch { return reject(new HttpError('Invalid URL', 0)); }
+    if (!['http:', 'https:'].includes(u.protocol)) return reject(new HttpError('Invalid URL', 0));
+    let settled = false;
+    const done = (fn, v) => { if (settled) return; settled = true; clearTimeout(timer); fn(v); };
+    const timer = setTimeout(() => {
+      const e = new HttpError(`Timeout (${timeout / 1000}s)`, 0);
+      req.destroy(e);
+      done(reject, e);
+    }, timeout);
+    const mod = u.protocol === 'https:' ? https : http;
+    const req = mod.request(u, {
+      method,
+      headers: { 'accept-encoding': 'identity', ...headers, ...(body ? { 'content-length': Buffer.byteLength(body) } : {}) },
+      rejectUnauthorized: !insecureTls,
+      timeout,
+    }, (res) => {
+      const len = Number(res.headers['content-length'] || 0);
+      if (len > maxBytes) {
+        const e = new HttpError('Response too large', res.statusCode);
+        req.destroy(e);
+        return done(reject, e);
+      }
+      const chunks = [];
+      let size = 0;
+      res.on('data', (c) => {
+        size += c.length;
+        if (size > maxBytes) {
+          const e = new HttpError('Response too large', res.statusCode);
+          req.destroy(e);
+          done(reject, e);
+          return;
+        }
+        chunks.push(c);
+      });
+      res.on('end', () => done(resolve, { status: res.statusCode, headers: res.headers, buffer: Buffer.concat(chunks) }));
+      res.on('error', (e) => done(reject, e instanceof HttpError ? e : new HttpError(e.message, 0)));
+    });
+    req.on('timeout', () => req.destroy(new HttpError(`Timeout (${timeout / 1000}s)`, 0)));
+    req.on('error', (e) => done(reject, e instanceof HttpError ? e : new HttpError(describeNetError({ cause: e, message: e.message }), 0)));
+    if (body) req.write(body);
+    req.end();
+  });
+}

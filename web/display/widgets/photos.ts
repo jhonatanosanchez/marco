@@ -1,14 +1,74 @@
 // Photo rotation controller: preloads + decodes the next image before showing it, then hands it to the
-// WebGL photo layer (shader transition) or to the CSS cross-fade fallback.
+// WebGL photo layer (shader transition) or to the CSS cross-fade fallback. A photo whose orientation differs from
+// the screen can be composed on a canvas first (background.portraitFit): the whole photo over a blurred copy of
+// itself. Both layers then take the canvas like any other image, so Ken Burns and the tone measure stay the same.
 import { coverPosition, coverWindow, freeBand, type PhotoFrame } from '../../shared/focus';
 import type { PhotoStats } from '../../shared/glass';
 import type { Photo } from '../../shared/types';
+import { immichCaption, wantsBlurFill } from '../photoFit';
 import { ctx } from '../ctx';
 import { el, esc, reducedMotion } from '../dom';
 import { mediaUrl } from '../identity';
 import type { PhotoLayer } from '../gl/photoLayer';
 
 const MAX_TEX = 2560;
+/** Longest side of a composed (blurred fill) frame. */
+const MAX_COMPOSED = 1920;
+
+/** Decoded photo ready for a layer: the image itself, or a canvas with the blurred fill composed around it. */
+interface Loaded {
+  img: HTMLImageElement;
+  src: TexImageSource & { width: number; height: number };
+  /** what the tone measure reads (the composed frame when there is one) */
+  tone: CanvasImageSource;
+  /** composed frame: pixel size, and the URL the CSS layer uses (a blob: URL to revoke later) */
+  composed?: { w: number; h: number; url: string };
+}
+
+/**
+ * The whole photo centred over a blurred, darker copy of itself that fills the frame (`fw` x `fh`). The blur is
+ * done on a small canvas and scaled up, which is cheap enough for a Raspberry Pi.
+ */
+function composeBlurFill(img: HTMLImageElement, fw: number, fh: number): HTMLCanvasElement {
+  const iw = img.naturalWidth, ih = img.naturalHeight;
+  const c = document.createElement('canvas');
+  c.width = fw;
+  c.height = fh;
+  const g = c.getContext('2d')!;
+  // blurred fill: cover-crop into a small canvas (a bit larger than needed, so the blur has no dark edges)
+  const sw = 160, sh = Math.max(1, Math.round((sw * fh) / fw));
+  const small = document.createElement('canvas');
+  small.width = sw;
+  small.height = sh;
+  const sg = small.getContext('2d')!;
+  const cover = Math.max(sw / iw, sh / ih) * 1.15;
+  const dw = iw * cover, dh = ih * cover;
+  if ('filter' in sg) sg.filter = 'blur(6px)';
+  sg.drawImage(img, (sw - dw) / 2, (sh - dh) / 2, dw, dh);
+  g.imageSmoothingEnabled = true;
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(small, 0, 0, fw, fh);
+  g.fillStyle = 'rgba(0, 0, 0, 0.28)';
+  g.fillRect(0, 0, fw, fh);
+  // the photo itself, whole, with a small margin so the slow zoom does not cut it
+  const fit = Math.min(fw / iw, fh / ih) * 0.94;
+  const pw = Math.round(iw * fit), ph = Math.round(ih * fit);
+  g.shadowColor = 'rgba(0, 0, 0, 0.45)';
+  g.shadowBlur = Math.round(Math.min(fw, fh) * 0.03);
+  g.drawImage(img, Math.round((fw - pw) / 2), Math.round((fh - ph) / 2), pw, ph);
+  return c;
+}
+
+const canvasUrl = (c: HTMLCanvasElement): Promise<string> =>
+  new Promise((res, rej) => c.toBlob((b) => (b ? res(URL.createObjectURL(b)) : rej(new Error('toBlob failed'))), 'image/jpeg', 0.9));
+
+type PhNode = HTMLElement & { _ph?: { w: number; h: number; p: Photo }; _blob?: string };
+/** Remove a CSS photo node, freeing the composed frame it showed. */
+function dropNode(n: PhNode | null | undefined): void {
+  if (!n) return;
+  n.remove();
+  if (n._blob) URL.revokeObjectURL(n._blob);
+}
 
 /** set once the first photo's tone has been applied (see measureTone) */
 let toneSeen = false;
@@ -23,7 +83,8 @@ export class Photos {
   private meta: HTMLElement;
   private failures = 0;
   private shownFile = '';
-  private lastGallery = '';
+  private lastShown = '';
+  private fitSig = '';
   /** Called when the batch has been shown completely; may replace the list (awaited before wrapping around). */
   onExhausted: (() => Promise<void> | void) | null = null;
   /** Free band of the photo panel (not covered by clock / weather card / side widgets); reported in heartbeats. */
@@ -39,9 +100,9 @@ export class Photos {
     return this.shownFile;
   }
 
-  /** Last gallery photo shown (for `after=`: sequential orders continue from it). */
-  get lastGalleryFile(): string {
-    return this.lastGallery;
+  /** Last gallery file or Immich asset shown (for `after=`: sequential orders continue from it). */
+  get lastKey(): string {
+    return this.lastShown;
   }
 
   /** Switch between WebGL and DOM rendering (e.g. after context loss). */
@@ -69,7 +130,11 @@ export class Photos {
       this.glLayer.interval = b.intervalSec;
       this.glLayer.cover = b.cover;
     }
-    if (!gl && !this.domCur && this.idx >= 0) this.showCurrentAgain();
+    // the portrait option changed: show the photo on screen again with the new framing
+    const fitSig = `${b.cover}|${b.portraitFit ?? 'auto'}`;
+    const refit = this.fitSig !== '' && fitSig !== this.fitSig;
+    this.fitSig = fitSig;
+    if ((refit || (!gl && !this.domCur)) && this.idx >= 0) this.showCurrentAgain();
     this.area.style.display = b.enabled ? '' : 'none';
     this.reframe();
     this.schedule();
@@ -105,7 +170,7 @@ export class Photos {
     if (!changed) return;
     this.frame = f;
     if (this.glLayer) this.glLayer.targetY = f?.targetY ?? 0.5;
-    const n = this.domCur as (HTMLElement & { _ph?: { w: number; h: number; p: Photo } }) | null;
+    const n = this.domCur as PhNode | null;
     if (n?._ph) this.frameDom(n, n._ph.w, n._ph.h, n._ph.p);
     this.onFrameChange?.();
   }
@@ -153,7 +218,8 @@ export class Photos {
     this.timer = setTimeout(() => this.next(), ctx.cfg.background.intervalSec * 1000);
   }
 
-  private async load(url: string): Promise<{ img: HTMLImageElement; src: TexImageSource & { width: number; height: number } }> {
+  private async load(p: Photo): Promise<Loaded> {
+    const url = p.url;
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.decoding = 'async';
@@ -172,6 +238,18 @@ export class Photos {
     }
     let src: TexImageSource & { width: number; height: number } = img;
     const w = img.naturalWidth, h = img.naturalHeight;
+    const aw = this.area.clientWidth || window.innerWidth, ah = this.area.clientHeight || window.innerHeight;
+    if (wantsBlurFill(ctx.cfg.background, p, w, h, aw, ah)) {
+      try {
+        const s = Math.min(1, MAX_COMPOSED / Math.max(aw * (window.devicePixelRatio || 1), ah * (window.devicePixelRatio || 1))) * (window.devicePixelRatio || 1);
+        const fw = Math.max(2, Math.round(aw * s)), fh = Math.max(2, Math.round(ah * s));
+        const canvas = composeBlurFill(img, fw, fh);
+        const composedUrl = this.usingGL ? '' : await canvasUrl(canvas);
+        return { img, src: canvas, tone: canvas, composed: { w: fw, h: fh, url: composedUrl } };
+      } catch (e) {
+        console.warn('[photos] blurred fill failed', e);
+      }
+    }
     if (this.usingGL && (w > MAX_TEX || h > MAX_TEX) && 'createImageBitmap' in window) {
       const s = MAX_TEX / Math.max(w, h);
       // WebGL ignores UNPACK_FLIP_Y for ImageBitmaps (three uploads them unflipped): flip at decode time;
@@ -180,7 +258,7 @@ export class Photos {
         resizeWidth: Math.round(w * s), resizeHeight: Math.round(h * s), resizeQuality: 'high', imageOrientation: 'flipY',
       });
     }
-    return { img, src };
+    return { img, src, tone: img };
   }
 
   async next(): Promise<void> {
@@ -205,12 +283,12 @@ export class Photos {
         if (this.idx >= this.list.length) this.idx = 0;
         const p = this.list[this.idx];
         try {
-          const { img, src } = await this.load(p.url).catch(async () => {
+          const loaded = await this.load(p).catch(async () => {
             await new Promise((r) => setTimeout(r, 1500)); // one retry for transient network/decoder hiccups
-            return this.load(p.url);
+            return this.load(p);
           });
-          this.display(p, img, src);
-          applyTone(img);
+          this.display(p, loaded);
+          applyTone(loaded.tone);
           this.failures = 0;
           break;
         } catch (e) {
@@ -226,39 +304,50 @@ export class Photos {
 
   private showCurrentAgain(): void {
     const p = this.list[this.idx];
-    if (p) this.load(p.url).then(({ img, src }) => this.display(p, img, src)).catch(() => {});
+    if (p) this.load(p).then((l) => this.display(p, l)).catch(() => {});
   }
 
-  private display(p: Photo, img: HTMLImageElement, src: TexImageSource & { width: number; height: number }): void {
+  private display(p: Photo, l: Loaded): void {
+    const { img, src, composed } = l;
     const b = ctx.cfg.background;
     this.shownFile = p.file || '';
-    if (p.file) this.lastGallery = p.file;
+    if (p.file || p.id) this.lastShown = p.file || p.id || '';
+    // a composed frame is already framed: no focal point
+    const focus = composed ? undefined : p;
     if (this.usingGL && this.glLayer) {
-      this.glLayer.show(src, p);
+      // composed for the CSS path before WebGL came back: its blob URL is not used here
+      if (composed?.url) URL.revokeObjectURL(composed.url);
+      this.glLayer.show(src, focus);
       if (this.domCur) {
-        this.domCur.remove();
+        dropNode(this.domCur);
         this.domCur = null;
       }
     } else {
-      const node = el('div', `ph${b.cover ? '' : ' contain'}`);
-      node.style.backgroundImage = `url("${img.src.replace(/"/g, '%22')}")`;
+      const node = el('div', `ph${b.cover ? '' : ' contain'}`) as PhNode;
+      const bgUrl = composed?.url || img.src;
+      if (composed?.url) node._blob = composed.url;
+      node.style.backgroundImage = `url("${bgUrl.replace(/"/g, '%22')}")`;
       node.style.setProperty('--kb-dur', `${b.intervalSec + 6}s`);
       node.style.setProperty('--kb-x', `${(Math.random() * 2 - 1).toFixed(2)}%`);
       node.style.setProperty('--kb-y', `${(Math.random() * 2 - 1).toFixed(2)}%`);
-      (node as HTMLElement & { _ph?: unknown })._ph = { w: img.naturalWidth, h: img.naturalHeight, p };
-      this.frameDom(node, img.naturalWidth, img.naturalHeight, p);
-      const old = this.domCur;
+      const fw = composed?.w ?? img.naturalWidth, fh = composed?.h ?? img.naturalHeight;
+      const fp: Photo = composed ? { ...p, focusX: undefined, focusY: undefined } : p;
+      node._ph = { w: fw, h: fh, p: fp };
+      this.frameDom(node, fw, fh, fp);
+      const old = this.domCur as PhNode | null;
       this.area.querySelector('.ph-stack')!.appendChild(node);
       this.domCur = node;
       const fade = b.transition !== 'none' && !reducedMotion();
       if (fade) {
         node.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 2200, easing: 'ease-in-out', fill: 'backwards' }).onfinish = () =>
-          old?.remove();
-      } else old?.remove();
+          dropNode(old);
+      } else dropNode(old);
     }
-    const showMeta = b.showMeta && (p.author || p.title);
+    const text =
+      p.source === 'immich' ? immichCaption(p, ctx.lang) : p.title ? `${p.title}${p.author ? ' · ' + p.author : ''}` : p.author ? ctx.t('photoBy', { a: p.author }) : '';
+    const showMeta = b.showMeta && !!text;
     this.meta.style.display = showMeta ? '' : 'none';
-    if (showMeta) this.meta.innerHTML = esc(p.title ? `${p.title}${p.author ? ' · ' + p.author : ''}` : ctx.t('photoBy', { a: p.author! }));
+    if (showMeta) this.meta.innerHTML = esc(text);
   }
 }
 
@@ -270,7 +359,7 @@ export class Photos {
 const toneCanvas = document.createElement('canvas');
 /** Latest measure of the photo (for the Modern glass tint / ink); null until a photo could be read. */
 export let photoStats: PhotoStats | null = null;
-function applyTone(img: HTMLImageElement): void {
+function applyTone(img: CanvasImageSource): void {
   try {
     const W = 48, H = 32;
     toneCanvas.width = W; toneCanvas.height = H;

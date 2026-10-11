@@ -736,7 +736,7 @@ async function fetchPhotos(): Promise<void> {
   if (state.demo) return set('photos', mockPhotos());
   try {
     const sid = getActiveScreen();
-    const r = await api.photos(20, photos.lastGalleryFile);
+    const r = await api.photos(20, photos.lastKey);
     if (sid) carousel?.put(sid, 'photos', r);
     if (sid !== getActiveScreen()) return;
     set('photos', r);
@@ -786,7 +786,8 @@ async function fetchConfig(): Promise<boolean> {
 let photoSig = '';
 let privateSig = '';
 /** What decides the photo list of a screen (a carousel keeps the list when the next screen has the same). */
-const photoSigOf = (b: { enabled: boolean; source: string; stockTopic: string; order?: string }) => `${b.enabled}|${b.source}|${b.stockTopic}|${b.order ?? 'random'}`;
+const photoSigOf = (b: { enabled: boolean; source: string; stockTopic: string; order?: string; immich?: { albumIds?: string[]; favoritesOnly?: boolean } }) =>
+  `${b.enabled}|${b.source}|${b.stockTopic}|${b.order ?? 'random'}|${(b.immich?.albumIds ?? []).join(',')}|${b.immich?.favoritesOnly ? 1 : 0}`;
 on('config', (s) => {
   if (!s.config) return;
   applyConfig(s.config);

@@ -6,6 +6,7 @@ import { RESERVED_SOURCE_IDS, defaultConfig, defaultScreenProfile } from './defa
 import { stableStringify } from './lib/text.js';
 import { countNoun, countChanged, summaryWord } from './lib/i18n.js';
 import { carouselList, targetInfo } from './carousels.js';
+import { IMMICH_KEY_RE } from './immichCore.js';
 
 /** Rotated backups kept per installation (or per household in the cloud). */
 export const KEEP_BACKUPS = 20;
@@ -23,6 +24,8 @@ export function exportSecrets(sec) {
     homeassistant: { ...(sec.homeassistant?.token ? { token: sec.homeassistant.token } : {}) },
     // A weather source's own API key (Pirate Weather), only when one is stored.
     ...(sec.weather?.apiKey ? { weather: { apiKey: sec.weather.apiKey } } : {}),
+    // The Immich API key, only when one is stored.
+    ...(sec.immich?.apiKey ? { immich: { apiKey: sec.immich.apiKey } } : {}),
     google: { accounts: sec.google?.accounts || {} },
     ...(sec.microsoft?.accounts && Object.keys(sec.microsoft.accounts).length ? { microsoft: { accounts: sec.microsoft.accounts } } : {}),
     apiTokens: sec.apiTokens || [],
@@ -77,6 +80,9 @@ export function sanitizeImportedSecrets(s) {
   }
   if (isObj(s.weather) && typeof s.weather.apiKey === 'string' && /^[A-Za-z0-9_-]{0,128}$/.test(s.weather.apiKey)) {
     out.weatherKey = s.weather.apiKey;
+  }
+  if (isObj(s.immich) && typeof s.immich.apiKey === 'string' && (s.immich.apiKey === '' || IMMICH_KEY_RE.test(s.immich.apiKey))) {
+    out.immichKey = s.immich.apiKey;
   }
   if (isObj(s.google) && isObj(s.google.accounts)) {
     const acc = {};
@@ -158,7 +164,7 @@ function listSummary(d, noun, l) {
 
 /** Top-level keys that make up a v2 config (except version/revision). */
 export const IMPORT_SECTIONS = ['screens', 'defaultScreen', 'calendar', 'datetime', 'weather', 'news', 'todo', 'localEvents',
-  'birthdays', 'eventRules', 'countdowns', 'schedules', 'carousels', 'homeassistant', 'auth'];
+  'birthdays', 'eventRules', 'countdowns', 'schedules', 'carousels', 'homeassistant', 'immich', 'auth'];
 
 /** Short localized summary of what changes per section (ImportPreview.sections); `l` = es | en | pt. */
 export function sectionSummaries(cur, next, l = 'en', absent = new Set()) {
