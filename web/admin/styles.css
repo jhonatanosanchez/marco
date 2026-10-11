@@ -2419,7 +2419,16 @@ input:checked + .check-box {
 .stat__value--text {
   font-size: 15px;
   font-weight: 650;
-  white-space: nowrap;
+  line-height: 1.25;
+  /* "hace 23 segundos" wraps under itself instead of running out of a narrow card */
+  align-items: baseline;
+  overflow-wrap: anywhere;
+}
+.stat__value--text .dot {
+  align-self: center;
+}
+.stat__value--text .dot + * {
+  min-width: 0;
 }
 .stat > div {
   min-width: 0;

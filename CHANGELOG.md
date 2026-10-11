@@ -5,6 +5,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-10-11
+
+### Fixed
+- Status: the weather and news cards no longer cut "23 seconds ago" in narrow cards; the text wraps under itself.
+
 ## [0.5.2] - 2026-10-11
 
 ### Added

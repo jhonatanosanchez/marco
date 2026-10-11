@@ -299,7 +299,7 @@ inicio de sesión automático en el escritorio (modos con pantalla) o como un us
 
 ```
 ~/marco/                  (o /opt/marco)
-├── current -> releases/0.5.2   la versión en marcha, se cambia en un solo paso al actualizar
+├── current -> releases/0.5.3   la versión en marcha, se cambia en un solo paso al actualizar
 ├── releases/                   la versión actual y la anterior (para volver atrás)
 ├── data/                       configuración, secretos, fotos, copias (se conservan al actualizar y desinstalar)
 └── .env                        puerto y otros ajustes, consulta .env.example
