@@ -99,19 +99,24 @@ The stored config has **global** sections shared by every screen and a list of *
                   //   appearance auto | clear | tinted, opacity 0..1 (see-through to solid), blur 0..40, tint dark | light | photo.
                   //   web/shared/glass.ts turns it (plus the current photo) into --g-* CSS variables on <html>.
   "layout":     { "preset": "bigCalendar", "sidePanel": "left", "sideWidth": 0.36, "people": null, "corner": "br" },
-                  // preset: bigCalendar | leftRight | topBottom | bigTime | agenda | today | people | photoFrame | twoWeeks | board | bedside
+                  // preset: bigCalendar | leftRight | topBottom | bigTime | agenda | today | people | photoFrame | twoWeeks | board | bedside | planner
                   // people: calendar ids shown as columns by 'people' (max 5; null = the first five without holidays / birthdays)
                   // corner: where 'photoFrame' puts its clock card (tl | tr | bl | br)
                   // today / people / photoFrame / board / bedside render into #view (web/display/widgets/views.ts, styles in
                   //   styles-views.css + styles-modern.css). today and twoWeeks reuse the big calendar frame (#app also gets
                   //   .preset-bigCalendar), people and board the top / bottom one (.preset-topBottom). twoWeeks is the month
                   //   grid with weeks = 2. Each view drops whole rows that do not fit (never a row cut in half).
+                  // planner: the month grid under a short band with the clock, the date and the weather. It uses the
+                  //   top / bottom frame on a portrait screen and the big calendar one on a landscape screen (#app gets
+                  //   .preset-topBottom or .preset-bigCalendar too); its own rules are in styles-planner.css. Picking it in
+                  //   the admin or the setup wizard sets calendar.weeks = "auto" and eventStyle = "cards"
+                  //   (PLANNER_CALENDAR in server/core/defaults.js); the display itself never forces them.
   "background": { "enabled": true, "source": "stock", "stockTopic": "nature", "order": "random", "intervalSec": 120, "brightness": 0.85,
                   "showMeta": false, "cover": true, "transition": "webgl", "ambient": "aurora", "panelBlur": 18, "panelShade": 0.5, "weatherFx": "simple" },
                   // source: stock | gallery | mixed · order: random | newest | name · transition: webgl | fade | none · ambient: aurora | particles | none · weatherFx: off | simple | rich
   "calendar":   { "enabled": true, "view": "month", "weeks": 5, "weekStart": 1, "showLocation": false, "showEndTime": false,
                   "showDayXofY": true, "showLegend": true, "hidePast": false, "maxEventsPerDay": 4,
-                  "marquee": true, "rotateBusyDays": true, "compactBusyDays": true,
+                  "marquee": true, "rotateBusyDays": true, "compactBusyDays": true, "eventStyle": "lines",
                   "sourceIds": null },               // null = every enabled source (incl. new ones); array = only these
                   // marquee: titles cut short (calendar chips, agenda-like lists, side panel pills, countdowns, news) slide to show the rest
                   // rotateBusyDays: a month-grid day with more events than fit pages through them every 8 s
@@ -119,6 +124,15 @@ The stored config has **global** sections shared by every screen and a list of *
                   //   one-line entries (time + title) below its multi-day bars, and week rows share the height by what
                   //   their events need (equal rows while every week fits). Only what still does not fit falls back to
                   //   rotateBusyDays or "+N". On for new screens; screens stored without the key get false (mergeDefaults).
+                  // weeks: 1..8, or "auto": the display picks 2 to 6 rows (fewer where the layout caps them) so each day
+                  //   fits maxEventsPerDay chips or cards at a readable size, and picks again when the grid's height
+                  //   changes (resize, orientation, news appearing). Events are fetched for 6 weeks then.
+                  // eventStyle: "lines" (one-line chips, the default and what every older screen keeps) or "cards": in the
+                  //   month and week grids, events of one day stack as cards (time line, then the title clamped to
+                  //   2 lines) below the bars of events that span days (a few lanes at most; the others show a one-day
+                  //   card on each day). Rows stay equal. A day with more cards than fit pages (rotateBusyDays) or shows
+                  //   "+N"; clamped titles scroll up with marquee. compactBusyDays is not used with cards.
+                  //   Pure planning helpers: web/display/cards.ts (tested in server/test/display-planner.test.js).
   "datetime":   { "enabled": true, "clock": "digital", "format24": true, "showSeconds": true, "showAmPm": false, "dateFormat": "weekday_d_month" },
   "weather":    { "enabled": true, "forecastDays": 5, "showHourly": true, "showPrecipChance": true },
   "news":       { "enabled": true, "rotateSec": 15 },

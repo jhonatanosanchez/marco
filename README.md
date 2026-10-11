@@ -88,11 +88,15 @@ transparency, blur and a light edge:
 
 <img src="docs/screenshots/display-portrait-1080x1920.webp" width="280" align="right" alt="Portrait layout at 1080x1920">
 
-- **Calendar:** month (configurable number of weeks), agenda and week views; eleven layouts (*big calendar*,
+- **Calendar:** month (a number of weeks, or *Auto*), agenda and week views; twelve layouts (*big calendar*,
   *two weeks*, *left/right*, *top/bottom*, *agenda*, *today*, *per person*, *board*, *big time*, *photo frame*,
-  *bedside*), landscape or portrait, each calendar with its own colour.
+  *bedside*, *planner*), landscape or portrait, each calendar with its own colour.
 - **Busy days:** a day with more events than fit lists them as small one-line entries, and weeks with more events get
   more height; what still does not fit takes turns.
+- **Planner for busy families:** events can show as *cards* (the time on top, the title below on up to two lines,
+  stacked in each day) instead of one-line chips, and *Auto* weeks picks 2 to 6 rows so every day fits its events at a
+  readable size. The *Planner* layout puts the clock, the date and the weather on top and the month below; see
+  [A planner for a busy family](#a-planner-for-a-busy-family).
 - **Layouts for every room:** *Today* shows the day hour by hour with a line for now, the next event in large type and
   the weather for the coming hours (the kitchen in the morning). *Per person* gives each calendar its own column with
   today and tomorrow (pick up to five in *Layout*). *Board* is a family organisation board: to-dos, countdowns, the
@@ -472,6 +476,26 @@ board layouts, the photo frame, Classic and glass styles, live weather effects, 
 (layouts, calendars, gallery) and the dim bedside clock at night.
 
 [![Demo video: the living room screen in the Modern style with the month calendar, weather and upcoming events](docs/media/poster.webp)](https://github.com/mr-reb00t/marco/releases/download/media/marco-demo.mp4)
+
+## A planner for a busy family
+
+When a family has several events a day, the month grid with one-line chips fills up and days end up with "+3". For
+a screen in portrait (a TV on its side, a tablet), Marco has a planner setup:
+
+1. In *Layout*, pick **Planner**. The clock, the date and the weather (with the next days) go on top and the month
+   fills the rest of the screen. Picking it also turns on *Auto* weeks and *Cards*.
+2. In *Calendars → Calendar view*, adjust if you like:
+   - **Weeks to show: Auto** picks 2 to 6 weeks, as many as fit with *Max. visible events per day* at a readable size
+     (with 6 you get about 3 weeks on a portrait 1080×1920 screen). It is worked out again when the screen turns.
+   - **Event style: Cards** shows each event as a small card: the time on top (and the end time if you turned it on),
+     the title below on up to two lines. Events of several days stay as bars across the week.
+   - A day with more cards than fit takes turns (*Rotate busy days*) or shows "+N". Titles longer than two lines
+     scroll up when *Slide long titles* is on.
+3. On a landscape screen the planner keeps a side column with the clock and the weather.
+
+Nothing changes for screens that do not use these options: the default is still one-line chips and a fixed number of
+weeks. *Cards* and *Auto* also work with the other layouts, in the month and week views. With cards, *Compact busy
+days* is not used (cards already stack up in each day).
 
 ## Private display links & pairing
 
@@ -938,6 +962,7 @@ Back up the whole folder (or use *Export*) to keep everything.
 | `?demo=1&pair=1` `?demo=1&pair=invalid` `&pairLen=6\|8` | Preview the pairing screen or the “link no longer valid” screen with a sample code (no server needed) |
 | `?empty=1` `?photos=0` | With `?demo=1`: no events, countdowns or to-dos, or no background photo (to check the empty states) |
 | `?marquee=0\|1` `?rotate=0\|1` | Turn off (or on) the long titles that slide (calendar chips, the pills next to the clock, countdowns, the news headline; titles on several lines move up a line at a time) and the busy days that take turns showing their events (*Calendars → Calendar view*); with `?demo=1`, `&busy=1` adds a busy day and long titles to try them |
+| `?cards=0\|1` `?weeks=auto` `?preset=planner` | Events as cards (or one-line chips), automatic weeks, the *Planner* layout. With `?demo=1`, `&planner=1` shows the planner as picking it in the admin sets it up (try `&busy=2`) |
 | `?compact=0\|1` `?weeks=1..8` | Turn off (or on) compact busy days: a day that cannot fit its events lists them as small one-line entries and the week rows share the height by how many events they have (*Calendars → Calendar view*); `?weeks=` shows that many weeks. With `?demo=1`, `&busy=2` fills the whole month |
 | `?client=<name>` | Name of this device in *Connected displays* (the kiosk script sets it) |
 

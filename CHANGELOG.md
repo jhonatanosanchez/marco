@@ -5,6 +5,21 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- Planner for busy families, all opt-in (screens that do not turn it on look exactly as before):
+  - *Weeks to show: Auto* (`calendar.weeks: "auto"`): the month view picks 2 to 6 weeks, as many as fit with
+    *Max. visible events per day* at a readable size, and works it out again when the screen size or orientation
+    changes. `?weeks=auto` on the display does the same.
+  - *Event style* (`calendar.eventStyle`, per screen, *Calendars → Calendar view*): *Lines* (the default, one-line
+    chips) or *Cards*: the time on top (and the end time when it is on), the title below on up to two lines, stacked in
+    each day of the month and week views. Events of several days stay as bars. A day with more cards than fit takes
+    turns (*Rotate busy days*) or shows "+N"; titles longer than two lines scroll up with *Slide long titles*. Cards
+    take precedence over *Compact busy days*. `?cards=1` on the display.
+  - *Planner* layout (`layout.preset: "planner"`): on a portrait screen the clock, the date and the weather with the
+    next days on top and the month below, filling the rest; on a landscape screen a side column with the clock and the
+    weather. Picking it in *Layout* (or in the setup API) also turns on *Auto* weeks and *Cards*, which can be changed
+    afterwards. `?demo=1&planner=1` shows it with the sample data.
+
 ### Changed
 - *Calendars → Calendar view*: *Max. visible events per day* now explains what it does. With *Compact busy days* on it
   is the point where a day switches to short lines (3 or 4 keeps normal days large).
