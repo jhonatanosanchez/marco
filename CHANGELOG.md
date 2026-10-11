@@ -11,26 +11,26 @@ All notable changes to this project are documented here. The format is based on
   birthdays stay by default). The server filters events and countdowns before they reach the display, so the screen
   never receives the real titles, places or notes. Optional per screen: stock photos instead of the gallery, and a
   small lock in the corner (on by default).
-- Turn it on from Home (1 h, 3 h, until tomorrow, until turned off; one screen or all), with a banner in the admin
-  while it is on, on a schedule per screen (days and times, may cross midnight), or from Home Assistant with
-  `POST /api/hooks/privacy` (`GET` reads the state). It turns off by itself when the time is up.
-- **Doorbell camera.** `POST /api/hooks/doorbell` (`{ action: "ring" | "dismiss", seconds?, screens?, camera? }`)
-  puts a Home Assistant camera full screen on the chosen screens for 10 to 300 seconds (60 by default), with a door
-  chime. Ringing again makes it last longer; `dismiss` (for example when the door opens) takes it away. It shows
-  above night mode, so a dimmed screen wakes up while it lasts and goes back to night mode afterwards.
+- Private mode can be turned on from Home (1 h, 3 h, until tomorrow, until turned off; one screen or all), on a
+  schedule per screen (days and times, may cross midnight), or from Home Assistant with `POST /api/hooks/privacy`
+  (`GET` reads the state). The admin shows a banner while it is on, and it turns off by itself when the time is up.
+- Doorbell camera. `POST /api/hooks/doorbell` (`{ action: "ring" | "dismiss", seconds?, screens?, camera? }`) puts a
+  Home Assistant camera full screen on the chosen screens for 10 to 300 seconds (60 by default), with a door chime.
+  Ringing again makes it last longer; `dismiss` (for example when the door opens) takes it away. It shows above night
+  mode and private mode, so a dimmed screen wakes up while it lasts and goes back to night mode afterwards.
 - *Home Assistant → Doorbell and camera*: the camera entity, time on screen, screens, door chime and a *Test* button.
-- The picture goes through Marco (`GET /api/display/doorbell/frame`), only to screens that are ringing at that moment,
-  one or two frames a second, shared between screens for half a second. The Home Assistant token never reaches a
-  screen and no picture is stored. Rings are logged in *Activity*.
-- `features.doorbell` and `features.doorbellLive` in `/api/health`.
-- Display demo: `?demo=1&doorbell=1` (or `doorbell=nocam`) shows the overlay with a drawn camera picture.
-- **Compact busy days** (`calendar.compactBusyDays`, per screen, *Calendars → Calendar view*): in the month, Two
-  weeks and week grids, a day that cannot fit its events at normal size lists them as small one-line entries (emoji,
-  time or all-day colour, title) below its multi-day bars. Week rows share the height by how many events they have,
-  with room for the dates and one event in every row; rows stay equal while every week fits. Only what still does not
-  fit pages through (*Rotate busy days*) or shows "+N". On for new screens, off for existing ones.
-- Display: `?compact=0|1` and `?weeks=1..8` to try it; with `?demo=1`, `&busy=2` fills the whole month (most days
-  four to ten events).
+  The picture goes through Marco (`GET /api/display/doorbell/frame`), only to screens that are ringing at that
+  moment, one or two frames a second, shared between screens for half a second. The Home Assistant token never
+  reaches a screen and no picture is stored. Rings are logged in *Activity*.
+- Compact busy days (`calendar.compactBusyDays`, per screen, *Calendars → Calendar view*): in the month, two weeks and
+  week grids, a day that cannot fit its events at normal size lists them as small one-line entries (emoji, time or
+  all-day colour, title) below its multi-day bars. Week rows share the height by how many events they have, with
+  room for the dates and one event in every row; rows stay equal while every week fits. Only what still does not fit
+  takes turns (*Rotate busy days*) or shows "+N". On for new screens, off for existing ones.
+- `features.privacy`, `features.doorbell` and `features.doorbellLive` in `/api/health`.
+- Display demo: `?demo=1` with `&private=1` (private mode), `&doorbell=1` or `&doorbell=nocam` (a ring with a drawn
+  camera picture, or without one) and `&busy=2` (a whole month packed with events). They can be combined. Also
+  `?compact=0|1` and `?weeks=1..8` on any screen.
 
 ## [0.5.3] - 2026-10-11
 
