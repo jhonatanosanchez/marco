@@ -346,7 +346,7 @@ goes (link keys, `device.screenId`, the display registry); the `v_` prefix tells
     marquee measures the titles again (during a slide they are off screen); it never looks inside the copy.
   - `Engine.snapshot()` reuses one canvas for every switch.
 - **Debug:** `?step=<slug>` pins one step, `?carousel=0` stays on the first step; `?demo=1&carousel=1&stepSec=8`
-  loops the demo screens (with `random`); `&tr=<transition>` and `&trSpeed=fast|normal|slow` force an animation on
+  loops the demo screens (with `random`; `&planner=1` makes the first one the Planner); `&tr=<transition>` and `&trSpeed=fast|normal|slow` force an animation on
   any display. `?try=1` (the admin's *Probar* in the preview) goes to the next step every 4 s and leaves the clock;
   with `random` each of those switches takes the next animation of the sequence.
 

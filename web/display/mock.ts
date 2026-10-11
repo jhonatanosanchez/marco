@@ -99,7 +99,8 @@ export function mockCarouselConfigs(): DisplayConfig[] {
   const q = new URLSearchParams(location.search);
   const sec = Math.min(3600, Math.max(3, Number(q.get('stepSec')) || 8));
   const screens: [string, string, string, string][] = [
-    ['s_main', 'living-room', L('Living room', 'Salón', 'Sala'), 'bigCalendar'],
+    // &planner=1: the first step is the Planner (automatic weeks and cards on every step)
+    ['s_main', 'living-room', L('Living room', 'Salón', 'Sala'), q.get('planner') === '1' ? 'planner' : 'bigCalendar'],
     ['s_today', 'today', L('Today', 'Hoy', 'Hoje'), 'today'],
     ['s_photos', 'photos', L('Photos', 'Fotos', 'Fotos'), 'photoFrame'],
     ['s_agenda', 'agenda', L('Agenda', 'Agenda', 'Agenda'), 'agenda'],
