@@ -30,6 +30,7 @@ import { BackgroundSection } from './sections/Background';
 import { BackupsSection } from './sections/Backups';
 import { BirthdaysSection } from './sections/Birthdays';
 import { CalendarsSection } from './sections/Calendars';
+import { CarouselsSection } from './sections/Carousels';
 import type { SectionProps } from './sections/common';
 import { CountdownsSection } from './sections/Countdowns';
 import { DateTimeSection } from './sections/DateTime';
@@ -76,6 +77,7 @@ const SECTIONS: Record<string, (p: SectionProps) => any> = {
   homeassistant: HomeAssistantSection,
   api: ApiSection,
   screens: ScreensSection,
+  carousels: CarouselsSection,
   displays: DisplaysSection,
   backups: BackupsSection,
   activity: ActivitySection,

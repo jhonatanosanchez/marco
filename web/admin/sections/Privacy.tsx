@@ -28,20 +28,86 @@ export function PrivacyModeField({ value, onChange }: { value: PrivacyMode; onCh
   );
 }
 
-const newRule = (): PrivacyRule => ({ id: `p_${Math.random().toString(36).slice(2, 10)}`, enabled: true, days: [], from: '22:00', to: '07:00' });
+const newRule = (from = '22:00', to = '07:00'): PrivacyRule => ({ id: `p_${Math.random().toString(36).slice(2, 10)}`, enabled: true, days: [], from, to });
+
+/**
+ * Days + from/to time windows (`to < from` ends the next day): the schedule of privacy mode and of carousels.
+ * `update` mutates a draft of the list.
+ */
+export function ScheduleRulesEditor({ rules, update, errorOf, max = 10, addLabel, newFrom, newTo }: {
+  rules: PrivacyRule[];
+  update: (fn: (list: PrivacyRule[]) => void) => void;
+  errorOf?: (r: PrivacyRule) => string | undefined;
+  max?: number;
+  addLabel?: string;
+  newFrom?: string;
+  newTo?: string;
+}) {
+  const wd = weekdayNames('short');
+  const updRule = (id: string, fn: (r: PrivacyRule) => void) =>
+    update((list) => {
+      const r = list.find((x) => x.id === id);
+      if (r) fn(r);
+    });
+  return (
+    <>
+      {rules.map((r) => {
+        const crosses = r.to < r.from;
+        const err = errorOf?.(r);
+        return (
+          <div class={`privacy-rule ${r.enabled ? '' : 'is-disabled'}`} key={r.id}>
+            <div class="privacy-rule__head">
+              <label class="mini-toggle">
+                <Toggle checked={r.enabled} onChange={(v) => updRule(r.id, (x) => void (x.enabled = v))} />
+                <span>{r.enabled ? t('Activa') : t('En pausa')}</span>
+              </label>
+              <button
+                type="button"
+                class="icon-btn"
+                title={t('Eliminar')}
+                onClick={() =>
+                  update((list) => {
+                    const i = list.findIndex((y) => y.id === r.id);
+                    if (i >= 0) list.splice(i, 1);
+                  })
+                }
+              >
+                <Icon name="trash" size={15} />
+              </button>
+            </div>
+            <Field label={t('Días')} hint={r.days.length ? undefined : t('Ninguno marcado: todos los días')}>
+              <WeekdayPicker labels={wd} value={r.days} onChange={(v) => updRule(r.id, (x) => void (x.days = v))} />
+            </Field>
+            <div class="grid grid--2">
+              <Field label={t('Desde')}>
+                <input class="input" type="time" value={r.from} onInput={(ev) => updRule(r.id, (x) => void (x.from = ev.currentTarget.value))} />
+              </Field>
+              <Field label={t('Hasta')} error={err ? t(err) : undefined} hint={crosses ? t('Termina al día siguiente') : undefined}>
+                <input class={`input ${err ? 'is-invalid' : ''}`} type="time" value={r.to} onInput={(ev) => updRule(r.id, (x) => void (x.to = ev.currentTarget.value))} />
+              </Field>
+            </div>
+          </div>
+        );
+      })}
+      {rules.length < max && (
+        <Button size="sm" icon="plus" onClick={() => update((list) => void list.push(newRule(newFrom, newTo)))}>
+          {addLabel ?? t('Añadir franja')}
+        </Button>
+      )}
+    </>
+  );
+}
 
 export function PrivacyCard({ cfg, set, errors, go }: { cfg: AppConfig; set: (fn: (d: AppConfig) => void) => void; errors: Errors; go: (r: string) => void }) {
   const p = cfg.privacy ?? DEFAULT_SCREEN_PRIVACY;
   const rows = usePrivacy();
   const row = rows?.find((r) => r.screenId === cfg.screenId);
-  const wd = weekdayNames('short');
   const tz = cfg.datetime.timezone;
   const upd = (fn: (x: ScreenPrivacyConfig) => void) =>
     set((d) => {
       d.privacy = d.privacy ?? structuredClone(DEFAULT_SCREEN_PRIVACY);
       fn(d.privacy);
     });
-  const updRule = (id: string, fn: (r: PrivacyRule) => void) => upd((x) => void fn(x.schedule.find((r) => r.id === id)!));
   const sources: { id: string; name: string; color: string; mode: PrivacyMode; set: (v: PrivacyMode) => void }[] = [
     ...cfg.calendar.sources.map((s) => ({
       id: s.id,
@@ -84,39 +150,7 @@ export function PrivacyCard({ cfg, set, errors, go }: { cfg: AppConfig; set: (fn
           {t('Se activa solo en estas franjas. Si lo quitas a mano durante una franja, vuelve en la siguiente. Si lo activas a mano, dura lo que elijas aunque la franja termine antes.')}
         </p>
       </div>
-      {p.schedule.map((r) => {
-        const crosses = r.to < r.from;
-        const err = errors[`privacy.${r.id}.to`];
-        return (
-          <div class={`privacy-rule ${r.enabled ? '' : 'is-disabled'}`}>
-            <div class="privacy-rule__head">
-              <label class="mini-toggle">
-                <Toggle checked={r.enabled} onChange={(v) => updRule(r.id, (x) => void (x.enabled = v))} />
-                <span>{r.enabled ? t('Activa') : t('En pausa')}</span>
-              </label>
-              <button type="button" class="icon-btn" title={t('Eliminar')} onClick={() => upd((x) => void (x.schedule = x.schedule.filter((y) => y.id !== r.id)))}>
-                <Icon name="trash" size={15} />
-              </button>
-            </div>
-            <Field label={t('Días')} hint={r.days.length ? undefined : t('Ninguno marcado: todos los días')}>
-              <WeekdayPicker labels={wd} value={r.days} onChange={(v) => updRule(r.id, (x) => void (x.days = v))} />
-            </Field>
-            <div class="grid grid--2">
-              <Field label={t('Desde')}>
-                <input class="input" type="time" value={r.from} onInput={(ev) => updRule(r.id, (x) => void (x.from = ev.currentTarget.value))} />
-              </Field>
-              <Field label={t('Hasta')} error={err ? t(err) : undefined} hint={crosses ? t('Termina al día siguiente') : undefined}>
-                <input class={`input ${err ? 'is-invalid' : ''}`} type="time" value={r.to} onInput={(ev) => updRule(r.id, (x) => void (x.to = ev.currentTarget.value))} />
-              </Field>
-            </div>
-          </div>
-        );
-      })}
-      {p.schedule.length < 10 && (
-        <Button size="sm" icon="plus" onClick={() => upd((x) => void x.schedule.push(newRule()))}>
-          {t('Añadir franja')}
-        </Button>
-      )}
+      <ScheduleRulesEditor rules={p.schedule} update={(fn) => upd((x) => fn(x.schedule))} errorOf={(r) => errors[`privacy.${r.id}.to`]} />
 
       <div>
         <h4 class="privacy-sub">{t('Qué se ve de cada calendario')}</h4>

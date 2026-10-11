@@ -251,11 +251,14 @@ export function NumberInput(props: {
 
 export function Select<T extends string | number>(props: {
   value: T;
-  options: { value: T; label: string }[];
+  /** `group`: options with a group are shown under that heading (in the order the groups first appear) */
+  options: { value: T; label: string; group?: string }[];
   onChange: (v: T) => void;
   disabled?: boolean;
   error?: boolean;
 }) {
+  const opt = (o: { value: T; label: string }) => <option value={String(o.value)}>{o.label}</option>;
+  const groups = [...new Set(props.options.map((o) => o.group).filter((g): g is string => !!g))];
   return (
     <div class={`select ${props.error ? 'is-invalid' : ''}`}>
       <select
@@ -267,9 +270,12 @@ export function Select<T extends string | number>(props: {
           if (found) props.onChange(found.value);
         }}
       >
-        {props.options.map((o) => (
-          <option value={String(o.value)}>{o.label}</option>
-        ))}
+        {groups.length
+          ? [
+              ...props.options.filter((o) => !o.group).map(opt),
+              ...groups.map((g) => <optgroup label={g}>{props.options.filter((o) => o.group === g).map(opt)}</optgroup>),
+            ]
+          : props.options.map(opt)}
       </select>
       <Icon name="down" size={14} class="select__chev" />
     </div>

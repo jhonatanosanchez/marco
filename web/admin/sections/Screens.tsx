@@ -12,6 +12,7 @@ import { LimitNote } from '../components/LimitNote';
 import { t } from '../i18n';
 import { takeIntent } from '../intent';
 import { clone, moveItem, uid } from '../util';
+import { pruneCarousels } from '../../shared/carousels';
 import { withPollNote } from '../liveNote';
 import type { SectionProps } from './common';
 
@@ -106,7 +107,9 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
   const linkState = useDisplayLinks(saved);
   const links = linkState.data;
   const screens = full.screens;
-  const taken = (exceptId: string) => new Set(screens.filter((s) => s.id !== exceptId).map((s) => s.slug));
+  // a carousel's address is taken too (the server never lets a screen and a carousel share one)
+  const carouselSlugs = (full.carousels?.items ?? []).map((c) => c.slug);
+  const taken = (exceptId: string) => new Set([...screens.filter((s) => s.id !== exceptId).map((s) => s.slug), ...carouselSlugs]);
   const upd = (id: string, fn: (s: ScreenProfile) => void) =>
     setFull((d) => {
       const s = d.screens.find((x) => x.id === id);
@@ -133,6 +136,8 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
     // Scheduled messages that only target this screen: an empty list would mean "all screens",
     // so they get disabled instead (the server applies the same rule on save/import).
     const orphans = full.schedules.items.filter((m) => m.screenIds.length > 0 && m.screenIds.every((x) => x === s.id));
+    // carousels that show this screen lose its steps (and are turned off when none is left)
+    const inCarousels = (full.carousels?.items ?? []).filter((c) => c.steps.some((st) => st.screenId === s.id) || c.offScreenId === s.id);
     const ok = await confirmDialog({
       title: t('Eliminar la pantalla “{name}”', { name: s.name }),
       body: (
@@ -145,6 +150,16 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
               <ul>
                 {orphans.map((m) => (
                   <li key={m.id}>{`${m.emoji ? m.emoji + ' ' : ''}${m.title || t('(sin título)')}`}</li>
+                ))}
+              </ul>
+            </>
+          )}
+          {inCarousels.length > 0 && (
+            <>
+              <p class="err-text">{t('Estos carruseles dejarán de mostrarla:')}</p>
+              <ul>
+                {inCarousels.map((c) => (
+                  <li key={c.id}>{c.name}</li>
                 ))}
               </ul>
             </>
@@ -163,6 +178,8 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
         if (m.screenIds.length && !keep.length) m.enabled = false;
         m.screenIds = keep;
       }
+      // same rule as the server (server/core/carousels.js pruneCarousels)
+      if (d.carousels) d.carousels.items = pruneCarousels(d.carousels.items, d.screens.map((x) => x.id));
     });
     if (screenId === s.id) setScreenId(screens.find((x) => x.id !== s.id)!.id);
   };

@@ -64,7 +64,7 @@ export function useDisplayLinks(saved: StoredConfig | null): { data: DisplayLink
 export const displayOriginOf = (data: DisplayLinksResponse | null): string | null => caps().displayOrigin || data?.displayOrigin || null;
 
 /**
- * URL that opens screen `screenId` as saved, or null when there is nothing to open yet (unsaved screen, links still
+ * URL that opens screen (or carousel) `screenId` as saved, or null when there is nothing to open yet (unsaved screen, links still
  * loading). A failed links request falls back to "/?screen=<slug>", which a self-hosted admin session can open.
  */
 export function useScreenUrl(saved: StoredConfig | null, screenId: string | null | undefined, opts: { preview?: boolean } = {}): string | null {
@@ -79,7 +79,8 @@ export function screenHref(
   links: { data: DisplayLinksResponse | null; settled: boolean },
   { preview = false }: { preview?: boolean } = {},
 ): string | null {
-  const scr = saved?.screens.find((s) => s.id === screenId);
+  // a screen, or a carousel (opened by its own private link or /?screen=<its slug>)
+  const scr = saved?.screens.find((s) => s.id === screenId) ?? saved?.carousels?.items.find((c) => c.id === screenId);
   if (!saved || !scr) return null;
   const wanted = usesPrivateLinks(saved);
   if (wanted && !links.settled) return null;

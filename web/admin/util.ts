@@ -224,10 +224,12 @@ export const isPerScreenKey = (k: string) => PER_SCREEN_KEY.test(k);
 export function validateGlobal(c: StoredConfig): Errors {
   const e: Errors = {};
   const seenSlugs = new Map<string, string>();
+  const carouselSlugs = new Set((c.carousels?.items ?? []).map((x) => x.slug));
   for (const s of c.screens) {
     if (!s.name.trim()) e[`scr.${s.id}.name`] = 'Obligatorio';
     if (!SLUG_RE.test(s.slug)) e[`scr.${s.id}.slug`] = 'Solo minúsculas, números y guiones';
     else if (seenSlugs.has(s.slug)) e[`scr.${s.id}.slug`] = 'Ya existe otra pantalla con esta dirección';
+    else if (carouselSlugs.has(s.slug)) e[`scr.${s.id}.slug`] = 'Ya hay un carrusel con esta dirección';
     seenSlugs.set(s.slug, s.id);
   }
   for (const x of c.localEvents?.items ?? []) {
@@ -265,6 +267,22 @@ export function validateGlobal(c: StoredConfig): Errors {
     if (!(cd.birthdayDays >= 1 && cd.birthdayDays <= 366)) e['countdowns.birthdayDays'] = 'Entre 1 y 366';
     if (!(cd.horizonDays >= 1 && cd.horizonDays <= 3660)) e['countdowns.horizonDays'] = 'Entre 1 y 3660';
   }
+  // carousels: a name, an address no screen uses, at least one step, 10 s to 1 h per step
+  const carSlugs = new Set<string>();
+  const screenIds = new Set(c.screens.map((s) => s.id));
+  for (const x of c.carousels?.items ?? []) {
+    const p = `car.${x.id}`;
+    if (!x.name.trim()) e[`${p}.name`] = 'Obligatorio';
+    if (!SLUG_RE.test(x.slug)) e[`${p}.slug`] = 'Solo minúsculas, números y guiones';
+    else if (seenSlugs.has(x.slug)) e[`${p}.slug`] = 'Ya hay una pantalla con esta dirección';
+    else if (carSlugs.has(x.slug)) e[`${p}.slug`] = 'Ya existe otro carrusel con esta dirección';
+    carSlugs.add(x.slug);
+    if (x.enabled && !x.steps.some((st) => screenIds.has(st.screenId))) e[`${p}.steps`] = 'Añade al menos una pantalla';
+    x.steps.forEach((st, j) => {
+      if (!(Number.isInteger(st.seconds) && st.seconds >= 10 && st.seconds <= 3600)) e[`${p}.step${j}.seconds`] = 'Entre 10 s y 1 h';
+    });
+    for (const r of x.schedule ?? []) if (r.from === r.to) e[`${p}.sched.${r.id}.to`] = 'Debe ser distinta de la hora de inicio';
+  }
   for (const m of c.schedules?.items ?? []) {
     const p = `sched.${m.id}`;
     if (!m.title.trim()) e[`${p}.title`] = 'Obligatorio';
@@ -292,6 +310,7 @@ const LIMITED_LISTS: [LimitName, (c: StoredConfig) => number][] = [
   ['localEvents', (c) => c.localEvents?.items?.length ?? 0],
   ['birthdays', (c) => c.birthdays?.items?.length ?? 0],
   ['countdowns', (c) => c.countdowns?.items?.length ?? 0],
+  ['carousels', (c) => c.carousels?.items?.length ?? 0],
 ];
 
 /** `limit.<name>` errors for lists longer than the limit. */
@@ -337,13 +356,13 @@ export function sectionForServerPath(path: string): { screenIndex: number | null
     calendar: path.includes('iconRules') ? 'icons' : 'calendars',
     datetime: 'datetime', weather: 'weather', news: 'news', todo: 'todo', localEvents: 'local', birthdays: 'birthdays',
     eventRules: 'filters', countdowns: 'countdowns', schedules: 'alerts', homeassistant: 'homeassistant', auth: 'security',
-    screens: 'screens', defaultScreen: 'screens',
+    screens: 'screens', defaultScreen: 'screens', carousels: 'carousels',
   };
   return { screenIndex: null, section: map[top] ?? 'home' };
 }
 
 /** Map an error key to the nav section that owns it (for "jump to error"). */
-const LIMIT_SECTION: Record<string, string> = { screens: 'screens', sources: 'calendars', newsFeeds: 'news', localEvents: 'local', birthdays: 'birthdays', countdowns: 'countdowns' };
+const LIMIT_SECTION: Record<string, string> = { screens: 'screens', sources: 'calendars', newsFeeds: 'news', localEvents: 'local', birthdays: 'birthdays', countdowns: 'countdowns', carousels: 'carousels' };
 
 export function sectionForError(key: string): string {
   if (key.startsWith('limit.')) return LIMIT_SECTION[key.slice(6)] ?? 'home';
@@ -356,6 +375,7 @@ export function sectionForError(key: string): string {
   if (key.startsWith('bday.')) return 'birthdays';
   if (key.startsWith('frule.')) return 'filters';
   if (key.startsWith('scr.')) return 'screens';
+  if (key.startsWith('car.')) return 'carousels';
   if (key.startsWith('background.')) return 'background';
   if (key.startsWith('calendar.') || key.startsWith('source.')) return 'calendars';
   if (key.startsWith('rule.')) return 'icons';

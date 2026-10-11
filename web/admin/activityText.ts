@@ -27,7 +27,7 @@ export function sectionLabel(key: string): string {
     calendar: 'Calendarios', datetime: 'Fecha y hora', weather: 'Tiempo', news: 'Noticias', todo: 'Tareas', localEvents: 'Eventos locales',
     birthdays: 'Cumpleaños', eventRules: 'Filtros', countdowns: 'Cuentas atrás', schedules: 'Mensajes programados', homeassistant: 'Home Assistant',
     auth: 'Seguridad', screens: 'Pantallas', defaultScreen: 'Pantalla predeterminada', screen: 'Ajustes', layout: 'Diseño', background: 'Fondo',
-    message: 'Mensaje', alerts: 'Avisos', security: 'Acceso a las pantallas', privacy: 'Modo privado',
+    message: 'Mensaje', alerts: 'Avisos', security: 'Acceso a las pantallas', privacy: 'Modo privado', carousels: 'Carruseles',
   };
   if (m) return `${m[1]}${m[2] ? ` › ${t(names[m[2]] ?? m[2])}` : ''}`;
   return t(names[key] ?? key);
