@@ -2,7 +2,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/logo-lockup-dark.svg">
-  <img src="docs/logo-lockup-light.svg" width="300" alt="Marco: two arches, one with the sun and one with the moon, next to the word Marco">
+  <img src="docs/logo-lockup-light.svg" width="280" alt="marco. Two arches, one with the sun and one with the moon, next to the word marco">
 </picture>
 
 ### Your family's day, framed.

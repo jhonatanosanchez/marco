@@ -2,7 +2,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/logo-lockup-dark.svg">
-  <img src="docs/logo-lockup-light.svg" width="300" alt="Marco: dos arcos, uno con el sol y otro con la luna, junto a la palabra Marco">
+  <img src="docs/logo-lockup-light.svg" width="280" alt="marco. Dos arcos, uno con el sol y otro con la luna, junto a la palabra marco">
 </picture>
 
 ### El día de tu familia, enmarcado.
