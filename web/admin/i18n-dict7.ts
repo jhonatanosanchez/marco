@@ -77,4 +77,5 @@ export const ROWS7: [string, string, string][] = [
   ['Panel del tiempo', 'Weather panel', 'Painel do tempo'],
   ['Cómo se ve el panel del tiempo del estilo Clásico sobre la foto de fondo.', 'How the weather panel of the Classic style looks over the background photo.', 'Como fica o painel do tempo do estilo Clássico sobre a foto de fundo.'],
   ['Panel del tiempo (estilo clásico)', 'Weather panel (Classic style)', 'Painel do tempo (estilo clássico)'],
+  ['{name} (lista de Marco)', '{name} (Marco list)', '{name} (lista do Marco)'],
 ];

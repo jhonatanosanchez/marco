@@ -1,5 +1,5 @@
 import { projectScreen, SLUG_RE } from '../shared/screens';
-import { locale } from './i18n';
+import { locale, t } from './i18n';
 import type { AppConfig, CalendarSource, IconRule, SourceKind, StoredConfig } from '../shared/types';
 import { findKeyword } from '../../server/lib/keywords.js';
 import { caps as currentCaps, hasFeature, limitOf, type Caps, type LimitName } from './caps';
@@ -389,13 +389,51 @@ export function sectionForError(key: string): string {
   return 'screen';
 }
 
+type BuiltinCfg = Pick<StoredConfig, 'calendar' | 'localEvents' | 'birthdays'>;
+export type BuiltinListId = 'local' | 'birthdays';
+
+/** A built-in list with no items, or turned off, is left out of the display legend (server/core/screens.js publicSources). */
+export const builtinListShown = (c: BuiltinCfg, id: BuiltinListId) => {
+  const b = id === 'local' ? c.localEvents : c.birthdays;
+  return b.enabled !== false && (b.items?.length ?? 0) > 0;
+};
+
+const builtinBaseName = (c: BuiltinCfg, id: BuiltinListId) => (id === 'local' ? c.localEvents.name || 'Local' : c.birthdays.name || t('Cumpleaños')).trim();
+
+/** Whether a calendar source has the same name as a built-in list (case-insensitive). */
+export function builtinNameClashes(c: BuiltinCfg, id: BuiltinListId) {
+  const key = builtinBaseName(c, id).toLocaleLowerCase();
+  return c.calendar.sources.some((s) => (s.name || '').trim().toLocaleLowerCase() === key);
+}
+
+/** Name of a built-in list, marked "(lista de Marco)" when a calendar source has the same name. */
+export function builtinListName(c: BuiltinCfg, id: BuiltinListId) {
+  const name = builtinBaseName(c, id);
+  return builtinNameClashes(c, id) ? t('{name} (lista de Marco)', { name }) : name;
+}
+
+/** Name of a source row from the server (status lists): the built-in lists get the clash label of builtinListName. */
+export const sourceRowName = (c: BuiltinCfg, id: string, name: string) => (id === 'local' || id === 'birthdays' ? builtinListName(c, id) : name);
+
+/**
+ * Rows of "Qué se ve de cada calendario" (privacy mode): every calendar source, then the built-in lists that the
+ * display would show (not empty, not turned off), with the clash label of builtinListName.
+ */
+export function privacyCalendarRows(c: BuiltinCfg) {
+  const rows: { id: string; name: string; color: string }[] = c.calendar.sources.map((s) => ({ id: s.id, name: s.name || s.id, color: s.color }));
+  for (const id of ['local', 'birthdays'] as const) {
+    if (builtinListShown(c, id)) rows.push({ id, name: builtinListName(c, id), color: (id === 'local' ? c.localEvents : c.birthdays).color });
+  }
+  return rows;
+}
+
 /** User calendar sources + the built-in pseudo-sources (local events, birthdays) as picker options. */
-export function allSourceOptions(c: Pick<StoredConfig, 'calendar' | 'localEvents' | 'birthdays'>, opts: { includeDisabled?: boolean } = {}) {
+export function allSourceOptions(c: BuiltinCfg, opts: { includeDisabled?: boolean } = {}) {
   const out = c.calendar.sources
     .filter((s) => opts.includeDisabled || s.enabled)
     .map((s) => ({ id: s.id, name: s.name || s.id, color: s.color, emoji: s.emoji || KIND_EMOJI[s.kind] || '' }));
-  out.push({ id: 'local', name: c.localEvents.name || 'Local', color: c.localEvents.color, emoji: c.localEvents.emoji || '📅' });
-  out.push({ id: 'birthdays', name: c.birthdays.name || 'Cumpleaños', color: c.birthdays.color, emoji: c.birthdays.emoji || '🎂' });
+  out.push({ id: 'local', name: builtinListName(c, 'local'), color: c.localEvents.color, emoji: c.localEvents.emoji || '📅' });
+  out.push({ id: 'birthdays', name: builtinListName(c, 'birthdays'), color: c.birthdays.color, emoji: c.birthdays.emoji || '🎂' });
   return out;
 }
 

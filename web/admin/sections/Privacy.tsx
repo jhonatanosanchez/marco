@@ -6,7 +6,7 @@ import { PrivacyActions, privacyUntilText, usePrivacy } from '../components/Priv
 import { Button, Card, Field, Select, Toggle, ToggleRow, WeekdayPicker } from '../components/ui';
 import { weekdayNames } from '../dates';
 import { t } from '../i18n';
-import type { Errors } from '../util';
+import { privacyCalendarRows, type Errors } from '../util';
 
 export const DEFAULT_SCREEN_PRIVACY: ScreenPrivacyConfig = { hidePhotos: false, showLock: true, schedule: [] };
 
@@ -108,17 +108,13 @@ export function PrivacyCard({ cfg, set, errors, go }: { cfg: AppConfig; set: (fn
       d.privacy = d.privacy ?? structuredClone(DEFAULT_SCREEN_PRIVACY);
       fn(d.privacy);
     });
-  const sources: { id: string; name: string; color: string; mode: PrivacyMode; set: (v: PrivacyMode) => void }[] = [
-    ...cfg.calendar.sources.map((s) => ({
-      id: s.id,
-      name: s.name,
-      color: s.color,
-      mode: s.privacy ?? defaultPrivacyOf(s.kind),
-      set: (v: PrivacyMode) => set((d) => void (d.calendar.sources.find((x) => x.id === s.id)!.privacy = v)),
-    })),
-    { id: 'local', name: cfg.localEvents.name, color: cfg.localEvents.color, mode: cfg.localEvents.privacy ?? 'busy', set: (v: PrivacyMode) => set((d) => void (d.localEvents.privacy = v)) },
-    { id: 'birthdays', name: cfg.birthdays.name, color: cfg.birthdays.color, mode: cfg.birthdays.privacy ?? 'keep', set: (v: PrivacyMode) => set((d) => void (d.birthdays.privacy = v)) },
-  ];
+  const modeOf = (id: string): { mode: PrivacyMode; set: (v: PrivacyMode) => void } => {
+    if (id === 'local') return { mode: cfg.localEvents.privacy ?? 'busy', set: (v) => set((d) => void (d.localEvents.privacy = v)) };
+    if (id === 'birthdays') return { mode: cfg.birthdays.privacy ?? 'keep', set: (v) => set((d) => void (d.birthdays.privacy = v)) };
+    const s = cfg.calendar.sources.find((x) => x.id === id)!;
+    return { mode: s.privacy ?? defaultPrivacyOf(s.kind), set: (v) => set((d) => void (d.calendar.sources.find((x) => x.id === id)!.privacy = v)) };
+  };
+  const sources = privacyCalendarRows(cfg).map((r) => ({ ...r, ...modeOf(r.id) }));
   return (
     <Card
       id="scr-privacy"

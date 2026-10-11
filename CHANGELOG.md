@@ -50,6 +50,12 @@ All notable changes to this project are documented here. The format is based on
   style when the screen uses the Classic style (they only change the Classic weather panel; Modern uses *Glass*). The
   settings and how the screens look stay the same.
 
+### Fixed
+- *Private mode → What each calendar shows* no longer lists the built-in local events or birthdays list when it is
+  empty or turned off, like the screen legend. A built-in list with the same name as a calendar (for example an ICS
+  calendar called *Cumpleaños*) is shown as "Cumpleaños (Marco list)" there and in the calendar pickers, filters and
+  status lists.
+
 ## [0.6.1] - 2026-10-11
 
 ### Added

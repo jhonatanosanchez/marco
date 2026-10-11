@@ -7,6 +7,7 @@ import { has, runtime } from '../caps';
 import { formatDuration, relTime, t } from '../i18n';
 import type { SectionProps } from './common';
 import { fetchErrorText } from '../apiErrors';
+import { sourceRowName } from '../util';
 import { UpdatesCard } from '../components/Updates';
 
 export function StatusSection({ cfg }: SectionProps) {
@@ -146,7 +147,7 @@ export function StatusSection({ cfg }: SectionProps) {
                       return (
                         <tr>
                           <td>
-                            <span class="dot-color" style={{ background: m?.color ?? '#888' }} /> {m?.emoji} <strong>{s.name}</strong>
+                            <span class="dot-color" style={{ background: m?.color ?? '#888' }} /> {m?.emoji} <strong>{sourceRowName(cfg, s.id, s.name)}</strong>
                           </td>
                           <td>
                             {s.ok ? (

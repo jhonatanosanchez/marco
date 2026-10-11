@@ -14,7 +14,7 @@ import { has, runtime } from '../caps';
 import { screenHref, useDisplayLinks } from '../displayLinks';
 import { formatDuration, locale, nScreens, relTime, t } from '../i18n';
 import { withPollNote } from '../liveNote';
-import { greetingName } from '../util';
+import { greetingName, sourceRowName } from '../util';
 import type { SectionProps } from './common';
 
 const WMO: Record<number, string> = {
@@ -376,7 +376,7 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
                     <li title={s.error ?? ''}>
                       <StatusDot state={state} />
                       <span class="dot-color" style={{ background: color }} />
-                      <span class="health-list__name">{s.name}</span>
+                      <span class="health-list__name">{sourceRowName(full, s.id, s.name)}</span>
                       <span class={`small ${s.ok ? 'muted' : 'err-text'}`}>{s.ok ? t('{n} eventos', { n: s.count }) : s.enabled === false ? t('Desactivado') : fetchErrorText(s.error) || t('Pendiente')}</span>
                     </li>
                   );

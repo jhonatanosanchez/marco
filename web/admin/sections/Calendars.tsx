@@ -27,7 +27,7 @@ import { atLimit, has, offers } from '../caps';
 import { defaultPrivacyOf, privacyModeOptions } from './Privacy';
 import { LimitNote } from '../components/LimitNote';
 import { t } from '../i18n';
-import { allSourceOptions, guessKind, HOLIDAY_PRESETS, isHttpUrl, KIND_EMOJI, moveItem, SWATCHES, uid } from '../util';
+import { allSourceOptions, builtinNameClashes, guessKind, HOLIDAY_PRESETS, isHttpUrl, KIND_EMOJI, moveItem, SWATCHES, uid } from '../util';
 import type { SectionProps } from './common';
 import { ICloudGuide, icloudUrl } from './ICloudGuide';
 
@@ -579,7 +579,7 @@ function ScreenSourcesCard({ cfg, set, full }: SectionProps) {
                     {o.name}
                   </span>
                   {disabled.has(o.id) && <span class="badge badge--soft">{t('Desactivado')}</span>}
-                  {(o.id === 'local' || o.id === 'birthdays') && <span class="badge badge--soft">{o.id === 'local' ? t('Eventos locales') : t('Cumpleaños')}</span>}
+                  {(o.id === 'local' || o.id === 'birthdays') && !builtinNameClashes(full, o.id) && <span class="badge badge--soft">{o.id === 'local' ? t('Eventos locales') : t('Cumpleaños')}</span>}
                 </label>
               </li>
             );
