@@ -20,6 +20,13 @@ All notable changes to this project are documented here. The format is based on
     weather. Picking it in *Layout* (or in the setup API) also turns on *Auto* weeks and *Cards*, which can be changed
     afterwards. `?demo=1&planner=1` shows it with the sample data.
 
+- *Days in the agenda* (`calendar.agendaDays`, per screen, *Calendars → Calendar view* when the agenda is used):
+  *Automatic* (the default), 7, 14 or 30 days. The agenda view used to look 14 days ahead, so a quiet screen never
+  showed events three weeks away. *Automatic* shows Today and Tomorrow, then the next days with events for as long as
+  each whole day fits, and works it out again when the screen size or the events change. It never shows less than
+  the 14 days did, so a busy agenda looks the same. The compact agenda of the side panel still shows 3 days.
+  `?agendaDays=` on the display, and `?demo=1&sparse=1` for a quiet sample calendar.
+
 ### Changed
 - *Calendars → Calendar view*: *Max. visible events per day* now explains what it does. With *Compact busy days* on it
   is the point where a day switches to short lines (3 or 4 keeps normal days large).

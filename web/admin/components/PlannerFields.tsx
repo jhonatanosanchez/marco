@@ -1,6 +1,7 @@
 // Planner options of the month / week grid, shared by Calendars > Calendar view and the Planner layout's card:
-// how many weeks (a number or Auto) and how events look (one-line chips or cards).
-import type { AppConfig, CalendarWeeks, EventStyle } from '../../shared/types';
+// how many weeks (a number or Auto) and how events look (one-line chips or cards). Also how far the agenda view
+// looks ahead (Calendars > Calendar view).
+import type { AgendaDays, AppConfig, CalendarWeeks, EventStyle } from '../../shared/types';
 import { t } from '../i18n';
 import { Field, Segmented } from './ui';
 
@@ -48,6 +49,34 @@ export function EventStyleField({ cfg, set }: { cfg: AppConfig; set: Set }) {
           { value: 'cards', label: t('Tarjetas') },
         ]}
         onChange={(v) => set((d) => void (d.calendar.eventStyle = v))}
+      />
+    </Field>
+  );
+}
+
+/** calendar.agendaDays: how far the agenda view looks ahead (Automatic, 7, 14 or 30 days). */
+export function AgendaDaysField({ cfg, set }: { cfg: AppConfig; set: Set }) {
+  const v: AgendaDays = cfg.calendar.agendaDays ?? 'auto';
+  return (
+    <Field
+      class="field--agenda-days"
+      label={t('Días en la agenda')}
+      hint={
+        v === 'auto'
+          ? t('Automático: hoy y mañana, y después los próximos días con eventos hasta llenar la agenda. Nunca muestra menos de lo que mostraría con 14.')
+          : t('La agenda muestra los próximos {n} días. Los días sin eventos no ocupan sitio.', { n: v })
+      }
+    >
+      <Segmented<AgendaDays>
+        full
+        value={v}
+        options={[
+          { value: 'auto', label: t('Automático') },
+          { value: 7, label: '7' },
+          { value: 14, label: '14' },
+          { value: 30, label: '30' },
+        ]}
+        onChange={(n) => set((d) => void (d.calendar.agendaDays = n))}
       />
     </Field>
   );

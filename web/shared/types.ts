@@ -194,6 +194,8 @@ export interface IconRule {
 
 export type CalendarWeeks = number | 'auto';
 export type EventStyle = 'lines' | 'cards';
+/** Days the agenda view looks ahead, or 'auto': Today and Tomorrow, then the next days with events until it is full. */
+export type AgendaDays = 'auto' | 7 | 14 | 30;
 
 export interface CalendarConfig<S = CalendarSource> {
   enabled: boolean;
@@ -221,6 +223,11 @@ export interface CalendarConfig<S = CalendarSource> {
    * lines, stacked in the day; multi-day events stay bars). Cards take precedence over compactBusyDays inside a day.
    */
   eventStyle: EventStyle;
+  /**
+   * Agenda view: how many days ahead it looks (7, 14 or 30), or 'auto' (default): Today and Tomorrow, then the next days
+   * with events, as many as fit (never fewer than 14 days would show). The compact side agenda always shows 3 days.
+   */
+  agendaDays: AgendaDays;
   /** v2, per screen: null = every enabled source (incl. 'local' + 'birthdays'); array = only these ids. */
   sourceIds?: string[] | null;
   sources: S[];
@@ -1047,7 +1054,7 @@ export interface ScreenProfile {
   screen: Omit<ScreenConfig, 'name'>;
   layout: LayoutConfig;
   background: BackgroundConfig;
-  calendar: Pick<CalendarConfig, 'enabled' | 'view' | 'weeks' | 'weekStart' | 'showLocation' | 'showEndTime' | 'showDayXofY' | 'showLegend' | 'hidePast' | 'maxEventsPerDay' | 'marquee' | 'rotateBusyDays' | 'compactBusyDays' | 'eventStyle'> & { sourceIds: string[] | null };
+  calendar: Pick<CalendarConfig, 'enabled' | 'view' | 'weeks' | 'weekStart' | 'showLocation' | 'showEndTime' | 'showDayXofY' | 'showLegend' | 'hidePast' | 'maxEventsPerDay' | 'marquee' | 'rotateBusyDays' | 'compactBusyDays' | 'eventStyle' | 'agendaDays'> & { sourceIds: string[] | null };
   datetime: Omit<DateTimeConfig, 'timezone'>;
   weather: Pick<WeatherConfig, 'enabled' | 'forecastDays' | 'showHourly' | 'showPrecipChance'>;
   news: { enabled: boolean; rotateSec: number };

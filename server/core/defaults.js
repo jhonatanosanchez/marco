@@ -23,7 +23,7 @@ export const RESERVED_SOURCE_IDS = [LOCAL_SOURCE_ID, BIRTHDAYS_SOURCE_ID];
 
 /** Per-screen part of the keys that are split between global and per-screen ("merged sections"). */
 export const SCREEN_SPLIT_KEYS = {
-  calendar: ['enabled', 'view', 'weeks', 'weekStart', 'showLocation', 'showEndTime', 'showDayXofY', 'showLegend', 'hidePast', 'maxEventsPerDay', 'marquee', 'rotateBusyDays', 'compactBusyDays', 'eventStyle', 'sourceIds'],
+  calendar: ['enabled', 'view', 'weeks', 'weekStart', 'showLocation', 'showEndTime', 'showDayXofY', 'showLegend', 'hidePast', 'maxEventsPerDay', 'marquee', 'rotateBusyDays', 'compactBusyDays', 'eventStyle', 'agendaDays', 'sourceIds'],
   datetime: ['enabled', 'clock', 'format24', 'showSeconds', 'showAmPm', 'dateFormat', 'dateCustom'],
   weather: ['enabled', 'forecastDays', 'showHourly', 'showPrecipChance'],
   news: ['enabled', 'rotateSec'],
@@ -64,6 +64,9 @@ export function defaultScreenProfile({ id = 's_main', slug = 'living-room', name
       // eventStyle: 'lines' (one-line chips) or 'cards' (time on top, title below on up to 2 lines, stacked in the day);
       // weeks may also be 'auto' (rows picked so each day fits maxEventsPerDay events). The planner layout sets both.
       eventStyle: 'lines',
+      // agendaDays: how far the agenda view looks ahead, 7, 14 or 30 days, or 'auto' (Today and Tomorrow, then the
+      // next days with events until the agenda is full)
+      agendaDays: 'auto',
       sourceIds: null, // null = every enabled source (incl. local + birthdays); array = only these ids
     },
     datetime: { enabled: true, clock: 'digital', format24: true, showSeconds: true, showAmPm: false, dateFormat: 'weekday_d_month', dateCustom: '{dddd}, {d} {mmmm} {yyyy}' },

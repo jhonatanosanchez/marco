@@ -14,7 +14,7 @@ import { addDays, startOfWeek } from '../shared/i18n';
 import { api, ApiError } from './api';
 import { parseColor, toHex } from './color';
 import { ctx, setCtxConfig } from './ctx';
-import { normalizeConfig } from './defaults';
+import { normalizeAgendaDays, normalizeConfig } from './defaults';
 import { Heartbeat, noteError } from './heartbeat';
 import { authHeaders, clearDeviceToken, clientId, credential, credentialKind, screenKey, storedDeviceToken, withScreen } from './identity';
 import { $ } from './dom';
@@ -31,6 +31,7 @@ import { detectLiveMode, startConfigPoll, startPoll, type StreamHandlers } from 
 import { connectStream, pollUrl } from './stream';
 import { current, onTick, setClockOffset, setTimezone, startTicker, type Tick } from './time';
 import { Agenda } from './widgets/agenda';
+import { agendaFetchDays } from './agendaFill';
 import { Announcements, IdentifyOverlay, ScheduleBanners, setServerNow } from './widgets/alerts';
 import { Countdowns } from './widgets/countdowns';
 import { DoorbellOverlay, type FrameSource } from './widgets/doorbell';
@@ -73,7 +74,7 @@ const clock = new Clock($('#clock'));
 const highlights = new Highlights($('#highlights'));
 const weather = new Weather($('#weather'));
 const calendar = new MonthCalendar($('#calendar'));
-const agenda = new Agenda($('#agenda'), { days: 14 });
+const agenda = new Agenda($('#agenda'), {}); // days: calendar.agendaDays
 const sideAgenda = new Agenda($('#side-agenda'), { days: 3, compact: true, maxPerDay: 4 });
 const news = new News($('#news'));
 const photos = new Photos(photoArea, $('.photo-meta'));
@@ -298,6 +299,11 @@ function applyConfig(raw: DisplayConfig): void {
   const pw = Number(params.get('weeks'));
   if (Number.isInteger(pw) && pw >= 1 && pw <= 8) cfg.calendar.weeks = pw;
   if (params.get('weeks') === 'auto') cfg.calendar.weeks = 'auto';
+  // ?agendaDays=auto|7|14|30 (how far the agenda view looks ahead)
+  if (params.has('agendaDays')) {
+    const pad = params.get('agendaDays');
+    cfg.calendar.agendaDays = normalizeAgendaDays(pad === 'auto' ? 'auto' : Number(pad));
+  }
   const pcd = params.get('cards');
   if (pcd === '0' || pcd === '1') cfg.calendar.eventStyle = pcd === '1' ? 'cards' : 'lines';
   // automatic weeks: at most 6 rows, fewer where a layout caps the rows below
@@ -675,7 +681,12 @@ function deniedBy(e: unknown): boolean {
 function eventsRange(): [string, string] {
   const today = current().dayKey;
   const from = startOfWeek(today, ctx.cfg.calendar.weekStart);
-  const to = addDays(from, Math.max(rangeWeeks(ctx.cfg.calendar.weeks) * 7, 21) + 1);
+  let to = addDays(from, Math.max(rangeWeeks(ctx.cfg.calendar.weeks) * 7, 21) + 1);
+  // the agenda view looks further ahead than the grid (calendar.agendaDays; 'auto' up to AGENDA_AUTO_MAX_DAYS)
+  if (app.classList.contains('view-agenda')) {
+    const agendaTo = addDays(today, agendaFetchDays(ctx.cfg.calendar.agendaDays));
+    if (agendaTo > to) to = agendaTo;
+  }
   return [from, to];
 }
 
@@ -883,6 +894,28 @@ try {
       if (roT) clearTimeout(roT);
       roT = setTimeout(() => renderCalendar(current()), 60);
     }).observe(weeksEl);
+  }
+} catch { /* ignore */ }
+
+// The agenda's automatic days fill the room it has: lay it out again when its size changes (news appearing, …).
+// Rendering never changes the agenda's own size, so this cannot loop.
+let lastAgendaSize = '';
+let agT: ReturnType<typeof setTimeout> | null = null;
+try {
+  const agendaEl = document.getElementById('agenda');
+  if (agendaEl && 'ResizeObserver' in window) {
+    new ResizeObserver((entries) => {
+      const r = entries[0].contentRect;
+      const size = `${Math.round(r.width)}x${Math.round(r.height)}`;
+      if (size === lastAgendaSize) return;
+      lastAgendaSize = size;
+      if (!r.width || !r.height || !state.config || !app.classList.contains('view-agenda')) return;
+      if (agT) clearTimeout(agT);
+      agT = setTimeout(() => {
+        renderCalendar(current());
+        fitSide();
+      }, 80);
+    }).observe(agendaEl);
   }
 } catch { /* ignore */ }
 

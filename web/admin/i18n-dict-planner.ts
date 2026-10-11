@@ -36,4 +36,16 @@ export const ROWS_PLANNER: [string, string, string][] = [
     'Not used with the cards style: cards already stack up in each day.',
     'Não se usa com o estilo de cartões: os cartões já se empilham em cada dia.',
   ],
+  // how far the agenda view looks ahead (calendar.agendaDays)
+  ['Días en la agenda', 'Days in the agenda', 'Dias na agenda'],
+  [
+    'Automático: hoy y mañana, y después los próximos días con eventos hasta llenar la agenda. Nunca muestra menos de lo que mostraría con 14.',
+    'Automatic: today and tomorrow, then the next days with events until the agenda is full. It never shows less than 14 days would.',
+    'Automático: hoje e amanhã e, depois, os próximos dias com eventos até encher a agenda. Nunca mostra menos do que mostraria com 14.',
+  ],
+  [
+    'La agenda muestra los próximos {n} días. Los días sin eventos no ocupan sitio.',
+    'The agenda shows the next {n} days. Days without events take no room.',
+    'A agenda mostra os próximos {n} dias. Os dias sem eventos não ocupam espaço.',
+  ],
 ];

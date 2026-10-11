@@ -117,7 +117,7 @@ The stored config has **global** sections shared by every screen and a list of *
   "calendar":   { "enabled": true, "view": "month", "weeks": 5, "weekStart": 1, "showLocation": false, "showEndTime": false,
                   "showDayXofY": true, "showLegend": true, "hidePast": false, "maxEventsPerDay": 4,
                   "marquee": true, "rotateBusyDays": true, "compactBusyDays": true, "eventStyle": "lines",
-                  "sourceIds": null },               // null = every enabled source (incl. new ones); array = only these
+                  "agendaDays": "auto", "sourceIds": null },               // null = every enabled source (incl. new ones); array = only these
                   // marquee: titles cut short (calendar chips, agenda-like lists, side panel pills, countdowns, news) slide to show the rest
                   // rotateBusyDays: a month-grid day with more events than fit pages through them every 8 s
                   // compactBusyDays: a month / week grid day whose events do not fit at normal size lists them as small
@@ -133,6 +133,12 @@ The stored config has **global** sections shared by every screen and a list of *
                   //   card on each day). Rows stay equal. A day with more cards than fit pages (rotateBusyDays) or shows
                   //   "+N"; clamped titles scroll up with marquee. compactBusyDays is not used with cards.
                   //   Pure planning helpers: web/display/cards.ts (tested in server/test/display-planner.test.js).
+                  // agendaDays: how far the agenda view looks ahead: 7, 14 or 30 days, or "auto" (default, also for older
+                  //   screens): Today and Tomorrow, then the next days with events. The display lays every candidate
+                  //   day out in a hidden copy of the agenda and keeps the leading day blocks that fit whole, never
+                  //   fewer than 14 days would show; it measures again when the agenda's size or the events change.
+                  //   Events are fetched up to 61 days ahead while the agenda view is on. The side agenda shows 3 days.
+                  //   Pure helpers: web/display/agendaFill.ts (tested in server/test/display-agenda.test.js).
   "datetime":   { "enabled": true, "clock": "digital", "format24": true, "showSeconds": true, "showAmPm": false, "dateFormat": "weekday_d_month" },
   "weather":    { "enabled": true, "forecastDays": 5, "showHourly": true, "showPrecipChance": true },
   "news":       { "enabled": true, "rotateSec": 15 },

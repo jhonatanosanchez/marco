@@ -1300,7 +1300,8 @@ h1 .scope {
   display: block;
   grid-column: 1 / 3;
 }
-.field--weeks .seg button {
+.field--weeks .seg button,
+.field--agenda-days .seg button {
   padding-inline: 4px;
 }
 .mini-layout--planner {

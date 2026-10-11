@@ -963,6 +963,7 @@ Back up the whole folder (or use *Export*) to keep everything.
 | `?empty=1` `?photos=0` | With `?demo=1`: no events, countdowns or to-dos, or no background photo (to check the empty states) |
 | `?marquee=0\|1` `?rotate=0\|1` | Turn off (or on) the long titles that slide (calendar chips, the pills next to the clock, countdowns, the news headline; titles on several lines move up a line at a time) and the busy days that take turns showing their events (*Calendars → Calendar view*); with `?demo=1`, `&busy=1` adds a busy day and long titles to try them |
 | `?cards=0\|1` `?weeks=auto` `?preset=planner` | Events as cards (or one-line chips), automatic weeks, the *Planner* layout. With `?demo=1`, `&planner=1` shows the planner as picking it in the admin sets it up (try `&busy=2`) |
+| `?agendaDays=auto\|7\|14\|30` | How far the agenda view looks ahead (*Calendars → Calendar view → Days in the agenda*). With `?demo=1`, `&sparse=1&preset=agenda` shows a quiet calendar with events weeks away |
 | `?compact=0\|1` `?weeks=1..8` | Turn off (or on) compact busy days: a day that cannot fit its events lists them as small one-line entries and the week rows share the height by how many events they have (*Calendars → Calendar view*); `?weeks=` shows that many weeks. With `?demo=1`, `&busy=2` fills the whole month |
 | `?client=<name>` | Name of this device in *Connected displays* (the kiosk script sets it) |
 

@@ -16,6 +16,8 @@ const ID = /^[A-Za-z0-9_-]{1,64}$/;
 export const LAYOUT_PRESETS = ['bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda', 'today', 'people', 'photoFrame', 'twoWeeks', 'board', 'bedside', 'planner'];
 /** calendar.eventStyle: 'lines' (one-line chips, the original look) or 'cards' (time on top, title below). */
 export const EVENT_STYLES = ['lines', 'cards'];
+/** calendar.agendaDays: days the agenda view looks ahead, or 'auto' (fills the agenda with the next days that have events). */
+export const AGENDA_DAYS = ['auto', 7, 14, 30];
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,255}$/;
 
 export function isHttpUrl(s, protocols = ['http:', 'https:']) {
@@ -289,6 +291,9 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
     compactBusyDays: bool(ctx, `${p}.calendar.compactBusyDays`, ca.compactBusyDays, false),
     // how events look in the month / week grid: one-line chips (default, what every screen had) or stacked cards
     eventStyle: oneOf(ctx, `${p}.calendar.eventStyle`, ca.eventStyle, D.calendar.eventStyle, EVENT_STYLES),
+    // how far the agenda view looks ahead: 7, 14 or 30 days, or 'auto' (the default for every screen: it only adds
+    // days with events where the agenda had empty room)
+    agendaDays: oneOf(ctx, `${p}.calendar.agendaDays`, ca.agendaDays, D.calendar.agendaDays, AGENDA_DAYS),
     sourceIds: ca.sourceIds === null || ca.sourceIds === undefined ? null : idList(ctx, `${p}.calendar.sourceIds`, ca.sourceIds),
   };
 
