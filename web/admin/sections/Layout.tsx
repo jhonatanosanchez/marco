@@ -358,6 +358,23 @@ export function GlassCard({ cfg, set }: Pick<SectionProps, 'cfg' | 'set'>) {
   );
 }
 
+/** Weather panel of the Classic style: blur and darkness behind it (background.panelBlur / panelShade). */
+export function WeatherPanelCard({ cfg, set }: Pick<SectionProps, 'cfg' | 'set'>) {
+  const b = cfg.background;
+  return (
+    <Card id="layout-weather-panel" scope="screen" title={t('Panel del tiempo')} icon="cloud" desc={t('Cómo se ve el panel del tiempo del estilo Clásico sobre la foto de fondo.')}>
+      <div class="grid grid--2">
+        <Field label={t('Desenfoque del panel del tiempo')} hint={t('0 = sin desenfoque. En la Raspberry Pi, menos desenfoque es más ligero.')}>
+          <Slider value={b.panelBlur ?? 18} min={0} max={40} step={1} format={(v) => (v ? `${v}` : t('Sin desenfoque'))} onChange={(v) => set((d) => void (d.background.panelBlur = v))} />
+        </Field>
+        <Field label={t('Oscuridad del panel del tiempo')} hint={t('Más oscuro = más legible sobre fotos claras.')}>
+          <Slider value={b.panelShade ?? 0.5} min={0} max={1} step={0.05} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => set((d) => void (d.background.panelShade = v))} />
+        </Field>
+      </div>
+    </Card>
+  );
+}
+
 const CORNERS: { value: FrameCorner; label: string }[] = [
   { value: 'tl', label: 'Arriba izquierda' },
   { value: 'tr', label: 'Arriba derecha' },
@@ -474,7 +491,7 @@ export function LayoutSection(props: SectionProps) {
           ))}
         </div>
       </Card>
-      {style === 'modern' && <GlassCard cfg={cfg} set={set} />}
+      {style === 'modern' ? <GlassCard cfg={cfg} set={set} /> : <WeatherPanelCard cfg={cfg} set={set} />}
       <div class="preset-grid" id="layout-presets">
         {PRESETS.map((p) => (
           <button

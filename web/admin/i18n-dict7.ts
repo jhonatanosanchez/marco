@@ -49,7 +49,6 @@ export const ROWS7: [string, string, string][] = [
   ['Foto oscura', 'Dark photo', 'Foto escura'],
   ['Foto clara', 'Bright photo', 'Foto clara'],
   ['Cristal (estilo moderno)', 'Glass (Modern style)', 'Vidro (estilo moderno)'],
-  ['Con el estilo Moderno, las tarjetas de cristal se ajustan en Diseño > Cristal.', 'With the Modern style, the glass cards are set in Layout > Glass.', 'Com o estilo Moderno, os cartões de vidro ajustam-se em Disposição > Vidro.'],
   // New layouts (Diseño page)
   ['Dos semanas', 'Two weeks', 'Duas semanas'],
   ['Esta semana y la siguiente, con más sitio para cada día. Hoy se ve resaltado.', 'This week and the next, with more room for each day. Today is highlighted.', 'Esta semana e a seguinte, com mais espaço para cada dia. O dia de hoje aparece destacado.'],
@@ -75,4 +74,7 @@ export const ROWS7: [string, string, string][] = [
   ['Hasta cinco columnas. Se ven en el orden de esta lista.', 'Up to five columns, shown in the order of this list.', 'Até cinco colunas, pela ordem desta lista.'],
   ['No has marcado ningún calendario: la pantalla pedirá que elijas alguno.', 'No calendar is ticked: the screen will ask you to choose one.', 'Nenhum calendário marcado: o ecrã vai pedir que escolha algum.'],
   ['Plantillas: hoy, por persona, dos semanas, tablero, marco de fotos, mesilla', 'Layouts: today, per person, two weeks, board, photo frame, bedside', 'Modelos: hoje, por pessoa, duas semanas, quadro, moldura de fotos, mesa de cabeceira'],
+  ['Panel del tiempo', 'Weather panel', 'Painel do tempo'],
+  ['Cómo se ve el panel del tiempo del estilo Clásico sobre la foto de fondo.', 'How the weather panel of the Classic style looks over the background photo.', 'Como fica o painel do tempo do estilo Clássico sobre a foto de fundo.'],
+  ['Panel del tiempo (estilo clásico)', 'Weather panel (Classic style)', 'Painel do tempo (estilo clássico)'],
 ];

@@ -16,6 +16,7 @@ export interface SettingEntry {
 export const SETTINGS_INDEX: SettingEntry[] = [
   // Pantalla
   { label: 'Cristal (estilo moderno)', route: 'layout', anchor: 'layout-glass', keywords: 'glass cristal vidro liquid transparente transparency transparência opacidad opacity blur desenfoque desfoque tint tono tom edge borde contorno iphone ios apple modern moderno' },
+  { label: 'Panel del tiempo (estilo clásico)', route: 'layout', anchor: 'layout-weather-panel', keywords: 'weather panel panel del tiempo painel do tempo desenfoque blur desfoque oscuridad darkness escuridão sombra shade classic clásico clássico' },
   { label: 'Estilo clásico / moderno', route: 'layout', anchor: 'layout-style', keywords: 'style estilo look aspecto moderno modern classic clásico clássico apple glass cristal vidro minimal' },
   { label: 'Plantilla de diseño', route: 'layout', anchor: 'layout-presets', keywords: 'layout preset agenda calendario grande reloj grande template' },
   { label: 'Plantillas: hoy, por persona, dos semanas, tablero, marco de fotos, mesilla', route: 'layout', anchor: 'layout-presets', keywords: 'today hoy hoje timeline per person por persona pessoa columns columnas board tablero quadro tasks tareas photo frame marco moldura bedside mesilla dormitorio bedroom quarto two weeks dos semanas duas semanas corner esquina' },

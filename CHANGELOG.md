@@ -46,6 +46,9 @@ All notable changes to this project are documented here. The format is based on
   "Screen «x» not found" notice and `screenFallback` in the display config are gone.
 - *Calendars → Calendar view*: *Max. visible events per day* now explains what it does. With *Compact busy days* on it
   is the point where a day switches to short lines (3 or 4 keeps normal days large).
+- The weather panel blur and darkness moved from *Background* to *Layout*, in a *Weather panel* card shown next to the
+  style when the screen uses the Classic style (they only change the Classic weather panel; Modern uses *Glass*). The
+  settings and how the screens look stay the same.
 
 ## [0.6.1] - 2026-10-11
 
