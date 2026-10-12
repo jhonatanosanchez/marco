@@ -13,6 +13,11 @@ export const ROWS_PLANNER: [string, string, string][] = [
     'Auto picks 2 to 6 weeks, as many as fit with the most events per day at a good size. It is worked out again when the screen turns.',
     'Auto escolhe entre 2 e 6 semanas, as que cabem com o máximo de eventos por dia num bom tamanho. É recalculado se o ecrã rodar.',
   ],
+  [
+    'Auto elige entre 2 y 4 semanas, las que caben con el máximo de eventos por día a buen tamaño. Con la hora y el tiempo arriba o abajo no caben más.',
+    'Auto picks 2 to 4 weeks, as many as fit with the most events per day at a good size. With the time and the weather at the top or the bottom, no more fit.',
+    'Auto escolhe entre 2 e 4 semanas, as que cabem com o máximo de eventos por dia num bom tamanho. Com a hora e o tempo em cima ou em baixo não cabem mais.',
+  ],
   // where the clock and the weather go on a landscape screen (layout.plannerBar)
   ['Hora y tiempo', 'Time and weather', 'Hora e tempo'],
   ['Al lado', 'At the side', 'Ao lado'],

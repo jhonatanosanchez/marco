@@ -137,6 +137,8 @@ export interface SegOption<T> {
   label: ComponentChildren;
   icon?: IconName;
   title?: string;
+  /** shown but not selectable (greyed out); `title` says why. aria-disabled, not disabled, so the tooltip still shows. */
+  off?: boolean;
 }
 
 export function Segmented<T extends string | number>(props: {
@@ -161,10 +163,11 @@ export function Segmented<T extends string | number>(props: {
           type="button"
           role="radio"
           aria-checked={o.value === props.value}
-          class={o.value === props.value ? 'is-active' : ''}
+          class={`${o.value === props.value ? 'is-active' : ''} ${o.off ? 'is-off' : ''}`}
           title={o.title}
           disabled={props.disabled}
-          onClick={() => props.onChange(o.value)}
+          aria-disabled={o.off ? 'true' : undefined}
+          onClick={() => !o.off && props.onChange(o.value)}
         >
           {o.icon && <Icon name={o.icon} size={15} />}
           <span>{o.label}</span>

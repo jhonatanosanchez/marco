@@ -329,7 +329,29 @@ test('plannerBar in the admin: the option in the Planner card, the side panel ca
   for (const m of admin.matchAll(/t\('((?:En pantallas horizontales|El Planificador tiene|Con la hora y el tiempo)[^']+)'\)/g)) {
     assert.ok(dict.includes(`'${m[1]}'`), `no row for "${m[1]}"`);
   }
-  // 5 or 6 fixed weeks with the strip: the card says that at most 4 are shown
-  assert.match(admin, /cfg\.calendar\.weeks > 4\s*\? ' ' \+ t\('Con la hora y el tiempo arriba o abajo se ven como mucho 4 semanas\.'\)/);
+  // with the strip at most 4 weeks are shown: picking Top / Bottom turns 5 or 6 into 4, and the weeks field (here and
+  // in Calendars, Calendar view) greys out 5 and 6 with the reason as their tooltip and hint
+  assert.match(admin, /d\.layout\.plannerBar = v;\s*\/\/[^\n]*\n\s*const cap = weeksCap\(d\);\s*if \(cap && typeof d\.calendar\.weeks === 'number' && d\.calendar\.weeks > cap\) d\.calendar\.weeks = cap;/);
+  const fields = read('web/admin/components/PlannerFields.tsx');
+  assert.match(fields, /export const PLANNER_STRIP_WEEKS = 4;/);
+  assert.match(fields, /if \(l\.preset !== 'planner' \|\| \(l\.plannerBar \?\? 'side'\) === 'side' \|\| cfg\.screen\.orientation === 'portrait'\) return undefined;/);
+  assert.match(fields, /cap && \(v as number\) > cap \? \{ value: v, label: String\(v\), off: true, title: capMsg \}/);
+  assert.match(read('web/admin/sections/Calendars.tsx'), /<WeeksField cfg=\{props\.cfg\} set=\{set\}/);
+  const ui = read('web/admin/components/ui.tsx');
+  assert.match(ui, /aria-disabled=\{o\.off \? 'true' : undefined\}/);
+  assert.match(ui, /onClick=\{\(\) => !o\.off && props\.onChange\(o\.value\)\}/);
+  for (const m of fields.matchAll(/t\('((?:Auto elige|Con la hora y el tiempo)[^']+)'\)/g)) assert.ok(dict.includes(`'${m[1]}'`), `no row for "${m[1]}"`);
   assert.match(read('web/shared/types.ts'), /plannerBar\?: PlannerBar;/);
+});
+
+test('Modern: the today circle stays inside the number row, so the top of the week row never cuts it', () => {
+  const css = read('web/display/styles-modern.css');
+  // centred on the number's line, at most 1.72em, smaller where the number row is low
+  assert.match(css, /\.style-modern \.num \{\s*--num-pt: 1\.2rem;\s*padding: var\(--num-pt\) 1\.2rem 0;/);
+  assert.match(css, /--dot: min\(1\.72em, calc\(2 \* \(var\(--num-pt\) \+ 0\.5em - 0\.25rem\)\), calc\(2 \* \(var\(--num-h\) - var\(--num-pt\) - 0\.5em - 0\.25rem\)\)\);/);
+  assert.match(css, /margin: calc\(\(1em - var\(--dot\)\) \/ 2\) 0 calc\(\(1em - var\(--dot\)\) \/ 2\) -0\.3em;/);
+  // the top / bottom frame (the planner strip, the planner on portrait screens, Top / Bottom): room for the circle
+  assert.match(css, /\.style-modern \.preset-topBottom \.cal \{ --num-h: 4\.2rem; \}/);
+  assert.match(css, /\.style-modern \.preset-topBottom \.num \{ --num-pt: 0\.9rem; padding-top: var\(--num-pt\); font-size: 2\.4rem; \}/);
+  assert.doesNotMatch(css, /margin: -0\.36em 0 -0\.36em -0\.3em/);
 });

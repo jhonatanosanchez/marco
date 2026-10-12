@@ -2,7 +2,7 @@ import { useRef } from 'preact/hooks';
 import { GLASS_DEFAULTS, glassVars, normalizeGlass, type PhotoStats } from '../../shared/glass';
 import type { DisplayStyle, FrameCorner, GlassConfig, LayoutPreset, PlannerBar, WidgetPlacement } from '../../shared/types';
 import { Icon } from '../components/icons';
-import { EventStyleField, PLANNER_CALENDAR, undoPlannerPick, WeeksField } from '../components/PlannerFields';
+import { EventStyleField, PLANNER_CALENDAR, undoPlannerPick, weeksCap, WeeksField } from '../components/PlannerFields';
 import { Button, Callout, Card, ColorPicker, Field, PageHeader, ReorderButtons, Segmented, Select, Slider, ToggleRow } from '../components/ui';
 import { has } from '../caps';
 import { t } from '../i18n';
@@ -766,18 +766,20 @@ function PresetOptions({ cfg, set, full, go }: SectionProps) {
         </div>
         <Field
           label={t('Hora y tiempo')}
-          hint={
-            t('En pantallas horizontales. Arriba o abajo, el mes ocupa todo el ancho y el tiempo se ve en una fila. En vertical siempre van arriba.') +
-            ((l.plannerBar ?? 'side') !== 'side' && typeof cfg.calendar.weeks === 'number' && cfg.calendar.weeks > 4
-              ? ' ' + t('Con la hora y el tiempo arriba o abajo se ven como mucho 4 semanas.')
-              : '')
-          }
+          hint={t('En pantallas horizontales. Arriba o abajo, el mes ocupa todo el ancho y el tiempo se ve en una fila. En vertical siempre van arriba.')}
         >
           <Segmented
             full
             value={l.plannerBar ?? 'side'}
             options={PLANNER_BARS.map((o) => ({ value: o.value, label: t(o.label) }))}
-            onChange={(v) => set((d) => void (d.layout.plannerBar = v))}
+            onChange={(v) =>
+              set((d) => {
+                d.layout.plannerBar = v;
+                // the strip leaves room for 4 weeks at most: 5 or 6 become 4 (back at the side they stay 4)
+                const cap = weeksCap(d);
+                if (cap && typeof d.calendar.weeks === 'number' && d.calendar.weeks > cap) d.calendar.weeks = cap;
+              })
+            }
           />
         </Field>
       </Card>

@@ -819,6 +819,13 @@ input[type='number']::-webkit-inner-spin-button {
 .seg button.is-active {
   color: var(--text);
 }
+.seg button.is-off {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.seg button.is-off:hover {
+  color: var(--muted);
+}
 .seg button.is-active .ico {
   color: var(--accent);
 }

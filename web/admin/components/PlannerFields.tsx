@@ -19,20 +19,47 @@ export function undoPlannerPick(cal: { weeks: CalendarWeeks; eventStyle: EventSt
 
 type Set = (fn: (d: AppConfig) => void) => void;
 
+/** The most weeks the planner shows with its clock and weather in a strip above or below the month (web/display/main.ts). */
+export const PLANNER_STRIP_WEEKS = 4;
+
+/**
+ * The most weeks this screen can show: 4 for a planner with layout.plannerBar top / bottom on a screen that is not set
+ * to portrait (portrait screens always put the clock on top, without the cap). Otherwise none (undefined).
+ */
+export function weeksCap(cfg: Pick<AppConfig, 'layout' | 'screen'>): number | undefined {
+  const l = cfg.layout;
+  if (l.preset !== 'planner' || (l.plannerBar ?? 'side') === 'side' || cfg.screen.orientation === 'portrait') return undefined;
+  return PLANNER_STRIP_WEEKS;
+}
+
 export function WeeksField({ cfg, set, error, max = 6, min = 1 }: { cfg: AppConfig; set: Set; error?: string; max?: number; min?: number }) {
+  const cap = weeksCap(cfg);
+  const capMsg = t('Con la hora y el tiempo arriba o abajo se ven como mucho 4 semanas.');
   const n: CalendarWeeks[] = [];
   for (let i = min; i <= max; i++) n.push(i);
+  const auto = cfg.calendar.weeks === 'auto';
   return (
     <Field
       class="field--weeks"
       label={t('Semanas a mostrar')}
-      hint={cfg.calendar.weeks === 'auto' ? t('Auto elige entre 2 y 6 semanas, las que caben con el máximo de eventos por día a buen tamaño. Se recalcula si la pantalla gira.') : undefined}
+      hint={
+        cap
+          ? auto
+            ? t('Auto elige entre 2 y 4 semanas, las que caben con el máximo de eventos por día a buen tamaño. Con la hora y el tiempo arriba o abajo no caben más.')
+            : capMsg
+          : auto
+            ? t('Auto elige entre 2 y 6 semanas, las que caben con el máximo de eventos por día a buen tamaño. Se recalcula si la pantalla gira.')
+            : undefined
+      }
       error={error}
     >
       <Segmented<CalendarWeeks>
         full
         value={cfg.calendar.weeks}
-        options={[{ value: 'auto', label: t('Auto') }, ...n.map((v) => ({ value: v, label: String(v) }))]}
+        options={[
+          { value: 'auto', label: t('Auto') },
+          ...n.map((v) => (cap && (v as number) > cap ? { value: v, label: String(v), off: true, title: capMsg } : { value: v, label: String(v) })),
+        ]}
         onChange={(v) => set((d) => void (d.calendar.weeks = v))}
       />
     </Field>

@@ -13,6 +13,13 @@ All notable changes to this project are documented here. The format is based on
   width, with up to 4 weeks, and the weather is laid out in one row: now, the next hours and the next days, hiding
   what does not fit. Portrait screens are unchanged.
 
+### Fixed
+- *Weeks to show* with the Planner's time and weather at the top or bottom: 5 and 6 are now greyed out, with the
+  reason as a tooltip, since the strip leaves room for 4 weeks at most. Picking *Top* or *Bottom* with 5 or 6 weeks
+  sets 4. The same applies in *Calendars → Calendar view*.
+- Modern style: the circle around today's date was cut at the top by the line above the week in the Planner with the
+  strip, the Planner on portrait screens and the *Top / Bottom* layout. It now stays below that line.
+
 ## [0.9.0] - 2026-10-12
 
 ### Added

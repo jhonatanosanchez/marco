@@ -460,7 +460,8 @@
 .style-modern .cell.we { background: none; }
 .style-modern .cell.today::before { display: none; }
 .style-modern .num {
-  padding: 1.1rem 1.2rem 0;
+  --num-pt: 1.2rem;
+  padding: var(--num-pt) 1.2rem 0;
   font-family: var(--font-num);
   font-size: 2.6rem;
   font-weight: 500;
@@ -469,10 +470,13 @@
 }
 .style-modern .num.past { color: var(--fg-3); }
 .style-modern .num.m1 > span { font-weight: 600; color: var(--accent); letter-spacing: 0; }
+/* The today circle is centred on the number's line and never crosses the top of the row (.wk clips it there) nor
+   the bottom of the number row: at most 1.72em, less where the number row is low (the top / bottom frame, 720p). */
 .style-modern .num .dot {
-  width: 1.72em;
-  height: 1.72em;
-  margin: -0.36em 0 -0.36em -0.3em;
+  --dot: min(1.72em, calc(2 * (var(--num-pt) + 0.5em - 0.25rem)), calc(2 * (var(--num-h) - var(--num-pt) - 0.5em - 0.25rem)));
+  width: var(--dot);
+  height: var(--dot);
+  margin: calc((1em - var(--dot)) / 2) 0 calc((1em - var(--dot)) / 2) -0.3em;
   background: var(--accent);
   color: #fff;
   font-weight: 600;
@@ -569,8 +573,8 @@
 }
 .style-modern .cal .cstack .ev.cl.timed:has(> .em)::before { display: none; }
 .style-modern .cal .cstack .ev.cl.ongoing { background: rgb(var(--c) / 0.18); }
-.style-modern .preset-topBottom .cal { --num-h: 3.8rem; }
-.style-modern .preset-topBottom .num { padding-top: 0.6rem; font-size: 2.4rem; }
+.style-modern .preset-topBottom .cal { --num-h: 4.2rem; }
+.style-modern .preset-topBottom .num { --num-pt: 0.9rem; padding-top: var(--num-pt); font-size: 2.4rem; }
 .style-modern .preset-topBottom .cal-head { padding-bottom: 0.8rem; }
 .style-modern .preset-topBottom .cal-title { font-size: 3rem; }
 .style-modern .preset-topBottom .cal-dow { padding-bottom: 0.4rem; }
