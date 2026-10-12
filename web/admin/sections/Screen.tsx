@@ -3,7 +3,7 @@ import { api, ApiError } from '../api';
 import { toast } from '../components/feedback';
 import { GoogleG, Icon } from '../components/icons';
 import { PrivateLinkCard } from '../components/DisplayAccess';
-import { Button, Callout, Card, Chips, ColorPicker, Field, PageHeader, Segmented, Slider, Textarea, TextInput, ToggleRow } from '../components/ui';
+import { Button, Callout, Card, Chips, Field, PageHeader, Segmented, Slider, Textarea, TextInput, ToggleRow } from '../components/ui';
 import { has, limit, offers } from '../caps';
 import { locale, t } from '../i18n';
 import { cssBytes, EMAIL_RE } from '../util';
@@ -55,24 +55,6 @@ export function ScreenSection({ cfg, set, errors, screenId, saved, go }: Section
         </div>
       </Card>
       <PrivateLinkCard screenId={screenId} saved={saved} mode={saved.security?.displayAccess ?? 'open'} go={go} />
-      <Card id="scr-look" scope="screen" title={t('Apariencia')} icon="palette">
-        <div class="grid grid--2">
-          <Field label={t('Tema')}>
-            <Segmented
-              full
-              value={s.theme}
-              options={[
-                { value: 'dark', label: t('Oscuro'), icon: 'moon' },
-                { value: 'light', label: t('Claro'), icon: 'sun' },
-              ]}
-              onChange={(v) => set((d) => void (d.screen.theme = v))}
-            />
-          </Field>
-          <Field label={t('Color de acento')} error={errors['screen.accent']}>
-            <ColorPicker value={s.accent} error={!!errors['screen.accent']} onChange={(v) => v && set((d) => void (d.screen.accent = v))} />
-          </Field>
-        </div>
-      </Card>
       <Card id="scr-night" scope="screen" title={t('Modo noche')} icon="moon" desc={t('Atenúa la pantalla durante la noche.')}>
         <ToggleRow label={t('Activar modo noche')} checked={nm.enabled} onChange={(v) => set((d) => void (d.screen.nightMode.enabled = v))} />
         <div class={`grid grid--3 ${nm.enabled ? '' : 'is-disabled'}`}>

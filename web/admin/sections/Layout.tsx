@@ -3,7 +3,7 @@ import { GLASS_DEFAULTS, glassVars, normalizeGlass, type PhotoStats } from '../.
 import type { DisplayStyle, FrameCorner, GlassConfig, LayoutPreset, WidgetPlacement } from '../../shared/types';
 import { Icon } from '../components/icons';
 import { EventStyleField, PLANNER_CALENDAR, undoPlannerPick, WeeksField } from '../components/PlannerFields';
-import { Button, Callout, Card, Field, PageHeader, ReorderButtons, Segmented, Select, Slider, ToggleRow } from '../components/ui';
+import { Button, Callout, Card, ColorPicker, Field, PageHeader, ReorderButtons, Segmented, Select, Slider, ToggleRow } from '../components/ui';
 import { has } from '../caps';
 import { t } from '../i18n';
 import { allSourceOptions, MAX_SCREEN_WIDGETS, moveItem } from '../util';
@@ -809,6 +809,8 @@ export function LayoutSection(props: SectionProps) {
             if (was && was.layout.preset !== 'planner') undoPlannerPick(d.calendar, was.calendar);
           }
           d.layout.preset = 'kidsFamily';
+          // the kids layouts are made for a light page; the theme is right below if they want it dark
+          d.screen.theme = 'light';
         }
         return;
       }
@@ -857,6 +859,24 @@ export function LayoutSection(props: SectionProps) {
             </Button>
           </Callout>
         )}
+      </Card>
+      <Card id="layout-look" scope="screen" title={t('Apariencia')} icon="palette">
+        <div class="grid grid--2">
+          <Field label={t('Tema')}>
+            <Segmented
+              full
+              value={cfg.screen.theme}
+              options={[
+                { value: 'dark', label: t('Oscuro'), icon: 'moon' },
+                { value: 'light', label: t('Claro'), icon: 'sun' },
+              ]}
+              onChange={(v) => set((d) => void (d.screen.theme = v))}
+            />
+          </Field>
+          <Field label={t('Color de acento')} error={props.errors['screen.accent']}>
+            <ColorPicker value={cfg.screen.accent} error={!!props.errors['screen.accent']} onChange={(v) => v && set((d) => void (d.screen.accent = v))} />
+          </Field>
+        </div>
       </Card>
       {!kids && (style === 'modern' ? <GlassCard cfg={cfg} set={set} /> : <WeatherPanelCard cfg={cfg} set={set} />)}
       {kids && !cfg.family.enabled && (
