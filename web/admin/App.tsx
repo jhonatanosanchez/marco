@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { applyScreen, defaultScreenOf, projectScreen } from '../shared/screens';
-import type { AppConfig, AuthMeResponse, DisplayInfo, Lang, SetupStatus, StoredConfig } from '../shared/types';
+import type { AppConfig, AuthMeResponse, DisplayConfig, DisplayInfo, Lang, SetupStatus, StoredConfig } from '../shared/types';
 import { api, ApiError } from './api';
 import { BrandMark } from './components/BrandMark';
 import { CommandPalette, type PaletteItem } from './components/CommandPalette';
@@ -31,6 +31,7 @@ import { BackupsSection } from './sections/Backups';
 import { BirthdaysSection } from './sections/Birthdays';
 import { CalendarsSection } from './sections/Calendars';
 import { CarouselsSection, tryUrl } from './sections/Carousels';
+import { draftDisplayConfig } from './livePreview';
 import type { SectionProps } from './sections/common';
 import { CountdownsSection } from './sections/Countdowns';
 import { DateTimeSection } from './sections/DateTime';
@@ -469,6 +470,13 @@ export function App() {
 
   /* ---------- draft state */
   const dirty = useMemo(() => !!draft && !!saved && JSON.stringify(draft) !== JSON.stringify(saved), [draft, saved]);
+  // the preview of a screen shows the unsaved settings too (a short pause while typing)
+  const [live, setLive] = useState<DisplayConfig | null>(null);
+  const liveId = curScreen?.id ?? '';
+  useEffect(() => {
+    const id = window.setTimeout(() => setLive(draft && dirty && liveId ? draftDisplayConfig(draft, liveId) : null), 150);
+    return () => clearTimeout(id);
+  }, [draft, dirty, liveId]);
   const allErrors = useMemo(() => (draft ? validateAll(draft, caps) : { global: {}, screens: {}, total: 0 }), [draft, caps]);
   const errors: Errors = useMemo(() => ({ ...allErrors.global, ...(allErrors.screens[screenId] ?? {}) }), [allErrors, screenId]);
   const errorKeys = Object.keys(errors);
@@ -1072,7 +1080,7 @@ export function App() {
           </main>
           {previewSide && (
             <aside class="preview-col">
-              <Preview variant="side" saved={savedSlug != null} url={previewUrl} openUrl={viewUrl} screenName={multi ? curScreen.name : ''} {...(pvTarget ?? {})} reloadKey={previewKey} portrait={portrait} onClose={() => (setShowPreview(false), lsSet(LS_PREVIEW, '0'))} />
+              <Preview variant="side" saved={savedSlug != null} url={previewUrl} openUrl={viewUrl} screenName={multi ? curScreen.name : ''} live={live} hint={t('Muestra lo que cambias aunque no esté guardado. Los calendarios, las fotos y los eventos nuevos se ven al guardar.')} {...(pvTarget ? { ...pvTarget, live: undefined } : {})} reloadKey={previewKey} portrait={portrait} onClose={() => (setShowPreview(false), lsSet(LS_PREVIEW, '0'))} />
             </aside>
           )}
         </div>
@@ -1102,7 +1110,7 @@ export function App() {
       {sheet && !previewSide && (
         <div class="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && setSheet(false)}>
           <div class="sheet">
-            <Preview variant="sheet" saved={savedSlug != null} url={previewUrl} openUrl={viewUrl} screenName={multi ? curScreen.name : ''} {...(pvTarget ?? {})} reloadKey={previewKey} portrait={portrait} onClose={() => setSheet(false)} />
+            <Preview variant="sheet" saved={savedSlug != null} url={previewUrl} openUrl={viewUrl} screenName={multi ? curScreen.name : ''} live={live} hint={t('Muestra lo que cambias aunque no esté guardado. Los calendarios, las fotos y los eventos nuevos se ven al guardar.')} {...(pvTarget ? { ...pvTarget, live: undefined } : {})} reloadKey={previewKey} portrait={portrait} onClose={() => setSheet(false)} />
           </div>
         </div>
       )}

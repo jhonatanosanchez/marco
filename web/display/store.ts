@@ -22,8 +22,27 @@ export const state: State = {
   config: null, events: null, weather: null, news: null, photos: null, countdowns: null, online: true, demo: false,
 };
 
+/** Admin preview only: unsaved settings laid over every config the server sends (null = none). */
+let configOverlay: ((c: DisplayConfig) => DisplayConfig) | null = null;
+/** The last config as it came, before the overlay. */
+let baseConfig: DisplayConfig | null = null;
+
+/** Lay `fn` over the config (and over every later one), or take it away with null. */
+export function setConfigOverlay(fn: ((c: DisplayConfig) => DisplayConfig) | null): void {
+  configOverlay = fn;
+  if (baseConfig) put('config', fn ? fn(baseConfig) : baseConfig);
+}
+
 export function set<K extends Topic>(k: K, v: State[K]): void {
+  if (k === 'config' && v) {
+    baseConfig = v as DisplayConfig;
+    if (configOverlay) v = configOverlay(baseConfig) as State[K];
+  }
   if (state[k] === v) return;
+  put(k, v);
+}
+
+function put<K extends Topic>(k: K, v: State[K]): void {
   state[k] = v;
   const s = subs.get(k);
   if (s) for (const fn of s) {

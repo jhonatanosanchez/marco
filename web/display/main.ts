@@ -17,7 +17,7 @@ import { ctx, setCtxConfig } from './ctx';
 import { normalizeAgendaDays, normalizeConfig } from './defaults';
 import { Heartbeat, noteError } from './heartbeat';
 import {
-  authHeaders, clearDeviceToken, clientId, credential, credentialKind, getActiveScreen, screenKey, setActiveScreen, storedDeviceToken, withScreen,
+  authHeaders, clearDeviceToken, clientId, credential, credentialKind, getActiveScreen, isPreview, screenKey, setActiveScreen, storedDeviceToken, withScreen,
 } from './identity';
 import { CarouselController, type Bundle, type BundlePart } from './carousel';
 import { ScreenSwitcher, type SwitchGL } from './screenSwitch';
@@ -32,7 +32,7 @@ import type { PrecipLayer } from './gl/precipLayer';
 import type { WeatherFxLayer } from './gl/weatherFxLayer';
 import { weatherFxOf } from './icons';
 import { mockAnnouncements, mockCarouselConfigs, mockConfig, mockCountdowns, mockEvents, mockNews, mockPhotos, mockWeather } from './mock';
-import { loadCache, loadScreenCache, on, saveCache, saveScreenCache, set, state } from './store';
+import { loadCache, loadScreenCache, on, saveCache, saveScreenCache, set, setConfigOverlay, state } from './store';
 import { detectLiveMode, startConfigPoll, startPoll, type StreamHandlers } from './live';
 import { connectStream, pollUrl } from './stream';
 import { current, onTick, setClockOffset, setTimezone, startTicker, type Tick } from './time';
@@ -1542,6 +1542,19 @@ const heartbeat = new Heartbeat(
   },
   (now) => setServerNow(now),
 );
+// The admin preview shows unsaved settings: the admin posts this screen's config as it would be once saved, and it is
+// laid over what the server sends until the admin takes it back (null) or reloads the preview after a save. Only the
+// page that frames this preview (frame-ancestors keeps that to the admin) is listened to. What only the server knows
+// (privacy right now, the carousel) stays as the server says.
+if (isPreview) {
+  window.addEventListener('message', (e) => {
+    if (e.source !== window.parent || e.data?.type !== 'marco:preview-draft') return;
+    const draft = e.data.config as DisplayConfig | null;
+    if (!draft || typeof draft !== 'object') return setConfigOverlay(null);
+    setConfigOverlay((c) => (c.screenId !== draft.screenId ? c : { ...draft, revision: c.revision, privacy: c.privacy, target: c.target, carousel: c.carousel }));
+  });
+}
+
 // The admin's focal-point editor previews the photo with this display's real free band.
 // On a carousel the frame changes with every layout: report it at most every 5 minutes there.
 let frameSentAt = 0;

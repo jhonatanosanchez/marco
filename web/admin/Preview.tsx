@@ -7,13 +7,22 @@ import { t } from './i18n';
  * `url` is the preview address (displayLinks.ts useScreenUrl with preview: the display then neither registers as a
  * connected screen nor writes its storage), `openUrl` the same screen for a new tab; null while it is not known yet.
  */
-export function Preview({ reloadKey, portrait, onClose, variant, saved, url, openUrl, screenName, choices, chosen, onChoose, hint }: { reloadKey: number; portrait: boolean; onClose?: () => void; variant: 'side' | 'sheet'; saved: boolean; url: string | null; openUrl: string | null; screenName?: string; choices?: { value: string; label: string }[]; chosen?: string; onChoose?: (v: string) => void; hint?: string }) {
+export function Preview({ reloadKey, portrait, onClose, variant, saved, url, openUrl, screenName, choices, chosen, onChoose, hint, live }: { reloadKey: number; portrait: boolean; onClose?: () => void; variant: 'side' | 'sheet'; saved: boolean; url: string | null; openUrl: string | null; screenName?: string; choices?: { value: string; label: string }[]; chosen?: string; onChoose?: (v: string) => void; hint?: string; live?: unknown }) {
   const box = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [orient, setOrient] = useState<'land' | 'port'>(portrait ? 'port' : 'land');
   useEffect(() => setOrient(portrait ? 'port' : 'land'), [portrait]);
   useEffect(() => setLoaded(false), [reloadKey, orient, url]);
+  // unsaved settings (null = none): sent again whenever they change and each time the page in the frame loads
+  const frame = useRef<HTMLIFrameElement>(null);
+  useEffect(() => {
+    if (live === undefined || !loaded || !url) return;
+    try {
+      const origin = new URL(url, location.href).origin;
+      frame.current?.contentWindow?.postMessage({ type: 'marco:preview-draft', config: live }, origin);
+    } catch { /* the frame went away */ }
+  }, [live, loaded, url]);
   useEffect(() => {
     const el = box.current;
     if (!el) return;
@@ -74,6 +83,7 @@ export function Preview({ reloadKey, portrait, onClose, variant, saved, url, ope
           ) : w > 0 && url && (
             <iframe
               key={`${reloadKey}-${orient}-${url}`}
+              ref={frame}
               src={`${url}${url.includes('?') ? '&' : '?'}v=${reloadKey}`}
               title={t('Vista previa')}
               loading="lazy"

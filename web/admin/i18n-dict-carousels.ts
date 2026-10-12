@@ -45,6 +45,7 @@ export const ROWS_CAROUSELS: [string, string, string][] = [
   ['Guarda el carrusel para obtener su dirección.', 'Save the carousel to get its address.', 'Guarde o carrossel para obter o endereço.'],
   ['Qué mostrar', 'What to show', 'O que mostrar'],
   ['Aquí cambia cada 4 s para enseñar la animación, que se ve aunque no esté guardada. Las pantallas y los tiempos se ven al guardar.', 'Here it switches every 4 s to show the animation, which shows even when not saved. Screens and times show once saved.', 'Aqui muda a cada 4 s para mostrar a animação, que se vê mesmo sem guardar. Os ecrãs e os tempos veem-se ao guardar.'],
+  ['Muestra lo que cambias aunque no esté guardado. Los calendarios, las fotos y los eventos nuevos se ven al guardar.', 'Shows your changes even before saving. New calendars, photos and events show once saved.', 'Mostra o que muda mesmo sem guardar. Os calendários, as fotos e os eventos novos veem-se ao guardar.'],
   ['Plegar', 'Fold', 'Recolher'],
   ['Desplegar', 'Unfold', 'Expandir'],
   ['Buscar carrusel o pantalla…', 'Search carousel or screen…', 'Procurar carrossel ou ecrã…'],
