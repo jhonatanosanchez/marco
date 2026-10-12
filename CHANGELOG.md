@@ -5,12 +5,19 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-12
+
 ### Added
 - Widgets (#1): images and, on your own server, web pages on your screens (*Content → Widgets*). Each one goes in a
   corner or the side column of any screen (*Layout → Widgets on this screen*), or fills the screen with the new
   *Widget* layout, which works well in carousels. Images reload every 1 s to 24 h and swap only once the new one has
   loaded; a failed reload keeps the last image with a small "not updated" mark. The TV loads the address itself, so
   images from your local network work. Web pages load in an isolated frame. *Test* checks the address first.
+
+### Changed
+- *Appearance* (light or dark theme and accent color) moved from *Settings* to *Layout*, right under the display style.
+  Picking the *Kids* style switches the screen to the light theme; it can be changed back right there.
+- The three style cards in *Layout* share the whole row.
 
 ### Security
 - Pages of the server only load inside a frame as the admin's own preview, so a web page cannot send its frame back
