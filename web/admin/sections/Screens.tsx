@@ -5,6 +5,7 @@ import { api, ApiError } from '../api';
 import { openPairDialog, shareOrigin } from '../components/DisplayAccess';
 import { confirmDialog, toast } from '../components/feedback';
 import { Icon } from '../components/icons';
+import { canCopy, copyText } from '../components/share';
 import { Button, Callout, Card, Field, Modal, PageHeader, ReorderButtons, Select, TextInput } from '../components/ui';
 import { atLimit, limit } from '../caps';
 import { screenHref, useDisplayLinks } from '../displayLinks';
@@ -194,13 +195,10 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
     if (screenId === s.id) setScreenId(screens.find((x) => x.id !== s.id)!.id);
   };
 
+  // copyText also works on plain-http LAN pages, where the browser has no async clipboard
   const copy = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast(t('Copiado'), 'ok', 1500);
-    } catch {
-      toast(text, 'info', 6000);
-    }
+    if (await copyText(text)) toast(t('Copiado'), 'ok', 1500);
+    else toast(text, 'info', 6000);
   };
 
   const reload = async (s: ScreenProfile) => {
@@ -272,9 +270,17 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
                     <button type="button" class="icon-btn" title={t('Generar desde el nombre')} onClick={() => upd(s.id, (x) => void (x.slug = uniqueSlug(x.name, taken(s.id))))}>
                       <Icon name="wand" size={15} />
                     </button>
-                    <button type="button" class="icon-btn" title={t('Copiar URL')} onClick={() => copy(url)}>
-                      <Icon name="copy" size={15} />
-                    </button>
+                  </div>
+                ) : null}
+                {openMode ? (
+                  // the whole address, to read or select by hand on a TV or a phone
+                  <div class="screen-card__slug screen-card__link">
+                    <input class="input input--mono input--sm" value={url} readOnly spellcheck={false} aria-label={t('Dirección')} placeholder={t('Dirección')} onFocus={(e) => e.currentTarget.select()} />
+                    {canCopy() && (
+                      <button type="button" class="btn btn--sm btn--ghost" disabled={!url} onClick={() => copy(url)}>
+                        <Icon name="copy" size={15} /> {t('Copiar')}
+                      </button>
+                    )}
                   </div>
                 ) : (
                   // Private links: the screen's own link, read only, ready to copy (the slug does not open anything here)
@@ -288,9 +294,11 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
                       placeholder={isNew ? t('Guarda la pantalla para obtener su enlace privado.') : t('Cargando el enlace…')}
                       onFocus={(e) => e.currentTarget.select()}
                     />
-                    <button type="button" class="btn btn--sm btn--ghost" title={url ? t('Copiar enlace privado') : t('Guarda la pantalla para obtener su enlace privado.')} disabled={!url} onClick={() => copy(url)}>
-                      <Icon name="copy" size={15} /> {t('Copiar')}
-                    </button>
+                    {canCopy() && (
+                      <button type="button" class="btn btn--sm btn--ghost" title={url ? t('Copiar enlace privado') : t('Guarda la pantalla para obtener su enlace privado.')} disabled={!url} onClick={() => copy(url)}>
+                        <Icon name="copy" size={15} /> {t('Copiar')}
+                      </button>
+                    )}
                   </div>
                 )}
                 {openMode && !slugOk && <div class="field__error">{t('Solo minúsculas, números y guiones; no puede repetirse')}</div>}

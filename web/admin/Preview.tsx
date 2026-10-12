@@ -7,7 +7,7 @@ import { t } from './i18n';
  * `url` is the preview address (displayLinks.ts useScreenUrl with preview: the display then neither registers as a
  * connected screen nor writes its storage), `openUrl` the same screen for a new tab; null while it is not known yet.
  */
-export function Preview({ reloadKey, portrait, onClose, variant, saved, url, openUrl, screenName }: { reloadKey: number; portrait: boolean; onClose?: () => void; variant: 'side' | 'sheet'; saved: boolean; url: string | null; openUrl: string | null; screenName?: string }) {
+export function Preview({ reloadKey, portrait, onClose, variant, saved, url, openUrl, screenName, choices, chosen, onChoose }: { reloadKey: number; portrait: boolean; onClose?: () => void; variant: 'side' | 'sheet'; saved: boolean; url: string | null; openUrl: string | null; screenName?: string; choices?: { value: string; label: string }[]; chosen?: string; onChoose?: (v: string) => void }) {
   const box = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -33,8 +33,17 @@ export function Preview({ reloadKey, portrait, onClose, variant, saved, url, ope
         <span class="live-dot" />
         <strong>
           {t('Vista previa')}
-          {screenName && <span class="preview__scr"> · {screenName}</span>}
+          {!choices && screenName && <span class="preview__scr"> · {screenName}</span>}
         </strong>
+        {choices && (
+          <select class="preview__pick" value={chosen} aria-label={t('Qué mostrar')} onChange={(e) => onChoose?.(e.currentTarget.value)}>
+            {choices.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        )}
         <div class="preview__tools">
           <button type="button" class={`icon-btn ${orient === 'land' ? 'is-active' : ''}`} onClick={() => setOrient('land')} title={t('Horizontal')}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">

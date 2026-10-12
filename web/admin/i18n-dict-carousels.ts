@@ -42,6 +42,8 @@ export const ROWS_CAROUSELS: [string, string, string][] = [
   ],
   ['La primera del carrusel ({name})', 'The first one in the carousel ({name})', 'O primeiro do carrossel ({name})'],
   ['Guarda el carrusel para obtener su enlace privado.', 'Save the carousel to get its private link.', 'Guarde o carrossel para obter a ligação privada.'],
+  ['Guarda el carrusel para obtener su dirección.', 'Save the carousel to get its address.', 'Guarde o carrossel para obter o endereço.'],
+  ['Qué mostrar', 'What to show', 'O que mostrar'],
   ['Añadir pantalla', 'Add screen', 'Adicionar ecrã'],
   ['Ciclo completo: {d}', 'Full loop: {d}', 'Ciclo completo: {d}'],
   ['Sin transición', 'No transition', 'Sem transição'],

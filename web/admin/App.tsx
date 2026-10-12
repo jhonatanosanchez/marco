@@ -49,7 +49,7 @@ import { ScreensSection } from './sections/Screens';
 import { StatusSection } from './sections/Status';
 import { WeatherSection } from './sections/Weather';
 import { UNAUTHORIZED_EVENT } from './api';
-import { usesPrivateLinks, useScreenUrl } from './displayLinks';
+import { screenHref, useDisplayLinks, usesPrivateLinks, useScreenUrl } from './displayLinks';
 import { withPollNote } from './liveNote';
 import { clone, produce, sectionForError, sectionForServerPath, validateAll, type Errors } from './util';
 
@@ -428,6 +428,17 @@ export function App() {
   // Private link on the display origin (Marco Cloud, self-hosted private mode) or /?screen=<slug> (open mode).
   const previewUrl = useScreenUrl(saved, savedSlug ? curScreen?.id : null, { preview: true });
   const viewUrl = useScreenUrl(saved, savedSlug ? curScreen?.id : null);
+  // On the Carousels page the preview plays a saved carousel (the first one unless another carousel or a screen is
+  // picked in its bar); everywhere else it shows the screen being edited.
+  const linkState = useDisplayLinks(saved);
+  const [pvPick, setPvPick] = useState<string | null>(null);
+  const savedCars = saved?.carousels?.items ?? [];
+  const pvChoices =
+    route === 'carousels' && saved && savedCars.length
+      ? [...savedCars.map((c) => ({ value: c.id, label: `🔁 ${c.name}` })), ...saved.screens.map((s) => ({ value: s.id, label: s.name }))]
+      : null;
+  const pvId = pvChoices ? (pvChoices.some((o) => o.value === pvPick) ? pvPick! : savedCars[0].id) : null;
+  const pvTarget = pvId ? { saved: true, url: screenHref(saved, pvId, linkState, { preview: true }), openUrl: screenHref(saved, pvId, linkState), choices: pvChoices!, chosen: pvId, onChoose: setPvPick } : null;
 
   /* ---------- draft state */
   const dirty = useMemo(() => !!draft && !!saved && JSON.stringify(draft) !== JSON.stringify(saved), [draft, saved]);
@@ -1034,7 +1045,7 @@ export function App() {
           </main>
           {previewSide && (
             <aside class="preview-col">
-              <Preview variant="side" saved={savedSlug != null} url={previewUrl} openUrl={viewUrl} screenName={multi ? curScreen.name : ''} reloadKey={previewKey} portrait={portrait} onClose={() => (setShowPreview(false), lsSet(LS_PREVIEW, '0'))} />
+              <Preview variant="side" saved={savedSlug != null} url={previewUrl} openUrl={viewUrl} screenName={multi ? curScreen.name : ''} {...(pvTarget ?? {})} reloadKey={previewKey} portrait={portrait} onClose={() => (setShowPreview(false), lsSet(LS_PREVIEW, '0'))} />
             </aside>
           )}
         </div>
@@ -1064,7 +1075,7 @@ export function App() {
       {sheet && !previewSide && (
         <div class="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && setSheet(false)}>
           <div class="sheet">
-            <Preview variant="sheet" saved={savedSlug != null} url={previewUrl} openUrl={viewUrl} screenName={multi ? curScreen.name : ''} reloadKey={previewKey} portrait={portrait} onClose={() => setSheet(false)} />
+            <Preview variant="sheet" saved={savedSlug != null} url={previewUrl} openUrl={viewUrl} screenName={multi ? curScreen.name : ''} {...(pvTarget ?? {})} reloadKey={previewKey} portrait={portrait} onClose={() => setSheet(false)} />
           </div>
         </div>
       )}

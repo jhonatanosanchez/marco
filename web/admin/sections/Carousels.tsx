@@ -9,6 +9,7 @@ import {
 import { openPairDialog, shareOrigin } from '../components/DisplayAccess';
 import { confirmDialog, toast } from '../components/feedback';
 import { Icon } from '../components/icons';
+import { canCopy, copyText } from '../components/share';
 import { LimitNote } from '../components/LimitNote';
 import { Button, Callout, Card, Empty, Field, Modal, NumberInput, PageHeader, ReorderButtons, Segmented, Select, TextInput, Toggle, ToggleRow } from '../components/ui';
 import { atLimit, limit } from '../caps';
@@ -114,7 +115,7 @@ function NowShowing({ full, c }: { full: StoredConfig; c: Carousel }) {
   const now = Date.now();
   const ph = carouselPhase(block, now, { tz: full.datetime.timezone });
   const name = full.screens.find((s) => s.id === ph.screenId)?.name ?? '–';
-  const left = ph.endsAt ? Math.max(0, Math.round((ph.endsAt - now) / 1000)) : null;
+  const left = ph.endsAt ? Math.max(1, Math.ceil((ph.endsAt - now) / 1000)) : null;
   const what =
     ph.mode === 'off'
       ? t('Fuera de horario')
@@ -181,13 +182,10 @@ export function CarouselsSection({ full, setFull, saved, errors, go, dirty, save
       if (c) fn(c);
     });
 
+  // copyText also works on plain-http LAN pages, where the browser has no async clipboard
   const copy = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast(t('Copiado'), 'ok', 1500);
-    } catch {
-      toast(text, 'info', 6000);
-    }
+    if (await copyText(text)) toast(t('Copiado'), 'ok', 1500);
+    else toast(text, 'info', 6000);
   };
 
   const remove = async (c: Carousel) => {
@@ -283,10 +281,18 @@ export function CarouselsSection({ full, setFull, saved, errors, go, dirty, save
                       <button type="button" class="icon-btn" title={t('Generar desde el nombre')} onClick={() => upd(c.id, (x) => void (x.slug = uniqueSlug(x.name, takenSlugs(full, c.id))))}>
                         <Icon name="wand" size={15} />
                       </button>
-                      <button type="button" class="icon-btn" title={t('Copiar URL')} disabled={!url} onClick={() => copy(url)}>
-                        <Icon name="copy" size={15} />
-                      </button>
                     </div>
+                  ) : null}
+                  {openMode ? (
+                    // the whole address, to read or select by hand on a TV or a phone
+                  <div class="screen-card__slug screen-card__link">
+                    <input class="input input--mono input--sm" value={url} readOnly spellcheck={false} aria-label={t('Dirección')} placeholder={t('Guarda el carrusel para obtener su dirección.')} onFocus={(e) => e.currentTarget.select()} />
+                    {canCopy() && (
+                      <button type="button" class="btn btn--sm btn--ghost" disabled={!url} onClick={() => copy(url)}>
+                        <Icon name="copy" size={15} /> {t('Copiar')}
+                      </button>
+                    )}
+                  </div>
                   ) : (
                     <div class="screen-card__slug screen-card__link">
                       <input
@@ -298,9 +304,11 @@ export function CarouselsSection({ full, setFull, saved, errors, go, dirty, save
                         placeholder={isNew ? t('Guarda el carrusel para obtener su enlace privado.') : t('Cargando el enlace…')}
                         onFocus={(e) => e.currentTarget.select()}
                       />
-                      <button type="button" class="btn btn--sm btn--ghost" disabled={!url} onClick={() => copy(url)}>
-                        <Icon name="copy" size={15} /> {t('Copiar')}
-                      </button>
+                      {canCopy() && (
+                        <button type="button" class="btn btn--sm btn--ghost" disabled={!url} onClick={() => copy(url)}>
+                          <Icon name="copy" size={15} /> {t('Copiar')}
+                        </button>
+                      )}
                     </div>
                   )}
                   {err('slug') && <div class="field__error">{t(err('slug')!)}</div>}

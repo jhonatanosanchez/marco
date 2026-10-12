@@ -4,6 +4,12 @@ import { qrSvg } from '../../shared/qr';
 import { t } from '../i18n';
 import { Icon } from './icons';
 
+/**
+ * Whether a copy button can work: browsers only allow copying from a script on HTTPS (or localhost). On a plain-http
+ * LAN address the buttons are left out and the text is shown in full, ready to select by hand.
+ */
+export const canCopy = (): boolean => typeof window !== 'undefined' && window.isSecureContext && !!navigator.clipboard;
+
 export async function copyText(text: string): Promise<boolean> {
   try {
     if (navigator.clipboard && window.isSecureContext) {
@@ -34,9 +40,9 @@ export async function copyText(text: string): Promise<boolean> {
 export function CopyField({ value, mono = true, label }: { value: string; mono?: boolean; label?: string }) {
   const [done, setDone] = useState(false);
   return (
-    <div class={`copy-field ${mono ? 'copy-field--mono' : ''}`}>
+    <div class={`copy-field ${mono ? 'copy-field--mono' : ''} ${canCopy() ? '' : 'copy-field--plain'}`}>
       <code title={value}>{value}</code>
-      <button
+      {canCopy() && <button
         type="button"
         class={`btn btn--default btn--sm ${done ? 'is-done' : ''}`}
         aria-label={label ?? t('Copiar')}
@@ -49,7 +55,7 @@ export function CopyField({ value, mono = true, label }: { value: string; mono?:
       >
         <Icon name={done ? 'check' : 'copy'} size={15} />
         <span>{done ? t('Copiado') : t('Copiar')}</span>
-      </button>
+      </button>}
     </div>
   );
 }

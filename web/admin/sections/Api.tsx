@@ -3,6 +3,7 @@ import type { ApiTokenCreated, ApiTokenInfo } from '../../shared/types';
 import { api, ApiError } from '../api';
 import { confirmDialog, toast } from '../components/feedback';
 import { Icon } from '../components/icons';
+import { canCopy } from '../components/share';
 import { Button, Callout, Card, Empty, Field, Modal, PageHeader, Segmented, TextInput } from '../components/ui';
 import { fmtDateTime } from '../dates';
 import { atLimit, has, limit, runtime } from '../caps';
@@ -44,10 +45,12 @@ function CodeBlock({ code, lang }: { code: string; lang?: string }) {
     <div class="codeblock">
       <div class="codeblock__bar">
         <span class="mono small muted">{lang}</span>
-        <button type="button" class="btn btn--ghost btn--sm" onClick={() => copyText(code)}>
-          <Icon name="copy" size={14} />
-          <span>{t('Copiar')}</span>
-        </button>
+        {canCopy() && (
+          <button type="button" class="btn btn--ghost btn--sm" onClick={() => copyText(code)}>
+            <Icon name="copy" size={14} />
+            <span>{t('Copiar')}</span>
+          </button>
+        )}
       </div>
       <pre>
         <code>{code}</code>
@@ -103,10 +106,12 @@ function NewTokenDialog({ onClose, onCreated }: { onClose: () => void; onCreated
           <Callout kind="warn">{t('Cópialo ahora: por seguridad no se volverá a mostrar.')}</Callout>
           <div class="token-reveal">
             <code>{created.token}</code>
-            <button type="button" class="btn btn--primary btn--sm" onClick={() => copyText(created.token)}>
-              <Icon name="copy" size={14} />
-              <span>{t('Copiar')}</span>
-            </button>
+            {canCopy() && (
+              <button type="button" class="btn btn--primary btn--sm" onClick={() => copyText(created.token)}>
+                <Icon name="copy" size={14} />
+                <span>{t('Copiar')}</span>
+              </button>
+            )}
           </div>
           <p class="muted small">{t('Úsalo en la cabecera Authorization: Bearer <token>. Los ejemplos de abajo ya lo incluyen mientras esta página esté abierta.')}</p>
         </div>

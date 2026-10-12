@@ -5506,3 +5506,26 @@ button.immich-album:hover {
 .car-anim { display: flex; gap: 8px; align-items: center; }
 .car-anim > .select { flex: 1; min-width: 0; }
 .car-try { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+
+/* no copy button (plain-http LAN page): the whole value, wrapped, selected with one click */
+.copy-field--plain code {
+  white-space: normal;
+  word-break: break-all;
+  user-select: all;
+  padding-block: 4px;
+}
+
+/* preview bar: carousel or screen picker (Carousels page) */
+.preview__pick {
+  min-width: 0;
+  max-width: 55%;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: var(--r);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2, var(--surface));
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+}
