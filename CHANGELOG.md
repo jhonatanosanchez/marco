@@ -5,6 +5,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- Family: up to six people, routines for the morning, afternoon and evening that earn stars, rewards to spend them
+  on, and the meals of the week (*Content → Family* and *Content → Meals*).
+- Three layouts for kids under a new *Kids* style card in *Layout*: *Routines* (a card per person with today's
+  routines, progress and stars), *Family* (the day of the whole family: events, routines, meals, to-dos and rewards)
+  and *Meals of the week*. They use the Modern style and work in landscape and portrait.
+- A family page for phones (`/f/<key>`, also as a QR code on the kids layouts) to tick routines and, when you allow
+  it, redeem rewards. On a touch screen kids can tick routines on the TV itself (*Family → Access*).
+- Backups and exports include the family history; importing the *Family* section brings it back.
+
 ### Changed
 - In open mode the bare address (no `?screen=`) only shows the default screen on the server itself, such as an
   all-in-one kiosk on `http://localhost:3000/`. From another device it shows "Open a screen's link" and no data.

@@ -90,7 +90,8 @@ color de la foto, transparencia, desenfoque y borde de luz:
 
 - **Calendario:** vistas de mes (con un número de semanas, o *Auto*), agenda y semana; doce diseños (*calendario
   grande*, *dos semanas*, *izquierda/derecha*, *arriba/abajo*, *agenda*, *hoy*, *por persona*, *tablero*, *hora
-  grande*, *marco de fotos*, *mesilla*, *planificador*), en horizontal o vertical, y cada calendario con su propio color.
+  grande*, *marco de fotos*, *mesilla*, *planificador*) y tres para niños (*rutinas*, *familia*, *semana de comidas*),
+  en horizontal o vertical, y cada calendario con su propio color.
 - **Días llenos:** un día con más eventos de los que caben los muestra en líneas pequeñas, y las semanas con más
   eventos ocupan más alto; lo que aun así no cabe se muestra por turnos.
 - **Planificador para familias con muchas citas:** los eventos pueden verse como *tarjetas* (la hora arriba y el
@@ -106,7 +107,12 @@ color de la foto, transparencia, desenfoque y borde de luz:
   dos filas amplias.
 - **Dos estilos por pantalla:** *Moderno* (el de serie), un aspecto minimalista al estilo de Apple, con tarjetas de
   cristal sobre la foto, reloj de pantalla de bloqueo y una cuadrícula de mes como la de iOS, o *Clásico*. El estilo
-  es independiente del diseño.
+  es independiente del diseño. Una tercera tarjeta, *Niños*, es el estilo Moderno con los diseños para niños: colores
+  suaves sobre un fondo liso.
+- **Rutinas, estrellas y comidas de la familia:** hasta seis personas con un emoji y un color, rutinas de mañana,
+  tarde y noche que dan estrellas, premios en los que gastarlas y el menú de la semana. Los niños marcan sus rutinas
+  en la tele (pantallas táctiles) o en el móvil, con un código QR de la pantalla; mira
+  [Familia: rutinas, estrellas y comidas](#familia-rutinas-estrellas-y-comidas).
 - **Opciones de cristal** del estilo Moderno, por pantalla: automático (se adapta a cada foto), transparente o
   tintado; transparencia, desenfoque, tono oscuro, claro o de la foto y borde de luz, con vista previa en *Diseño*.
 - **Emojis automáticos:** 🎂 cumpleaños, ✈️ vuelos, 🩺 médico, 🎒 colegio, ⚽ deporte, 🍽️ cenas, 💼 reuniones, 🏖️
@@ -524,6 +530,50 @@ planificador:
 Nada cambia en las pantallas que no usan estas opciones: lo de serie siguen siendo eventos en una línea y un número
 fijo de semanas. Las *Tarjetas* y las semanas *Auto* también funcionan con los demás diseños, en las vistas de mes y de
 semana. Con tarjetas no se usan los *Días llenos en compacto* (las tarjetas ya se apilan en cada día).
+
+## Familia: rutinas, estrellas y comidas
+
+*Contenido → Familia* (se activa arriba de la página) tiene cuatro pestañas:
+
+- **Miembros:** hasta seis personas, cada una con nombre, emoji, color y, si quieres, su propio calendario (su avatar
+  sale entonces en esos eventos). Marca a los niños: solo los niños ganan estrellas.
+- **Rutinas:** qué hace cada persona y cuándo (por la mañana, por la tarde, por la noche o en cualquier momento), qué
+  días y cuántas estrellas da (de 0 a 20). *Añadir rutinas de ejemplo* pone unas cuantas para empezar. Las rutinas de
+  hoy también se pueden marcar aquí.
+- **Premios:** lo que se consigue con las estrellas ("Elegir la peli del viernes 🎬, 10 estrellas"), si se muestran
+  las estrellas y si los premios se pueden canjear desde el móvil. El saldo de cada niño, +1 / -1 o un ajuste con
+  nota, y el historial con *Deshacer*. En la tele nunca se canjean premios.
+- **Acceso:** el enlace familiar (`/f/<clave>`) con su código QR, para crearlo, copiarlo, cambiarlo o quitarlo. Para
+  la pantalla elegida en el panel: permitir marcar tocándola, mostrar el código QR, quién sale en ella y qué hace el
+  modo privado (solo iniciales u ocultar las rutinas).
+
+*Contenido → Menús* planifica desayuno, comida, merienda y cena (eliges cuáles) de cada semana, con una plantilla
+para las semanas sin plan: *Copiar la semana anterior*, *Guardar como plantilla* y *Vaciar esta semana*.
+
+En *Diseño*, la tarjeta de estilo **Niños** muestra tres diseños:
+
+- **Rutinas:** una tarjeta por persona con las rutinas de hoy por momentos del día (el actual abierto y resaltado),
+  una barra de progreso y las estrellas. "¡Todo hecho!" cuando está todo marcado.
+- **Familia:** un saludo, los eventos de hoy y de mañana, las rutinas de todos, las comidas de hoy, las tareas y lo que
+  le falta a cada niño para el próximo premio.
+- **Semana de comidas:** los siete días de comidas con hoy resaltado, la hora y lo próximo de hoy.
+
+Los diseños para niños necesitan el estilo Moderno (con Clásico la pantalla muestra el calendario grande) y quitan la
+foto de fondo para que los colores sigan suaves y se lean bien. Funcionan en horizontal y en vertical.
+
+**En el móvil:** el enlace familiar abre una página pequeña (sin contraseña) con el progreso de todos, las rutinas de
+cada persona con botones grandes para marcarlas, sus premios (canjear solo si lo has permitido) y las comidas de hoy.
+Añádela a la pantalla de inicio. El enlace solo da acceso a la página familiar, nunca a calendarios ni ajustes;
+cambiarlo en *Acceso* deja el anterior sin efecto al momento. El código QR solo sale en pantallas que abren su enlace
+privado, están vinculadas o están en la red local, así que nunca llega a una pantalla abierta por `PUBLIC_URL` en modo
+abierto.
+
+**En una pantalla táctil:** con *Permitir marcar tocando esta pantalla*, los niños tocan la rutina en la tele. No
+funciona mientras la pantalla está en modo privado ni dentro de la vista previa del panel.
+
+Lo que se ha hecho (rutinas marcadas, premios canjeados, ajustes) se guarda en `data/family.json` durante 90 días; lo
+más antiguo se suma al saldo de cada niño, así que las estrellas no cambian. *Exportar* lo incluye, e importar la
+sección *Familia* lo recupera.
 
 ## Enlaces privados y vinculación de pantallas
 
@@ -988,6 +1038,7 @@ data/
 ├── activity.jsonl       # registro de actividad
 ├── announcements.json   # avisos activos + historial
 ├── displays.json        # pantallas conocidas
+├── family.json          # rutinas marcadas, premios canjeados y ajustes de estrellas (últimos 90 días)
 └── update/              # última comprobación, ajustes de actualización y registro de la última actualización
 ```
 
@@ -1014,6 +1065,8 @@ Haz copia de seguridad de toda la carpeta (o usa *Exportar*) para conservarlo to
 | `?cards=0\|1` `?weeks=auto` `?preset=planner` | Eventos como tarjetas (o en líneas), semanas automáticas, el diseño *Planificador*. Con `?demo=1`, `&planner=1` muestra el planificador tal como queda al elegirlo en el panel (prueba con `&busy=2`) |
 | `?agendaDays=auto\|7\|14\|30` | Hasta dónde mira la vista de agenda (*Calendarios → Vista del calendario → Días en la agenda*). Con `?demo=1`, `&sparse=1&preset=agenda` muestra un calendario tranquilo con eventos dentro de varias semanas |
 | `?compact=0\|1` `?weeks=1..8` | Desactiva (o activa) los días llenos en compacto: un día en el que no caben sus eventos los muestra en líneas pequeñas y las filas de semanas se reparten el alto según los eventos que tienen (*Calendarios → Vista del calendario*); `?weeks=` muestra ese número de semanas. Con `?demo=1`, `&busy=2` llena todo el mes |
+| `?style=modern&preset=kidsRoutines\|kidsFamily\|kidsMeals` | Los diseños para niños. Con `?demo=1`: `&members=6`, `&touch=0`, `&qr=0`, `&stars=0`, `&meals=0`, `&snack=1` (cuatro comidas al día), `&todo=1`, `&famPrivacy=hide` (con `&private=1`) |
+| `/f/<clave>` | La página familiar para el móvil (la clave sale de *Familia → Acceso*) |
 | `?client=<name>` | Nombre de este dispositivo en *Pantallas conectadas* (lo define el script del kiosco) |
 
 ## Seguridad

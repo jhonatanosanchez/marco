@@ -56,6 +56,7 @@ failing source never breaks the others.
 | `announcements.json` | Active announcements + history (50) |
 | `displays.json` | Known displays registry (≤ 100, offline > 30 days pruned) |
 | `privacy.json` | Privacy mode state per screen: `{ screens: { [screenId]: { on, until, by, at } } }` (server/privacy.js) |
+| `family.json` | Familia state (server/family.js): `{ version, rev, completions: { [date]: { [choreId]: { memberId, points, title, emoji, by, at } } }, redemptions, adjustments, base }`. Entries older than 90 days are folded into `base` so balances never change. A broken file is kept as `family.json.corrupt-<ms>` |
 | `update/` | `check.json` (last answer from GitHub, ETag), `settings.json`, `request` (while an update is asked for), `status.json` and `update.log` (last update) |
 
 ## Configuration schema (v2)
@@ -87,7 +88,11 @@ The stored config has **global** sections shared by every screen and a list of *
                   // screen is deleted it falls back to the default screen, never to all), door chime
   "immich":     { "enabled": false, "url": "", "insecureTls": false },  // API key in secrets.json; url without /api
   "auth":       { "allowedGoogleEmails": [], "passwordLoginEnabled": true },
-  "security":   { "displayAccess": "private" }      // "open" = legacy LAN mode (installs upgraded from 0.2)
+  "security":   { "displayAccess": "private" },     // "open" = legacy LAN mode (installs upgraded from 0.2)
+  "family":     { "enabled": false, "members": [], "chores": [], "rewards": [], "showPoints": true,
+                  "allowRedeemFromPhone": false, "privacy": "initials",
+                  "meals": { "enabled": false, "slots": ["breakfast", "lunch", "dinner"], "useTemplate": true, "template": {}, "weeks": {} } }
+                  // see "Familia" below
 }
 ```
 
@@ -103,6 +108,7 @@ The stored config has **global** sections shared by every screen and a list of *
                   //   web/shared/glass.ts turns it (plus the current photo) into --g-* CSS variables on <html>.
   "layout":     { "preset": "bigCalendar", "sidePanel": "left", "sideWidth": 0.36, "people": null, "corner": "br" },
                   // preset: bigCalendar | leftRight | topBottom | bigTime | agenda | today | people | photoFrame | twoWeeks | board | bedside | planner
+                  //   | kidsRoutines | kidsFamily | kidsMeals (Modern style only; with Classic the display shows bigCalendar)
                   // people: calendar ids shown as columns by 'people' (max 5; null = the first five without holidays / birthdays)
                   // corner: where 'photoFrame' puts its clock card (tl | tr | bl | br)
                   // today / people / photoFrame / board / bedside render into #view (web/display/widgets/views.ts, styles in
@@ -152,8 +158,10 @@ The stored config has **global** sections shared by every screen and a list of *
   "message":    { "enabled": false, "text": "", "emoji": "💬" },
   "countdowns": { "enabled": true, "max": 4 },
   "alerts":     { "enabled": true, "sound": true, "volume": 0.6 },
-  "privacy":    { "hidePhotos": false, "showLock": true, "schedule": [{ "id", "enabled", "days", "from", "to" }] } }
+  "privacy":    { "hidePhotos": false, "showLock": true, "schedule": [{ "id", "enabled", "days", "from", "to" }] },
                   // privacy mode of this screen (docs/API.md "Privacy mode"); the on / off state is runtime data
+  "family":     { "memberIds": null, "touch": false, "showQr": true } }
+                  // Familia on this screen: who appears (null = everyone), ticking by touch, the QR card on kids layouts
 ```
 
 Global vs per-screen for the "split" sections:
@@ -349,6 +357,32 @@ goes (link keys, `device.screenId`, the display registry); the `v_` prefix tells
   loops the demo screens (with `random`; `&planner=1` makes the first one the Planner); `&tr=<transition>` and `&trSpeed=fast|normal|slow` force an animation on
   any display. `?try=1` (the admin's *Probar* in the preview) goes to the next step every 4 s and leaves the clock;
   with `random` each of those switches takes the next animation of the sequence.
+
+## Familia
+
+Members (up to 6), routines (up to 80) with stars, rewards (up to 20) and the week's meals. Config in
+`config.family` (validated by `sanitizeFamily` in `server/core/familyCore.js`), per screen `screens[].family`. Only
+kids earn stars; a routine is `{ id, memberId, title, emoji, days ([] = every day), slot (morning | afternoon |
+evening | any), points (0..20), enabled }`, a reward `{ id, title, emoji, cost (1..500) }`. Meals:
+`template['0'..'6']` (0 = Sunday) and `weeks['YYYY-Www']` (ISO weeks, the newest 26 kept); a week with its own plan
+uses only its own days.
+
+- **Pure rules** (`server/core/familyCore.js`, shared with Marco Cloud): sanitizers, ISO weeks, meals of a day or a
+  week, today's routines, points (`base` + ticks + adjustments - redemptions, never stored as a balance), the
+  toggle / redeem / adjust / undo reducers, the 90-day prune, and what the TV and the phone get
+  (`displayFamily`, `phoneFamily`, already private when the screen is).
+- **Node side** (`server/family.js`): `data/family.json`, the family link key (`secrets.family`, `fk_` + 32
+  characters, compared in constant time), rate limits, the activity log and the `family` live event.
+- **Display** (`web/display/widgets/kids.ts`, `styles-kids.css`, every rule under `.style-modern #app.is-kids`): the
+  three kids layouts. A kids preset with the Classic style falls back to `bigCalendar`; the photo and the ambient
+  layer are off. The display asks for `/api/display/family` only when Familia is on and a kids layout is shown, on the
+  `family` event, after config fetches, privacy changes, day changes and every 5 minutes. Taps are optimistic and kept
+  on top of every answer until their own request settles. Each layout drops whole rows when space runs out (done
+  routines first, then later groups folded to one line, then "+N more").
+- **Phone page** (`web/family/`, `/f/<key>`): its own small Preact bundle (`vite.config.ts` input `family`). The key
+  stays in the address (a home-screen shortcut keeps it) and in `localStorage` for `/f`.
+- **Admin**: *Familia* (`web/admin/sections/Family.tsx`) and *Menús* (`Meals.tsx`); the *Niños* style card in
+  *Diseño* is the Modern style with a kids preset (`styleChoiceOf`), not a stored style.
 
 ## Immich source
 

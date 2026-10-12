@@ -104,7 +104,7 @@ The admin and the display read these fields to decide which sections, actions an
   `announcements`, `displayCommands`, `openDisplayAccess`, `insecureTls`, `googleCalendar`, `googleLogin`,
   `passwordLogin`, `apiTokens`, `webhooks`, `backups`, `importExport`, `includeSecrets`, `activity`, `setupWizard`,
   `status`, `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`,
-  `carousels`, `immich`. A self-hosted server turns all of them on, except
+  `carousels`, `immich`, `family`. A self-hosted server turns all of them on, except
   `googleCalendar` and `googleLogin` (on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set),
   `microsoftCalendar` (Outlook and Microsoft 365 calendars, on when `MICROSOFT_CLIENT_ID` and
   `MICROSOFT_CLIENT_SECRET` are set), `accountMenu` and `feedback` (always off). `updates` is the update banner,
@@ -117,7 +117,9 @@ The admin and the display read these fields to decide which sections, actions an
   live camera picture proxied from Home Assistant. A server with `doorbell` and without `doorbellLive` answers the
   frame URL with the latest snapshot it was given instead; the display works the same way with both. `carousels` is
   the *Carousels* page and `config.carousels` (a server without it would drop the section on save). `immich` is
-  the Immich photo source and `/api/admin/immich/*` (Marco Cloud answers `false`).
+  the Immich photo source and `/api/admin/immich/*` (Marco Cloud answers `false`). `family` is *Familia*: the
+  `Familia` and `Menús` pages, the kids layouts, the family page on the phone and `/api/admin/family*`,
+  `/api/family/*` and `/api/display/family*` (see [Familia](#familia)).
 - `limits` (optional): plan limits such as `screens`, `sources` or `devices`. Absent means no limit beyond the
   config validator's own caps (12 screens, 50 calendars, 20 news feeds, 1000 local events, 500 birthdays,
   100 countdowns, 6 carousels). The admin disables "add" at the limit and flags a config that goes over it.
@@ -133,10 +135,10 @@ The admin and the display read these fields to decide which sections, actions an
   `http://localhost` can say where other devices reach the admin.
 
 Clients treat a response with no `features` field (servers older than 0.5.0) as having every feature on, except
-`accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`, `carousels` and
-`immich`. A key missing from `features` counts as off only when `edition` is not `'self-hosted'`, and a missing
-`accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`, `carousels` or
-`immich` is always off.
+`accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`, `carousels`,
+`immich` and `family`. A key missing from `features` counts as off only when `edition` is not `'self-hosted'`, and a missing
+`accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`, `carousels`,
+`immich` or `family` is always off.
 
 ### Account mode
 
@@ -184,6 +186,7 @@ calendar's.
 | `privacy` | `{ active, screenId }` | privacy mode of this screen turned on or off (admin, webhook, schedule, or a period that ended); the display refetches its config, events, countdowns and photos |
 | `doorbell` | `{ id, screenId, startedAt, updatedAt, expiresAt, sound, frames, refreshMs }` | someone rang (`screenId`: the ringing screen; a display on a carousel asks for its frames with `?screen=<screenId>`); replayed on connect while it lasts. The same `id` again with a later `expiresAt` extends it. `frames: false` = no camera, `refreshMs` = time between two frame requests (750) |
 | `doorbell-end` | `{ id }` | the ring was dismissed |
+| `family` | `{ rev }` | Familia changed: a routine ticked (phone, TV or admin), stars, a reward, an import, a new or removed family link. Displays with a kids layout ask for `GET /api/display/family` again |
 | `ping` | `{ t }` | every 25 s |
 | `revoked` | `{ code: "invalid_key" \| "key_required" }` | the link was regenerated or replaced by an import, the device revoked or dropped by an import, the screen deleted, display access switched to private for a keyless display, or (`key_required`) the admin session a stream was opened with ended (logout, logout everywhere, password change); the server then closes the stream. Every stream's credential is re-checked after config saves, imports, session revocation and on each heartbeat |
 
@@ -433,6 +436,64 @@ Deleting a carousel drops its private link (its displays get `revoked`) and move
 A carousel left with no screens keeps its link, but the link then reads a blank screen (`screenId` = the carousel
 id, no calendar, stock photos, no countdowns), never the default screen. Carousel ids always start with `v_` and
 never match a screen id; a saved id that does not follow this gets a new one.
+
+## Familia
+
+Members, routines with stars, rewards and the week's meals (`config.family`, see docs/ARCHITECTURE.md "Familia"),
+and what was done in `data/family.json`. The rules are in `server/core/familyCore.js` (shared with Marco Cloud);
+`server/family.js` keeps the state file and the family link, `server/routes/family.js` the endpoints. Needs
+`features.family`. Every answer is `Cache-Control: private, no-store`; POST bodies must be `application/json` (else
+`415 { error: "json required" }`) and at most 4 kB. Errors are `{ error: code, code }`: `unknown_chore`,
+`unknown_reward`, `unknown_member`, `not_found` (404), `not_today`, `not_enough` (409), `not_kid`, `bad_delta`,
+`bad_date` (400).
+
+**Admin** (session required):
+
+| Method | Path | Body | Answer |
+|---|---|---|---|
+| GET | `/api/admin/family` | | `FamilyAdminState`: `{ today, rev, points, progress, completions (last 14 days, newest first), redemptions (50), adjustments (50), link: { exists, path, createdAt }, lanAddresses, publicUrl }` |
+| POST | `/api/admin/family/toggle` | `{ choreId, date?, done }` | today or up to 7 days back → `{ ok, state }` |
+| POST | `/api/admin/family/adjust` | `{ memberId, delta, note? }` | `delta` -500..500, not 0 → `{ ok, state }` |
+| POST | `/api/admin/family/redeem` | `{ rewardId, memberId, force? }` | `force: true` lets the balance go below zero → `{ ok, state }` |
+| DELETE | `/api/admin/family/redemptions/:id`, `/api/admin/family/adjustments/:id` | | undo → `{ ok, state }` |
+| POST | `/api/admin/family/link` | | create or replace the family link (the old one stops working at once) → `{ link }` |
+| DELETE | `/api/admin/family/link` | | remove it → `{ ok }` |
+
+**Family page** (`/f/<key>` on a phone; header `X-Family-Key: fk_…`):
+
+| Method | Path | Body | Answer |
+|---|---|---|---|
+| GET | `/api/family/state` | | `FamilyPhoneState`: `{ today, slotNow, lang, rev, showPoints, allowRedeem, members, chores (today), rewards, meals }`. Never calendars, screens or other settings |
+| POST | `/api/family/toggle` | `{ choreId, done }` | today only → `{ ok, state }` |
+| POST | `/api/family/redeem` | `{ rewardId, memberId }` | `403 redeem_off` unless `family.allowRedeemFromPhone` → `{ ok, state }` |
+
+No key: `401 key_required`; a wrong one: `403 invalid_key`; Familia off: `404 family_off`. Wrong or missing keys are
+limited to 20 per 10 minutes per address and 200 overall (`429 rate_limited`, `Retry-After: 600`); the right key is
+checked first and is never locked out by them. With the right key: 120 requests a minute per address and 40 ticks or
+redeems a minute.
+
+**Display** (after the display credential checks, like the rest of `/api/display/*`):
+
+| Method | Path | Answer |
+|---|---|---|
+| GET | `/api/display/family` | `FamilyDisplayState` of the request's screen: `{ today, slotNow, rev, private, hidden, showPoints, touch, qrUrl, members, chores, meals, nextReward, generatedAt }`; `404 family_off` while Familia is off |
+| POST | `/api/display/family/toggle` `{ choreId, done }` | `{ ok, state }` |
+
+A tick from the TV is accepted only when the screen has `family.touch` on, is not private, shows the routine's person,
+and the request carries the screen's key, a paired device, an admin session, or comes from the local network in open
+mode; otherwise `403 touch_off`. 30 ticks a minute per screen. There is no way to redeem from the TV.
+
+`GET /api/display/config` has a `family` block: `{ enabled, mealsEnabled, showPoints, touch, qrUrl, privacy }`.
+`qrUrl` is the family page (`PUBLIC_URL`, else the request's host when it is not loopback, else the first LAN
+address) only when a family link exists, the screen has `family.showQr`, a kids layout with the Modern style, is not
+private, and the request comes from a display we know (key, paired device, admin session, or the local network in
+open mode). While private there are no stars and no touch; with `family.privacy: "initials"` names become initials,
+with `"hide"` the routines are left out (`hidden: true`).
+
+Activity log types: `family.chore`, `family.redeemed`, `family.points`, `family.undone`, `family.link`,
+`family.key_rejected`. The family key and `/f/<key>` are redacted from logs. An export carries `familyState` (and
+`secrets.family` with secrets); an import that takes the `family` section restores it (the previous file is kept as
+`family.json.pre-import-<ms>`, newest 5).
 
 ## Privacy mode
 

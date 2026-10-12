@@ -90,7 +90,8 @@ transparency, blur and a light edge:
 
 - **Calendar:** month (a number of weeks, or *Auto*), agenda and week views; twelve layouts (*big calendar*,
   *two weeks*, *left/right*, *top/bottom*, *agenda*, *today*, *per person*, *board*, *big time*, *photo frame*,
-  *bedside*, *planner*), landscape or portrait, each calendar with its own colour.
+  *bedside*, *planner*) plus three for kids (*routines*, *family*, *meals of the week*), landscape or portrait, each
+  calendar with its own colour.
 - **Busy days:** a day with more events than fit lists them as small one-line entries, and weeks with more events get
   more height; what still does not fit takes turns.
 - **Planner for busy families:** events can show as *cards* (the time on top, the title below on up to two lines,
@@ -104,7 +105,11 @@ transparency, blur and a light edge:
   card in the corner you choose. *Bedside* is a huge, very dim clock with the next event and the temperature that
   dims further at night. *Two weeks* is the month grid with two roomy rows.
 - **Two styles per screen:** *Modern* (the default), a minimal Apple-like look with glass cards over the photo,
-  a Lock Screen clock and an iOS-style month grid, or *Classic*. The style is independent of the layout.
+  a Lock Screen clock and an iOS-style month grid, or *Classic*. The style is independent of the layout. A third
+  card, *Kids*, is the Modern style with the kids layouts: soft colours on a plain background.
+- **Family routines, stars and meals:** up to six people with an emoji and a colour, morning, afternoon and evening
+  routines that earn stars, rewards to spend them on, and the meals of the week. Kids tick their routines on the TV
+  (touch screens) or on a phone, from a QR code on the screen; see [Family: routines, stars and meals](#family-routines-stars-and-meals).
 - **Glass options** for the Modern style, per screen: automatic (adapts to each photo), clear or tinted; transparency,
   blur, a dark, light or photo-coloured tint and a light edge, with a live preview in *Layout*.
 - **Automatic emoji:** 🎂 birthdays, ✈️ flights, 🩺 doctor, 🎒 school, ⚽ sports, 🍽️ dinners, 💼 meetings, 🏖️
@@ -497,6 +502,48 @@ a screen in portrait (a TV on its side, a tablet), Marco has a planner setup:
 Nothing changes for screens that do not use these options: the default is still one-line chips and a fixed number of
 weeks. *Cards* and *Auto* also work with the other layouts, in the month and week views. With cards, *Compact busy
 days* is not used (cards already stack up in each day).
+
+## Family: routines, stars and meals
+
+*Content → Family* (turn it on at the top of the page) has four tabs:
+
+- **Members:** up to six people, each with a name, an emoji, a colour and, if you like, their own calendar (their
+  avatar then shows on its events). Mark the kids: only kids earn stars.
+- **Routines:** what each person does and when (morning, afternoon, evening or any time), on which days and for how
+  many stars (0 to 20). *Add example routines* fills in a few to start with. Today's routines can be ticked here too.
+- **Rewards:** what the stars buy ("Pick Friday's film 🎬, 10 stars"), whether stars are shown at all and whether
+  rewards can be redeemed from a phone. Each kid's balance, +1 / -1 or a custom adjustment with a note, and the
+  history with *Undo*. Rewards are never redeemed on the TV.
+- **Access:** the family link (`/f/<key>`) with its QR code, to create, copy, replace or remove. For the screen chosen
+  in the admin: allow ticking by touching it, show the QR code, who appears on it, and what privacy mode does
+  (initials only, or hide the routines).
+
+*Content → Meals* plans breakfast, lunch, snack and dinner (pick which ones) for each week, with a template for the
+weeks you do not plan: *Copy last week*, *Save as template* and *Clear this week*.
+
+In *Layout*, the **Kids** style card shows three layouts:
+
+- **Routines:** a card per person with today's routines grouped by time of day (the current one open and
+  highlighted), a progress bar and the stars. "All done!" when everything is ticked.
+- **Family:** a greeting, today's and tomorrow's events, everyone's routines, today's meals, the to-do list and how
+  far each kid is from the next reward.
+- **Meals of the week:** seven days of meals with today highlighted, the time and what is next today.
+
+The kids layouts need the Modern style (with Classic the screen shows the big calendar) and turn off the photo
+background so the colours stay soft and readable. They work in landscape and portrait.
+
+**On a phone:** the family link opens a small page (no login) with everyone's progress, each person's routines with
+big tick buttons, their rewards (redeeming only when you allowed it) and today's meals. Add it to the home screen. The
+link only gives access to the family page, never to calendars or settings; replacing it in *Access* stops the old one
+at once. The QR code only shows on screens that open their private link, are paired, or are on the local network, so
+it never reaches a screen opened through `PUBLIC_URL` in open mode.
+
+**On a touch screen:** with *Allow ticking by touching this screen* on, kids tap a routine on the TV. It is off while
+the screen is in privacy mode, and inside the admin's preview.
+
+What was done (routines ticked, rewards redeemed, adjustments) is kept in `data/family.json` for 90 days; older entries
+are folded into each kid's balance, so stars never change. *Export* includes it, and importing the *Family* section
+brings it back.
 
 ## Private display links & pairing
 
@@ -941,6 +988,7 @@ data/
 ├── activity.jsonl       # activity log
 ├── announcements.json   # active alerts + history
 ├── displays.json        # known displays
+├── family.json          # routines ticked, rewards redeemed and star adjustments (last 90 days)
 └── update/              # last update check, update settings and the log of the last update
 ```
 
@@ -967,6 +1015,8 @@ Back up the whole folder (or use *Export*) to keep everything.
 | `?cards=0\|1` `?weeks=auto` `?preset=planner` | Events as cards (or one-line chips), automatic weeks, the *Planner* layout. With `?demo=1`, `&planner=1` shows the planner as picking it in the admin sets it up (try `&busy=2`) |
 | `?agendaDays=auto\|7\|14\|30` | How far the agenda view looks ahead (*Calendars → Calendar view → Days in the agenda*). With `?demo=1`, `&sparse=1&preset=agenda` shows a quiet calendar with events weeks away |
 | `?compact=0\|1` `?weeks=1..8` | Turn off (or on) compact busy days: a day that cannot fit its events lists them as small one-line entries and the week rows share the height by how many events they have (*Calendars → Calendar view*); `?weeks=` shows that many weeks. With `?demo=1`, `&busy=2` fills the whole month |
+| `?style=modern&preset=kidsRoutines\|kidsFamily\|kidsMeals` | The kids layouts. With `?demo=1`: `&members=6`, `&touch=0`, `&qr=0`, `&stars=0`, `&meals=0`, `&snack=1` (four meals a day), `&todo=1`, `&famPrivacy=hide` (with `&private=1`) |
+| `/f/<key>` | The family page for phones (the key comes from *Family → Access*) |
 | `?client=<name>` | Name of this device in *Connected displays* (the kiosk script sets it) |
 
 ## Security
