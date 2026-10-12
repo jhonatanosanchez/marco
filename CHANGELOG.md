@@ -5,10 +5,6 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-### Fixed
-- Month grid: on load, a screen set to fewer weeks showed five rows for half a second before settling on its own
-  number. Carousel switches no longer fade the rows of the previous screen out over the new one either.
-
 ## [0.9.0] - 2026-10-12
 
 ### Added
@@ -22,6 +18,10 @@ All notable changes to this project are documented here. The format is based on
 - *Appearance* (light or dark theme and accent color) moved from *Settings* to *Layout*, right under the display style.
   Picking the *Kids* style switches the screen to the light theme; it can be changed back right there.
 - The three style cards in *Layout* share the whole row.
+
+### Fixed
+- Month grid: on load, a screen set to fewer weeks showed five rows for half a second before settling on its own
+  number. Carousel switches no longer fade the rows of the previous screen out over the new one either.
 
 ### Security
 - Pages of the server only load inside a frame as the admin's own preview, so a web page cannot send its frame back
