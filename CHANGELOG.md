@@ -5,6 +5,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- In open mode the bare address (no `?screen=`) only shows the default screen on the server itself, such as an
+  all-in-one kiosk on `http://localhost:3000/`. From another device it shows "Open a screen's link" and no data.
+  Private links, paired devices and the admin session work as before. The sign-in page no longer links to the display.
+
 ### Fixed
 - Layout: picking the Planner and then another layout before saving left automatic weeks and cards on, so the other layout could show only two weeks.
 - Carousels: screens with different photo settings showed the first photo of each again at every switch. Each

@@ -65,6 +65,13 @@ test('screen not found: neutral text in es/en/pt, no slug, retries every 60 s an
     sm.showScreenMissing('es', async () => false);
     assert.equal(root.text.textContent, 'Pantalla no encontrada');
     assert.equal(timers.length, 1);
+    // the bare address from another machine: same page, asks for a screen's link (no slug, no list)
+    assert.equal(i18n.t('es', 'screenNotChosen'), 'Abre el enlace de una pantalla');
+    assert.equal(i18n.t('en', 'screenNotChosen'), 'Open a screen\'s link');
+    assert.equal(i18n.t('pt', 'screenNotChosen'), 'Abra a ligação de um ecrã');
+    sm.showScreenMissing('pt', async () => false, { bare: true });
+    assert.equal(root.text.textContent, 'Abra a ligação de um ecrã');
+    assert.equal(timers.length, 1);
   } finally {
     globalThis.setInterval = saved.setInterval;
     for (const k of ['location', 'document', 'localStorage']) Object.defineProperty(globalThis, k, { value: saved[k], configurable: true, writable: true });

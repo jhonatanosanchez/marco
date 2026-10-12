@@ -393,11 +393,15 @@ goes (link keys, `device.screenId`, the display registry); the `v_` prefix tells
 | a valid device token (`md_…`) | the device's screen | the device's screen |
 | an unknown / revoked key or token | `403 invalid_key` | `403 invalid_key` |
 | an admin session cookie | any screen (`?screen=`) | any screen |
-| nothing | `401 key_required` | default screen / `?screen=` (as in 0.2) |
+| nothing | `401 key_required` | `?screen=`; the default screen only on this machine |
 
 Without a credential (admin session, open mode) a `?screen=` that names no screen or carousel answers
 `404 screen_not_found` on every display endpoint (`displayAccess.js` `unknownScreenRequest`, applied by `displayAuth`
-and `mediaAuth`); only an absent or empty `?screen=` means the default screen. A stream or poll for an unknown screen
+and `mediaAuth`); only an absent or empty `?screen=` means the default screen, and in open mode only for this
+machine (loopback after `trust proxy`, not through an untrusted proxy; `bareScreenRequest`): from another machine the
+bare address gets the same 404 and the display says "Open a screen's link". `/api/news` and `/media/*` never name a
+screen and are exempt. A stream opened with no screen from another machine (an admin session while private) reloads
+when the mode switches to open. A stream or poll for an unknown screen
 is never registered (no display under the default screen, no live events). When a config save leaves a connected
 stream's `?screen=` naming nothing, `reresolveClients` sends it `reload` and closes it; the display reloads and shows
 the "Screen not found" page (`web/display/widgets/screenMissing.ts`), which asks for the config again every 60 s and

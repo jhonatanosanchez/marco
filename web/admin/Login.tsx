@@ -89,9 +89,6 @@ export function Login({ me, onDone, initialError }: { me: AuthMeResponse; onDone
           </div>
         )}
       </div>
-      <a class="login__screen-link" href="/">
-        <Icon name="monitor" size={14} /> {t('Ver la pantalla')}
-      </a>
     </div>
   );
 }

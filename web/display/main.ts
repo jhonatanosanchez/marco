@@ -692,7 +692,8 @@ function stopDisplay(): Lang {
 
 /**
  * ?screen= names no screen or carousel (404 screen_not_found): a neutral "Screen not found" page, never the default
- * screen. It checks again every minute and starts normally once the screen exists (widgets/screenMissing.ts).
+ * screen. Opened with no screen at all from another machine (the bare address, open mode): the same page, asking for
+ * a screen's link. It checks again every minute and starts normally once the screen exists (widgets/screenMissing.ts).
  */
 function screenMissing(): void {
   if (accessDenied || state.demo) return;
@@ -706,7 +707,7 @@ function screenMissing(): void {
       // access changed meanwhile: reload so the pairing / invalid-link screen takes over
       return e instanceof ApiError && (e.status === 401 || e.status === 403);
     }
-  });
+  }, { bare: !screenKey && !credential });
 }
 
 /** True (and the access screen shown) when `e` is a 401 / 403, or a 404 screen_not_found, from the display API. */

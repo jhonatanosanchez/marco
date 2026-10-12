@@ -8,7 +8,7 @@ import { publish, recordIdentify, readSince, trackPoller, isPolling, nextDelay, 
 import { logActivityThrottled } from './activity.js';
 import { activeFor } from './announce.js';
 import { ringPayloadFor } from './doorbell.js';
-import { deviceName, requestScreen } from './displayAccess.js';
+import { bareScreenRequest, deviceName, isLoopbackClient, requestScreen } from './displayAccess.js';
 import { carouselMembers, findTarget, isCarouselId, isTargetId, targetInfo, targetMembers } from './core/carousels.js';
 
 export const MAX_DISPLAYS = 100;
@@ -168,6 +168,8 @@ function streamAccess(req) {
   const a = accessOf(req);
   const d = req?.displayAccess;
   if (d?.credHash) a.credHash = d.credHash;
+  // this machine itself (all-in-one kiosk): may stay on the default screen (revalidateStreams)
+  if (req && isLoopbackClient(req)) a.local = true;
   // Admin-session streams: the request (its cookie session) is re-checked on logout / epoch rotation / heartbeat.
   if (d?.via === 'session') {
     Object.defineProperty(a, 'authReq', { value: req, enumerable: false });
@@ -454,8 +456,9 @@ export function recordHeartbeat(body, req) {
   const stream = listClients().find((c) => c.clientId === hb.clientId);
   const bound = boundScreen(cfg, req);
   const sub = stream || bound ? null : subscriptionFor(cfg, hb.screen);
-  // a display on an unknown screen is not listed (and never under the default screen)
-  if (sub?.notFound) return { error: 'screen_not_found' };
+  // a display on an unknown screen is not listed (and never under the default screen); nor one that names no screen
+  // from another machine (displayAccess.js bareScreenRequest)
+  if (sub?.notFound || (sub && req && bareScreenRequest(cfg, req, hb.screen))) return { error: 'screen_not_found' };
   let d = registry.get(hb.clientId);
   if (!d) {
     if (registry.size >= MAX_DISPLAYS) prune();

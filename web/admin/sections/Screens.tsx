@@ -388,7 +388,7 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
             {t('En la Raspberry Pi, edita')} <code>KIOSK_URL</code> {t('en')} <code>~/.config/marco/kiosk.env</code> {t('y reinicia el kiosco.')}
           </li>
           <li>
-            {t('Sin ?screen= se muestra la pantalla predeterminada (★). Comprueba qué ve cada dispositivo en')}{' '}
+            {t('Sin ?screen= solo el propio servidor (http://localhost) muestra la pantalla predeterminada (★); desde otro equipo se ve «Abre el enlace de una pantalla». Comprueba qué ve cada dispositivo en')}{' '}
             <a href="#/displays">{t('Pantallas conectadas')}</a>.
           </li>
         </ol>

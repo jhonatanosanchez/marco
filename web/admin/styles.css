@@ -2938,17 +2938,6 @@ input:checked + .check-box {
   justify-content: center;
   gap: 6px;
 }
-.login__screen-link {
-  position: fixed;
-  bottom: 18px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 13px;
-}
 .shake {
   animation: shake 0.4s;
 }

@@ -19,6 +19,7 @@ import { listClients, dropClient } from './sse.js';
 import { listPollers, dropPollers } from './pollHub.js';
 import { logActivity } from './activity.js';
 import { resolveScreen } from './core/screens.js';
+import { untrustedProxy } from './lib/net.js';
 import {
   carouselList, carouselMembers, emptyCarouselScreen, carouselScreenNow, findCarousel, findTarget, isTargetId, targetInfo,
 } from './core/carousels.js';
@@ -160,7 +161,8 @@ const ERRORS = {
  *   - not bound, ?screen=<carousel>: the screen it shows now; ?screen=<screen>&via=<carousel>: that screen, with
  *     the carousel when the screen belongs to it
  *   - a carousel with no screens left: a blank screen (core/carousels.js emptyCarouselScreen), `empty: true`
- * An unknown ?screen= never reaches here over HTTP: displayAuth answers 404 screen_not_found first.
+ * An unknown ?screen= never reaches here over HTTP, nor (open mode) a request with no screen from another machine:
+ * displayAuth answers 404 screen_not_found first.
  * @returns {{ screen: object, fallback: boolean, carousel: object | null, empty?: boolean }}
  */
 export function requestScreen(cfg, req) {
@@ -196,23 +198,63 @@ function carouselRequest(cfg, c, key) {
 /**
  * True when the request asks for a screen or carousel that does not exist: ?screen= is given (not empty) and names
  * nothing, and no credential binds the request to a saved screen or carousel (a binding always wins over ?screen=).
- * Such a request gets 404 screen_not_found, never the default screen's data. No ?screen= (or an empty one) still
- * means the default screen.
+ * Such a request gets 404 screen_not_found, never the default screen's data. No ?screen= (or an empty one): see
+ * bareScreenRequest.
  */
 export function unknownScreenRequest(cfg, req) {
-  const id = req.displayAccess?.screenId;
-  if (id && isTargetId(cfg, id)) return false;
+  if (boundToTarget(cfg, req)) return false;
   const v = req.query?.screen;
   if (v === undefined) return false;
   if (typeof v !== 'string') return true; // ?screen=a&screen=b names no single screen
   return Boolean(v.trim()) && !findTarget(cfg, v);
 }
 
+const boundToTarget = (cfg, req) => {
+  const id = req.displayAccess?.screenId;
+  return Boolean(id && isTargetId(cfg, id));
+};
+
+/**
+ * Is the client this machine itself (127.0.0.0/8, ::1)? `req.ip` after `trust proxy`: a reverse proxy on this
+ * machine passes the real client in X-Forwarded-For (trusted by default), and a proxy that is not trusted
+ * (forwarding headers from an address outside TRUST_PROXY) never counts as local.
+ */
+export function isLoopbackClient(req) {
+  const ip = String(req.ip || '').replace(/^::ffff:/i, '');
+  if (ip !== '::1' && !/^127\./.test(ip)) return false;
+  return !untrustedProxy(req);
+}
+
+/**
+ * True when an open-mode request names no screen at all (the bare address, "/" or "/?screen=") and nothing else
+ * decides one: no credential bound to a saved screen or carousel, and the client is not this machine. Such a
+ * request gets 404 screen_not_found like an unknown slug, so the bare address shows nothing on the network. An
+ * all-in-one kiosk (browser on the server itself, http://localhost:PORT/) still gets the default screen. Private
+ * mode is left as it was: there every request already carries a key, a device token or an admin session.
+ */
+export function bareScreenRequest(cfg, req, key = req.query?.screen) {
+  if (displayAccessMode(cfg) === 'private') return false;
+  if (boundToTarget(cfg, req)) return false;
+  if (key !== undefined && (typeof key !== 'string' || key.trim())) return false;
+  return !isLoopbackClient(req);
+}
+
+/** Display API paths that do not depend on a screen (no ?screen= is ever sent): exempt from bareScreenRequest. */
+const UNSCOPED_PATHS = new Set(['/api/news', '/api/display/heartbeat']);
+
+/** Unknown ?screen=, or no screen at all where one is needed (see unknownScreenRequest, bareScreenRequest). */
+function noScreen(req, { bare = true } = {}) {
+  const cfg = getConfig();
+  if (unknownScreenRequest(cfg, req)) return true;
+  return bare && bareScreenRequest(cfg, req);
+}
+
 export const SCREEN_NOT_FOUND = { error: 'screen_not_found', code: 'screen_not_found' };
 
 /**
  * Express middleware for the display JSON API: sets req.displayAccess or answers 401/403 (no data), and 404
- * screen_not_found for an unknown ?screen= (unknownScreenRequest).
+ * screen_not_found for an unknown ?screen=, or for no screen at all from another machine in open mode
+ * (unknownScreenRequest, bareScreenRequest; /api/news and the heartbeat are not about one screen).
  */
 export function displayAuth({ allowQuery = false } = {}) {
   return (req, res, next) => {
@@ -221,7 +263,8 @@ export function displayAuth({ allowQuery = false } = {}) {
     res.set('cache-control', 'private, no-store');
     if (!a.ok) return res.status(a.status).json({ error: ERRORS[a.code], code: a.code });
     req.displayAccess = a;
-    if (unknownScreenRequest(getConfig(), req)) return res.status(404).json(SCREEN_NOT_FOUND);
+    const p = `${req.baseUrl || ''}${req.path || ''}`.replace(/\/+$/, '');
+    if (noScreen(req, { bare: !UNSCOPED_PATHS.has(p) })) return res.status(404).json(SCREEN_NOT_FOUND);
     next();
   };
 }
@@ -234,7 +277,9 @@ export function mediaAuth(req, res, next) {
   const a = resolveDisplayAccess(req, { allowQuery: true });
   if (a.ok && (a.via !== 'open' || isLanClient(req))) {
     req.displayAccess = a; // the Immich proxy reads which screen the credential belongs to
-    if (unknownScreenRequest(getConfig(), req)) return res.status(404).set('cache-control', 'private, no-store').json(SCREEN_NOT_FOUND);
+    // Media URLs (gallery photos, Immich) never name a screen: only an unknown ?screen= is refused here. The display
+    // learns them from /api/photos, which needs a screen.
+    if (noScreen(req, { bare: false })) return res.status(404).set('cache-control', 'private, no-store').json(SCREEN_NOT_FOUND);
     return next();
   }
   if (a.ok) return res.status(404).type('text/plain').send('not found');
@@ -368,6 +413,7 @@ const sameHash = (hex, buf) => /^[a-f0-9]{64}$/.test(hex || '') && crypto.timing
  *   device:  the device must still exist ('invalid_key'); moved to another screen → 'reload' + close
  *   session: the admin session must still be valid (epoch, login method) ('key_required')
  *   open:    only while display access is 'open' ('key_required')
+ *   no screen asked for (open mode, not from this machine, not bound): 'reload' (see bareScreenRequest)
  * Returns how many streams were closed.
  */
 export function revalidateStreams(cfg = getConfig()) {
@@ -376,7 +422,7 @@ export function revalidateStreams(cfg = getConfig()) {
   const devs = new Map(devices().map((d) => [d.id, d]));
   const mode = displayAccessMode(cfg);
   /** null (still valid), 'reload' (device moved to another screen) or the `revoked` code. */
-  const check = (a, since) => {
+  const check = (a, since, screenKey) => {
     if (a.via === 'key') {
       const cur = k[a.screenId]?.key;
       if (!ids.has(a.screenId) || typeof cur !== 'string' || !sameHash(a.credHash, sha(cur))) return 'invalid_key';
@@ -392,12 +438,15 @@ export function revalidateStreams(cfg = getConfig()) {
     } else if (a.via === 'open') {
       if (mode !== 'open') return 'key_required';
     }
+    // Open mode, no screen asked for, from another machine (an admin session opened while private): the default
+    // screen is only for this machine, so the display reloads into "Screen not found".
+    if (mode === 'open' && !a.screenId && !a.local && !screenKey) return 'reload';
     return null;
   };
   let n = 0;
   for (const c of listClients()) {
     if (!c.access) continue;
-    const code = check(c.access, c.since);
+    const code = check(c.access, c.since, c.screenKey);
     if (code === 'reload') { dropClient(c, { event: 'reload', data: {} }); n++; }
     else if (code) { dropClient(c, { event: 'revoked', data: { code } }); n++; }
   }

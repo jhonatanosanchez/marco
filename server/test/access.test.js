@@ -17,6 +17,7 @@ import { _resetActivityThrottle, logActivity, listActivity } from '../activity.j
 import { createToken } from '../tokens.js';
 import {
   syncDisplayKeys, onDisplayAccessConfig, listDisplayLinks, KEY_RE, DEVICE_TOKEN_RE, _resetDisplayAccess, revalidateStreams,
+  isLoopbackClient,
 } from '../displayAccess.js';
 import {
   startPairing, pairingStatus, claimPairing, displayAddress, normalizeCode, _resetPairing, _pendingCount, CODE_ALPHABET, CODE_LENGTH,
@@ -394,7 +395,7 @@ test('pairing over HTTP: start → claim (admin) → status hands the token once
   });
 });
 
-const fakeDisplay = (ip = '192.168.1.50') => ({ ip, get: () => 'Chromium' });
+const fakeDisplay = (ip = '192.168.0.50') => ({ ip, get: () => 'Chromium' });
 const admin = (ip = '127.0.0.1', epoch = 'e1') => ({ ip, session: { epoch, user: { email: 'admin' } } });
 
 test('pairing claim has two steps: the first only names the waiting display, confirm: true pairs it', async () => {
@@ -802,14 +803,14 @@ test('admin CSRF: same-origin only, by Origin and Sec-Fetch-Site; works on the L
       req.on('error', reject);
       req.end(body);
     });
-    assert.equal(await post({ host: '192.168.1.50:3100', origin: 'http://192.168.1.50:3100' }), 200);
+    assert.equal(await post({ host: '192.168.0.50:3100', origin: 'http://192.168.0.50:3100' }), 200);
     assert.equal(await post({ host: 'localhost:3100', origin: 'http://localhost:3100', 'sec-fetch-site': 'same-origin' }), 200);
-    assert.equal(await post({ host: '192.168.1.50:3100' }), 200, 'no Origin (old clients, curl) still works');
+    assert.equal(await post({ host: '192.168.0.50:3100' }), 200, 'no Origin (old clients, curl) still works');
     assert.equal(await post({ host: 'localhost:3100', origin: 'http://localhost:3100', 'sec-fetch-site': 'cross-site' }), 403);
     assert.equal(await post({ host: 'localhost:3100', origin: 'http://localhost:3100', 'sec-fetch-site': 'same-site' }), 403);
     assert.equal(await post({ host: 'localhost:3100', 'sec-fetch-site': 'cross-site' }), 403, 'Sec-Fetch-Site alone refuses');
-    assert.equal(await post({ host: '192.168.1.50:3100', origin: 'http://evil.example' }), 403);
-    assert.equal(await post({ host: '192.168.1.50:3100', origin: 'http://192.168.1.50:3101' }), 403, 'another port is another origin');
+    assert.equal(await post({ host: '192.168.0.50:3100', origin: 'http://evil.example' }), 403);
+    assert.equal(await post({ host: '192.168.0.50:3100', origin: 'http://192.168.0.50:3101' }), 403, 'another port is another origin');
     // the display's own POSTs (no admin cookie) are outside the guard
     assert.notEqual((await ctx.call('POST', '/api/display/heartbeat', { body: { clientId: 'kiosk-x' }, headers: { 'sec-fetch-site': 'cross-site' } })).status, 403);
   }, { mode: 'open' });
@@ -857,7 +858,7 @@ test('unknown ?screen= (open mode, admin session): every display endpoint answer
   }
 });
 
-test('no ?screen= (or an empty one) is still the default screen; known screens and carousels resolve as before', async () => {
+test('no ?screen= (or an empty one) from this machine is still the default screen; known screens and carousels resolve as before', async () => {
   await withServer(async (ctx) => {
     for (const url of ['/api/display/config', '/api/display/config?screen=', '/api/display/config?screen=%20']) {
       const r = await ctx.call('GET', url);
@@ -899,4 +900,133 @@ test('heartbeat for an unknown screen: 404, not listed, never under the default 
     assert.equal((await ctx.call('POST', '/api/display/heartbeat', { body: { clientId: 'kiosk-hb', screen: 'kitchen' } })).status, 200);
     assert.equal(listDisplays().find((d) => d.clientId === 'kiosk-hb').screenId, 's_kitchen');
   }, { mode: 'open' });
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// The bare address (no ?screen=, no credential): open mode shows no screen to other machines; the server itself
+// (all-in-one kiosk on http://localhost) keeps the default screen. A LAN client is simulated with a reverse proxy on
+// this machine (trusted by default) passing X-Forwarded-For.
+
+const LAN = { 'x-forwarded-for': '192.168.0.50' };
+const BARE_ENDPOINTS = [
+  ...ENDPOINTS.filter((ep) => !ep.sse && !ep.url.startsWith('/media/') && ep.name !== 'news' && ep.name !== 'heartbeat'),
+  { name: 'doorbell frame', method: 'GET', url: '/api/display/doorbell/frame' },
+];
+
+test('bare address from the LAN (open mode): 404 screen_not_found on every per-screen endpoint, no data', async () => {
+  await withServer(async (ctx) => {
+    const cookie = await ctx.login();
+    for (const opts of [{ headers: LAN }, { headers: LAN, cookie }]) {
+      for (const ep of BARE_ENDPOINTS) {
+        for (const suffix of ['', ep.url.includes('?') ? '&screen=' : '?screen=', ep.url.includes('?') ? '&screen=%20' : '?screen=%20']) {
+          const r = await ctx.call(ep.method, ep.url + suffix, { body: ep.body, ...opts });
+          const what = `${ep.name}${suffix}${opts.cookie ? ' (session)' : ''}`;
+          assert.equal(r.status, 404, what);
+          assert.deepEqual(r.json, { error: 'screen_not_found', code: 'screen_not_found' }, what);
+        }
+      }
+      // a screen named in the URL works from the LAN as before
+      assert.equal((await ctx.call('GET', '/api/display/config?screen=kitchen', opts)).json.screenId, 's_kitchen');
+      assert.equal((await ctx.call('GET', '/api/display/config?screen=living-room', opts)).json.screenId, 's_main');
+    }
+    // not about one screen: news, gallery files (their URLs come from /api/photos, which needs a screen)
+    assert.equal((await ctx.call('GET', '/api/news', { headers: LAN })).status, 200);
+    assert.equal((await ctx.call('GET', '/media/photos/family.jpg', { headers: LAN })).status, 200);
+    // the stream is refused before it opens: not registered
+    const s = await ctx.stream('/api/stream?client=kiosk-bare-lan', { headers: LAN });
+    assert.equal(s.status, 404);
+    assert.equal(listClients().length, 0);
+    // a heartbeat naming no screen is not listed (and never under the default screen)
+    const hb = await ctx.call('POST', '/api/display/heartbeat', { body: { clientId: 'kiosk-bare-lan' }, headers: LAN });
+    assert.equal(hb.status, 404);
+    assert.equal(hb.json.error, 'screen_not_found');
+    assert.ok(!listDisplays().some((d) => d.clientId === 'kiosk-bare-lan'));
+    assert.equal((await ctx.call('POST', '/api/display/heartbeat', { body: { clientId: 'kiosk-bare-lan', screen: 'kitchen' }, headers: LAN })).status, 200);
+  }, { mode: 'open' });
+});
+
+test('bare address from this machine (all-in-one kiosk): the default screen as before', async () => {
+  await withServer(async (ctx) => {
+    for (const headers of [{}, { 'x-forwarded-for': '127.0.0.1' }, { 'x-forwarded-for': '::1' }]) {
+      const r = await ctx.call('GET', '/api/display/config', { headers });
+      assert.equal(r.status, 200);
+      assert.equal(r.json.screenId, 's_main');
+    }
+    for (const ep of ENDPOINTS.filter((e) => !e.sse)) assert.ok(allowed(ep, await hit(ctx, ep)), `${ep.name}: bare from localhost`);
+    // no ring now: 404 no_ring, not screen_not_found
+    assert.equal((await ctx.call('GET', '/api/display/doorbell/frame')).json.code, 'no_ring');
+    const s = await ctx.stream('/api/stream?client=kiosk-local');
+    assert.equal(s.status, 200);
+    assert.equal((await s.next('hello')).data.screenId, 's_main');
+    s.close();
+    assert.equal((await ctx.call('POST', '/api/display/heartbeat', { body: { clientId: 'kiosk-local-hb' } })).status, 200);
+    assert.equal(listDisplays().find((d) => d.clientId === 'kiosk-local-hb').screenId, 's_main');
+  }, { mode: 'open' });
+});
+
+test('bare address with a key or a paired device from the LAN: its bound screen', async () => {
+  await withServer(async (ctx) => {
+    const cookie = await ctx.login();
+    const st = await ctx.call('POST', '/api/pair/start', { body: {} });
+    await ctx.call('POST', '/api/admin/pair/claim', { cookie, body: { code: st.json.code, screenId: 's_kitchen', name: 'Hall tablet', confirm: true } });
+    const deviceToken = (await ctx.call('POST', '/api/pair/status', { body: { sessionId: st.json.sessionId } })).json.token;
+    assert.match(deviceToken, DEVICE_TOKEN_RE);
+    for (const cred of [keyOf('kitchen'), deviceToken]) {
+      const r = await ctx.call('GET', '/api/display/config', { headers: { ...LAN, 'x-marco-key': cred } });
+      assert.equal(r.status, 200);
+      assert.equal(r.json.screenId, 's_kitchen');
+      for (const ep of ENDPOINTS.filter((e) => !e.sse)) assert.ok(allowed(ep, await hit(ctx, ep, { cred, headers: LAN })), `${ep.name}: bare + credential`);
+      assert.equal((await ctx.call('GET', '/api/display/doorbell/frame', { headers: { ...LAN, 'x-marco-key': cred } })).json.code, 'no_ring');
+    }
+    const s = await ctx.stream(`/api/stream?client=kiosk-k-lan&k=${keyOf('living-room')}`, { headers: LAN });
+    assert.equal(s.status, 200);
+    assert.equal((await s.next('hello')).data.screenId, 's_main');
+    s.close();
+  }, { mode: 'open' });
+});
+
+test('private mode is unchanged: no credential is 401, an admin session from the LAN still gets the default screen', async () => {
+  await withServer(async (ctx) => {
+    const cookie = await ctx.login();
+    assert.equal((await ctx.call('GET', '/api/display/config', { headers: LAN })).status, 401);
+    const r = await ctx.call('GET', '/api/display/config', { headers: LAN, cookie });
+    assert.equal(r.status, 200);
+    assert.equal(r.json.screenId, 's_main');
+    assert.equal((await ctx.call('GET', '/api/display/config', { headers: { ...LAN, 'x-marco-key': keyOf('kitchen') } })).json.screenId, 's_kitchen');
+  }, { mode: 'private' });
+});
+
+test('private → open: a bare admin-session stream from the LAN reloads (no default screen); localhost stays', async () => {
+  await withServer(async (ctx) => {
+    const cookie = await ctx.login();
+    const lan = await ctx.stream('/api/stream?client=kiosk-sess-lan', { headers: LAN, cookie });
+    const local = await ctx.stream('/api/stream?client=kiosk-sess-local', { cookie });
+    const named = await ctx.stream('/api/stream?client=kiosk-sess-named&screen=kitchen', { headers: LAN, cookie });
+    for (const x of [lan, local, named]) await x.next('hello');
+    const cfg = (await ctx.call('GET', '/api/admin/config', { cookie })).json;
+    cfg.security.displayAccess = 'open';
+    assert.equal((await ctx.call('PUT', '/api/admin/config', { cookie, body: cfg })).status, 200);
+    await lan.next('reload');
+    await new Promise((r) => setTimeout(r, 100));
+    assert.ok(!local.events().some((e) => e.event === 'reload' || e.event === 'revoked'));
+    assert.ok(!named.events().some((e) => e.event === 'reload' || e.event === 'revoked'));
+    local.close();
+    named.close();
+  }, { mode: 'private' });
+});
+
+test('isLoopbackClient: only this machine, never a spoofed or untrusted forwarded address', () => {
+  const trustLoopback = (addr) => addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
+  const req = (ip, peer, headers = {}) => ({ ip, headers, socket: { remoteAddress: peer }, app: { get: () => trustLoopback } });
+  assert.equal(isLoopbackClient(req('127.0.0.1', '127.0.0.1')), true);
+  assert.equal(isLoopbackClient(req('::1', '::1')), true);
+  assert.equal(isLoopbackClient(req('::ffff:127.0.0.1', '::ffff:127.0.0.1')), true);
+  assert.equal(isLoopbackClient(req('192.168.0.50', '192.168.0.50')), false);
+  // a proxy on this machine passing the LAN client: req.ip is the client
+  assert.equal(isLoopbackClient(req('192.168.0.50', '127.0.0.1', { 'x-forwarded-for': '192.168.0.50' })), false);
+  // a LAN client claiming X-Forwarded-For: 127.0.0.1 (not trusted: req.ip stays its own address)
+  assert.equal(isLoopbackClient(req('192.168.0.50', '192.168.0.50', { 'x-forwarded-for': '127.0.0.1' })), false);
+  // TRUST_PROXY points elsewhere and a proxy on this machine forwards: not trusted, never local
+  const other = { ip: '127.0.0.1', headers: { 'x-forwarded-for': '203.0.113.9' }, socket: { remoteAddress: '127.0.0.1' }, app: { get: () => () => false } };
+  assert.equal(isLoopbackClient(other), false);
 });

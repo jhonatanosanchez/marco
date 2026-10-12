@@ -11,7 +11,10 @@ All endpoints speak JSON. TypeScript types for every request and response live i
 - **Webhooks** need `Authorization: Bearer <token>` (create tokens in *Admin → API & webhooks*).
 
 Without a key or device token, every display endpoint accepts `?screen=<slug|id>` (case-insensitive; a carousel's
-slug or id too). Absent or empty → default screen. Unknown (or given twice) → `404 { error: "screen_not_found", code:
+slug or id too). Absent or empty → default screen, but in open mode only for this machine (`127.0.0.0/8` or `::1` after
+`trust proxy`, not relayed by an untrusted proxy: an all-in-one kiosk on `http://localhost:PORT/`); from another
+machine it is the same 404 as an unknown slug (`/api/news`, the heartbeat and `/media/*` are exempt, and a heartbeat
+with no `screen` from another machine is not listed). Unknown (or given twice) → `404 { error: "screen_not_found", code:
 "screen_not_found" }` on every display endpoint (`/api/display/*` including poll, heartbeat and the doorbell frame,
 `/api/events`, `/api/weather`, `/api/news`, `/api/photos`, `/api/countdowns`, `/api/stream` and `/media/*`), never the
 default screen's data, and the body names no screen. An unknown screen's stream or poll is not registered as a display

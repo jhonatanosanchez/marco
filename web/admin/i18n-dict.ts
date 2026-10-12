@@ -378,7 +378,6 @@ const ROWS: [string, string, string][] = [
   ['Usar mi galería', 'Use my gallery', 'Usar a minha galeria'],
   ['Vas a salir a Google para vincular la cuenta. ¿Guardamos primero los cambios pendientes?', 'You are going to Google to link the account. Save pending changes first?', 'Vais sair para a Google para ligar a conta. Guardamos primeiro as alterações pendentes?'],
   ['Velos de color suaves que se mueven lentamente.', 'Soft colour veils drifting slowly.', 'Véus de cor suaves que se movem lentamente.'],
-  ['Ver la pantalla', 'View the screen', 'Ver o ecrã'],
   ['Ver pantalla', 'View screen', 'Ver ecrã'],
   ['Vertical', 'Portrait', 'Vertical'],
   ['Vincula una cuenta de Google y elige qué calendarios mostrar.', 'Link a Google account and choose which calendars to show.', 'Liga uma conta Google e escolhe que calendários mostrar.'],

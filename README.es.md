@@ -866,7 +866,9 @@ imposible de adivinar; para retirarlo, desactiva *Calendario público* en iCloud
 Crea varias **pantallas** en *Sistema → Pantallas* ("Salón", "Cocina", "Pasillo"). Cada una tiene su propio diseño,
 tema, fondo, widgets y conjunto de calendarios; los calendarios, las reglas y las integraciones son compartidos. Un
 dispositivo muestra una pantalla con su [enlace privado](#enlaces-privados-y-vinculación-de-pantallas) o vinculándolo a
-ella (en modo abierto también con `http://<server-ip>:3000/?screen=<slug>`; sin `?screen`, la predeterminada ★). El
+ella (en modo abierto también con `http://<server-ip>:3000/?screen=<slug>`; sin `?screen`, la predeterminada ★, pero solo en el propio servidor, como
+`http://localhost:3000/` en un kiosco todo en uno: desde otro equipo la dirección sin `?screen` solo dice "Abre el
+enlace de una pantalla"). El
 selector **Editando: Salón ▾** de la cabecera de la administración elige qué pantalla editan las páginas que se
 configuran por pantalla.
 
@@ -997,7 +999,7 @@ Haz copia de seguridad de toda la carpeta (o usa *Exportar*) para conservarlo to
 |---|---|
 | `/d/<clave>` | Enlace privado de una pantalla (la clave decide la pantalla) |
 | `/pair` | Muestra un código de vinculación (también en modo abierto) |
-| `?screen=<slug>` | Muestra ese perfil de pantalla (la predeterminada si no se indica o no existe); solo en modo abierto o con sesión del panel |
+| `?screen=<slug>` | Muestra ese perfil de pantalla; solo en modo abierto o con sesión del panel. Si no existe: "Pantalla no encontrada". Sin él: la predeterminada en el propio servidor, "Abre el enlace de una pantalla" desde otro equipo |
 | `?lite=1` | Sin efectos WebGL (dispositivos lentos) |
 | `?demo=1` | Datos de ejemplo integrados (no necesita datos del servidor) |
 | `?lang=en\|es\|pt` | Fuerza el idioma |

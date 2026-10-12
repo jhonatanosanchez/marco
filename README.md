@@ -816,7 +816,8 @@ it, turn off *Public Calendar* in iCloud.
 Create several **screens** in *System → Screens* ("Living room", "Kitchen", "Hallway"). Each has its own layout,
 theme, background, widgets and set of calendars; calendars, rules and integrations are shared. A device shows a screen
 through that screen's [private link](#private-display-links--pairing) or by being paired to it (in open mode also
-`http://<server-ip>:3000/?screen=<slug>`; without `?screen` the default one ★).
+`http://<server-ip>:3000/?screen=<slug>`; without `?screen` the default one ★, but only on the server itself, such as
+`http://localhost:3000/` on an all-in-one kiosk: from another device the bare address only says "Open a screen's link").
 The **Editing: Living room ▾** switcher in the admin header selects which screen the per-screen pages edit.
 
 *System → Connected displays* lists every browser showing a screen (IP, browser, resolution, pixel ratio, WebGL,
@@ -951,7 +952,7 @@ Back up the whole folder (or use *Export*) to keep everything.
 |---|---|
 | `/d/<key>` | A screen's private link (the key decides the screen) |
 | `/pair` | Show a pairing code (also in open mode) |
-| `?screen=<slug>` | Show that screen profile (default screen if absent or unknown); open mode or admin session only |
+| `?screen=<slug>` | Show that screen profile; open mode or admin session only. Unknown: "Screen not found". Absent: the default screen on the server itself, "Open a screen's link" from another device |
 | `?lite=1` | No WebGL effects (slow devices) |
 | `?demo=1` | Built-in sample data (no server data needed) |
 | `?lang=en\|es\|pt` | Override the language |

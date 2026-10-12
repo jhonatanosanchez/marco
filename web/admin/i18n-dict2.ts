@@ -444,7 +444,7 @@ export const ROWS2: [string, string, string][] = [
   ['Si la copia trae otra contraseña, se cerrarán todas las sesiones.', 'If the backup has another password, all sessions will be signed out.', 'Se a cópia trouxer outra palavra-passe, todas as sessões serão terminadas.'],
   ['Si lo desactivas, esta pantalla no recibe ningún aviso.', 'If off, this screen receives no alerts.', 'Se desativares, este ecrã não recebe avisos.'],
   ['Silencioso', 'Silent', 'Silencioso'],
-  ['Sin ?screen= se muestra la pantalla predeterminada (★). Comprueba qué ve cada dispositivo en', 'Without ?screen= the default screen (★) is shown. Check what each device shows in', 'Sem ?screen= é mostrado o ecrã predefinido (★). Verifica o que cada dispositivo mostra em'],
+  ['Sin ?screen= solo el propio servidor (http://localhost) muestra la pantalla predeterminada (★); desde otro equipo se ve «Abre el enlace de una pantalla». Comprueba qué ve cada dispositivo en', 'Without ?screen= only the server itself (http://localhost) shows the default screen (★); other devices see "Open a screen\'s link". Check what each device shows in', 'Sem ?screen= só o próprio servidor (http://localhost) mostra o ecrã predefinido (★); nos outros equipamentos aparece «Abra a ligação de um ecrã». Verifica o que cada dispositivo mostra em'],
   ['Sin actividad registrada.', 'No activity recorded.', 'Sem atividade registada.'],
   ['Sin conexión: las órdenes no llegarán.', 'Offline: commands will not arrive.', 'Sem ligação: as ordens não chegarão.'],
   ['Sin datos de: {list}', 'No data from: {list}', 'Sem dados de: {list}'],
