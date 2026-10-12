@@ -308,24 +308,18 @@ export function CarouselsSection({ full, setFull, saved, errors, go, dirty, save
                         class="input--sm"
                         value={c.slug}
                         error={!!err('slug')}
-                        prefix={<span class="mono small">?screen=</span>}
+                        prefix={<span class="mono small">{`${origin}/?screen=`}</span>}
                         onValue={(v) => upd(c.id, (x) => void (x.slug = v.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 32)))}
                       />
                       <button type="button" class="icon-btn" title={t('Generar desde el nombre')} onClick={() => upd(c.id, (x) => void (x.slug = uniqueSlug(x.name, takenSlugs(full, c.id))))}>
                         <Icon name="wand" size={15} />
                       </button>
+                      {canCopy() && (
+                        <button type="button" class="icon-btn" title={t('Copiar URL')} disabled={!url} onClick={() => copy(url)}>
+                          <Icon name="copy" size={15} />
+                        </button>
+                      )}
                     </div>
-                  ) : null}
-                  {openMode ? (
-                    // the whole address, to read or select by hand on a TV or a phone
-                  <div class="screen-card__slug screen-card__link">
-                    <input class="input input--mono input--sm" value={url} readOnly spellcheck={false} aria-label={t('Dirección')} placeholder={t('Guarda el carrusel para obtener su dirección.')} onFocus={(e) => e.currentTarget.select()} />
-                    {canCopy() && (
-                      <button type="button" class="btn btn--sm btn--ghost" disabled={!url} onClick={() => copy(url)}>
-                        <Icon name="copy" size={15} /> {t('Copiar')}
-                      </button>
-                    )}
-                  </div>
                   ) : (
                     <div class="screen-card__slug screen-card__link">
                       <input

@@ -1433,7 +1433,8 @@ h1 .scope {
   gap: 4px;
 }
 .screen-card__slug .input-group {
-  max-width: 340px;
+  /* the prefix carries the whole address (http://host:port/?screen=) */
+  max-width: 560px;
   flex: 1;
   height: 34px;
 }
