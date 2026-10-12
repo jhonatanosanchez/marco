@@ -15,7 +15,8 @@ All notable changes to this project are documented here. The format is based on
   *Vista previa* on a carousel card shows that carousel there.
 - Carousel cards fold to one line with their screens, times and what is on now (remembered per browser). With more
   than three carousels a search box filters them by name, address or screen.
-- Screen and carousel cards show the whole `?screen=` address in open mode, ready to select.
+- In open mode the address field of a screen or a carousel shows the whole address (`http://host:port/?screen=`)
+  before the part you edit, so one field says where to point a TV.
 
 ### Changed
 - The *Probar* button and the preview dialog of a carousel are gone: the side preview does that now.
