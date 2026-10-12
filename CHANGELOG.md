@@ -5,6 +5,10 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- Month grid: on load, a screen set to fewer weeks showed five rows for half a second before settling on its own
+  number. Carousel switches no longer fade the rows of the previous screen out over the new one either.
+
 ## [0.9.0] - 2026-10-12
 
 ### Added

@@ -472,6 +472,9 @@ function eventsNormalized(): NEvent[] {
 }
 
 function renderCalendar(tick: Tick): void {
+  // not before the config (the first tick, the resize observer, cached events): the default number of weeks would
+  // be drawn first and its extra rows would still be fading out while the screen fades in
+  if (!state.config) return;
   const evs = eventsNormalized();
   const cfg = ctx.cfg;
   const preset = effectivePreset(cfg);
@@ -1269,7 +1272,13 @@ function showScreen(id: string, b: Bundle, sw: SwitchInfo): void {
       const w = weatherByLang.get(b.config.screen.language);
       state.weather = w ? w.w : state.weather;
     }
-    set('config', b.config);
+    // the new screen goes in with its own number of weeks at once (no rows of the old one fading out)
+    calendar.still = true;
+    try {
+      set('config', b.config);
+    } finally {
+      calendar.still = false;
+    }
     saveShown(b);
     const spot = newPhotos ? photoSpots.get(sig) : undefined;
     if (spot) {

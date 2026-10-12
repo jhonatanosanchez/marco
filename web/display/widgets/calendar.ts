@@ -86,6 +86,8 @@ export class MonthCalendar {
   roomy = false;
   /** Most week rows calendar.weeks = 'auto' may pick (layouts with a shorter calendar lower it). */
   maxAutoWeeks = AUTO_WEEKS_MAX;
+  /** Week rows go in and out at once (a new carousel screen): no rows of the old screen fading out over it. */
+  still = false;
   private head: HTMLElement;
   private dow: HTMLElement;
   private weeks: HTMLElement;
@@ -159,7 +161,7 @@ export class MonthCalendar {
       weekRows.push({ key: ws, start: ws });
       weekSpecs.push({ key: `w${ws}`, className: cards ? 'wk cards' : 'wk', html: '' });
     }
-    reconcile(this.weeks, weekSpecs, { flip: true });
+    reconcile(this.weeks, weekSpecs, { flip: true, animate: !this.still });
     const rowEls = Array.from(this.weeks.children).filter((x) => !(x as any).__leaving) as HTMLElement[];
 
     this.geom = this.measureGeom();

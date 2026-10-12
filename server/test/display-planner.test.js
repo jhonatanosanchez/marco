@@ -89,6 +89,20 @@ test('the display reads the options the same way: old configs keep lines and the
   assert.match(main, /params\.get\('cards'\)/);
 });
 
+test('first paint: the month grid shows the configured weeks from the start, also when a carousel switches', () => {
+  const main = read('web/display/main.ts');
+  // the first tick, the resize observer and cached events come before the config: nothing is drawn with the
+  // default 5 weeks (their extra rows used to fade out for half a second while the screen faded in)
+  const body = main.slice(main.indexOf('function renderCalendar('));
+  assert.match(body, /^function renderCalendar\(tick: Tick\): void \{\s*(\/\/[^\n]*\n\s*)*if \(!state\.config\) return;/);
+  // a carousel screen goes in with its own rows at once, none of the old screen fading out over it
+  assert.match(main, /calendar\.still = true;\s*try \{\s*set\('config', b\.config\);\s*\} finally \{\s*calendar\.still = false;\s*\}/);
+  const cal = read('web/display/widgets/calendar.ts');
+  assert.match(cal, /reconcile\(this\.weeks, weekSpecs, \{ flip: true, animate: !this\.still \}\);/);
+  // a number of weeks never waits for a measure: the first render already has it
+  assert.equal(cards.resolveWeeks(3, 0, 0), 3);
+});
+
 test('the planner layout: accepted everywhere, and picking it sets automatic weeks and cards', () => {
   assert.ok(LAYOUT_PRESETS.includes('planner'));
   assert.deepEqual(PLANNER_CALENDAR, { weeks: 'auto', eventStyle: 'cards' });
