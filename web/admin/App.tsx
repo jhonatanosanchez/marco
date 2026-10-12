@@ -30,7 +30,7 @@ import { BackgroundSection } from './sections/Background';
 import { BackupsSection } from './sections/Backups';
 import { BirthdaysSection } from './sections/Birthdays';
 import { CalendarsSection } from './sections/Calendars';
-import { CarouselsSection } from './sections/Carousels';
+import { CarouselsSection, tryUrl } from './sections/Carousels';
 import type { SectionProps } from './sections/common';
 import { CountdownsSection } from './sections/Countdowns';
 import { DateTimeSection } from './sections/DateTime';
@@ -249,6 +249,8 @@ export function App() {
   const [showErrors, setShowErrors] = useState(false);
   const [displays, setDisplays] = useState<DisplayInfo[] | null>(null);
   const wide = useMedia('(min-width: 1360px)');
+  const wideRef = useRef(wide);
+  wideRef.current = wide;
   const mainRef = useRef<HTMLElement>(null);
 
   const changeLang = (l: Lang) => {
@@ -432,13 +434,38 @@ export function App() {
   // picked in its bar); everywhere else it shows the screen being edited.
   const linkState = useDisplayLinks(saved);
   const [pvPick, setPvPick] = useState<string | null>(null);
+  // "Vista previa" on a carousel card: show that one, opening the preview when it is closed
+  useEffect(() => {
+    const on = (e: Event) => {
+      setPvPick((e as CustomEvent<string>).detail);
+      if (wideRef.current) {
+        setShowPreview(true);
+        lsSet(LS_PREVIEW, '1');
+      } else setSheet(true);
+    };
+    window.addEventListener('cs:preview-target', on);
+    return () => window.removeEventListener('cs:preview-target', on);
+  }, []);
   const savedCars = saved?.carousels?.items ?? [];
   const pvChoices =
     route === 'carousels' && saved && savedCars.length
       ? [...savedCars.map((c) => ({ value: c.id, label: `🔁 ${c.name}` })), ...saved.screens.map((s) => ({ value: s.id, label: s.name }))]
       : null;
   const pvId = pvChoices ? (pvChoices.some((o) => o.value === pvPick) ? pvPick! : savedCars[0].id) : null;
-  const pvTarget = pvId ? { saved: true, url: screenHref(saved, pvId, linkState, { preview: true }), openUrl: screenHref(saved, pvId, linkState), choices: pvChoices!, chosen: pvId, onChoose: setPvPick } : null;
+  // a carousel switches every few seconds there, with the animation chosen now (saved or not)
+  const pvCar = pvId ? draft?.carousels?.items.find((c) => c.id === pvId) ?? null : null;
+  const pvHref = pvId ? screenHref(saved, pvId, linkState, { preview: true }) : null;
+  const pvTarget = pvId
+    ? {
+        saved: true,
+        url: pvHref && pvCar ? tryUrl(pvHref, pvCar) : pvHref,
+        openUrl: screenHref(saved, pvId, linkState),
+        choices: pvChoices!,
+        chosen: pvId,
+        onChoose: setPvPick,
+        hint: pvCar ? t('Aquí cambia cada 4 s para enseñar la animación, que se ve aunque no esté guardada. Las pantallas y los tiempos se ven al guardar.') : undefined,
+      }
+    : null;
 
   /* ---------- draft state */
   const dirty = useMemo(() => !!draft && !!saved && JSON.stringify(draft) !== JSON.stringify(saved), [draft, saved]);

@@ -1,9 +1,12 @@
 // Animated switch between two carousel screens (the plan comes from web/display/switchPlan.ts).
 //
-// 1. Snapshot: #app is cloned into a fixed overlay above it (ids become data-shot-id, canvases are copied, scroll
-//    positions and the current frame of running animations are kept). With WebGL on, the GL canvas (photo, ambient
-//    backdrop) is copied too, so the old screen is complete and opaque.
-// 2. The new screen is rendered into the real #app underneath, right away.
+// 1. Snapshot: #app is copied into a fixed overlay above it, inside a blank same-origin iframe with the page's own
+//    styles and the root classes and variables of the screen that leaves (theme, style, font size, accent...). The
+//    copy is a separate document, so when the new screen changes those on <html> the old one keeps its look. Canvases
+//    are copied, scroll positions and the current frame of running animations are kept. With WebGL on, the GL canvas
+//    (photo, ambient backdrop) is copied too, so the old screen is complete and opaque.
+// 2. As soon as the copy is ready (its images decoded and fonts loaded, a few frames at most), the new screen is
+//    rendered into the real #app underneath.
 // 3. Both layers are animated with the Web Animations API, on transform and opacity only (the wipe's soft edge is a
 //    gradient mask that moves with a transform), so the compositor does the work. 'dissolve' instead hands the GL copy to
 //    the GL dissolve layer (web/display/gl/dissolveLayer.ts) and crossfades the content above it.
@@ -11,10 +14,6 @@
 //
 // A light plan (reduced motion, lite mode, a Raspberry Pi) skips all of that: #app fades out, the new screen goes
 // in and #app fades back in, with no copy of the page or of the GL frame.
-//
-// The ids of the clone are dropped, so the stylesheet rules that use ids (#app, #calendar, ...) get a second
-// selector for data-shot-id the first time a switch runs (shotSelectors). The added selector has the same
-// specificity, so the clone looks exactly like the screen it copies.
 import type { SwitchPlan } from './switchPlan';
 
 export interface SwitchGL {
@@ -31,57 +30,8 @@ export interface SwitchGL {
 }
 
 const EASE = 'cubic-bezier(0.45, 0, 0.2, 1)';
-const NEVER_ID = '#__marco-shot-never';
-const ID_RE = /#(-?[_a-zA-Z][\w-]*)/g;
-
-/** `#app .x` → `#app .x, :is([data-shot-id="app"],#never) .x` (same specificity, so the cascade order holds). */
-export function shotSelector(sel: string): string | null {
-  if (!sel.includes('#')) return null;
-  const parts = sel.split(',').map((s) => s.trim()).filter(Boolean);
-  const extra: string[] = [];
-  for (const p of parts) {
-    if (p.includes('data-shot-id')) return null; // done already
-    // leave selectors with quoted strings alone (a '#' there is not an id)
-    if (/["']/.test(p) || !ID_RE.test(p)) continue;
-    ID_RE.lastIndex = 0;
-    extra.push(p.replace(ID_RE, (_m, id: string) => `:is([data-shot-id="${id}"],${NEVER_ID})`));
-  }
-  ID_RE.lastIndex = 0;
-  return extra.length ? `${parts.join(', ')}, ${extra.join(', ')}` : null;
-}
-
-const doneRules = new WeakSet<CSSRule>();
-
-function rewriteRules(list: CSSRuleList): void {
-  for (let i = 0; i < list.length; i++) {
-    const r = list[i];
-    if (doneRules.has(r)) continue;
-    doneRules.add(r);
-    if (r instanceof CSSStyleRule) {
-      const next = shotSelector(r.selectorText);
-      if (next) {
-        try {
-          r.selectorText = next;
-        } catch { /* keep the rule as it is */ }
-      }
-    }
-    const inner = (r as CSSGroupingRule).cssRules;
-    if (inner) rewriteRules(inner);
-  }
-}
-
-/** Give every id rule of the page a data-shot-id twin (new rules only: the custom CSS can change). */
-function shotSelectors(): void {
-  for (const sheet of Array.from(document.styleSheets)) {
-    let rules: CSSRuleList | null = null;
-    try {
-      rules = sheet.cssRules;
-    } catch {
-      continue; // another origin
-    }
-    if (rules) rewriteRules(rules);
-  }
-}
+/** Longest wait for the copy's images and fonts before the switch goes on anyway (ms). */
+const READY_MAX = 600;
 
 interface Running {
   overlay: HTMLElement | null;
@@ -104,7 +54,7 @@ export class ScreenSwitcher {
     this.finish();
     if (plan.effect === 'none' || plan.ms <= 0 || document.hidden || typeof this.app.animate !== 'function') return apply();
     if (plan.light) return this.fade(plan.ms, apply);
-    let overlay: HTMLElement;
+    let shot: { overlay: HTMLElement; ready: Promise<unknown> };
     let glShot: HTMLCanvasElement | null = null;
     const gl = this.glOn();
     let effect = plan.effect;
@@ -112,17 +62,33 @@ export class ScreenSwitcher {
       glShot = gl ? gl.snapshot() : null;
       if (effect === 'dissolve' && !glShot) effect = 'fade';
       // the dissolve keeps the old content see-through: the GL layer under it does the background
-      overlay = this.snapshot(effect === 'dissolve' ? null : glShot, effect !== 'dissolve');
+      shot = this.snapshot(effect === 'dissolve' ? null : glShot, effect !== 'dissolve');
     } catch (e) {
       console.warn('[switch] snapshot failed', e);
       return apply();
     }
-    try {
-      apply();
-    } catch (e) {
-      overlay.remove();
-      throw e;
-    }
+    // the copy covers #app already: the new screen goes in once the copy is fully drawn (finish() puts it in sooner)
+    const run: Running = { overlay: shot.overlay, anims: [], gl, pending: apply, timer: setTimeout(() => this.finish(), plan.ms + READY_MAX + 600) };
+    this.run = run;
+    const go = () => {
+      if (this.run !== run || !run.pending) return;
+      const put = run.pending;
+      run.pending = null;
+      try {
+        put();
+      } catch (e) {
+        this.finish();
+        throw e;
+      }
+      this.animate(run, plan, effect, glShot);
+    };
+    void Promise.race([shot.ready, new Promise((r) => setTimeout(r, READY_MAX))]).then(go, go);
+  }
+
+  /** Run the planned animation: the copy in `run.overlay` leaves, the new screen in #app comes in. */
+  private animate(run: Running, plan: SwitchPlan, effect: SwitchPlan['effect'], glShot: HTMLCanvasElement | null): void {
+    const overlay = run.overlay!;
+    const gl = run.gl;
     const ms = plan.ms;
     const anims: Animation[] = [];
     const opts = (extra?: KeyframeAnimationOptions): KeyframeAnimationOptions => ({ duration: ms, easing: EASE, fill: 'both', ...extra });
@@ -164,8 +130,9 @@ export class ScreenSwitcher {
         // a true crossfade: the old screen is opaque, so fading it out over the new one mixes the two
         anims.push(shell.animate([{ opacity: 1 }, { opacity: 0 }], opts({ easing: 'ease-in-out' })));
     }
-    const run: Running = { overlay, anims, gl, timer: setTimeout(() => this.finish(), ms + 600) };
-    this.run = run;
+    run.anims = anims;
+    clearTimeout(run.timer);
+    run.timer = setTimeout(() => this.finish(), ms + 600);
     void Promise.all(anims.map((a) => a.finished)).then(
       () => this.run === run && this.finish(),
       () => undefined,
@@ -226,14 +193,17 @@ export class ScreenSwitcher {
     return gl && document.documentElement.classList.contains('gl') ? gl : null;
   }
 
-  /** The overlay with a still copy of #app (and of the GL frame when given). */
-  private snapshot(glShot: HTMLCanvasElement | null, opaque: boolean): HTMLElement {
-    shotSelectors();
+  /**
+   * The overlay with a still copy of #app (and of the GL frame when given), drawn in its own blank iframe so it keeps
+   * the root classes and variables it has now. `ready` settles once its images and fonts can be drawn.
+   */
+  private snapshot(glShot: HTMLCanvasElement | null, opaque: boolean): { overlay: HTMLElement; ready: Promise<unknown> } {
     const app = this.app;
     const clone = app.cloneNode(true) as HTMLElement;
     const src = [app, ...Array.from(app.querySelectorAll<HTMLElement>('*'))];
     const dst = [clone, ...Array.from(clone.querySelectorAll<HTMLElement>('*'))];
-    const scrolled: [HTMLElement, number, number][] = [];
+    const scrolled: [number, number, number][] = [];
+    const canvases: [number, HTMLCanvasElement][] = [];
     const animated = new Set<Element>();
     for (const a of app.getAnimations({ subtree: true })) {
       const t = (a.effect as KeyframeEffect | null)?.target;
@@ -243,22 +213,15 @@ export class ScreenSwitcher {
       const s = src[i];
       const d = dst[i];
       if (!d || !s) break;
-      if (d.id) {
-        d.setAttribute('data-shot-id', d.id);
-        d.removeAttribute('id');
-      }
-      if (s.scrollTop || s.scrollLeft) scrolled.push([d, s.scrollTop, s.scrollLeft]);
+      if (s.scrollTop || s.scrollLeft) scrolled.push([i, s.scrollTop, s.scrollLeft]);
       if (animated.has(s)) {
-        // the clone has no animations: keep the frame they are at now
+        // the copy has no animations: keep the frame they are at now
         const cs = getComputedStyle(s);
         d.style.transform = cs.transform === 'none' ? '' : cs.transform;
         d.style.opacity = cs.opacity;
       }
-      if (s instanceof HTMLCanvasElement && d instanceof HTMLCanvasElement && s.width && s.height) {
-        try {
-          d.getContext('2d')?.drawImage(s, 0, 0);
-        } catch { /* a canvas we cannot read stays empty */ }
-      } else if (d instanceof HTMLImageElement) d.removeAttribute('loading');
+      if (s instanceof HTMLCanvasElement && s.width && s.height) canvases.push([i, s]);
+      else if (d instanceof HTMLImageElement) d.removeAttribute('loading');
       else if (d instanceof HTMLMediaElement) {
         d.muted = true;
         d.removeAttribute('autoplay');
@@ -276,16 +239,71 @@ export class ScreenSwitcher {
     if (glShot) inner.appendChild(glLayer(glShot));
     // no GL copy: the page background makes the old screen opaque
     else if (opaque) inner.style.background = getComputedStyle(document.body).backgroundColor;
-    inner.appendChild(clone);
+    const frame = document.createElement('iframe');
+    frame.className = 'switch-shot__frame';
+    frame.tabIndex = -1;
+    frame.setAttribute('aria-hidden', 'true');
+    // the same color scheme inside and out, or the browser paints the frame opaque
+    const scheme = getComputedStyle(document.documentElement).colorScheme || 'normal';
+    Object.assign(frame.style, { width: `${window.innerWidth}px`, height: `${window.innerHeight}px`, colorScheme: scheme });
+    inner.appendChild(frame);
     shell.appendChild(inner);
     overlay.appendChild(shell);
     app.after(overlay);
-    for (const [el, top, left] of scrolled) {
-      el.scrollTop = top;
-      el.scrollLeft = left;
+    const doc = frame.contentDocument;
+    if (!doc) throw new Error('no frame document');
+    const root = document.documentElement;
+    const attrs = (el: HTMLElement) => `class="${esc(el.className)}" style="${esc(el.getAttribute('style') ?? '')}"`;
+    doc.open();
+    doc.write(
+      `<!doctype html><html ${attrs(root)} lang="${esc(root.lang)}"><head><meta charset="utf-8"><style>${pageCss()}</style>` +
+        `<style>:root{color-scheme:${scheme}!important}html,body{background:transparent!important}*,*::before,*::after{animation:none!important;transition:none!important}</style>` +
+        `</head><body ${attrs(document.body)}>${clone.outerHTML}</body></html>`,
+    );
+    doc.close();
+    // the copy of #app, in the same order as src/dst
+    const base = doc.body.firstElementChild as HTMLElement | null;
+    const nodes = base ? [base, ...Array.from(base.querySelectorAll<HTMLElement>('*'))] : [];
+    for (const [i, c] of canvases) {
+      const d = nodes[i];
+      if (!(d instanceof HTMLCanvasElement)) continue;
+      d.width = c.width;
+      d.height = c.height;
+      try {
+        d.getContext('2d')?.drawImage(c, 0, 0);
+      } catch { /* a canvas we cannot read stays empty */ }
     }
-    return overlay;
+    for (const [i, top, left] of scrolled) {
+      const d = nodes[i];
+      if (!d) continue;
+      d.scrollTop = top;
+      d.scrollLeft = left;
+    }
+    const imgs = Array.from(doc.images).map((img) => (img.complete ? null : img.decode().catch(() => undefined)));
+    const fonts = (doc as Document & { fonts?: FontFaceSet }).fonts;
+    const ready = Promise.all([...imgs, fonts ? fonts.ready : null]);
+    return { overlay, ready };
   }
+}
+
+const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+/** The text of every stylesheet of the page (same origin), for the copy's own document. */
+function pageCss(): string {
+  const out: string[] = [];
+  for (const sheet of Array.from(document.styleSheets)) {
+    let rules: CSSRuleList | null = null;
+    try {
+      rules = sheet.cssRules;
+    } catch {
+      continue; // another origin
+    }
+    if (!rules) continue;
+    const media = sheet.media?.mediaText;
+    const text = Array.from(rules, (r) => r.cssText).join('\n');
+    out.push(media && media !== 'all' ? `@media ${media}{${text}}` : text);
+  }
+  return out.join('\n').replace(/<\/style/gi, '<\\/style');
 }
 
 function glLayer(c: HTMLCanvasElement): HTMLCanvasElement {

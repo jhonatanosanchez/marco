@@ -25,6 +25,7 @@ const P: Record<string, string> = {
   trash: 'M4 7h16 M9 7V4h6v3 M6 7l1 13h10l1-13 M10 11v6 M14 11v6',
   up: 'M12 19V5 M6 11l6-6 6 6',
   down: 'M12 5v14 M6 13l6 6 6-6',
+  chevron: 'm6 9 6 6 6-6',
   grip: 'M9 6h.01 M9 12h.01 M9 18h.01 M15 6h.01 M15 12h.01 M15 18h.01',
   x: 'M6 6l12 12 M18 6L6 18',
   lock: 'M5 11h14v10H5z M8 11V7a4 4 0 0 1 8 0v4',

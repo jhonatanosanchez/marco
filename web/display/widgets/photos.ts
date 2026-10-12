@@ -77,6 +77,11 @@ export class Photos {
   private list: Photo[] = [];
   private idx = -1;
   private timer: ReturnType<typeof setTimeout> | null = null;
+  /** when the timer fires (ms) and with which interval it was set (s) */
+  private dueAt = 0;
+  private dueSec = 0;
+  /** When a carousel changes screen next (local ms, null = not by time), so a photo change never lands on it (main.ts). */
+  switchAt: (() => number | null) | null = null;
   private loading = false;
   private glLayer: PhotoLayer | null = null;
   private domCur: HTMLElement | null = null;
@@ -212,10 +217,31 @@ export class Photos {
     node.style.transformOrigin = `${(win.ax * 100).toFixed(1)}% ${(win.ay * 100).toFixed(1)}%`;
   }
 
-  private schedule(): void {
+  /**
+   * Set the timer for the next photo. A config refresh (every carousel switch brings one) keeps a running timer, so
+   * the slideshow goes on at its own pace; only a new interval, or `restart` after a photo, sets it again. A change
+   * that would come within a few seconds of a carousel switch moves to the middle of the next screen's turn.
+   */
+  private schedule(restart = false): void {
+    const b = ctx.cfg.background;
+    const now = Date.now();
+    if (!b.enabled) {
+      if (this.timer) clearTimeout(this.timer);
+      this.timer = null;
+      return;
+    }
+    const sec = b.intervalSec;
+    if (!restart && this.timer && sec === this.dueSec && this.dueAt > now) return;
+    let at = now + sec * 1000;
+    const sw = this.switchAt?.() ?? null;
+    if (sw !== null && sw > now) {
+      const margin = Math.min(5000, sec * 250);
+      if (Math.abs(at - sw) < margin) at = sw + Math.max(margin, sec * 500);
+    }
     if (this.timer) clearTimeout(this.timer);
-    if (!ctx.cfg.background.enabled) return;
-    this.timer = setTimeout(() => this.next(), ctx.cfg.background.intervalSec * 1000);
+    this.timer = setTimeout(() => this.next(), at - now);
+    this.dueAt = at;
+    this.dueSec = sec;
   }
 
   private async load(p: Photo): Promise<Loaded> {
@@ -263,7 +289,7 @@ export class Photos {
 
   async next(): Promise<void> {
     if (this.loading || !this.list.length || !ctx.cfg.background.enabled) {
-      this.schedule();
+      this.schedule(true);
       return;
     }
     this.loading = true;
@@ -298,7 +324,7 @@ export class Photos {
       }
     } finally {
       this.loading = false;
-      this.schedule();
+      this.schedule(true);
     }
   }
 

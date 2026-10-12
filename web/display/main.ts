@@ -1167,6 +1167,11 @@ on('countdowns', () => {
 });
 on('photos', (s) => s.photos && photos.setList(s.photos.photos || []));
 photos.onExhausted = () => fetchPhotos();
+// a carousel switch and a new photo at the same moment look like a glitch: the slideshow steps around switches
+photos.switchAt = () => {
+  const at = carousel?.nextSwitchAt() ?? null;
+  return at === null ? null : at - serverNow() + Date.now();
+};
 
 // ---------------------------------------------------------------------------------------------
 // Timers

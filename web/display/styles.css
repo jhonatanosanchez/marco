@@ -96,6 +96,7 @@ body {
 /* transform: fixed children (the copy of #app) are placed inside this box, not on the viewport */
 .switch-shot__inner { transform: translateZ(0); overflow: hidden; }
 .switch-shot__gl { position: absolute; inset: 0; width: 100%; height: 100%; }
+.switch-shot__frame { position: absolute; left: 0; top: 0; border: 0; display: block; background: transparent; }
 .switch-shot__shell.is-wipe {
   -webkit-mask-image: linear-gradient(104deg, transparent calc(50% - var(--feather, 120px)), #000 calc(50% + var(--feather, 120px)));
   mask-image: linear-gradient(104deg, transparent calc(50% - var(--feather, 120px)), #000 calc(50% + var(--feather, 120px)));

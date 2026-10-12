@@ -11,11 +11,10 @@ import { confirmDialog, toast } from '../components/feedback';
 import { Icon } from '../components/icons';
 import { canCopy, copyText } from '../components/share';
 import { LimitNote } from '../components/LimitNote';
-import { Button, Callout, Card, Empty, Field, Modal, NumberInput, PageHeader, ReorderButtons, Segmented, Select, TextInput, Toggle, ToggleRow } from '../components/ui';
+import { Button, Callout, Card, Empty, Field, Modal, NumberInput, PageHeader, ReorderButtons, SearchInput, Segmented, Select, TextInput, Toggle, ToggleRow } from '../components/ui';
 import { atLimit, limit } from '../caps';
 import { screenHref, useDisplayLinks } from '../displayLinks';
 import { t } from '../i18n';
-import { Preview } from '../Preview';
 import { clone, moveItem, uid } from '../util';
 import { ScheduleRulesEditor } from './Privacy';
 import type { SectionProps } from './common';
@@ -136,45 +135,49 @@ function NowShowing({ full, c }: { full: StoredConfig; c: Carousel }) {
   );
 }
 
-function PreviewDialog({ url, openUrl, name, carousel, savedSteps, trying: tryAtStart, onClose }: { url: string | null; openUrl: string | null; name: string; carousel: Carousel; savedSteps: number; trying?: boolean; onClose: () => void }) {
-  const [trying, setTrying] = useState(!!tryAtStart);
-  const [key, setKey] = useState(0);
-  // the preview loads the saved carousel: the animation can be unsaved, the steps cannot
-  const canTry = carousel.transition !== 'none' && savedSteps > 1;
-  const shown = url && trying && canTry ? tryUrl(url, carousel) : url;
-  return (
-    <Modal title={t('Vista previa')} icon="eye" size="xl" onClose={onClose} autoFocus={false}>
-      <div class="car-try">
-        <Button
-          size="sm"
-          icon={trying ? 'x' : 'play'}
-          disabled={!canTry}
-          onClick={() => {
-            setTrying(!trying);
-            setKey((k) => k + 1);
-          }}
-        >
-          {trying ? t('Dejar de probar') : t('Probar la animación')}
-        </Button>
-        <span class="muted small">{trying ? t('Cambia de pantalla cada pocos segundos, con la animación elegida aunque no esté guardada.') : t('Las teles cambian cuando toca cada paso.')}</span>
-      </div>
-      <Preview variant="sheet" saved url={shown} openUrl={openUrl} screenName={name} reloadKey={key} portrait={false} />
-    </Modal>
-  );
+const LS_OPEN = 'calendar-admin.carousels-open';
+/** Ids of the carousel cards left open (this browser only). */
+function loadOpen(): Set<string> | null {
+  try {
+    const v = localStorage.getItem(LS_OPEN);
+    return v ? new Set(JSON.parse(v) as string[]) : null;
+  } catch {
+    return null;
+  }
 }
+function storeOpen(ids: Set<string>) {
+  try {
+    localStorage.setItem(LS_OPEN, JSON.stringify([...ids]));
+  } catch { /* private mode: only for this visit */ }
+}
+
+/** Show a saved carousel in the side preview (App.tsx listens; it opens the preview when it is closed). */
+export const showInPreview = (id: string) => window.dispatchEvent(new CustomEvent('cs:preview-target', { detail: id }));
 
 export function CarouselsSection({ full, setFull, saved, errors, go, dirty, save }: SectionProps) {
   const [creating, setCreating] = useState(false);
-  const [preview, setPreview] = useState<{ id: string; trying: boolean } | null>(null);
   const openMode = saved.security?.displayAccess === 'open';
   const linkState = useDisplayLinks(saved);
   const links = linkState.data;
   const origin = openMode ? location.origin : shareOrigin(links) || location.origin;
   const items = full.carousels?.items ?? [];
-  // the preview follows the card as it is edited (the "Probar" animation is the one chosen now, saved or not)
-  const previewing = preview ? items.find((c) => c.id === preview.id) ?? null : null;
   const screens = full.screens;
   const screenName = (id: string) => screens.find((s) => s.id === id)?.name ?? t('(pantalla borrada)');
+  // cards fold to one line; with one carousel it starts open, with more they start folded (the choice is remembered)
+  const [openIds, setOpenIds] = useState<Set<string>>(() => loadOpen() ?? new Set(items.length === 1 ? [items[0].id] : []));
+  const toggleOpen = (id: string) =>
+    setOpenIds((cur) => {
+      const n = new Set(cur);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      storeOpen(n);
+      return n;
+    });
+  const [q, setQ] = useState('');
+  const query = q.trim().toLowerCase();
+  const matches = (c: Carousel) =>
+    !query || [c.name, c.slug, ...c.steps.map((st) => screenName(st.screenId))].some((x) => x.toLowerCase().includes(query));
+  const shown = items.filter(matches);
 
   const upd = (id: string, fn: (c: Carousel) => void) =>
     setFull((d) => {
@@ -245,9 +248,15 @@ export function CarouselsSection({ full, setFull, saved, errors, go, dirty, save
         </Card>
       ) : (
         <div class="screen-cards" id="car-list">
-          {items.map((c, i) => {
+          {items.length > 3 && <SearchInput value={q} onValue={setQ} placeholder={t('Buscar carrusel o pantalla…')} />}
+          {items.length > 3 && !shown.length && <p class="muted small">{t('Ningún carrusel coincide con «{q}».', { q })}</p>}
+          {shown.map((c) => {
+            const i = items.indexOf(c);
             const isNew = !saved.carousels?.items.some((x) => x.id === c.id);
             const err = (k: string) => errors[`car.${c.id}.${k}`];
+            const hasErr = Object.keys(errors).some((k) => k.startsWith(`car.${c.id}.`));
+            // a new card, or one with an error, is always open
+            const open = isNew || hasErr || openIds.has(c.id);
             const total = cycleMs(c.steps.filter((st) => screens.some((s) => s.id === st.screenId))) / 1000;
             const link = links?.links.find((l) => l.screenId === c.id);
             const savedC = saved.carousels?.items.find((x) => x.id === c.id);
@@ -256,17 +265,41 @@ export function CarouselsSection({ full, setFull, saved, errors, go, dirty, save
             const first = screens.find((s) => s.id === c.steps[0]?.screenId);
             const offOptions = [{ value: '', label: t('La primera del carrusel ({name})', { name: first?.name ?? '–' }) }, ...screenOptions];
             return (
-              <section class={`screen-card car-card ${c.enabled ? '' : 'is-off'}`} key={c.id}>
+              <section class={`screen-card car-card ${c.enabled ? '' : 'is-off'} ${open ? '' : 'is-folded'}`} key={c.id}>
                 <div class="screen-card__body">
                   <div class="screen-card__head">
+                    <button
+                      type="button"
+                      class="icon-btn car-fold"
+                      aria-expanded={open}
+                      disabled={isNew || hasErr}
+                      title={open ? t('Plegar') : t('Desplegar')}
+                      onClick={() => toggleOpen(c.id)}
+                    >
+                      <Icon name="chevron" size={16} />
+                    </button>
                     <Icon name="repeat" size={18} />
-                    <TextInput class="screen-card__name" value={c.name} maxLength={40} onValue={(v) => upd(c.id, (x) => void (x.name = v))} error={!!err('name')} />
+                    {open ? (
+                      <TextInput class="screen-card__name" value={c.name} maxLength={40} onValue={(v) => upd(c.id, (x) => void (x.name = v))} error={!!err('name')} />
+                    ) : (
+                      <button type="button" class="car-fold__name" onClick={() => toggleOpen(c.id)}>
+                        <strong>{c.name}</strong>
+                        <span class="muted small">
+                          {c.steps.map((st) => `${screenName(st.screenId)} ${formatCycle(st.seconds)}`).join(' → ')}
+                          {total > 0 ? ` · ${t('Ciclo completo: {d}', { d: formatCycle(total) })}` : ''}
+                        </span>
+                      </button>
+                    )}
                     <label class="mini-toggle">
                       <Toggle checked={c.enabled} onChange={(v) => upd(c.id, (x) => void (x.enabled = v))} />
                       <span>{c.enabled ? t('Activo') : t('En pausa')}</span>
                     </label>
                     {isNew && <span class="badge badge--soft">{t('Nuevo')}</span>}
                   </div>
+
+                  {!open && c.enabled && c.steps.length > 0 && <NowShowing full={full} c={c} />}
+                  {open && (
+                    <>
 
                   {openMode ? (
                     <div class="screen-card__slug">
@@ -388,16 +421,6 @@ export function CarouselsSection({ full, setFull, saved, errors, go, dirty, save
                           options={TRANSITIONS.map(([value, label]) => ({ value, label: t(label) }))}
                           onChange={(v) => upd(c.id, (x) => void (x.transition = v))}
                         />
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          icon="play"
-                          disabled={isNew || c.transition === 'none' || (savedC?.steps.length ?? 0) < 2}
-                          title={isNew || (c.steps.length > 1 && (savedC?.steps.length ?? 0) < 2) ? t('Guarda para previsualizar este carrusel') : undefined}
-                          onClick={() => setPreview({ id: c.id, trying: true })}
-                        >
-                          {t('Probar la animación')}
-                        </Button>
                       </div>
                     </Field>
                     <Field label={t('Duración de la animación')}>
@@ -446,8 +469,11 @@ export function CarouselsSection({ full, setFull, saved, errors, go, dirty, save
                     newTo="22:00"
                   />
 
+                    </>
+                  )}
+
                   <div class="screen-card__actions">
-                    <Button size="sm" icon="eye" disabled={isNew} title={isNew ? t('Guarda para previsualizar este carrusel') : undefined} onClick={() => setPreview({ id: c.id, trying: false })}>
+                    <Button size="sm" icon="eye" disabled={isNew} title={isNew ? t('Guarda para previsualizar este carrusel') : undefined} onClick={() => showInPreview(c.id)}>
                       {t('Vista previa')}
                     </Button>
                     {!isNew && screenHref(saved, c.id, linkState) && (
@@ -522,17 +548,6 @@ export function CarouselsSection({ full, setFull, saved, errors, go, dirty, save
             setCreating(false);
             toast(t('Carrusel “{name}” creado · guarda para aplicar', { name: c.name }), 'ok');
           }}
-        />
-      )}
-      {preview && previewing && (
-        <PreviewDialog
-          name={previewing.name}
-          carousel={previewing}
-          savedSteps={saved.carousels?.items.find((x) => x.id === previewing.id)?.steps.length ?? 0}
-          trying={preview.trying}
-          url={screenHref(saved, previewing.id, linkState, { preview: true })}
-          openUrl={screenHref(saved, previewing.id, linkState)}
-          onClose={() => setPreview(null)}
         />
       )}
     </>

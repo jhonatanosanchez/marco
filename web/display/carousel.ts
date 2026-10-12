@@ -256,6 +256,15 @@ export class CarouselController {
     }
   }
 
+  /** When the screen on display changes next by the clock (ms, server time), or null (paused, held, pinned, try mode). */
+  nextSwitchAt(now = this.d.now()): number | null {
+    if (this.stopped || this.manual !== null || this.d.frozen || this.d.pin) return null;
+    const ph = this.phase(now);
+    if (ph.mode !== 'rotate' || ph.endsAt === null) return null;
+    const next = this.phase(ph.endsAt + 1);
+    return next.screenId && next.screenId !== ph.screenId ? ph.endsAt : null;
+  }
+
   /** Parts of a screen's bundle that need a refresh now. */
   stale(screenId: string, now = this.d.now()): BundlePart[] {
     const b = this.bundles.get(screenId);

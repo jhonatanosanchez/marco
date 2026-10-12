@@ -7,7 +7,7 @@ import { t } from './i18n';
  * `url` is the preview address (displayLinks.ts useScreenUrl with preview: the display then neither registers as a
  * connected screen nor writes its storage), `openUrl` the same screen for a new tab; null while it is not known yet.
  */
-export function Preview({ reloadKey, portrait, onClose, variant, saved, url, openUrl, screenName, choices, chosen, onChoose }: { reloadKey: number; portrait: boolean; onClose?: () => void; variant: 'side' | 'sheet'; saved: boolean; url: string | null; openUrl: string | null; screenName?: string; choices?: { value: string; label: string }[]; chosen?: string; onChoose?: (v: string) => void }) {
+export function Preview({ reloadKey, portrait, onClose, variant, saved, url, openUrl, screenName, choices, chosen, onChoose, hint }: { reloadKey: number; portrait: boolean; onClose?: () => void; variant: 'side' | 'sheet'; saved: boolean; url: string | null; openUrl: string | null; screenName?: string; choices?: { value: string; label: string }[]; chosen?: string; onChoose?: (v: string) => void; hint?: string }) {
   const box = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -85,7 +85,7 @@ export function Preview({ reloadKey, portrait, onClose, variant, saved, url, ope
           {saved && !loaded && <div class="preview__loading shimmer" />}
         </div>
       </div>
-      <p class="preview__hint muted small">{t('Se recarga al guardar. Los cambios sin guardar no aparecen aquí.')}</p>
+      <p class="preview__hint muted small">{hint ?? t('Se recarga al guardar. Los cambios sin guardar no aparecen aquí.')}</p>
     </div>
   );
 }

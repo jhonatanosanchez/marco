@@ -116,17 +116,8 @@ test('low power: the Pi GPU and ARM client hints (recent Chromium says x86_64 on
   assert.equal(isArmDesktop('arm', 'Android', true), false);
 });
 
-test('shotSelector: id rules get a data-shot-id twin with the same specificity', () => {
-  const { shotSelector } = sw;
-  assert.equal(shotSelector('.side .x'), null);
-  assert.equal(shotSelector('#app.side-right'), '#app.side-right, :is([data-shot-id="app"],#__marco-shot-never).side-right');
-  assert.equal(
-    shotSelector('html.lite #app .card, #news'),
-    'html.lite #app .card, #news, html.lite :is([data-shot-id="app"],#__marco-shot-never) .card, :is([data-shot-id="news"],#__marco-shot-never)',
-  );
-  assert.equal(shotSelector('a[href="#top"]'), null, 'a # inside a string is not an id');
-  const once = shotSelector('#app');
-  assert.equal(shotSelector(once), null, 'never twice');
+test('screenSwitch: the module loads (the switch itself needs a browser)', () => {
+  assert.equal(typeof sw.ScreenSwitcher, 'function');
 });
 
 test('admin "Probar": the preview address carries the animation chosen now', () => {

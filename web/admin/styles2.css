@@ -5529,3 +5529,24 @@ button.immich-album:hover {
   font-weight: 600;
   font-size: 13px;
 }
+
+/* carousels: a folded card is one line (name, its screens and times, what is on now) */
+.car-fold .ico { transition: transform 0.15s ease; }
+.car-card.is-folded .car-fold .ico { transform: rotate(-90deg); }
+.car-fold__name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.car-fold__name strong { font-size: 16px; }
+.car-fold__name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
