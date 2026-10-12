@@ -9,7 +9,7 @@ import './styles-modern.css';
 import './styles-planner.css';
 import './styles-kids.css';
 import type {
-  Announcement, CountdownsResponse, DisplayConfig, EventsResponse, FamilyDisplayState, Lang, NewsResponse, NightCommand, PhotosResponse, StreamHello, WeatherResponse,
+  Announcement, CountdownsResponse, DisplayConfig, EventsResponse, FamilyDisplayState, Lang, NewsResponse, NightCommand, PhotosResponse, PlannerBar, StreamHello, WeatherResponse,
 } from '../shared/types';
 import { addDays, startOfWeek } from '../shared/i18n';
 import { api, ApiError } from './api';
@@ -240,10 +240,20 @@ const PRESETS = [
 /** Newer layouts built on an older one's frame: they also get its class, so its rules (and the Modern ones) apply. */
 const PRESET_BASE: Record<string, string> = { today: 'bigCalendar', twoWeeks: 'bigCalendar', people: 'topBottom', board: 'topBottom' };
 
-/** Planner: the top / bottom frame on a portrait screen, the big calendar one (side column) on a landscape one. */
-function presetBase(preset: string, portrait: boolean): string {
-  if (preset === 'planner') return portrait ? 'topBottom' : 'bigCalendar';
+/**
+ * Planner: the top / bottom frame on a portrait screen. On a landscape one, the big calendar frame (side column), or
+ * the top / bottom frame with a low strip when layout.plannerBar is 'top' or 'bottom'.
+ */
+function presetBase(preset: string, portrait: boolean, bar: PlannerBar = 'side'): string {
+  if (preset === 'planner') return portrait || bar !== 'side' ? 'topBottom' : 'bigCalendar';
   return PRESET_BASE[preset] ?? '';
+}
+
+/** Where the planner puts the clock and the weather on this screen ('side' anywhere else, and on portrait screens). */
+function plannerBar(cfg: DisplayConfig, preset: string, portrait: boolean): PlannerBar {
+  if (preset !== 'planner' || portrait) return 'side';
+  const q = params.get('bar') || cfg.layout.plannerBar;
+  return q === 'top' || q === 'bottom' ? q : 'side';
 }
 
 function effectivePreset(cfg: DisplayConfig): string {
@@ -267,12 +277,15 @@ function applyLayout(): void {
   const portrait = isPortrait(cfg);
   const side = params.get('side') || cfg.layout.sidePanel;
   const corner = params.get('corner') || cfg.layout.corner || 'br';
+  const bar = plannerBar(cfg, preset, portrait);
   app.className = [
     // kept until revealApp() fades the screen in (with the Modern style over a photo, once the photo is there)
     app.classList.contains('booting') ? 'booting' : '',
     `preset-${preset}`, `side-${side === 'right' ? 'right' : 'left'}`, portrait ? 'portrait' : 'landscape',
     cfg.background.enabled ? 'has-photo' : 'no-photo',
-    presetBase(preset, portrait) ? `preset-${presetBase(preset, portrait)}` : '',
+    presetBase(preset, portrait, bar) ? `preset-${presetBase(preset, portrait, bar)}` : '',
+    // planner on a landscape screen with the clock and the weather in a strip (styles-planner.css)
+    bar !== 'side' ? `pbar pbar-${bar}` : '',
     preset === 'photoFrame' ? `corner-${['tl', 'tr', 'bl', 'br'].includes(corner) ? corner : 'br'}` : '',
   ].filter(Boolean).join(' ');
   app.classList.toggle('has-view', VIEW_PRESETS.includes(preset));
@@ -306,6 +319,13 @@ function applyGlass(): void {
   root.classList.toggle('glass-thin', g.thin);
 }
 window.addEventListener('marco:photo-tone', () => applyGlass());
+
+/** The shape of the screen as far as the week-row caps in applyConfig go (portrait or not, small landscape or not). */
+let lastFrameKey = '';
+function frameKey(): string {
+  const small = window.innerWidth > window.innerHeight && window.innerHeight <= 820;
+  return `${isPortrait(ctx.cfg) ? 'p' : 'l'}|${small ? 's' : 'n'}`;
+}
 
 function applyConfig(raw: DisplayConfig): void {
   const cfg = normalizeConfig(raw);
@@ -362,6 +382,8 @@ function applyConfig(raw: DisplayConfig): void {
   if (pfx === 'off' || pfx === 'simple' || pfx === 'rich') cfg.background.weatherFx = pfx;
   // the top-bottom preset has a shorter calendar: cap the number of week rows so chips stay readable
   if (effectivePreset(cfg) === 'topBottom') capWeeks(4);
+  // so has the planner with its clock and weather in a strip above or below the month (landscape)
+  if (plannerBar(cfg, effectivePreset(cfg), isPortrait(cfg)) !== 'side') capWeeks(4);
   // Two weeks: the month grid with two roomy rows (more events per day)
   if (effectivePreset(cfg) === 'twoWeeks') {
     cfg.calendar.view = 'month';
@@ -377,6 +399,7 @@ function applyConfig(raw: DisplayConfig): void {
   if (window.innerWidth > window.innerHeight && window.innerHeight <= 820 && effectivePreset(cfg) !== 'twoWeeks') capWeeks(4);
   calendar.maxAutoWeeks = autoMax;
   setCtxConfig(cfg);
+  lastFrameKey = frameKey();
   setTimezone(ctx.tz);
   const root = document.documentElement;
   root.lang = ctx.lang;
@@ -588,15 +611,18 @@ function fitSide(): void {
 function fitSideContent(): void {
   const mid = sideEl.querySelector('.side-mid') as HTMLElement;
   const cdChips = Array.from(document.querySelectorAll<HTMLElement>('#countdowns > .cd'));
+  // the planner strip centres its content: a few px into its padding is still fully visible, only more than that counts
+  const slack = app.classList.contains('pbar') ? parseFloat(getComputedStyle(sideEl).paddingBottom) || 0 : 0;
   const overflowing = () => {
     const midHasContent = Array.from(mid.children).some((c) => (c as HTMLElement).style.display !== 'none' && (c as HTMLElement).offsetHeight > 0);
     // bigTime fades its mid column out with a mask: overflowing there is by design (agenda simply fades out)
     const midMasked = app.classList.contains('preset-bigTime');
-    return sideEl.scrollHeight > sideEl.clientHeight + 2 || (!midMasked && midHasContent && mid.scrollHeight > mid.clientHeight + 2);
+    return sideEl.scrollHeight > sideEl.clientHeight + 2 + slack || (!midMasked && midHasContent && mid.scrollHeight > mid.clientHeight + 2);
   };
   app.classList.remove(...FIT_STEPS);
   for (const c of cdChips) c.classList.remove('fit-hide');
   fitStrip();
+  fitPlannerBar();
   if (!overflowing()) return;
   // Today: the forecast for the next hours matters more than the countdowns
   if (app.classList.contains('preset-today')) {
@@ -643,6 +669,29 @@ function fitMidRows(): void {
   for (const c of cds) {
     c.classList.add('fit-hide');
     if (!over()) return;
+  }
+}
+
+/**
+ * Planner strip (#app.pbar, a landscape screen with layout.plannerBar top / bottom): the weather is one row after the
+ * clock. It keeps the current weather and as many whole hours and days as fit: the hours go first, then the days, each
+ * from the furthest, and a group left with one column goes with its line.
+ */
+function fitPlannerBar(): void {
+  const wx = document.getElementById('weather');
+  if (!wx) return;
+  const groups = Array.from(wx.querySelectorAll<HTMLElement>(':scope > .wx-hourly, :scope > .wx-days'));
+  const hours = Array.from(wx.querySelectorAll<HTMLElement>(':scope > .wx-hourly > *'));
+  const days = Array.from(wx.querySelectorAll<HTMLElement>(':scope > .wx-days > *'));
+  for (const el of [...groups, ...hours, ...days]) el.classList.remove('fit-hide');
+  if (!app.classList.contains('pbar') || !sideEl.offsetWidth) return;
+  const over = () => sideEl.scrollWidth > sideEl.clientWidth + 1;
+  for (const el of [...hours.reverse(), ...days.reverse()]) {
+    if (!over()) return;
+    el.classList.add('fit-hide');
+    // a group down to one column says little next to the current weather: it goes with its line
+    const g = el.parentElement;
+    if (g && g.querySelectorAll(':scope > :not(.fit-hide)').length < 2) g.classList.add('fit-hide');
   }
 }
 
@@ -1438,6 +1487,12 @@ let resizeT: ReturnType<typeof setTimeout> | null = null;
 window.addEventListener('resize', () => {
   if (resizeT) clearTimeout(resizeT);
   resizeT = setTimeout(() => {
+    // the week-row caps depend on the shape of the screen: when it turns (or a landscape window gets small or big), start again from the saved config
+    if (state.config && frameKey() !== lastFrameKey) {
+      applyConfig(state.config);
+      photos.reframe();
+      return;
+    }
     applyLayout();
     renderAll();
     photos.reframe();

@@ -2,7 +2,7 @@
 export const ROWS_PLANNER: [string, string, string][] = [
   // the layout card (one line each: server/test/display-layouts.test.js looks for the whole row)
   ['Planificador', 'Planner', 'Planeador'],
-  ['Para familias con muchas citas: reloj, fecha y tiempo arriba, y debajo el mes con tarjetas que llenan cada día. Pensado para pantallas verticales.', 'For busy families: clock, date and weather on top, and below them the month with cards that fill each day. Made for portrait screens.', 'Para famílias com muitos compromissos: relógio, data e tempo em cima e, por baixo, o mês com cartões que enchem cada dia. Pensado para ecrãs verticais.'],
+  ['Para familias con muchas citas: el mes con tarjetas que llenan cada día, y el reloj, la fecha y el tiempo arriba. En pantallas horizontales también pueden ir al lado o abajo.', 'For busy families: the month with cards that fill each day, with the clock, the date and the weather on top. On landscape screens they can also go at the side or at the bottom.', 'Para famílias com muitos compromissos: o mês com cartões que enchem cada dia, com o relógio, a data e o tempo em cima. Em ecrãs horizontais também podem ficar ao lado ou em baixo.'],
   [
     'Al elegirlo se activan las semanas automáticas y las tarjetas. Puedes cambiarlo aquí o en Calendarios, Vista del calendario.',
     'Picking it turns on automatic weeks and cards. You can change them here or in Calendars, Calendar view.',
@@ -12,6 +12,26 @@ export const ROWS_PLANNER: [string, string, string][] = [
     'Auto elige entre 2 y 6 semanas, las que caben con el máximo de eventos por día a buen tamaño. Se recalcula si la pantalla gira.',
     'Auto picks 2 to 6 weeks, as many as fit with the most events per day at a good size. It is worked out again when the screen turns.',
     'Auto escolhe entre 2 e 6 semanas, as que cabem com o máximo de eventos por dia num bom tamanho. É recalculado se o ecrã rodar.',
+  ],
+  // where the clock and the weather go on a landscape screen (layout.plannerBar)
+  ['Hora y tiempo', 'Time and weather', 'Hora e tempo'],
+  ['Al lado', 'At the side', 'Ao lado'],
+  ['Arriba', 'Top', 'Em cima'],
+  ['Abajo', 'Bottom', 'Em baixo'],
+  [
+    'En pantallas horizontales. Arriba o abajo, el mes ocupa todo el ancho y el tiempo se ve en una fila. En vertical siempre van arriba.',
+    'On landscape screens. At the top or the bottom, the month takes the whole width and the weather is shown in one row. On portrait screens they are always on top.',
+    'Em ecrãs horizontais. Em cima ou em baixo, o mês ocupa toda a largura e o tempo aparece numa linha. Na vertical ficam sempre em cima.',
+  ],
+  [
+    'Con la hora y el tiempo arriba o abajo se ven como mucho 4 semanas.',
+    'With the time and the weather at the top or the bottom, at most 4 weeks are shown.',
+    'Com a hora e o tempo em cima ou em baixo, veem-se no máximo 4 semanas.',
+  ],
+  [
+    'El Planificador tiene ahora la hora y el tiempo arriba o abajo, sin columna lateral.',
+    'The Planner now has the time and the weather at the top or the bottom, with no side column.',
+    'O Planeador tem agora a hora e o tempo em cima ou em baixo, sem coluna lateral.',
   ],
   ['Estilo de los eventos', 'Event style', 'Estilo dos eventos'],
   ['Líneas', 'Lines', 'Linhas'],

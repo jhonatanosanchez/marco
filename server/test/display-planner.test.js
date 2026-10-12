@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { validateConfig, mergeDefaults, LAYOUT_PRESETS, EVENT_STYLES } from '../core/validate.js';
+import { validateConfig, mergeDefaults, LAYOUT_PRESETS, EVENT_STYLES, PLANNER_BARS } from '../core/validate.js';
 import { defaultConfig, defaultScreenProfile, PLANNER_CALENDAR, SCREEN_SPLIT_KEYS } from '../core/defaults.js';
 import { displayConfig } from '../core/screens.js';
 import { applySetup, parseSetupBody } from '../setup.js';
@@ -250,4 +250,86 @@ test('portrait top band: the pills under the clock never widen its column (the w
   assert.match(css, /\.hl-tt \{ overflow: hidden; text-overflow: ellipsis; min-width: 0;/);
   assert.match(css, /\.hl-pill \{[^}]*max-width: 100%;/);
   assert.match(read('web/display/marquee.ts'), /'\.hl-tt'/);
+});
+
+// GitHub issue #2: the planner on a landscape screen with the time and the weather above or below the month.
+test('plannerBar is side, top or bottom, per screen; anything else is rejected with its path', () => {
+  assert.deepEqual(PLANNER_BARS, ['side', 'top', 'bottom']);
+  assert.equal(defaultScreenProfile().layout.plannerBar, 'side');
+  for (const ok of PLANNER_BARS) {
+    const c = defaultConfig();
+    c.screens[0].layout.preset = 'planner';
+    c.screens[0].layout.plannerBar = ok;
+    const r = validateConfig(c);
+    assert.equal(r.ok, true, `${ok}: ${JSON.stringify(r.errors)}`);
+    assert.equal(r.value.screens[0].layout.plannerBar, ok);
+    // the display gets it with the rest of the layout
+    assert.equal(displayConfig(r.value, r.value.screens[0]).layout.plannerBar, ok);
+  }
+  for (const bad of ['Top', 'left', 'above', 1, true, '']) {
+    const c = defaultConfig();
+    c.screens[0].layout.plannerBar = bad;
+    const r = validateConfig(c);
+    assert.equal(r.ok, false, `accepted ${JSON.stringify(bad)}`);
+    assert.ok(r.errors.some((e) => e.path === 'screens[0].layout.plannerBar'), JSON.stringify(r.errors));
+    assert.equal(r.value.screens[0].layout.plannerBar, 'side');
+  }
+});
+
+test('plannerBar: screens saved before it keep the side column, on the server and on the display', () => {
+  const c = defaultConfig();
+  c.screens[0].layout.preset = 'planner';
+  delete c.screens[0].layout.plannerBar;
+  for (const v of [validateConfig(mergeDefaults(structuredClone(c))), validateConfig(structuredClone(c))]) {
+    assert.equal(v.ok, true, JSON.stringify(v.errors));
+    assert.equal(v.value.screens[0].layout.plannerBar, 'side');
+  }
+  const { normalizeConfig } = displayDefaults;
+  assert.equal(normalizeConfig({}).layout.plannerBar, 'side');
+  assert.equal(normalizeConfig({ layout: { preset: 'planner' } }).layout.plannerBar, 'side');
+  assert.equal(normalizeConfig({ layout: { plannerBar: 'nowhere' } }).layout.plannerBar, 'side');
+  assert.equal(normalizeConfig({ layout: { plannerBar: 'bottom' } }).layout.plannerBar, 'bottom');
+});
+
+test('plannerBar on the display: a landscape planner with top / bottom uses the top / bottom frame and a low strip', () => {
+  const main = read('web/display/main.ts');
+  // portrait is unchanged (always the top band); landscape: side column, or the top / bottom frame
+  assert.match(main, /if \(preset === 'planner'\) return portrait \|\| bar !== 'side' \? 'topBottom' : 'bigCalendar';/);
+  assert.match(main, /function plannerBar\(cfg: DisplayConfig, preset: string, portrait: boolean\): PlannerBar \{\s*if \(preset !== 'planner' \|\| portrait\) return 'side';/);
+  assert.match(main, /bar !== 'side' \? `pbar pbar-\$\{bar\}` : ''/);
+  // ?bar=top|bottom|side for screenshots and tests
+  assert.match(main, /params\.get\('bar'\) \|\| cfg\.layout\.plannerBar/);
+  // a shorter grid: at most four rows, like the top / bottom layout; the weather row drops what does not fit
+  assert.match(main, /if \(plannerBar\(cfg, effectivePreset\(cfg\), isPortrait\(cfg\)\) !== 'side'\) capWeeks\(4\);/);
+  assert.match(main, /fitStrip\(\);\s*fitPlannerBar\(\);/);
+  const css = read('web/display/styles-planner.css').replace(/\/\*[\s\S]*?\*\//g, '');
+  // a low strip (18% of the height, more with a bigger font scale)
+  assert.match(css, /#app\.preset-planner\.pbar \{ grid-template-rows: min\(30%, calc\(18% \* var\(--fs\)\)\) minmax\(0, 1fr\); \}/);
+  assert.match(css, /#app\.preset-planner\.pbar-bottom \{ grid-template-rows: minmax\(0, 1fr\) min\(30%, calc\(18% \* var\(--fs\)\)\); \}/);
+  assert.match(css, /#app\.preset-planner\.pbar-bottom \.photo-area, #app\.preset-planner\.pbar-bottom \.side \{ grid-row: 2; \}/);
+  assert.match(css, /\.preset-planner\.pbar \.weather \.fit-hide \{ display: none !important; \}/);
+  // Modern: a long place name is cut, it does not push the forecast out of the row
+  assert.match(css, /\.style-modern \.preset-planner\.pbar \.wxm-main \{ max-width: 22rem; \}/);
+  // the strip centres its content: a few px into its padding is not an overflow (the hourly forecast stays)
+  assert.match(main, /const slack = app\.classList\.contains\('pbar'\) \? parseFloat\(getComputedStyle\(sideEl\)\.paddingBottom\) \|\| 0 : 0;/);
+  // a screen that turns gets its week-row caps worked out again from the saved config
+  assert.match(main, /if \(state\.config && frameKey\(\) !== lastFrameKey\) \{\s*applyConfig\(state\.config\);/);
+  assert.match(main, /setCtxConfig\(cfg\);\s*lastFrameKey = frameKey\(\);/);
+});
+
+test('plannerBar in the admin: the option in the Planner card, the side panel card muted, texts in es / en / pt', () => {
+  const admin = read('web/admin/sections/Layout.tsx');
+  assert.match(admin, /value=\{l\.plannerBar \?\? 'side'\}/);
+  assert.match(admin, /d\.layout\.plannerBar = v/);
+  assert.match(admin, /const plannerStrip = l\.preset === 'planner' && \(l\.plannerBar \?\? 'side'\) !== 'side';/);
+  assert.match(admin, /\.includes\(l\.preset\) && !plannerStrip;/);
+  assert.match(admin, /<Schematic id=\{p\.id\} side=\{l\.sidePanel\} plannerBar=\{l\.plannerBar \?\? 'side'\} \/>/);
+  const dict = read('web/admin/i18n-dict-planner.ts');
+  for (const s of ['Hora y tiempo', 'Al lado', 'Arriba', 'Abajo']) assert.match(dict, new RegExp(`\\['${s}', '[^']+', '[^']+'\\]`), s);
+  for (const m of admin.matchAll(/t\('((?:En pantallas horizontales|El Planificador tiene|Con la hora y el tiempo)[^']+)'\)/g)) {
+    assert.ok(dict.includes(`'${m[1]}'`), `no row for "${m[1]}"`);
+  }
+  // 5 or 6 fixed weeks with the strip: the card says that at most 4 are shown
+  assert.match(admin, /cfg\.calendar\.weeks > 4\s*\? ' ' \+ t\('Con la hora y el tiempo arriba o abajo se ven como mucho 4 semanas\.'\)/);
+  assert.match(read('web/shared/types.ts'), /plannerBar\?: PlannerBar;/);
 });

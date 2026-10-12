@@ -525,7 +525,10 @@ planificador:
      ancho de la semana.
    - Un día con más tarjetas de las que caben las muestra por turnos (*Rotar los días con muchos eventos*) o con "+N".
      Los títulos de más de dos líneas suben poco a poco con *Desplazar los textos largos*.
-3. En una pantalla horizontal, el planificador mantiene una columna lateral con el reloj y el tiempo.
+3. En una pantalla horizontal, *Hora y tiempo* en la tarjeta Planificador de *Diseño* decide dónde van el reloj y el
+   tiempo: en una columna lateral (lo de serie) o en una franja baja arriba o abajo. Con la franja el mes ocupa todo
+   el ancho (como mucho 4 semanas) y el tiempo va en una fila: ahora, las próximas horas y los próximos días, y se
+   oculta lo que no cabe. En vertical siempre van arriba.
 
 Nada cambia en las pantallas que no usan estas opciones: lo de serie siguen siendo eventos en una línea y un número
 fijo de semanas. Las *Tarjetas* y las semanas *Auto* también funcionan con los demás diseños, en las vistas de mes y de
@@ -1062,7 +1065,7 @@ Haz copia de seguridad de toda la carpeta (o usa *Exportar*) para conservarlo to
 | `?demo=1&pair=1` `?demo=1&pair=invalid` `&pairLen=6\|8` | Muestra la pantalla de vinculación o la de “enlace ya no válido” con un código de ejemplo (sin servidor) |
 | `?empty=1` `?photos=0` | Con `?demo=1`: sin eventos, cuentas atrás ni tareas, o sin foto de fondo (para ver los estados vacíos) |
 | `?marquee=0\|1` `?rotate=0\|1` | Desactiva (o activa) los títulos largos que se deslizan (eventos del calendario, las píldoras junto al reloj, las cuentas atrás, el titular de las noticias; los de varias líneas suben línea a línea) y los días con muchos eventos que los muestran por turnos (*Calendarios → Vista del calendario*); con `?demo=1`, `&busy=1` añade un día lleno y títulos largos para probarlo |
-| `?cards=0\|1` `?weeks=auto` `?preset=planner` | Eventos como tarjetas (o en líneas), semanas automáticas, el diseño *Planificador*. Con `?demo=1`, `&planner=1` muestra el planificador tal como queda al elegirlo en el panel (prueba con `&busy=2`) |
+| `?cards=0\|1` `?weeks=auto` `?preset=planner` | Eventos como tarjetas (o en líneas), semanas automáticas, el diseño *Planificador*. Con `?demo=1`, `&planner=1` muestra el planificador tal como queda al elegirlo en el panel (prueba con `&busy=2`); `&bar=side\|top\|bottom` pone su reloj y su tiempo al lado, arriba o abajo en una pantalla horizontal |
 | `?agendaDays=auto\|7\|14\|30` | Hasta dónde mira la vista de agenda (*Calendarios → Vista del calendario → Días en la agenda*). Con `?demo=1`, `&sparse=1&preset=agenda` muestra un calendario tranquilo con eventos dentro de varias semanas |
 | `?compact=0\|1` `?weeks=1..8` | Desactiva (o activa) los días llenos en compacto: un día en el que no caben sus eventos los muestra en líneas pequeñas y las filas de semanas se reparten el alto según los eventos que tienen (*Calendarios → Vista del calendario*); `?weeks=` muestra ese número de semanas. Con `?demo=1`, `&busy=2` llena todo el mes |
 | `?style=modern&preset=kidsRoutines\|kidsFamily\|kidsMeals` | Los diseños para niños. Con `?demo=1`: `&members=6`, `&touch=0`, `&qr=0`, `&stars=0`, `&meals=0`, `&snack=1` (cuatro comidas al día), `&todo=1`, `&famPrivacy=hide` (con `&private=1`) |

@@ -3,7 +3,8 @@
    - Cards (calendar.eventStyle = 'cards'): every rule is scoped to .ev-cards, .wk.cards or .cstack.cards, which
      only exist in that style, so screens with one-line chips look exactly as before.
    - Planner layout (layout.preset = 'planner'): every rule is scoped to .preset-planner. On a portrait screen it
-     uses the top / bottom frame (#app also gets .preset-topBottom), on a landscape one the big calendar frame.
+     uses the top / bottom frame (#app also gets .preset-topBottom), on a landscape one the big calendar frame, or the top / bottom frame with a low strip when
+     layout.plannerBar is 'top' or 'bottom' (#app gets .pbar).
    The card sizes (--card-*) are set in px by calendar.ts, which plans the cards with the same numbers.
    ============================================================================================= */
 
@@ -97,3 +98,89 @@
 .preset-planner.portrait .main { padding-top: 0.6rem; }
 /* the date stays on one line: the column is as wide as the clock and the date (the pills below never widen it) */
 .preset-planner.portrait .side-top .date { white-space: nowrap; }
+
+/* landscape strip (layout.plannerBar 'top' / 'bottom', #app.pbar): the top / bottom frame with a low band. The clock
+   with the date and the next event beside it on one side; on the other the weather laid out as one row (now, the next
+   hours, the next days). main.ts (fitPlannerBar) hides the hours and then the days that do not fit, from the end. */
+#app.preset-planner.pbar { grid-template-rows: min(30%, calc(18% * var(--fs))) minmax(0, 1fr); }
+#app.preset-planner.pbar-bottom { grid-template-rows: minmax(0, 1fr) min(30%, calc(18% * var(--fs))); }
+#app.preset-planner.pbar-bottom .photo-area, #app.preset-planner.pbar-bottom .side { grid-row: 2; }
+#app.preset-planner.pbar-bottom .main { grid-row: 1; }
+.preset-planner.pbar .side {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4rem;
+  padding: 1.2rem 3.6rem;
+  overflow: hidden;
+}
+.preset-planner.pbar .side-top {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  align-self: center;
+  column-gap: 2.8rem;
+  flex: none;
+  text-align: left;
+}
+.preset-planner.pbar #clock { display: contents; }
+.preset-planner.pbar .clock { grid-column: 1; grid-row: 1 / 3; }
+.preset-planner.pbar .clock.digital { font-size: 12rem; }
+.style-modern #app.preset-planner.pbar .clock.digital { font-size: 13rem; }
+.preset-planner.pbar .clock.analog svg { width: 14rem; height: 14rem; }
+.preset-planner.pbar .side-top .date { grid-column: 2; grid-row: 1; align-self: end; margin: 0; white-space: nowrap; }
+/* the next-event pill sits under the date and is never wider than it (see .preset-topBottom .highlights) */
+.preset-planner.pbar .highlights { grid-column: 2; grid-row: 2; align-self: start; margin-top: 1.2rem; }
+.preset-planner.pbar .hl-pill:nth-child(n + 2) { display: none; }
+.preset-planner.pbar .side-bottom { flex: none; align-self: center; max-width: none; margin: 0; }
+.preset-planner.pbar .side .side-bottom .weather { margin: 0; }
+.preset-planner.pbar .weather { flex-direction: row; align-items: center; gap: 0; }
+.preset-planner.pbar .weather .wx-meta { display: none; }
+.preset-planner.pbar .weather .fit-hide { display: none !important; }
+/* the groups of the row: the next hours, the next days, each after a thin line */
+.preset-planner.pbar .weather .wx-hourly,
+.preset-planner.pbar .weather .wx-days {
+  display: flex;
+  align-items: center;
+  gap: 1.4rem;
+  margin: 0 0 0 2.4rem;
+  padding: 0 0 0 2.4rem;
+  border: 0;
+  border-left: 1px solid rgb(255 255 255 / 0.16);
+  align-self: stretch;
+}
+.preset-planner.pbar .weather .wx-hourly .h { min-width: 4.6rem; }
+/* Classic: the current weather smaller, the days as small columns */
+.preset-planner.pbar .wx-icon svg { width: 7.6rem; height: 8rem; }
+.preset-planner.pbar .wx-temp { font-size: 8.4rem; }
+.preset-planner.pbar .wx-desc { max-width: 22rem; }
+.preset-planner.pbar .wx-desc b { font-size: 2.1rem; }
+.preset-planner.pbar .wx-desc .hilo { font-size: 1.9rem; }
+#app.preset-planner.pbar .dp { flex-direction: column; justify-content: center; gap: 0.3rem; min-width: 7.6rem; padding: 0.8rem 0.8rem 0.9rem; }
+#app.preset-planner.pbar .dp svg { width: 3.8rem; height: 4rem; }
+#app.preset-planner.pbar .dp .dmx { font-size: 2rem; }
+.preset-planner.pbar .side .side-bottom .weather { padding: 1.4rem 2.2rem; }
+/* Modern: the card keeps its look, a little lower */
+.style-modern .preset-planner.pbar .side .side-bottom .weather { padding: 1.2rem 2.6rem; border-radius: 2.4rem; }
+.style-modern .preset-planner.pbar .wxm-head { align-items: center; gap: 2.4rem; }
+.style-modern .preset-planner.pbar .wxm-temp { font-size: 7rem; }
+/* the row gives the card its natural width: a long place name is cut with an ellipsis instead of pushing the forecast out */
+.style-modern .preset-planner.pbar .wxm-main { max-width: 22rem; }
+.style-modern .preset-planner.pbar .wxm-icon svg { width: 3.6rem; height: 3.8rem; margin-bottom: 0; }
+.style-modern .preset-planner.pbar .weather .wx-hourly,
+.style-modern .preset-planner.pbar .weather .wxm-days { gap: 2rem; margin-top: 0; border-top: 0; border-left-color: var(--m-sep); }
+.style-modern .preset-planner.pbar .weather .wx-hourly .h { min-width: 0; }
+/* the columns of a group line up: name and symbol at the top, the temperatures at the bottom (a rain chance may sit
+   between them in some columns only) */
+.preset-planner.pbar .weather .wx-hourly,
+.preset-planner.pbar .weather .wx-days { align-items: stretch; }
+.preset-planner.pbar .weather .wx-hourly .h,
+.preset-planner.pbar .weather .wxm-day { justify-content: flex-start; }
+.preset-planner.pbar .weather .wx-hourly .hv,
+.preset-planner.pbar .weather .wxm-day .dmx { margin-top: auto; }
+#app.preset-planner.pbar .dp { justify-content: flex-start; }
+#app.preset-planner.pbar .dp .dmx { margin-top: auto; }
+/* over a photo: a shade behind the clock and the date (the weather has its own card) */
+.preset-planner.pbar .scrim { background: linear-gradient(to right, rgb(0 0 0 / 0.55), rgb(0 0 0 / 0.2) 45%, rgb(0 0 0 / 0.2) 60%, rgb(0 0 0 / 0.4)); }

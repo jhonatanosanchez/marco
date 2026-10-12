@@ -30,6 +30,8 @@ export const LAYOUT_PRESETS = [
 ];
 /** calendar.eventStyle: 'lines' (one-line chips, the original look) or 'cards' (time on top, title below). */
 export const EVENT_STYLES = ['lines', 'cards'];
+/** layout.plannerBar: where the 'planner' layout puts the clock and the weather on a landscape screen. */
+export const PLANNER_BARS = ['side', 'top', 'bottom'];
 /** calendar.agendaDays: days the agenda view looks ahead, or 'auto' (fills the agenda with the next days that have events). */
 export const AGENDA_DAYS = ['auto', 7, 14, 30];
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,255}$/;
@@ -267,6 +269,8 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs, familyMemberIds 
     people: ly.people === null || ly.people === undefined ? null : [...new Set(idList(ctx, `${p}.layout.people`, ly.people, 5))],
     // 'photoFrame' layout: corner of the clock card
     corner: oneOf(ctx, `${p}.layout.corner`, ly.corner, D.layout.corner, ['tl', 'tr', 'bl', 'br']),
+    // 'planner' layout on a landscape screen: clock and weather in the side column, or in a strip above / below the month
+    plannerBar: oneOf(ctx, `${p}.layout.plannerBar`, ly.plannerBar, D.layout.plannerBar, PLANNER_BARS),
     // 'widget' layout: the widget shown full screen (a deleted one is dropped quietly)
     widgetId: typeof ly.widgetId === 'string' && widgetIds.has(ly.widgetId) ? ly.widgetId : null,
   };

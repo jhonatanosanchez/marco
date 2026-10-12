@@ -1,6 +1,6 @@
 import { useRef } from 'preact/hooks';
 import { GLASS_DEFAULTS, glassVars, normalizeGlass, type PhotoStats } from '../../shared/glass';
-import type { DisplayStyle, FrameCorner, GlassConfig, LayoutPreset, WidgetPlacement } from '../../shared/types';
+import type { DisplayStyle, FrameCorner, GlassConfig, LayoutPreset, PlannerBar, WidgetPlacement } from '../../shared/types';
 import { Icon } from '../components/icons';
 import { EventStyleField, PLANNER_CALENDAR, undoPlannerPick, WeeksField } from '../components/PlannerFields';
 import { Button, Callout, Card, ColorPicker, Field, PageHeader, ReorderButtons, Segmented, Select, Slider, ToggleRow } from '../components/ui';
@@ -22,7 +22,7 @@ export const PRESETS: { id: LayoutPreset; name: string; desc: string; wizard?: b
   { id: 'bigTime', name: 'Hora grande', desc: 'Reloj protagonista sobre la foto, con la agenda de hoy y mañana.', wizard: true },
   { id: 'photoFrame', name: 'Marco de fotos', desc: 'La foto es la protagonista: solo un reloj pequeño, la temperatura y el próximo evento en una esquina. Ideal para un marco vertical.' },
   { id: 'bedside', name: 'Mesilla', desc: 'Reloj enorme, el próximo evento y la temperatura con muy poco brillo, para el dormitorio. Se atenúa más por la noche.' },
-  { id: 'planner', name: 'Planificador', desc: 'Para familias con muchas citas: reloj, fecha y tiempo arriba, y debajo el mes con tarjetas que llenan cada día. Pensado para pantallas verticales.' },
+  { id: 'planner', name: 'Planificador', desc: 'Para familias con muchas citas: el mes con tarjetas que llenan cada día, y el reloj, la fecha y el tiempo arriba. En pantallas horizontales también pueden ir al lado o abajo.' },
   { id: 'widget', name: 'Widget', desc: 'Un widget ocupa toda la pantalla. Útil en carruseles.' },
   // kids layouts (Familia): Modern style only, the display shows the big calendar with Classic
   { id: 'kidsRoutines', name: 'Rutinas', desc: 'Una columna por niño con sus rutinas de mañana, tarde y noche, su progreso y sus estrellas.', group: 'kids' },
@@ -31,8 +31,64 @@ export const PRESETS: { id: LayoutPreset; name: string; desc: string; wizard?: b
 ];
 const isKidsPreset = (id: string) => PRESETS.some((p) => p.id === id && p.group === 'kids');
 
+/**
+ * The planner's drawing: the month with cards, and the clock and the weather in the side column (layout.plannerBar
+ * 'side') or in a low strip above or below the month.
+ */
+function PlannerSchematic({ bar, side }: { bar: PlannerBar; side: 'left' | 'right' }) {
+  const accent = 'var(--accent)';
+  const block = 'var(--schem-block)';
+  const L = side === 'left';
+  // the strip, or the side column, and the area left for the month
+  const strip = bar === 'side' ? { x: L ? 6 : 114, y: 6, w: 40, h: 78 } : { x: 6, y: bar === 'top' ? 6 : 70, w: 148, h: 14 };
+  const grid = bar === 'side' ? { x: L ? 50 : 6, y: 8, w: 104, h: 76 } : { x: 6, y: bar === 'top' ? 24 : 6, w: 148, h: 60 };
+  const rows = 3;
+  const cw = grid.w / 7;
+  const rh = grid.h / rows;
+  return (
+    <g>
+      <rect x={strip.x} y={strip.y} width={strip.w} height={strip.h} rx="4" fill={block} opacity="0.9" />
+      {bar === 'side' ? (
+        <>
+          <rect x={strip.x + 5} y={strip.y + 6} width="26" height="10" rx="2" fill={accent} />
+          <rect x={strip.x + 5} y={strip.y + 20} width="20" height="3" rx="1.5" fill="var(--schem-line)" opacity=".6" />
+          <rect x={strip.x + 5} y={strip.y + 52} width="30" height="20" rx="3" fill="var(--schem-line)" opacity=".5" />
+        </>
+      ) : (
+        <>
+          <rect x={strip.x + 5} y={strip.y + 3} width="24" height="8" rx="2" fill={accent} />
+          <rect x={strip.x + 33} y={strip.y + 4} width="22" height="2.6" rx="1.3" fill="var(--schem-line)" opacity=".6" />
+          <rect x={strip.x + 33} y={strip.y + 8} width="16" height="2.6" rx="1.3" fill="var(--schem-line)" opacity=".4" />
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <rect x={strip.x + 84 + i * 10} y={strip.y + 3} width="7" height="8" rx="1.5" fill="var(--schem-line)" opacity={i === 0 ? 0.6 : 0.4} />
+          ))}
+        </>
+      )}
+      {Array.from({ length: rows }, (_, r) =>
+        [0, 1, 2, 3, 4, 5, 6].map((c) => (
+          <g>
+            {[0, 1, 2].slice(0, 1 + ((r + c) % 3)).map((k) => (
+              <rect
+                x={grid.x + 0.6 + c * cw}
+                y={grid.y + 0.6 + r * rh + 4 + k * 4.4}
+                width={cw - 1.2}
+                height="3.6"
+                rx="0.8"
+                fill={['#4c8dff', '#ff9f1c', '#9b5de5', '#2ec4b6'][(r + c + k) % 4]}
+                opacity=".75"
+              />
+            ))}
+            <rect x={grid.x + 0.6 + c * cw} y={grid.y + 0.6 + r * rh} width="5" height="2.4" rx="0.8" fill="var(--schem-line)" opacity=".6" />
+          </g>
+        )),
+      )}
+      <rect x={grid.x + 4 * cw} y={grid.y} width={cw} height={rh} rx="1.5" fill="none" stroke={accent} stroke-width="1.2" />
+    </g>
+  );
+}
+
 /** Tiny schematic drawing of each layout preset. */
-export function Schematic({ id, side }: { id: LayoutPreset; side: 'left' | 'right' }) {
+export function Schematic({ id, side, plannerBar = 'side' }: { id: LayoutPreset; side: 'left' | 'right'; plannerBar?: PlannerBar }) {
   const accent = 'var(--accent)';
   const block = 'var(--schem-block)';
   const photo = `url(#ph-${id})`;
@@ -165,32 +221,7 @@ export function Schematic({ id, side }: { id: LayoutPreset; side: 'left' | 'righ
           <rect x="117" y="78" width="30" height="3" rx="1.5" fill={accent} opacity=".8" />
         </g>
       )}
-      {id === 'planner' && (
-        <g>
-          <rect x="6" y="6" width="148" height="18" rx="4" fill={block} opacity="0.9" />
-          <rect x="11" y="10" width="30" height="10" rx="2" fill={accent} />
-          <rect x="104" y="10" width="44" height="10" rx="3" fill="var(--schem-line)" opacity=".5" />
-          {[0, 1, 2].map((r) =>
-            [0, 1, 2, 3, 4, 5, 6].map((c) => (
-              <g>
-                {[0, 1, 2].slice(0, 1 + ((r + c) % 3)).map((k) => (
-                  <rect
-                    x={6.6 + c * 21.14}
-                    y={28.6 + r * 19 + 4 + k * 4.4}
-                    width="19.9"
-                    height="3.6"
-                    rx="0.8"
-                    fill={['#4c8dff', '#ff9f1c', '#9b5de5', '#2ec4b6'][(r + c + k) % 4]}
-                    opacity=".75"
-                  />
-                ))}
-                <rect x={6.6 + c * 21.14} y={28.6 + r * 19} width="5" height="2.4" rx="0.8" fill="var(--schem-line)" opacity=".6" />
-              </g>
-            )),
-          )}
-          <rect x={6.6 + 4 * 21.14 - 0.6} y={28} width="21.1" height="18.4" rx="1.5" fill="none" stroke={accent} stroke-width="1.2" />
-        </g>
-      )}
+      {id === 'planner' && <PlannerSchematic bar={plannerBar} side={side} />}
       {id === 'widget' && (
         <g>
           <rect x="12" y="9" width="136" height="72" rx="7" fill={block} opacity=".92" />
@@ -549,6 +580,13 @@ export function WeatherPanelCard({ cfg, set }: Pick<SectionProps, 'cfg' | 'set'>
   );
 }
 
+/** Planner: where the clock and the weather go on a landscape screen (layout.plannerBar). */
+const PLANNER_BARS: { value: PlannerBar; label: string }[] = [
+  { value: 'side', label: 'Al lado' },
+  { value: 'top', label: 'Arriba' },
+  { value: 'bottom', label: 'Abajo' },
+];
+
 const CORNERS: { value: FrameCorner; label: string }[] = [
   { value: 'tl', label: 'Arriba izquierda' },
   { value: 'tr', label: 'Arriba derecha' },
@@ -726,6 +764,22 @@ function PresetOptions({ cfg, set, full, go }: SectionProps) {
           <WeeksField cfg={cfg} set={set} />
           <EventStyleField cfg={cfg} set={set} />
         </div>
+        <Field
+          label={t('Hora y tiempo')}
+          hint={
+            t('En pantallas horizontales. Arriba o abajo, el mes ocupa todo el ancho y el tiempo se ve en una fila. En vertical siempre van arriba.') +
+            ((l.plannerBar ?? 'side') !== 'side' && typeof cfg.calendar.weeks === 'number' && cfg.calendar.weeks > 4
+              ? ' ' + t('Con la hora y el tiempo arriba o abajo se ven como mucho 4 semanas.')
+              : '')
+          }
+        >
+          <Segmented
+            full
+            value={l.plannerBar ?? 'side'}
+            options={PLANNER_BARS.map((o) => ({ value: o.value, label: t(o.label) }))}
+            onChange={(v) => set((d) => void (d.layout.plannerBar = v))}
+          />
+        </Field>
       </Card>
     );
   }
@@ -787,8 +841,9 @@ function PresetOptions({ cfg, set, full, go }: SectionProps) {
 export function LayoutSection(props: SectionProps) {
   const { cfg, set } = props;
   const l = cfg.layout;
-  // the planner has a side column on landscape screens
-  const hasSide = ['bigCalendar', 'leftRight', 'today', 'twoWeeks', 'planner'].includes(l.preset);
+  // the planner has a side column on landscape screens, unless its clock and weather go in a strip above or below
+  const plannerStrip = l.preset === 'planner' && (l.plannerBar ?? 'side') !== 'side';
+  const hasSide = ['bigCalendar', 'leftRight', 'today', 'twoWeeks', 'planner'].includes(l.preset) && !plannerStrip;
   const style: DisplayStyle = cfg.screen.style === 'modern' ? 'modern' : 'classic';
   const choice = styleChoiceOf(cfg.screen.style, l.preset);
   const kids = choice === 'kids';
@@ -906,7 +961,7 @@ export function LayoutSection(props: SectionProps) {
             }
             aria-pressed={l.preset === p.id}
           >
-            <Schematic id={p.id} side={l.sidePanel} />
+            <Schematic id={p.id} side={l.sidePanel} plannerBar={l.plannerBar ?? 'side'} />
             <div class="preset__text">
               <div class="preset__name">
                 <span class="radio-dot" />
@@ -919,7 +974,14 @@ export function LayoutSection(props: SectionProps) {
       </div>
       <PresetOptions {...props} />
       {has('widgets') && <ScreenWidgetsCard cfg={cfg} set={set} full={props.full} go={props.go} />}
-      <Card id="layout-side" scope="screen" title={t('Panel lateral')} icon="layout" desc={t('Solo para los diseños con columna lateral.')} muted={!hasSide}>
+      <Card
+        id="layout-side"
+        scope="screen"
+        title={t('Panel lateral')}
+        icon="layout"
+        desc={plannerStrip ? t('El Planificador tiene ahora la hora y el tiempo arriba o abajo, sin columna lateral.') : t('Solo para los diseños con columna lateral.')}
+        muted={!hasSide}
+      >
         <div class="grid grid--2">
           <Field label={t('Posición')}>
             <Segmented

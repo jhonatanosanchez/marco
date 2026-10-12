@@ -11,7 +11,7 @@ export const DEFAULT_CONFIG: DisplayConfig = {
     nightMode: { enabled: false, from: '23:00', to: '07:00', dim: 0.35 },
     glass: { ...GLASS_DEFAULTS },
   },
-  layout: { preset: 'bigCalendar', sidePanel: 'left', sideWidth: 0.36, people: null, corner: 'br' },
+  layout: { preset: 'bigCalendar', sidePanel: 'left', sideWidth: 0.36, people: null, corner: 'br', plannerBar: 'side' },
   background: {
     enabled: true, source: 'stock', stockTopic: 'nature', order: 'random', intervalSec: 120, brightness: 0.85, showMeta: false,
     cover: true, transition: 'webgl', ambient: 'aurora', weatherFx: 'simple', portraitFit: 'auto',
@@ -76,6 +76,7 @@ export function normalizeConfig(raw: unknown): DisplayConfig {
   c.calendar.weekStart = clampInt(c.calendar.weekStart, 0, 6, 1);
   c.layout.sideWidth = Math.min(0.6, Math.max(0.2, Number(c.layout.sideWidth) || 0.36));
   if (!['tl', 'tr', 'bl', 'br'].includes(c.layout.corner as string)) c.layout.corner = 'br';
+  if (!['side', 'top', 'bottom'].includes(c.layout.plannerBar as string)) c.layout.plannerBar = 'side';
   c.layout.people = Array.isArray(c.layout.people) ? c.layout.people.filter((x) => typeof x === 'string').slice(0, 5) : null;
   c.screen.fontScale = Math.min(2, Math.max(0.5, Number(c.screen.fontScale) || 1));
   c.background.intervalSec = Math.max(10, Number(c.background.intervalSec) || 120);

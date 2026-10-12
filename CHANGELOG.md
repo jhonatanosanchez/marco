@@ -5,6 +5,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-10-12
+
+### Added
+- Planner on landscape screens can put the time and weather in a strip at the top or bottom (#2). *Layout → Planner →
+  Time and weather* offers *At the side* (as before), *Top* or *Bottom*. With the strip the month takes the whole
+  width, with up to 4 weeks, and the weather is laid out in one row: now, the next hours and the next days, hiding
+  what does not fit. Portrait screens are unchanged.
+
 ## [0.9.0] - 2026-10-12
 
 ### Added

@@ -66,7 +66,11 @@ export interface LayoutConfig {
   corner?: FrameCorner;
   /** 'widget' layout: the widget shown full screen (null / missing = none chosen). */
   widgetId?: string | null;
+  /** 'planner' layout on a landscape screen: clock and weather in the side column (default), or a strip above / below the month. */
+  plannerBar?: PlannerBar;
 }
+
+export type PlannerBar = 'side' | 'top' | 'bottom';
 
 // ---- Widgets (server/validate.js sanitizeWidget, server/screens.js displayWidgets) ----
 

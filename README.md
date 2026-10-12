@@ -497,7 +497,10 @@ a screen in portrait (a TV on its side, a tablet), Marco has a planner setup:
      the title below on up to two lines. Events of several days stay as bars across the week.
    - A day with more cards than fit takes turns (*Rotate busy days*) or shows "+N". Titles longer than two lines
      scroll up when *Slide long titles* is on.
-3. On a landscape screen the planner keeps a side column with the clock and the weather.
+3. On a landscape screen, *Time and weather* in the Planner card of *Layout* chooses where the clock and the weather
+   go: in a side column (the default), or in a low strip at the top or the bottom. With the strip the month takes the
+   whole width (at most 4 weeks) and the weather is one row: now, the next hours and the next days, hiding what does
+   not fit. Portrait screens always have them on top.
 
 Nothing changes for screens that do not use these options: the default is still one-line chips and a fixed number of
 weeks. *Cards* and *Auto* also work with the other layouts, in the month and week views. With cards, *Compact busy
@@ -1014,7 +1017,7 @@ Back up the whole folder (or use *Export*) to keep everything.
 | `?demo=1&pair=1` `?demo=1&pair=invalid` `&pairLen=6\|8` | Preview the pairing screen or the “link no longer valid” screen with a sample code (no server needed) |
 | `?empty=1` `?photos=0` | With `?demo=1`: no events, countdowns or to-dos, or no background photo (to check the empty states) |
 | `?marquee=0\|1` `?rotate=0\|1` | Turn off (or on) the long titles that slide (calendar chips, the pills next to the clock, countdowns, the news headline; titles on several lines move up a line at a time) and the busy days that take turns showing their events (*Calendars → Calendar view*); with `?demo=1`, `&busy=1` adds a busy day and long titles to try them |
-| `?cards=0\|1` `?weeks=auto` `?preset=planner` | Events as cards (or one-line chips), automatic weeks, the *Planner* layout. With `?demo=1`, `&planner=1` shows the planner as picking it in the admin sets it up (try `&busy=2`) |
+| `?cards=0\|1` `?weeks=auto` `?preset=planner` | Events as cards (or one-line chips), automatic weeks, the *Planner* layout. With `?demo=1`, `&planner=1` shows the planner as picking it in the admin sets it up (try `&busy=2`); `&bar=side\|top\|bottom` puts its clock and weather at the side, top or bottom on a landscape screen |
 | `?agendaDays=auto\|7\|14\|30` | How far the agenda view looks ahead (*Calendars → Calendar view → Days in the agenda*). With `?demo=1`, `&sparse=1&preset=agenda` shows a quiet calendar with events weeks away |
 | `?compact=0\|1` `?weeks=1..8` | Turn off (or on) compact busy days: a day that cannot fit its events lists them as small one-line entries and the week rows share the height by how many events they have (*Calendars → Calendar view*); `?weeks=` shows that many weeks. With `?demo=1`, `&busy=2` fills the whole month |
 | `?style=modern&preset=kidsRoutines\|kidsFamily\|kidsMeals` | The kids layouts. With `?demo=1`: `&members=6`, `&touch=0`, `&qr=0`, `&stars=0`, `&meals=0`, `&snack=1` (four meals a day), `&todo=1`, `&famPrivacy=hide` (with `&private=1`) |

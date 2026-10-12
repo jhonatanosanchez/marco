@@ -64,7 +64,9 @@ export function defaultScreenProfile({ id = 's_main', slug = 'living-room', name
     // people: calendar ids shown as columns by the 'people' layout (null = automatic); corner: where the
     // 'photoFrame' layout puts its small clock card (tl, tr, bl, br)
     // widgetId: the widget the 'widget' layout shows full screen (null = none chosen yet)
-    layout: { preset: 'bigCalendar', sidePanel: 'left', sideWidth: 0.36, people: null, corner: 'br', widgetId: null },
+    // plannerBar: where the 'planner' layout puts the clock and the weather on a landscape screen: 'side' (the side
+    // column), 'top' or 'bottom' (a low strip above or below the month). Portrait screens always have it on top.
+    layout: { preset: 'bigCalendar', sidePanel: 'left', sideWidth: 0.36, people: null, corner: 'br', widgetId: null, plannerBar: 'side' },
     background: {
       enabled: true, source: 'stock', stockTopic: 'nature', order: 'random', intervalSec: 120, brightness: 0.85, showMeta: false,
       cover: true, transition: 'webgl', ambient: 'aurora',

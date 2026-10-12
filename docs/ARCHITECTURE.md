@@ -107,7 +107,7 @@ The stored config has **global** sections shared by every screen and a list of *
                   // glass (Modern only): { "appearance": "auto", "opacity": 0.5, "blur": 18, "tint": "dark", "edge": true }
                   //   appearance auto | clear | tinted, opacity 0..1 (see-through to solid), blur 0..40, tint dark | light | photo.
                   //   web/shared/glass.ts turns it (plus the current photo) into --g-* CSS variables on <html>.
-  "layout":     { "preset": "bigCalendar", "sidePanel": "left", "sideWidth": 0.36, "people": null, "corner": "br" },
+  "layout":     { "preset": "bigCalendar", "sidePanel": "left", "sideWidth": 0.36, "people": null, "corner": "br", "plannerBar": "side" },
                   // preset: bigCalendar | leftRight | topBottom | bigTime | agenda | today | people | photoFrame | twoWeeks | board | bedside | planner
                   //   | kidsRoutines | kidsFamily | kidsMeals (Modern style only; with Classic the display shows bigCalendar)
                   // people: calendar ids shown as columns by 'people' (max 5; null = the first five without holidays / birthdays)
@@ -121,6 +121,9 @@ The stored config has **global** sections shared by every screen and a list of *
                   //   .preset-topBottom or .preset-bigCalendar too); its own rules are in styles-planner.css. Picking it in
                   //   the admin or the setup wizard sets calendar.weeks = "auto" and eventStyle = "cards"
                   //   (PLANNER_CALENDAR in server/core/defaults.js); the display itself never forces them.
+                  // plannerBar: side | top | bottom, where a landscape planner puts the clock and the weather. top / bottom use
+                  //   the top / bottom frame with a low strip (#app gets .pbar .pbar-top|bottom): the weather is one row and
+                  //   the month at most 4 weeks. Portrait screens ignore it. ?bar= overrides it.
   "background": { "enabled": true, "source": "stock", "stockTopic": "nature", "order": "random", "intervalSec": 120, "brightness": 0.85,
                   "showMeta": false, "cover": true, "transition": "webgl", "ambient": "aurora", "panelBlur": 18, "panelShade": 0.5, "weatherFx": "simple",
                   "portraitFit": "auto", "immich": { "albumIds": [], "favoritesOnly": false } },
