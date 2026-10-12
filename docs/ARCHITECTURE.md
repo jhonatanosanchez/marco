@@ -381,8 +381,8 @@ uses only its own days.
   routines first, then later groups folded to one line, then "+N more").
 - **Phone page** (`web/family/`, `/f/<key>`): its own small Preact bundle (`vite.config.ts` input `family`). The key
   stays in the address (a home-screen shortcut keeps it) and in `localStorage` for `/f`.
-- **Admin**: *Familia* (`web/admin/sections/Family.tsx`) and *Menús* (`Meals.tsx`); the *Niños* style card in
-  *Diseño* is the Modern style with a kids preset (`styleChoiceOf`), not a stored style.
+- **Admin**: *Family* (`web/admin/sections/Family.tsx`) and *Meals* (`Meals.tsx`); the *Kids* style card in
+  *Layout* is the Modern style with a kids preset (`styleChoiceOf`), not a stored style.
 
 ## Immich source
 

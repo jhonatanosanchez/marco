@@ -738,7 +738,9 @@ normally at `http://<server-ip>:3000/admin/` (only linking a Google account need
 
 - **Cloudflare Tunnel** (no open ports): `cloudflared tunnel create calendar`, route
   `calendar.example.com` to `http://localhost:3000` in the tunnel config, and protect it with Cloudflare Access if you
-  like. Server-Sent Events work through the tunnel.
+  like. Server-Sent Events work through the tunnel. `cloudflared` sends `X-Forwarded-For`, so visitors keep their own
+  address; a tunnel that does not (`ssh -R`, a TCP tunnel) makes everyone look like this machine, which open mode
+  trusts. Use private display access with such a tunnel.
 - Set **`TRUST_PROXY`** whenever the proxy does not connect from `127.0.0.1`: a proxy on **another machine**
   (`TRUST_PROXY=<proxy-ip>`) or **any proxy in front of the Docker container** (`TRUST_PROXY=172.16.0.0/12`, the
   Docker bridge). Without it the server sees the proxy's address instead of the visitor's: everyone coming through it

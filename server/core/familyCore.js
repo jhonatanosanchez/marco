@@ -590,7 +590,7 @@ export function displayFamily(cfg, screen, state, { today, hhmm = '00:00', priva
 }
 
 /** FamilyPhoneState: what the family page (/f/<key>) needs and nothing else (no calendars, screens or config). */
-export function phoneFamily(cfg, state, { today, hhmm = '00:00', lang = 'es' }) {
+export function phoneFamily(cfg, state, { today, hhmm = '00:00', lang = 'en' }) {
   const fam = cfg.family;
   const progress = todayProgress(fam, state, today);
   const points = pointsOf(fam, state);

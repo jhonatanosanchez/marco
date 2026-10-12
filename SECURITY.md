@@ -80,7 +80,10 @@ used on shared networks or behind an HTTPS reverse proxy on the Internet:
 If you need remote access, put an HTTPS reverse proxy in front (see `deploy/Caddyfile.example`), use a strong
 password, set `PUBLIC_URL` to your domain, and set `TRUST_PROXY` whenever the proxy does not connect from loopback
 (another host, or Docker). Expose the display routes (`/`, `/d/*`, `/pair`, `/api/display/*`, `/api/stream`…) only in
-**private** display-access mode; in open mode expose only the admin, login and setup routes.
+**private** display-access mode; in open mode expose only the admin, login and setup routes. Open mode trusts this machine
+(loopback): a tunnel that connects from the same machine without sending `X-Forwarded-For` (`ssh -R`, a TCP tunnel)
+makes every client on the other end look local, so it would get the default screen, the family QR code and taps on
+the TV. Never put open mode behind such a tunnel.
 
 ## Private display links and pairing: threat model
 

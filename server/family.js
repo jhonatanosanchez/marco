@@ -343,7 +343,7 @@ export function phoneFamilyState() {
   load();
   const cfg = getConfig();
   const c = familyClock(cfg);
-  return phoneFamily(cfg, state, { today: c.today, hhmm: c.hhmm, lang: defaultScreen(cfg)?.screen?.language || 'es' });
+  return phoneFamily(cfg, state, { today: c.today, hhmm: c.hhmm, lang: defaultScreen(cfg)?.screen?.language || 'en' });
 }
 
 /** FamilyDisplayState of `screen` (`priv` = its privacy mode is on, `qrUrl` = familyQrUrl()). */

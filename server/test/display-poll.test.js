@@ -15,6 +15,7 @@ import { _resetDisplays, setServerVersion, listDisplays } from '../displays.js';
 import { _resetAnnouncements } from '../announce.js';
 import { _resetActivityThrottle } from '../activity.js';
 import { _resetPairing } from '../pairing.js';
+import { _resetFamily } from '../family.js';
 import { syncDisplayKeys, listDisplayLinks, _resetDisplayAccess } from '../displayAccess.js';
 import {
   _resetPoll, readSince, record, currentCursor, pollEpoch, RING_SIZE, MAX_POLLERS_PER_IP, POLL_FAST_MS, POLL_HIDDEN_MS, POLL_NEXT_MS,
@@ -23,7 +24,7 @@ import {
 const realFetch = globalThis.fetch;
 const offlineFetch = (url, opts) => (/^https?:\/\/127\.0\.0\.1[:/]/.test(String(url)) ? realFetch(url, opts) : Promise.reject(new Error('offline test')));
 
-async function withServer(fn) {
+async function withServer(fn, { mut = () => {} } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'marco-poll-'));
   globalThis.fetch = offlineFetch;
   const c = defaultConfig();
@@ -33,6 +34,7 @@ async function withServer(fn) {
   c.screens.push(defaultScreenProfile({ id: 's_kitchen', slug: 'kitchen', name: 'Kitchen' }));
   c.screens.push(defaultScreenProfile({ id: 's_hall', slug: 'hall', name: 'Hall' }));
   c.screens[2].alerts.enabled = false;
+  mut(c);
   fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify(c));
   fs.writeFileSync(path.join(dir, 'secrets.json'), JSON.stringify({ passwordHash: await hashPassword('secret-pass-123'), passwordIsDefault: false }));
   store.initStore(dir);
@@ -42,6 +44,7 @@ async function withServer(fn) {
   _resetActivityThrottle();
   _resetDisplayAccess();
   _resetPoll();
+  _resetFamily();
   setServerVersion('0.5.0');
   await ensurePassword();
   syncDisplayKeys();
@@ -167,6 +170,24 @@ test('an announcement still running reaches a poller, with its ids; photos and r
     assert.equal(r.commands[0].title, 'Bins out');
     assert.deepEqual(r.activeAnnouncementIds, [ann.json.announcement.id]);
   });
+});
+
+test('a family change reaches pollers as `family` with the new revision', async () => {
+  const mut = (c) => {
+    c.family = {
+      enabled: true,
+      members: [{ id: 'm_kid', name: 'Kid', avatar: '🦊', kid: true }],
+      chores: [{ id: 'h_bed', memberId: 'm_kid', title: 'Bed', emoji: '🛏️', slot: 'any', points: 2 }],
+    };
+  };
+  await withServer(async ({ call, login, poll }) => {
+    const cookie = await login();
+    const k = await poll('kitchen', { client: 'kiosk-k1' });
+    const r = await call('POST', '/api/admin/family/toggle', { cookie, body: { choreId: 'h_bed', done: true } });
+    assert.equal(r.status, 200, r.text);
+    const next = await poll('kitchen', { client: 'kiosk-k1', cursor: k.cursor });
+    assert.deepEqual(next.commands.filter((c) => c.type === 'family'), [{ type: 'family', rev: r.json.state.rev }]);
+  }, { mut });
 });
 
 test('unknown, foreign, future and restarted cursors get a reset, never old commands', async () => {

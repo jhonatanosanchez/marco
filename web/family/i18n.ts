@@ -12,10 +12,10 @@ for (const [es, en, pt] of ROWS_FAMILY) {
   if (!(es in PT)) PT[es] = pt;
 }
 
-let current: Lang = 'es';
+let current: Lang = 'en';
 const LS_LANG = 'marco.family.lang';
 
-/** The household language the page used last time, else the browser's, else Spanish. */
+/** The household language the page used last time, else the browser's, else English. */
 export function initialLang(): Lang {
   try {
     const v = localStorage.getItem(LS_LANG);
@@ -31,7 +31,7 @@ export function initialLang(): Lang {
   } catch {
     /* ignore */
   }
-  return 'es';
+  return 'en';
 }
 
 export function setLang(l: Lang) {
