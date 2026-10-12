@@ -15,6 +15,9 @@ import {
 } from './carousels.js';
 import { IMMICH_ID_RE, MAX_IMMICH_ALBUMS, PORTRAIT_FITS, normalizeImmichUrl } from './immichCore.js';
 import { sanitizeFamily, sanitizeScreenFamily, KIDS_PRESETS } from './familyCore.js';
+import {
+  PRICE_ZONE_IDS, PRICE_VIEWS, PRICE_UNITS, PRICE_RESOLUTIONS, MAX_VAT, MIN_SURCHARGE, MAX_SURCHARGE,
+} from './pricesCore.js';
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
@@ -422,6 +425,15 @@ function sanitizeWidget(ctx, p, x, seen, opts) {
   const type = x.type;
   if (!(opts.widgetTypes ?? WIDGET_TYPES).includes(type)) ctx.err(`${p}.type`, 'not available on this server');
   const o = obj(ctx, `${p}.options`, x.options);
+  if (type === 'prices') {
+    return {
+      id: id(ctx, `${p}.id`, typeof x.id === 'string' && x.id.startsWith(WIDGET_PREFIX) ? x.id : undefined, WIDGET_PREFIX, seen),
+      type,
+      name: str(ctx, `${p}.name`, x.name, '', 60).trim() || 'Widget',
+      // the screens ask this server for the prices: no address, no reload interval of their own
+      options: { url: '', refreshSec: 900, fit: 'contain', bust: false, prices: sanitizePriceOptions(ctx, `${p}.options.prices`, o.prices) },
+    };
+  }
   let url = str(ctx, `${p}.options.url`, o.url, '', 2048).trim();
   if (!url) ctx.err(`${p}.options.url`, 'URL required');
   else {
@@ -445,6 +457,25 @@ function sanitizeWidget(ctx, p, x, seen, opts) {
       // add _marco=<time> to the image URL on every refresh (off for addresses that change by themselves, e.g. signed)
       bust: bool(ctx, `${p}.options.bust`, o.bust, true),
     },
+  };
+}
+
+/** Options of an electricity price widget (server/core/pricesCore.js). */
+function sanitizePriceOptions(ctx, p, v) {
+  const o = obj(ctx, p, v);
+  if (o.zone === undefined || o.zone === '') ctx.err(`${p}.zone`, 'zone required');
+  const round = (n, k) => Math.round(n * 10 ** k) / 10 ** k;
+  return {
+    zone: oneOf(ctx, `${p}.zone`, o.zone === '' ? undefined : o.zone, 'DK2', PRICE_ZONE_IDS),
+    view: oneOf(ctx, `${p}.view`, o.view, 'auto', PRICE_VIEWS),
+    unit: oneOf(ctx, `${p}.unit`, o.unit, 'main', PRICE_UNITS),
+    currency: oneOf(ctx, `${p}.currency`, o.currency, 'auto', ['auto', 'EUR']),
+    // what the household pays on top, per kWh in the main unit (before VAT), and the VAT in percent
+    surcharge: round(num(ctx, `${p}.surcharge`, o.surcharge, 0, MIN_SURCHARGE, MAX_SURCHARGE), 5),
+    vat: round(num(ctx, `${p}.vat`, o.vat, 0, 0, MAX_VAT), 2),
+    // length of the cheap stretches the widget looks for, in hours
+    windowHours: num(ctx, `${p}.windowHours`, o.windowHours, 3, 1, 6, true),
+    resolution: oneOf(ctx, `${p}.resolution`, o.resolution, 'hour', PRICE_RESOLUTIONS),
   };
 }
 

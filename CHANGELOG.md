@@ -5,6 +5,29 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-12
+
+### Added
+- Electricity price widget (#3): a new type in *Widgets*, *Electricity price*, with the day-ahead price of your
+  bidding zone. Views: *Automatic* (by placement), *24 h chart* (bars from cheap to expensive, tomorrow added once it
+  is published), *Price now* (large, with the trend for the next hour) and *Cheap windows* (the cheapest stretches
+  still ahead). Optional fixed extra per kWh and VAT, kroner or øre for Denmark, euros or cents elsewhere. 15-minute
+  prices are shown as hourly averages, or as quarter hours if you prefer. The server fetches and keeps the prices,
+  so the screens never call the sources. Free sources with no key:
+  - Energi Data Service: Denmark (DK1, DK2), SE3, SE4 and NO2.
+  - Elering: Estonia, Latvia, Lithuania and Finland.
+  - Red Eléctrica: Spain, wholesale market and PVPC. OMIE: Portugal, and Spain as a fallback.
+  - Energy-Charts (CC BY): Germany and Luxembourg, Austria, Belgium, the Netherlands, France, Switzerland, Czechia,
+    Poland, Hungary, Slovenia and Italy North. aWATTar: Germany and Austria as a fallback.
+
+  The other zones (Norway NO1/3/4/5, Sweden SE1/2, the rest of Italy, Greece, Romania, Bulgaria, Croatia, Slovakia,
+  Ireland and more) use ENTSO-E with your own free token, set in the widget's *More options*. On your own server,
+  zones Energy-Charts publishes for private use are also shown without a token.
+
+### Fixed
+- Widgets in two corners on the same side (top right and bottom right, or top left and bottom left) no longer
+  overlap: each corner gets half the height, and widgets stacked in one corner share it instead of being cut.
+
 ## [0.9.1] - 2026-10-12
 
 ### Added

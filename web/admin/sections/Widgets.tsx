@@ -9,6 +9,7 @@ import { atLimit as reachesLimit, edition, has, limit } from '../caps';
 import { setWidgetPreview } from '../livePreview';
 import { moveItem, uid, WEB_WIDGET_REFRESH_SEC, WIDGET_REFRESH_SEC, widgetUrlProblem } from '../util';
 import type { SectionProps } from './common';
+import { newPriceOptions, PriceWidgetFields } from './PriceWidget';
 
 /** Refresh choices as the admin shows them. */
 const REFRESH_LABEL: Record<number, string> = {
@@ -140,9 +141,11 @@ function WidgetCard({ w, i, n, full, errors, upd, remove, move, go, setScreenId 
   const [test, setTest] = useState<{ loading: boolean; res?: TestWidgetResponse; key?: string }>({ loading: false });
   const [more, setMore] = useState(false);
   const image = w.type === 'image';
+  const prices = w.type === 'prices';
   // Marco Cloud fetches the image itself (https only) and serves it to the screens; self-hosted TVs load the address
   const cloud = edition() === 'cloud';
   const webOk = has('webWidgets');
+  const pricesOk = has('priceWidgets');
   const urlBad = widgetUrlProblem(w.options.url, cloud);
   // choices below the server's shortest refresh are not offered (web pages keep "never reload")
   const minRefresh = limit('widgetMinRefreshSec') ?? 0;
@@ -168,7 +171,7 @@ function WidgetCard({ w, i, n, full, errors, upd, remove, move, go, setScreenId 
   return (
     <Card
       id={`widget-${w.id}`}
-      icon={image ? 'image' : 'globe'}
+      icon={image ? 'image' : prices ? 'zap' : 'globe'}
       title={w.name.trim() || t('Widget sin nombre')}
       actions={
         <div class="row-actions">
@@ -183,19 +186,35 @@ function WidgetCard({ w, i, n, full, errors, upd, remove, move, go, setScreenId 
         <Field label={t('Nombre')} error={errors[`wdg.${w.id}.name`]}>
           <TextInput value={w.name} maxLength={60} placeholder={t('Precios de la luz')} onValue={(v) => upd((x) => void (x.name = v))} />
         </Field>
-        <Field label={t('Tipo')} error={errors[`wdg.${w.id}.type`] ? t(errors[`wdg.${w.id}.type`]) : undefined} hint={image ? undefined : t('Solo para servidores propios. La página se carga en la pantalla dentro de un marco aislado.')}>
-          {!image && !webOk && <span class="chip chip--static chip--bad">{t('No disponible aquí')}</span>}
+        <Field
+          label={t('Tipo')}
+          error={errors[`wdg.${w.id}.type`] ? t(errors[`wdg.${w.id}.type`]) : undefined}
+          hint={
+            w.type === 'web'
+              ? t('Solo para servidores propios. La página se carga en la pantalla dentro de un marco aislado.')
+              : prices
+                ? t('Precio de la electricidad de tu zona, hoy y mañana. Lo consulta este servidor; las pantallas no llaman a ninguna web.')
+                : undefined
+          }
+        >
+          {((w.type === 'web' && !webOk) || (prices && !pricesOk)) && <span class="chip chip--static chip--bad">{t('No disponible aquí')}</span>}
           <Segmented
             full
             value={w.type}
             options={[
               { value: 'image', label: t('Imagen') },
-              ...(webOk || !image ? [{ value: 'web' as const, label: t('Web (iframe)') }] : []),
+              ...(webOk || w.type === 'web' ? [{ value: 'web' as const, label: t('Web (iframe)') }] : []),
+              ...(pricesOk || prices ? [{ value: 'prices' as const, label: t('Precio de la luz') }] : []),
             ]}
             onChange={(v) =>
               upd((x) => {
                 if (x.type === v) return;
                 x.type = v;
+                if (v === 'prices') {
+                  x.options.prices ??= newPriceOptions(full.datetime.timezone);
+                  return;
+                }
+                delete x.options.prices;
                 const list = v === 'web' ? WEB_WIDGET_REFRESH_SEC : WIDGET_REFRESH_SEC;
                 if (!list.includes(x.options.refreshSec)) x.options.refreshSec = v === 'web' ? 0 : 900;
               })
@@ -203,47 +222,54 @@ function WidgetCard({ w, i, n, full, errors, upd, remove, move, go, setScreenId 
           />
         </Field>
       </div>
-      <Field
-        label={t('Dirección')}
-        error={errors[`wdg.${w.id}.url`] ? t(errors[`wdg.${w.id}.url`]) : undefined}
-        hint={
-          image
-            ? `${t('PNG, JPEG, WebP o GIF.')} ${cloud ? t('Debe empezar por https://. Marco descarga la imagen y la sirve a tus pantallas.') : t('La pantalla carga la dirección directamente: puede ser de tu red local.')}`
-            : undefined
-        }
-      >
-        <div class="search-row">
-          <TextInput
-            mono
-            inputMode="url"
-            value={w.options.url}
-            placeholder={image ? 'https://…/tarjeta.png' : 'https://…'}
-            error={!!errors[`wdg.${w.id}.url`]}
-            onValue={(v) => upd((x) => void (x.options.url = v))}
-          />
-          <Button size="sm" icon="play" disabled={!!urlBad} loading={test.loading} onClick={run}>
-            {t('Probar')}
-          </Button>
-        </div>
-      </Field>
-      {openTokenUrl && (
-        <p class="muted small">
-          {t('Las pantallas están en modo abierto: cualquiera en tu red puede leer esta dirección completa. Si lleva una clave, cambia el acceso a las pantallas a privado.')}{' '}
-          <button type="button" class="link-btn" onClick={() => go('security/sec-display')}>
-            {t('Acceso a las pantallas')}
-          </button>
-        </p>
+      {prices && w.options.prices && <PriceWidgetFields w={w} errors={errors} upd={upd} part="main" />}
+      {!prices && (
+        <>
+          <Field
+            label={t('Dirección')}
+            error={errors[`wdg.${w.id}.url`] ? t(errors[`wdg.${w.id}.url`]) : undefined}
+            hint={
+              image
+                ? `${t('PNG, JPEG, WebP o GIF.')} ${cloud ? t('Debe empezar por https://. Marco descarga la imagen y la sirve a tus pantallas.') : t('La pantalla carga la dirección directamente: puede ser de tu red local.')}`
+                : undefined
+            }
+          >
+            <div class="search-row">
+              <TextInput
+                mono
+                inputMode="url"
+                value={w.options.url}
+                placeholder={image ? 'https://…/tarjeta.png' : 'https://…'}
+                error={!!errors[`wdg.${w.id}.url`]}
+                onValue={(v) => upd((x) => void (x.options.url = v))}
+              />
+              <Button size="sm" icon="play" disabled={!!urlBad} loading={test.loading} onClick={run}>
+                {t('Probar')}
+              </Button>
+            </div>
+          </Field>
+          {openTokenUrl && (
+            <p class="muted small">
+              {t('Las pantallas están en modo abierto: cualquiera en tu red puede leer esta dirección completa. Si lleva una clave, cambia el acceso a las pantallas a privado.')}{' '}
+              <button type="button" class="link-btn" onClick={() => go('security/sec-display')}>
+                {t('Acceso a las pantallas')}
+              </button>
+            </p>
+          )}
+          {res && <TestResult key={test.key} w={w} res={res} />}
+        </>
       )}
-      {res && <TestResult key={test.key} w={w} res={res} />}
       <div class="grid grid--2">
-        <Field label={t('Recargar cada')} error={errors[`wdg.${w.id}.refreshSec`] ? t(errors[`wdg.${w.id}.refreshSec`]) : undefined}>
-          <Select
-            value={w.options.refreshSec}
-            options={[...(belowMin ? [w.options.refreshSec] : []), ...refreshList].map((s) => ({ value: s, label: t(REFRESH_LABEL[s] ?? `${s} s`) }))}
-            onChange={(v) => upd((x) => void (x.options.refreshSec = v))}
-          />
-          {belowMin && <p class="muted small">{t('Aquí lo mínimo es {n} s.', { n: minRefresh })}</p>}
-        </Field>
+        {!prices && (
+          <Field label={t('Recargar cada')} error={errors[`wdg.${w.id}.refreshSec`] ? t(errors[`wdg.${w.id}.refreshSec`]) : undefined}>
+            <Select
+              value={w.options.refreshSec}
+              options={[...(belowMin ? [w.options.refreshSec] : []), ...refreshList].map((s) => ({ value: s, label: t(REFRESH_LABEL[s] ?? `${s} s`) }))}
+              onChange={(v) => upd((x) => void (x.options.refreshSec = v))}
+            />
+            {belowMin && <p class="muted small">{t('Aquí lo mínimo es {n} s.', { n: minRefresh })}</p>}
+          </Field>
+        )}
         <Field label={t('Usado en')}>
           {uses.length ? (
             <div class="widget-uses">
@@ -268,7 +294,8 @@ function WidgetCard({ w, i, n, full, errors, upd, remove, move, go, setScreenId 
       <button type="button" class="link-btn widget-more" aria-expanded={more} onClick={() => setMore(!more)}>
         <Icon name={more ? 'up' : 'chevron'} size={14} /> {t('Más opciones')}
       </button>
-      {more && (
+      {more && prices && w.options.prices && <PriceWidgetFields w={w} errors={errors} upd={upd} part="more" />}
+      {more && !prices && (
         <div class="stack">
           <Field label={t('Ajuste')} hint={t('Solo cuenta cuando el widget ocupa toda la pantalla.')}>
             <Segmented

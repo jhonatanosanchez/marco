@@ -74,7 +74,7 @@ export type PlannerBar = 'side' | 'top' | 'bottom';
 
 // ---- Widgets (server/validate.js sanitizeWidget, server/screens.js displayWidgets) ----
 
-export type WidgetType = 'image' | 'web';
+export type WidgetType = 'image' | 'web' | 'prices';
 export type WidgetPlace = 'corner' | 'side';
 export type WidgetSize = 's' | 'm' | 'l';
 export type WidgetFit = 'contain' | 'cover';
@@ -86,7 +86,48 @@ export interface WidgetOptions {
   fit: WidgetFit;
   /** image: add _marco=<time> to the address on every reload (off for addresses that change by themselves) */
   bust: boolean;
+  /** type 'prices' only (its url is empty) */
+  prices?: PriceWidgetOptions;
 }
+export type PriceView = 'auto' | 'chart' | 'now' | 'cheap';
+/** Electricity price widget (server/core/pricesCore.js, server/core/validate.js sanitizePriceOptions). */
+export interface PriceWidgetOptions {
+  /** bidding zone id (PRICE_ZONES), e.g. 'DK2', 'ES-PVPC', 'DE-LU' */
+  zone: string;
+  /** auto: by placement (corner: price now; side: now + chart; full screen: chart, now and cheap stretches) */
+  view: PriceView;
+  /** main: €/kWh, kr/kWh; sub: c/kWh, øre/kWh */
+  unit: 'main' | 'sub';
+  /** auto: the zone's own currency where the source gives it (DKK), else EUR */
+  currency: 'auto' | 'EUR';
+  /** fixed amount per kWh added before VAT (grid fees, taxes, supplier), main unit; -10 .. 100 */
+  surcharge: number;
+  /** VAT percent on the whole, 0 .. 50 */
+  vat: number;
+  /** length of the cheap stretches in hours, 1 .. 6 */
+  windowHours: number;
+  /** chart bars: hourly averages or quarter hours */
+  resolution: 'hour' | 'quarter';
+}
+/** GET /api/display/prices?zone= (server/prices.js getPrices) */
+export interface PricesResponse {
+  zone: string;
+  /** the zone's own currency ('DKK', 'EUR') */
+  currency: string;
+  /** the local prices were converted from euros (the source gave none) */
+  converted: boolean;
+  source: string | null;
+  /** who to credit on screen, e.g. 'Energinet' */
+  credit: string;
+  fetchedAt: string;
+  /** the prices no longer cover now, or the last refreshes failed for a while */
+  stale: boolean;
+  error: string | null;
+  /** [start (unix s), minutes, EUR/MWh, local/MWh?] in time order */
+  slots: [number, number, number, number?][];
+}
+/** POST /api/admin/test/prices { zone } */
+export type TestPricesResponse = ({ ok: true } & PricesResponse) | { ok: false; error: string };
 /** config.widgets[]: what a widget shows. Where it shows is chosen per screen. */
 export interface WidgetDef {
   id: string; // "w_xxx"
@@ -119,6 +160,8 @@ export interface DisplayWidget {
   via: 'direct' | 'proxy';
   /** short hash of type + url + refreshSec + bust: changes when the saved widget changes */
   v: string;
+  /** type 'prices': what to draw (the display fetches /api/display/prices?zone=) */
+  prices?: PriceWidgetOptions;
 }
 /** POST /api/admin/test/widget { type, url } */
 export interface TestWidgetResponse {
@@ -1080,6 +1123,8 @@ export interface Features {
   widgets: boolean;
   /** Web page widgets (a sandboxed iframe on the TV). Self-hosted only; absent = off. */
   webWidgets: boolean;
+  /** Electricity price widgets (type 'prices': GET /api/display/prices, POST /api/admin/test/prices); absent = off. */
+  priceWidgets: boolean;
 }
 
 export type FeatureName = keyof Features;

@@ -133,6 +133,9 @@ color de la foto, transparencia, desenfoque y borde de luz:
   pequeña. También tu propia entidad de tiempo y sensores interiores de [Home Assistant](https://www.home-assistant.io/);
   lluvia/nieve animadas.
 - **Teletipo de noticias** desde cualquier fuente RSS/Atom, una lista de tareas y un mensaje del día.
+- **Precio de la luz:** un widget con el precio del mercado diario de tu zona (casi toda Europa): gráfica de hoy y
+  mañana, el precio de ahora o las horas más baratas que quedan, con tus peajes e IVA. Mira
+  [Precio de la luz](#precio-de-la-luz).
 - **Fondo de fotos:** fotos de stock, tu propia galería o álbumes de tu biblioteca de [Immich](https://immich.app/),
   transiciones WebGL, zoom lento, un suave efecto ambiental de "aurora" y **recorte inteligente** que mantiene al
   protagonista (caras, mascotas) en la parte de la pantalla que no tapan el reloj ni el tiempo. Las fotos verticales
@@ -886,6 +889,37 @@ imposible de adivinar; para retirarlo, desactiva *Calendario público* en iCloud
   pantallas; consulta [webhooks](#tokens-de-api-y-webhooks).
 - **Noticias (RSS/Atom):** añade cualquier fuente en *Noticias*. Algunos sitios bloquean los clientes que no son
   navegadores; el servidor ya usa el User-Agent de un navegador de escritorio. Usa *Probar* para comprobar una fuente.
+
+## Precio de la luz
+
+En *Widgets → Añadir widget → Precio de la luz* eliges la zona (agrupadas por país). El servidor consulta el precio
+del mercado diario y lo guarda: las pantallas no llaman a ninguna web, y varias pantallas con la misma zona comparten
+los datos.
+
+- **Vista:** *Automática* (en una esquina pequeña o mediana, el precio de ahora; en una grande o en la columna
+  lateral, también la gráfica; a pantalla completa, todo), *Gráfica 24 h* (barras de barato a caro, la hora actual
+  marcada y mañana en cuanto se publica, hacia las 13:00), *Precio ahora* y *Franjas baratas* (por ejemplo "02:00 a
+  05:00").
+- **Recargo fijo por kWh** e **IVA**, para ver lo que pagas de verdad. El recargo (peajes, impuestos, margen de tu
+  compañía) se suma antes del IVA. Con 0 y 0 ves el precio del mercado.
+- Muchas zonas publican un precio cada 15 minutos; la gráfica muestra la media de cada hora (o los cuartos de hora,
+  en *Más opciones*). Los días de cambio de hora tienen 23 o 25 horas.
+- **Probar** enseña el precio de ahora con tu recargo e IVA, y si los de mañana ya están publicados.
+
+| Zona | Fuente | Clave |
+| --- | --- | --- |
+| Dinamarca (DK1, DK2), SE3, SE4, NO2 | [Energi Data Service](https://www.energidataservice.dk/) (Energinet), en coronas o euros | no |
+| Estonia, Letonia, Lituania, Finlandia | [Elering](https://dashboard.elering.ee/) | no |
+| España (mercado mayorista o PVPC) | [Red Eléctrica](https://www.ree.es/es/datos/apidatos), y OMIE si falla | no |
+| Portugal | [OMIE](https://www.omie.es/) | no |
+| Alemania, Austria, Bélgica, Países Bajos, Francia, Suiza, Chequia, Polonia, Hungría, Eslovenia, Italia Norte | [Energy-Charts](https://www.energy-charts.info/) (datos SMARD, CC BY 4.0), aWATTar para Alemania y Austria | no |
+| El resto (Noruega NO1/3/4/5, Suecia SE1/2, resto de Italia, Grecia, Rumanía, Bulgaria, Croacia, Eslovaquia, Irlanda...) | [ENTSO-E](https://transparency.entsoe.eu/) con tu clave gratuita; sin clave, en tu propio servidor, Energy-Charts (solo uso privado) | opcional |
+
+La clave de ENTSO-E se pide gratis en transparency.entsoe.eu (crea una cuenta y pide "Restful API access" por
+correo) y se pega en *Más opciones*. Se guarda en `data/secrets.json` y no se vuelve a mostrar. Si una fuente falla,
+Marco prueba la siguiente; si fallan todas, la pantalla sigue con los últimos precios y los marca como *sin
+actualizar*. Los precios se piden de nuevo después de la subasta de cada día hasta que salen los de mañana, y nunca
+más a menudo de lo que permiten las fuentes.
 
 ## Fotos
 

@@ -162,6 +162,7 @@ function loadSecrets() {
   s.homeassistant ??= {};
   s.weather ??= {}; // { apiKey } of a weather source that needs one (server/weather.js)
   s.immich ??= {}; // { apiKey } of the Immich server (server/immich.js)
+  s.prices ??= {}; // { entsoeToken } for the electricity price widget (server/prices.js)
   if (!Array.isArray(s.apiTokens)) s.apiTokens = []; // webhook tokens (hashed), see docs/ARCHITECTURE.md
   if (!s.sessionSecret) s.sessionSecret = crypto.randomBytes(32).toString('hex');
   writeFileAtomic(paths.secrets, JSON.stringify(s, null, 2), 0o600);

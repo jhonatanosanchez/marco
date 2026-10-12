@@ -12,7 +12,7 @@ export const FEATURE_KEYS = Object.freeze([
   'openDisplayAccess', 'insecureTls', 'googleCalendar', 'googleLogin', 'passwordLogin', 'apiTokens',
   'webhooks', 'backups', 'importExport', 'includeSecrets', 'activity', 'setupWizard', 'status', 'accountMenu',
   'microsoftCalendar', 'updates', 'feedback', 'privacy', 'doorbell', 'doorbellLive', 'carousels', 'immich',
-  'family', 'widgets', 'webWidgets',
+  'family', 'widgets', 'webWidgets', 'priceWidgets',
 ]);
 
 /** Feature flags of a self-hosted server: all on (`updates` too: the update banner and settings), Google and
@@ -22,7 +22,8 @@ export const FEATURE_KEYS = Object.freeze([
  *  screens in a loop on one TV (config.carousels, server/core/carousels.js). `immich` is the Immich
  *  photo source (server/immich.js), which needs a server on the same network as the library. `family` is Familia:
  *  members, routines with stars, rewards, meals, the kids layouts and the family page on the phone (server/family.js).
- *  `widgets` are images on screens (config.widgets); `webWidgets` adds web pages in a sandboxed frame. */
+ *  `widgets` are images on screens (config.widgets); `webWidgets` adds web pages in a sandboxed frame;
+ *  `priceWidgets` the electricity price card (server/prices.js). */
 export function selfHostedFeatures() {
   const google = googleConfigured();
   const out = {};

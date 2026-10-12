@@ -23,6 +23,7 @@ import { ROWS_IMMICH } from './i18n-dict-immich';
 import { ROWS_PLANNER } from './i18n-dict-planner';
 import { ROWS_FAMILY } from './i18n-dict-family';
 import { ROWS_WIDGETS } from './i18n-dict-widgets';
+import { ROWS_PRICES } from './i18n-dict-prices';
 // Translations for the admin panel. Spanish is the source language (key); [es, en, pt].
 const ROWS: [string, string, string][] = [
   ['(ninguno)', '(none)', '(nenhum)'],
@@ -421,7 +422,7 @@ for (const [es, en, pt] of ROWS) {
   PT[es] = pt;
 }
 // v2 pages; existing rows win on duplicates.
-for (const [es, en, pt] of [...ROWS2, ...ROWS3, ...ROWS4, ...ROWS5, ...ROWS6, ...ROWS7, ...ROWS8, ...ROWS9, ...ROWS10, ...ROWS11, ...ROWS12, ...ROWS13, ...ROWS14, ...ROWS15, ...ROWS_ICLOUD, ...ROWS_MOTION, ...ROWS_COMPACT, ...ROWS_FEEDBACK, ...ROWS_PRIVACY, ...ROWS_DOORBELL, ...ROWS_CAROUSELS, ...ROWS_IMMICH, ...ROWS_PLANNER, ...ROWS_FAMILY, ...ROWS_WIDGETS]) {
+for (const [es, en, pt] of [...ROWS2, ...ROWS3, ...ROWS4, ...ROWS5, ...ROWS6, ...ROWS7, ...ROWS8, ...ROWS9, ...ROWS10, ...ROWS11, ...ROWS12, ...ROWS13, ...ROWS14, ...ROWS15, ...ROWS_ICLOUD, ...ROWS_MOTION, ...ROWS_COMPACT, ...ROWS_FEEDBACK, ...ROWS_PRIVACY, ...ROWS_DOORBELL, ...ROWS_CAROUSELS, ...ROWS_IMMICH, ...ROWS_PLANNER, ...ROWS_FAMILY, ...ROWS_WIDGETS, ...ROWS_PRICES]) {
   if (!(es in EN)) EN[es] = en;
   if (!(es in PT)) PT[es] = pt;
 }

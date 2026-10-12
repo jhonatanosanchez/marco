@@ -872,3 +872,78 @@
   .style-modern .news-sum { font-size: 2.25rem; }
   .style-modern #news { height: 13rem; }
 }
+
+/* ------------------------------------------------------------------------------- electricity prices widget */
+/* the same glass card as the weather (widgets/prices.ts); white card on the light page like the agenda list */
+.style-modern .pw {
+  --pw-bg: rgb(var(--g-rgb, 22 22 26) / var(--g-a-wx, min(0.9, calc(0.18 + var(--tone-bottom, 0.5) * 0.2))));
+  --pw-ink: #fff;
+  --pw-ink-2: var(--m-ink-2);
+  --pw-ink-3: rgb(255 255 255 / 0.42);
+  --pw-sep: var(--m-sep);
+  --pw-band: rgb(255 255 255 / 0.05);
+  --pw-cheap: #64d2ff;
+  --pw-mid: #ffd60a;
+  --pw-high: #ff453a;
+  position: relative;
+  border: 0;
+  border-radius: 2.8rem;
+  padding: 1.8rem 2.2rem 1.4rem;
+  -webkit-backdrop-filter: var(--m-blur);
+  backdrop-filter: var(--m-blur);
+  box-shadow: var(--m-shadow), inset 0 1px 0 rgb(255 255 255 / 0.1);
+  letter-spacing: -0.003em;
+}
+.style-modern .pw--full { padding: calc(var(--pk) * 1.8rem) calc(var(--pk) * 2.2rem) calc(var(--pk) * 1.4rem); }
+.style-modern .pw::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(150deg, rgb(255 255 255 / calc(0.42 * var(--g-edge, 1))), rgb(255 255 255 / calc(0.08 * var(--g-edge, 1))) 32%, rgb(255 255 255 / calc(0.02 * var(--g-edge, 1))) 60%, rgb(255 255 255 / calc(0.14 * var(--g-edge, 1))));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+.lite.style-modern .pw { -webkit-backdrop-filter: none; backdrop-filter: none; --pw-bg: rgb(var(--g-rgb, 28 28 32) / var(--g-a-wx, 0.6)); }
+.style-modern .no-photo .pw { -webkit-backdrop-filter: none; backdrop-filter: none; --pw-bg: rgb(var(--g-solid, 28 28 30)); }
+.style-modern.theme-light .pw:not(.pw--side) {
+  --pw-bg: #fff;
+  --pw-ink: #000;
+  --pw-ink-2: rgb(60 60 67 / 0.62);
+  --pw-ink-3: rgb(60 60 67 / 0.38);
+  --pw-sep: rgb(60 60 67 / 0.13);
+  --pw-band: rgb(60 60 67 / 0.05);
+  --pw-cheap: #0a84ff;
+  --pw-mid: #d4a000;
+  --pw-high: #ff3b30;
+  --pw-cheap-ink: #0071a4;
+  --pw-mid-ink: #a05a00;
+  --pw-high-ink: #d70015;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: 0 0.1rem 0.3rem rgb(0 0 0 / 0.05), 0 0.8rem 2.4rem rgb(0 0 0 / 0.08);
+}
+.style-modern.theme-light .pw:not(.pw--side)::before { display: none; }
+.style-modern .pw-h { color: var(--pw-ink); font-size: 1.05em; font-weight: 600; }
+.style-modern .pw-zone { border: 0; background: var(--pw-band); color: var(--pw-ink-2); }
+.style-modern .pw-val { font-weight: 300; letter-spacing: -0.04em; }
+.style-modern .pw-unit { font-weight: 600; }
+.style-modern .pw-cheap-h { font-weight: 600; }
+
+/* the kids layouts: a pastel card like theirs, no glass */
+.style-modern #app.is-kids .pw,
+.style-modern.theme-light #app.is-kids .pw:not(.pw--side) {
+  --pw-bg: var(--k-card);
+  --pw-ink: var(--k-ink);
+  --pw-ink-2: var(--k-ink-2);
+  --pw-ink-3: var(--k-ink-3);
+  --pw-sep: var(--k-track);
+  --pw-band: var(--k-fill);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: var(--k-shadow);
+}
+.style-modern #app.is-kids .pw::before { display: none; }

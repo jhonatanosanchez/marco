@@ -5,6 +5,8 @@ import { getConfig } from '../store.js';
 import { getEvents } from '../calendars.js';
 import { getWeather } from '../weather.js';
 import { getNews } from '../news.js';
+import { getPrices, PricesError } from '../prices.js';
+import { priceZone } from '../core/pricesCore.js';
 import { getPhotos } from '../photos.js';
 import { sseHandler } from '../sse.js';
 import { streamInit, streamHello, onStreamOpen, onStreamClose, pollDisplay } from '../displays.js';
@@ -89,6 +91,19 @@ export function publicRouter({ version }) {
       res.json(await getWeather({ lang: requestScreen(getConfig(), req).screen.screen.language }));
     } catch (err) {
       res.status(502).json({ error: err.message });
+    }
+  });
+
+  // Electricity prices of one zone (the 'prices' widget). Any known zone: the admin preview shows unsaved widgets, and
+  // every zone is one cache entry refreshed a few times a day whoever asks (server/prices.js).
+  r.get('/display/prices', async (req, res, next) => {
+    try {
+      const zone = typeof req.query.zone === 'string' ? req.query.zone : '';
+      if (!priceZone(zone)) return res.status(400).json({ error: 'invalid_zone' });
+      res.json(await getPrices(zone));
+    } catch (err) {
+      if (err instanceof PricesError) return res.status(502).json({ error: err.code });
+      next(err);
     }
   });
 

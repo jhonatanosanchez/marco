@@ -104,7 +104,7 @@ The admin and the display read these fields to decide which sections, actions an
   `announcements`, `displayCommands`, `openDisplayAccess`, `insecureTls`, `googleCalendar`, `googleLogin`,
   `passwordLogin`, `apiTokens`, `webhooks`, `backups`, `importExport`, `includeSecrets`, `activity`, `setupWizard`,
   `status`, `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`,
-  `carousels`, `immich`, `family`, `widgets`, `webWidgets`. A self-hosted server turns all of them on, except
+  `carousels`, `immich`, `family`, `widgets`, `webWidgets`, `priceWidgets`. A self-hosted server turns all of them on, except
   `googleCalendar` and `googleLogin` (on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set),
   `microsoftCalendar` (Outlook and Microsoft 365 calendars, on when `MICROSOFT_CLIENT_ID` and
   `MICROSOFT_CLIENT_SECRET` are set), `accountMenu` and `feedback` (always off). `updates` is the update banner,
@@ -121,7 +121,9 @@ The admin and the display read these fields to decide which sections, actions an
   `Familia` and `Menús` pages, the kids layouts, the family page on the phone and `/api/admin/family*`,
   `/api/family/*` and `/api/display/family*` (see [Familia](#familia)). `widgets` is the *Widgets* page, the
   `widget` layout and `POST /api/admin/test/widget`; `webWidgets` allows the `web` type (a page in a sandboxed
-  frame). Marco Cloud answers `widgets: true`, `webWidgets: false` (see [Widgets](#widgets)).
+  frame). Marco Cloud answers `widgets: true`, `webWidgets: false` (see [Widgets](#widgets)). `priceWidgets` allows
+  the `prices` type, `GET /api/display/prices` and `/api/admin/test/prices`, `/api/admin/prices/token` (see
+  [Electricity prices](#electricity-prices)).
 - `limits` (optional): plan limits such as `screens`, `sources` or `devices`. Absent means no limit beyond the
   config validator's own caps (12 screens, 50 calendars, 20 news feeds, 1000 local events, 500 birthdays,
   100 countdowns, 6 carousels, 20 widgets). `widgetMinRefreshSec` is the shortest widget refresh the server takes
@@ -139,9 +141,9 @@ The admin and the display read these fields to decide which sections, actions an
 
 Clients treat a response with no `features` field (servers older than 0.5.0) as having every feature on, except
 `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`, `carousels`,
-`immich`, `family`, `widgets` and `webWidgets`. A key missing from `features` counts as off only when `edition` is not `'self-hosted'`, and a missing
+`immich`, `family`, `widgets`, `webWidgets` and `priceWidgets`. A key missing from `features` counts as off only when `edition` is not `'self-hosted'`, and a missing
 `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`, `carousels`,
-`immich`, `family`, `widgets` or `webWidgets` is always off.
+`immich`, `family`, `widgets`, `webWidgets` or `priceWidgets` is always off.
 
 ### Account mode
 
@@ -466,6 +468,32 @@ Images (and, on a server with `webWidgets`, web pages) the owner puts on screens
 - Web pages load in `<iframe sandbox="allow-scripts allow-same-origin">` with no referrer, no permissions and no
   top navigation or popups, never from the display's own origin. Pages of this server only load in a frame as the
   admin preview (`?preview=1`, same origin): any other framed request gets a sandboxed `403`.
+
+### Electricity prices
+
+A widget of type `prices` (needs `features.priceWidgets`) has no address: the display asks this server for the zone's
+day-ahead prices and draws the card itself. The zones, sources, parsers, price math and one refresh round are in
+`server/core/pricesCore.js` (shared with Marco Cloud); `server/prices.js` keeps one cache entry per zone in memory.
+
+- `options.prices`: `{ zone, view: 'auto' | 'chart' | 'now' | 'cheap', unit: 'main' | 'sub', currency: 'auto' | 'EUR',
+  surcharge, vat, windowHours, resolution: 'hour' | 'quarter' }`. `zone` is one of `PRICE_ZONE_IDS` (43 bidding
+  zones, `ES-PVPC` for the Spanish regulated tariff). `surcharge` is per kWh in the main unit (EUR or DKK), -10 to
+  100, added before `vat` (0 to 50 %). `windowHours` 1 to 6. `options.url` is stored empty.
+- `GET /api/display/prices?zone=DK2` (display auth): `{ zone, currency, converted, source, credit, fetchedAt, stale,
+  error, slots: [[start (s), minutes, EUR/MWh, local/MWh?]] }`. Slots run from the zone's local midnight to the end
+  of tomorrow once published, at 15 or 60 minutes. `converted`: kroner computed from euros (the source gave none).
+  `stale`: the last good prices kept after failed refreshes (no longer covering now, or over 3 hours old). `400
+  { error: 'invalid_zone' }`; `502 { error: code }` when no prices were ever fetched (`no_source`, `no_data`,
+  `timeout`, `fetch_failed`, `http_denied`, `http_error`, `bad_response`, `rate_limited`).
+- Refresh: after the day-ahead auction (12:50 Brussels time; PVPC 20:30 Madrid time) every 20 minutes until
+  tomorrow's prices are in, then at the next auction, at least every 6 hours. A screen never waits for a refresh
+  while prices are cached. Failures back off from 2 minutes to 1 hour; a source's `429` is respected with its
+  `Retry-After` (at most 1 hour).
+- `POST /api/admin/test/prices { zone }`: `{ ok: true, ...prices }` or `{ ok: false, error }`, through the cache (a
+  new round at most once a minute per zone).
+- `GET /api/admin/prices/token`: `{ set, hint }` (last 4 characters only). `PUT /api/admin/prices/token { token }`:
+  20 to 64 letters, digits or dashes (empty removes it), tried once against ENTSO-E; `400 { error: 'token_invalid' }`
+  when refused. Stored in `data/secrets.json` (`prices.entsoeToken`), included in exports with secrets.
 
 ## Familia
 

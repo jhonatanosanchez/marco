@@ -1154,6 +1154,36 @@
     },
     {
       "method": "GET",
+      "path": "/api/admin/prices/token",
+      "query": [],
+      "feature": "priceWidgets",
+      "callers": [
+        "pricesToken"
+      ],
+      "request": null,
+      "response": "WeatherKeyStatus",
+      "responseArray": false,
+      "responseKeys": [
+        "set",
+        "hint",
+        "checked?"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/prices/token",
+      "query": [],
+      "feature": "priceWidgets",
+      "callers": [
+        "setPricesToken"
+      ],
+      "request": "{token}",
+      "response": "WeatherKeyStatus & { checked?: boolean }",
+      "responseArray": false,
+      "responseKeys": null
+    },
+    {
+      "method": "GET",
       "path": "/api/admin/privacy",
       "query": [],
       "feature": "privacy",
@@ -1301,6 +1331,19 @@
         "missingScopes?",
         "error?"
       ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/test/prices",
+      "query": [],
+      "feature": "priceWidgets",
+      "callers": [
+        "testPrices"
+      ],
+      "request": "{zone}",
+      "response": "TestPricesResponse",
+      "responseArray": false,
+      "responseKeys": null
     },
     {
       "method": "POST",

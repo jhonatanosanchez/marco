@@ -101,7 +101,7 @@ function shortHash(s) {
 }
 
 /** What changes when a saved widget changes in a way the display must load again (its `v`). */
-export const widgetVersion = (w) => shortHash(JSON.stringify([w.type, w.options.url, w.options.refreshSec, w.options.bust]));
+export const widgetVersion = (w) => shortHash(JSON.stringify(w.type === 'prices' ? [w.type, w.options.prices?.zone] : [w.type, w.options.url, w.options.refreshSec, w.options.bust]));
 
 /**
  * Widgets a screen shows, in display form. `widgetSrc(w)` = what the display loads: the URL itself on a server whose
@@ -111,13 +111,16 @@ export const widgetVersion = (w) => shortHash(JSON.stringify([w.type, w.options.
 export function displayWidgets(cfg, screen, { isPrivate = false, widgetSrc = null } = {}) {
   if (isPrivate) return [];
   const defs = new Map((Array.isArray(cfg.widgets) ? cfg.widgets : []).map((w) => [w.id, w]));
-  const one = (w, place, corner, size) => ({
-    id: w.id, type: w.type, name: w.name, place, corner, size,
-    refreshSec: w.options.refreshSec, fit: w.options.fit, bust: w.options.bust,
-    src: widgetSrc ? widgetSrc(w) : w.options.url,
-    via: widgetSrc ? 'proxy' : 'direct',
-    v: widgetVersion(w),
-  });
+  const one = (w, place, corner, size) => (w.type === 'prices'
+    // the display asks this server for the zone's prices (GET /api/display/prices) and draws them itself
+    ? { id: w.id, type: w.type, name: w.name, place, corner, size, refreshSec: 0, fit: 'contain', bust: false, src: '', via: 'direct', v: widgetVersion(w), prices: { ...w.options.prices } }
+    : {
+        id: w.id, type: w.type, name: w.name, place, corner, size,
+        refreshSec: w.options.refreshSec, fit: w.options.fit, bust: w.options.bust,
+        src: widgetSrc ? widgetSrc(w) : w.options.url,
+        via: widgetSrc ? 'proxy' : 'direct',
+        v: widgetVersion(w),
+      });
   const out = [];
   const full = screen.layout?.preset === 'widget' ? defs.get(screen.layout.widgetId) : null;
   if (full) out.push(one(full, 'full', 'br', 'l'));

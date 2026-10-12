@@ -2,6 +2,7 @@ import { projectScreen, SLUG_RE } from '../shared/screens';
 import { locale, t } from './i18n';
 import type { AppConfig, CalendarSource, IconRule, SourceKind, StoredConfig } from '../shared/types';
 import { findKeyword } from '../../server/lib/keywords.js';
+import { MAX_SURCHARGE, MAX_VAT, MIN_SURCHARGE, priceZone } from '../../server/core/pricesCore.js';
 import { caps as currentCaps, hasFeature, limitOf, type Caps, type LimitName } from './caps';
 
 export const uid = (prefix: string) =>
@@ -330,6 +331,14 @@ export function validateGlobal(c: StoredConfig): Errors {
   const minRefresh = limitOf(wcaps, 'widgetMinRefreshSec') ?? 0;
   for (const w of c.widgets ?? []) {
     const p = `wdg.${w.id}`;
+    if (w.type === 'prices') {
+      const o = w.options.prices;
+      if (!hasFeature(wcaps, 'priceWidgets')) e[`${p}.type`] = 'No disponible aquí';
+      if (!o || !priceZone(o.zone)) e[`${p}.zone`] = 'Elige una zona';
+      if (o && !(Number.isFinite(o.surcharge) && o.surcharge >= MIN_SURCHARGE && o.surcharge <= MAX_SURCHARGE)) e[`${p}.surcharge`] = `Entre ${MIN_SURCHARGE} y ${MAX_SURCHARGE}`;
+      if (o && !(Number.isFinite(o.vat) && o.vat >= 0 && o.vat <= MAX_VAT)) e[`${p}.vat`] = `Entre 0 y ${MAX_VAT}`;
+      continue;
+    }
     const bad = widgetUrlProblem(w.options.url, wcaps.edition === 'cloud');
     if (bad) e[`${p}.url`] = bad;
     if (w.type === 'web' && !hasFeature(wcaps, 'webWidgets')) e[`${p}.type`] = 'No disponible aquí';

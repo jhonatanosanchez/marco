@@ -59,7 +59,8 @@ export function mockConfig(): DisplayConfig {
     weather: { locationName: L('Lisbon, Portugal', 'Lisboa, Portugal', 'Lisboa, Portugal') },
     // ?photos=0 → no background photo
     ...(q.get('photos') === '0' ? { background: { enabled: false } } : {}),
-    datetime: { timezone: TZ },
+    // ?h12=1 → 12-hour clock
+    datetime: { timezone: TZ, ...(q.get('h12') === '1' ? { format24: false, showAmPm: true } : {}) },
     ...(PRIVATE ? { privacy: { active: true, until: new Date(Date.now() + 3 * 3600_000).toISOString(), lock: true, next: null } } : {}),
     countdowns: { enabled: q.get('countdowns') !== '0', max: Number(q.get('cdmax')) || 4 },
     // ?sched=1 → a scheduled message whose window is open right now
@@ -90,6 +91,23 @@ export function mockConfig(): DisplayConfig {
     },
     message: { enabled: q.get('msg') === '1', text: L('Have a great weekend, everyone!', '¡Buen fin de semana, familia!', 'Bom fim de semana, família!'), emoji: '💛' },
   });
+  // ?pw=view:place:corner:size,... electricity price widgets (view auto|chart|now|cheap, place corner|side|full),
+  // &pwzone= (default DK2), &pwunit=sub, &pwvat=, &pwadd= (surcharge), &pwres=quarter. A 'full' one picks the Widget layout.
+  if (q.get('pw')) {
+    cfg.widgets = q.get('pw')!.split(',').map((spec, i) => {
+      const [view = 'auto', place = 'corner', corner = 'br', size = 'm'] = spec.split(':');
+      return {
+        id: `w_pw${i}`, type: 'prices' as const, name: q.get('pwname') ?? '', place: place as 'corner' | 'side' | 'full', corner: corner as 'tl' | 'tr' | 'bl' | 'br',
+        size: size as 's' | 'm' | 'l', refreshSec: 0, fit: 'contain' as const, bust: false, src: '', via: 'direct' as const, v: `pw${i}`,
+        prices: {
+          zone: q.get('pwzone') || 'DK2', view: view as 'auto', unit: q.get('pwunit') === 'sub' ? 'sub' as const : 'main' as const, currency: 'auto' as const,
+          surcharge: Number(q.get('pwadd')) || 0, vat: Number(q.get('pwvat')) || 0, windowHours: Number(q.get('pwh')) || 3,
+          resolution: q.get('pwres') === 'quarter' ? 'quarter' as const : 'hour' as const,
+        },
+      };
+    });
+    if (cfg.widgets.some((w) => w.place === 'full')) cfg.layout.preset = 'widget';
+  }
   // ?planner=1: the Planner layout with what picking it in the admin sets (automatic weeks, cards)
   if (q.get('planner') === '1') {
     cfg.layout.preset = 'planner';
@@ -517,7 +535,8 @@ function baseWeather(now: Date): WeatherResponse {
   ];
   return {
     updatedAt: now.toISOString(),
-    locationName: L('Lisbon, Portugal', 'Lisboa, Portugal', 'Lisboa, Portugal'),
+    // ?place= another place name (screenshots for a demo elsewhere)
+    locationName: new URLSearchParams(location.search).get('place') || L('Lisbon, Portugal', 'Lisboa, Portugal', 'Lisboa, Portugal'),
     current: {
       temp: 19.4, feelsLike: 18.6, humidity: 68, windKmh: 14, windDir: 315, windDirLabel: L('NW', 'NO', 'NO'), code: 2,
       isDay: p.hour >= 8 && p.hour < 19, description: L('Partly cloudy', 'Parcialmente nublado', 'Parcialmente nublado'), pressure: 1017, uv: 4,

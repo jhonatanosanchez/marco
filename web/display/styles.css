@@ -1425,6 +1425,8 @@ body {
 .uw-c.tr { top: 0; right: 0; align-items: flex-end; }
 .uw-c.bl { bottom: 0; left: 0; align-items: flex-start; flex-direction: column-reverse; }
 .uw-c.br { bottom: 0; right: 0; align-items: flex-end; flex-direction: column-reverse; }
+/* widgets in both corners of one side: each stack keeps to its half (widgets/custom.ts halves) */
+.uw-c.uw-half { max-height: 50%; }
 /* takes the room the rest of the side column leaves (it shrinks; widgets/custom.ts scales its cards to fit) */
 #uw-side { display: flex; flex: 0 1 auto; min-height: 0; overflow: hidden; flex-direction: column; align-items: center; gap: 1.2rem; pointer-events: none; }
 #uw-side:empty { display: none; }
@@ -1478,6 +1480,141 @@ iframe.uw-media { background: #fff; color-scheme: normal; }
 }
 .uw-note { font-size: 1.6rem; padding: 1.2rem 1.8rem; border-radius: 1.6rem; }
 .lite .uw-ph { backdrop-filter: none; background: rgb(14 14 18 / 0.85); }
+
+/* ---- electricity prices (widgets/prices.ts). Classic: an outlined glass card like the weather card. Text sizes in
+   rem times --pk (place and size: corner s/m/l, side 1, full screen 1.9); corners and padding are fixed like the other
+   cards. Bars: cheap / normal / expensive for the day, cheap in blue so it never reads like expensive to colour-blind
+   eyes (red / green). */
+.pw {
+  --pk: 1;
+  --pw-bg: rgb(8 10 14 / min(0.92, calc(0.5 * var(--panel-shade, 1))));
+  --pw-line: rgb(255 255 255 / 0.08);
+  --pw-ink: #f6f6f8;
+  --pw-ink-2: rgb(246 246 248 / 0.66);
+  --pw-ink-3: rgb(246 246 248 / 0.4);
+  --pw-sep: rgb(255 255 255 / 0.1);
+  --pw-band: rgb(255 255 255 / 0.04);
+  --pw-cheap: #40c8e0;
+  --pw-mid: #f5c542;
+  --pw-high: #ff6259;
+  --pw-cheap-ink: var(--pw-cheap);
+  --pw-mid-ink: var(--pw-mid);
+  --pw-high-ink: var(--pw-high);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--pk) * 1rem);
+  min-width: calc(var(--pk) * 22rem);
+  padding: 1.6rem 2rem 1.3rem;
+  border: 1px solid var(--pw-line);
+  border-radius: 2.2rem;
+  background: var(--pw-bg);
+  color: var(--pw-ink);
+  box-shadow: 0 1.2rem 4rem rgb(0 0 0 / 0.25), inset 0 1px 0 rgb(255 255 255 / 0.06);
+  -webkit-backdrop-filter: blur(calc(var(--panel-blur, 18) * 0.1rem)) saturate(1.25);
+  backdrop-filter: blur(calc(var(--panel-blur, 18) * 0.1rem)) saturate(1.25);
+  font-size: calc(var(--pk) * 1.6rem);
+  line-height: 1.2;
+  text-shadow: none;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+}
+.lite .pw { -webkit-backdrop-filter: none; backdrop-filter: none; --pw-bg: rgb(14 14 18 / min(0.92, calc(0.86 * var(--panel-shade, 1)))); }
+/* in the side column: the weather card's glass (its photo tone and Panel shade), and its width */
+.pw--side { --pw-bg: rgb(8 10 14 / min(0.92, calc((0.16 + var(--tone-bottom, 0.5) * 0.34) * var(--panel-shade, 1)))); }
+.lite .pw--side { --pw-bg: rgb(8 10 14 / min(0.92, calc((0.32 + var(--tone-bottom, 0.5) * 0.3) * var(--panel-shade, 1)))); }
+.no-photo .pw--side { --pw-bg: rgb(255 255 255 / 0.03); -webkit-backdrop-filter: none; backdrop-filter: none; }
+html:not(.style-modern) #uw-side { margin: 0 -1rem; }
+/* light theme: corners and full screen sit on the light page; the side column keeps the dark glass of its photo */
+.theme-light .pw:not(.pw--side) {
+  --pw-bg: rgb(255 255 255 / 0.86);
+  --pw-line: rgb(0 0 0 / 0.1);
+  --pw-ink: #16161a;
+  --pw-ink-2: rgb(22 22 26 / 0.64);
+  --pw-ink-3: rgb(22 22 26 / 0.42);
+  --pw-sep: rgb(0 0 0 / 0.08);
+  --pw-band: rgb(0 0 0 / 0.035);
+  --pw-cheap: #0a84ff;
+  --pw-mid: #d4a000;
+  --pw-high: #f0473d;
+  --pw-cheap-ink: #0071a4;
+  --pw-mid-ink: #9a6d00;
+  --pw-high-ink: #c9302a;
+  box-shadow: 0 0.6rem 2.4rem rgb(0 0 0 / 0.1);
+}
+.lite.theme-light .pw:not(.pw--side) { --pw-bg: #fff; }
+.pw--side { width: 100%; }
+.pw.pw-cramped { display: none; }
+.pw--full { min-width: 0; padding: calc(var(--pk) * 1.8rem) calc(var(--pk) * 2.2rem) calc(var(--pk) * 1.4rem); gap: calc(var(--pk) * 1.2rem); }
+
+.pw-h { display: flex; align-items: baseline; gap: 0.6em; min-width: 0; color: var(--pw-ink-2); font-size: 0.92em; font-weight: 600; }
+.pw-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pw-zone {
+  flex: none;
+  padding: 0.1em 0.5em;
+  border: 1px solid var(--pw-sep);
+  border-radius: 99em;
+  color: var(--pw-ink-3);
+  font-size: 0.78em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.pw-hnow { margin-left: auto; flex: none; color: var(--pw-ink); font-weight: 400; white-space: nowrap; }
+.pw-hnow b { font-family: var(--font-num); font-weight: 600; font-size: 1.25em; }
+.pw[data-level='cheap'] .pw-hnow b { color: var(--pw-cheap-ink); }
+.pw[data-level='high'] .pw-hnow b { color: var(--pw-high-ink); }
+.pw-u { color: var(--pw-ink-2); font-size: 0.8em; }
+
+.pw-now { display: flex; flex-direction: column; gap: 0.35em; min-width: 0; }
+.pw-nowrow { display: flex; align-items: baseline; gap: 0.3em; white-space: nowrap; }
+.pw-val { font-family: var(--font-num); font-weight: 300; font-size: 3.6em; line-height: 0.95; letter-spacing: -0.02em; }
+.pw--nowchart .pw-val { font-size: 2.8em; }
+.pw--full .pw-val { font-size: 4.2em; }
+.pw-unit { color: var(--pw-ink-2); font-size: 1em; font-weight: 500; }
+.pw-trend { align-self: center; width: 1.3em; height: 1.3em; margin-left: 0.15em; color: var(--pw-ink-2); flex: none; }
+.pw-trend--up { color: var(--pw-high-ink); }
+.pw-trend--down { color: var(--pw-cheap-ink); }
+.pw-sub { display: flex; align-items: center; flex-wrap: wrap; gap: 0.3em 0.8em; color: var(--pw-ink-2); font-size: 0.92em; }
+.pw-level { display: inline-flex; align-items: center; gap: 0.4em; font-weight: 600; }
+.pw-level::before { content: ''; width: 0.62em; height: 0.62em; border-radius: 50%; background: currentColor; }
+.pw-level--cheap { color: var(--pw-cheap-ink); }
+.pw-level--mid { color: var(--pw-mid-ink); }
+.pw-level--high { color: var(--pw-high-ink); }
+
+.pw-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 2em; align-items: start; }
+.pw-cheap { display: flex; flex-direction: column; gap: 0.45em; min-width: 0; }
+.pw-cheap-h { color: var(--pw-ink-2); font-size: 0.86em; font-weight: 600; }
+.pw--full .pw-cheap-h { font-size: 0.7em; }
+.pw-cheap-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.pw-win { display: flex; align-items: baseline; gap: 1em; padding: 0.4em 0; white-space: nowrap; }
+.pw-win + .pw-win { border-top: 1px solid var(--pw-sep); }
+.pw--full .pw-win { font-size: 0.8em; }
+.pw-when { display: flex; align-items: baseline; gap: 0.5em; font-weight: 500; }
+.pw-day { color: var(--pw-ink-3); font-size: 0.82em; font-weight: 600; }
+.pw-day--now { color: var(--pw-cheap-ink); }
+.pw-avg { margin-left: auto; font-family: var(--font-num); font-weight: 600; }
+.pw-win--cheap .pw-avg { color: var(--pw-cheap-ink); }
+.pw-empty { color: var(--pw-ink-3); font-size: 0.9em; }
+
+/* hours and the footer stay readable from across the room on the small cards (the weather's hourly labels: 1.6rem) */
+.pw-chart { flex: 1 1 auto; min-height: 0; font-size: max(0.72em, 1.6rem); position: relative; }
+.pw--full .pw-chart { font-size: max(0.58em, 1.6rem); }
+.pw-svg { position: absolute; inset: 0; display: block; overflow: visible; }
+.pw-bar { fill: var(--pw-mid); }
+.pw-bar--cheap { fill: var(--pw-cheap); }
+.pw-bar--high { fill: var(--pw-high); }
+.pw-bar.is-past { fill: var(--pw-ink); opacity: 0.16; }
+.pw-nowline { stroke: var(--pw-ink); stroke-width: 1.5; stroke-dasharray: 2 3; opacity: 0.55; }
+.pw-nowdot { fill: var(--pw-ink); }
+.pw-zero { stroke: var(--pw-ink-3); stroke-width: 1; }
+.pw-tmw { fill: var(--pw-band); }
+.pw-div { stroke: var(--pw-sep); stroke-width: 1; }
+.pw-ax { fill: var(--pw-ink-2); font-family: var(--font-num); font-size: 1em; font-weight: 500; }
+.pw-ax--day { fill: var(--pw-ink-2); font-family: var(--font-ui); font-weight: 600; }
+.pw-foot { display: flex; align-items: baseline; gap: 1em; color: var(--pw-ink-2); font-size: max(0.72em, 1.4rem); white-space: nowrap; }
+.pw-credit { margin-left: auto; overflow: hidden; text-overflow: ellipsis; color: var(--pw-ink-3); font-size: 0.85em; }
+.pw--full .pw-foot { font-size: max(0.56em, 1.4rem); }
+/* a stale card: the "not updated" pill sits in its footer corner */
+.uw-prices .uw-pill { right: auto; left: 50%; bottom: auto; top: 0.8rem; transform: translateX(-50%); }
 
 /* the 'widget' layout: one widget fills the screen, the photo and ambient keep running behind */
 #app.preset-widget, #app.portrait.preset-widget { grid-template-columns: 100%; grid-template-rows: 100%; }

@@ -128,6 +128,9 @@ transparency, blur and a light edge:
   Add your own [Home Assistant](https://www.home-assistant.io/) weather entity and indoor sensors; animated rain/snow, or an optional
   realistic effect with drops on the glass, layered snow and sun rays on clear days (the photo is never blurred).
 - **News ticker** from any RSS/Atom feed, a to-do list and a message of the day.
+- **Electricity price:** a widget with the day-ahead price of your bidding zone (most of Europe): a chart of today
+  and tomorrow, the price now or the cheapest hours ahead, with your own grid fees and VAT. See
+  [Electricity prices](#electricity-prices).
 - **Photo background:** stock photos, your own gallery or albums from your [Immich](https://immich.app/) library,
   WebGL transitions, slow zoom, a soft "aurora" ambient effect, and **smart cropping** that keeps the subject (faces,
   pets) in the part of the screen not covered by the clock or the weather. Portrait photos can be shown whole over a
@@ -836,6 +839,34 @@ it, turn off *Public Calendar* in iCloud.
   on the server. Home Assistant can also **send alerts** to the screens, see [webhooks](#api-tokens-and-webhooks).
 - **News (RSS/Atom):** add any feed in *News*. Some sites block non-browser clients; the server already uses a desktop
   browser User-Agent. Use *Test* to check a feed.
+
+## Electricity prices
+
+In *Widgets → Add widget → Electricity price* pick your zone (grouped by country). The server fetches the day-ahead
+market price and keeps it: the screens never call any website, and screens showing the same zone share one copy.
+
+- **View:** *Automatic* (a small or medium corner shows the price now; a large corner or the side column adds the
+  chart; full screen shows everything), *24 h chart* (bars from cheap to expensive, the current hour marked, tomorrow
+  added once it is published, around 13:00 CET), *Price now* and *Cheap windows* (for example "02:00 to 05:00").
+- **Fixed extra per kWh** and **VAT**, to see what you actually pay. The extra (grid fees, taxes, your supplier's
+  margin) is added before VAT. With 0 and 0 you see the market price.
+- Many zones publish a price every 15 minutes; the chart shows the average of each hour (or the quarter hours, in
+  *More options*). Days when the clocks change have 23 or 25 hours.
+- **Test** shows the price now with your extra and VAT, and whether tomorrow's prices are out.
+
+| Zone | Source | Key |
+| --- | --- | --- |
+| Denmark (DK1, DK2), SE3, SE4, NO2 | [Energi Data Service](https://www.energidataservice.dk/) (Energinet), in kroner or euros | none |
+| Estonia, Latvia, Lithuania, Finland | [Elering](https://dashboard.elering.ee/) | none |
+| Spain (wholesale market or PVPC) | [Red Eléctrica](https://www.ree.es/es/datos/apidatos), OMIE if it fails | none |
+| Portugal | [OMIE](https://www.omie.es/) | none |
+| Germany, Austria, Belgium, Netherlands, France, Switzerland, Czechia, Poland, Hungary, Slovenia, Italy North | [Energy-Charts](https://www.energy-charts.info/) (SMARD data, CC BY 4.0), aWATTar for Germany and Austria | none |
+| The rest (Norway NO1/3/4/5, Sweden SE1/2, the rest of Italy, Greece, Romania, Bulgaria, Croatia, Slovakia, Ireland...) | [ENTSO-E](https://transparency.entsoe.eu/) with your own free token; without one, on your own server, Energy-Charts (private use only) | optional |
+
+Get an ENTSO-E token for free at transparency.entsoe.eu (create an account, then ask for "Restful API access" by
+email) and paste it in *More options*. It is kept in `data/secrets.json` and never shown again. If a source fails,
+Marco tries the next one; if all fail, the screen keeps the last prices and marks them as *not updated*. Prices are
+asked again after each day's auction until tomorrow's are in, and never more often than the sources allow.
 
 ## Photos
 

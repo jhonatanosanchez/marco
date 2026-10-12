@@ -1,0 +1,38 @@
+[
+ {
+  "Rank": 26,
+  "DateTime": "2026-10-12T00:00:00+03:00",
+  "PriceNoTax": 0.03924,
+  "PriceWithTax": 0.04925
+ },
+ {
+  "Rank": 20,
+  "DateTime": "2026-10-12T00:15:00+03:00",
+  "PriceNoTax": 0.03516,
+  "PriceWithTax": 0.04413
+ },
+ {
+  "Rank": 3,
+  "DateTime": "2026-10-12T00:30:00+03:00",
+  "PriceNoTax": 0.03,
+  "PriceWithTax": 0.03765
+ },
+ {
+  "Rank": 4,
+  "DateTime": "2026-10-12T00:45:00+03:00",
+  "PriceNoTax": 0.03,
+  "PriceWithTax": 0.03765
+ },
+ {
+  "Rank": 25,
+  "DateTime": "2026-10-12T01:00:00+03:00",
+  "PriceNoTax": 0.03799,
+  "PriceWithTax": 0.04768
+ },
+ {
+  "Rank": 19,
+  "DateTime": "2026-10-12T01:15:00+03:00",
+  "PriceNoTax": 0.03515,
+  "PriceWithTax": 0.04411
+ }
+]

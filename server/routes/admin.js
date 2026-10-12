@@ -22,6 +22,7 @@ import { logActivity } from '../activity.js';
 import { resolveScreenList } from '../displays.js';
 import { handlePrivacy, privacyResponse } from '../privacy.js';
 import { testWidget } from '../widgets.js';
+import { testPrices, entsoeToken, entsoeTokenStatus, checkEntsoeToken, tokenChanged, ENTSOE_TOKEN_RE } from '../prices.js';
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -109,6 +110,26 @@ export function adminRouter({ onConfigSaved } = {}) {
   r.post('/test/widget', wrap(async (req, res) => {
     const { type, url } = req.body || {};
     res.json(await testWidget({ type, url, secure: req.secure, host: req.get('host') || '' }));
+  }));
+  // electricity prices: the zone's prices now, through the shared cache (server/prices.js)
+  r.post('/test/prices', wrap(async (req, res) => {
+    const zone = typeof req.body?.zone === 'string' ? req.body.zone : '';
+    res.json(await testPrices(zone));
+  }));
+  // ENTSO-E token for the price widget (zones without a free source): write-only, like the weather key
+  r.get('/prices/token', (req, res) => res.json(entsoeTokenStatus()));
+  r.put('/prices/token', wrap(async (req, res) => {
+    const token = req.body?.token;
+    if (typeof token !== 'string' || token.length > 200) return res.status(400).json({ error: 'token must be a string' });
+    const k = token.trim();
+    if (k && !ENTSOE_TOKEN_RE.test(k)) return res.status(400).json({ error: 'token_invalid' });
+    // a new token is tried once: one ENTSO-E refuses is not stored
+    const checked = k ? await checkEntsoeToken(k) : null;
+    if (checked === false) return res.status(400).json({ error: 'token_invalid' });
+    const changed = entsoeToken() !== k;
+    updateSecrets((s) => { s.prices = { ...(s.prices || {}), entsoeToken: k }; });
+    if (changed) tokenChanged();
+    res.json({ ...entsoeTokenStatus(k), checked: checked === true });
   }));
   r.post('/test/homeassistant', wrap(async (req, res) => {
     const { url, token } = req.body || {};

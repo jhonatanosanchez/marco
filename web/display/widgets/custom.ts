@@ -8,10 +8,14 @@
 //   old image with a small "not updated" mark. A widget that never loaded takes no space (corner, side).
 // - Web pages (self-hosted only): a sandboxed iframe without top navigation, popups or forms. A page from this
 //   display's own origin is never framed (scripts + same origin could lift the sandbox and reach the display).
+// - Electricity prices ('prices'): a card this display draws itself (widgets/prices.ts) from this server's prices.
+// - Two corners on the same side (top and bottom) share its height: each stack gets half (.uw-half), never overlapping.
+//   Inside one corner the widgets share the stack's height, so none is cut by it.
 // - Nothing while private; night dimming, alerts and the doorbell sit above (z-order in styles.css).
 import type { DisplayConfig, DisplayWidget, FrameCorner } from '../../shared/types';
 import { ctx } from '../ctx';
 import { authHeaders, isPreview, withScreen } from '../identity';
+import { PriceCard, priceFloorHeight } from './prices';
 
 /** Corner boxes: max width (vw) and height (vh) per size. */
 const CORNER_BOX: Record<string, [number, number]> = { s: [18, 22], m: [26, 32], l: [36, 45] };
@@ -26,7 +30,9 @@ interface Entry {
   w: DisplayWidget;
   el: HTMLElement;
   /** what is on screen now (null until the first load) */
-  media: HTMLImageElement | HTMLIFrameElement | null;
+  media: HTMLImageElement | HTMLIFrameElement | HTMLElement | null;
+  /** 'prices' widgets: the card that draws them */
+  card: PriceCard | null;
   /** natural size of the image on screen */
   nat: [number, number] | null;
   timer: ReturnType<typeof setTimeout> | null;
@@ -143,6 +149,7 @@ export class CustomWidgets {
       } else {
         e.w = w;
         this.place(e, box);
+        e.card?.update(w);
       }
       e.el.dataset.size = w.size;
       e.el.classList.toggle('uw-cover', w.fit === 'cover');
@@ -183,6 +190,7 @@ export class CustomWidgets {
       }
     }
     this.avoidPhotoFrame();
+    this.halves(false);
     for (const e of this.entries.values()) this.size(e);
     this.fitSideBox();
     if (moved) this.onSideChange?.();
@@ -194,6 +202,12 @@ export class CustomWidgets {
    */
   private fitSideBox(): void {
     const items = [...this.entries.values()].filter((e) => e.el.parentElement === this.side && e.media && !e.el.classList.contains('uw-wait'));
+    // price cards keep the room for their smallest readable size: the column drops its secondary content first
+    // (main.ts fitSideContent), as it does for its own cards
+    const cards = items.filter((e) => e.card);
+    const gap = parseFloat(getComputedStyle(this.side).rowGap) || 0;
+    const floor = cards.length ? cards.length * priceFloorHeight() + gap * (cards.length - 1) : 0;
+    this.side.style.minHeight = floor ? `${Math.ceil(floor)}px` : '';
     if (!items.length) return;
     const avail = this.side.clientHeight;
     const need = this.side.scrollHeight;
@@ -202,6 +216,10 @@ export class CustomWidgets {
     const k = Math.max(0, (avail - gaps) / Math.max(1, need - gaps));
     for (const e of items) {
       const m = e.media!;
+      if (e.card) {
+        e.card.layout(m.offsetWidth, Math.floor(m.offsetHeight * k), 'side');
+        continue;
+      }
       m.style.width = `${Math.max(1, Math.floor(m.offsetWidth * k))}px`;
       m.style.height = `${Math.max(1, Math.floor(m.offsetHeight * k))}px`;
     }
@@ -209,6 +227,7 @@ export class CustomWidgets {
 
   private usable(w: DisplayWidget): boolean {
     // only http(s): a javascript: or data: address in an iframe or the unsaved preview would run on this origin
+    if (w?.type === 'prices') return typeof w.id === 'string' && typeof w.prices?.zone === 'string' && !!w.prices.zone;
     if (!w || typeof w.id !== 'string' || !webUrl(w.src)) return false;
     // web pages are framed directly only; a proxied server never sends them, but never frame its routes either
     if (w.type === 'web') return w.via === 'direct';
@@ -230,7 +249,18 @@ export class CustomWidgets {
     const pill = document.createElement('span');
     pill.className = 'uw-pill';
     el.appendChild(pill);
-    return { key, w, el, media: null, nat: null, timer: null, gen: 0, blobUrl: null, abort: null, waiting: false, dead: false };
+    const e: Entry = { key, w, el, media: null, card: null, nat: null, timer: null, gen: 0, blobUrl: null, abort: null, waiting: false, dead: false };
+    if (w.type === 'prices') {
+      const card = new PriceCard(w);
+      e.card = card;
+      card.onState = (st) => {
+        if (e.dead) return;
+        if (st === 'failed') return this.failed(e);
+        if (!e.media) this.swap(e, card.el, null);
+        this.setStale(e, st === 'stale');
+      };
+    }
+    return e;
   }
 
   private place(e: Entry, box: HTMLElement): void {
@@ -245,6 +275,7 @@ export class CustomWidgets {
     e.gen++;
     if (e.timer) clearTimeout(e.timer);
     e.abort?.abort();
+    e.card?.stop();
     if (e.blobUrl) URL.revokeObjectURL(e.blobUrl);
     const wasSide = e.el.parentElement === this.side;
     e.el.remove();
@@ -275,6 +306,7 @@ export class CustomWidgets {
     e.waiting = false;
     if (e.timer) clearTimeout(e.timer);
     e.timer = null;
+    if (e.card) return e.card.start();
     if (e.w.type === 'web') return this.loadFrame(e);
     if (e.w.via === 'proxy') return void this.loadProxy(e);
     this.loadImage(e, e.w.bust ? addParam(e.w.src, '_marco', String(Math.floor(Date.now() / 1000))) : e.w.src, null);
@@ -404,7 +436,7 @@ export class CustomWidgets {
     this.size(e, f);
   }
 
-  private swap(e: Entry, next: HTMLImageElement | HTMLIFrameElement, nat: [number, number] | null): void {
+  private swap(e: Entry, next: HTMLImageElement | HTMLIFrameElement | HTMLElement, nat: [number, number] | null): void {
     const first = !e.media;
     const sizeChanged = !e.nat || !nat || e.nat[0] !== nat[0] || e.nat[1] !== nat[1];
     e.el.querySelector('.uw-note')?.remove();
@@ -416,12 +448,14 @@ export class CustomWidgets {
     e.nat = nat;
     e.el.classList.remove('uw-wait', 'uw-failed');
     this.size(e);
+    if (first) this.halves();
     if ((first || sizeChanged) && e.el.parentElement === this.side) this.onSideChange?.();
   }
 
   private failed(e: Entry): void {
     if (e.media) return this.setStale(e, true);
     e.el.classList.add('uw-failed');
+    this.halves();
     // full screen: the widget's name and "not updated" instead of an empty screen; corner / side: no space taken
     if (e.el.parentElement === this.full) this.showNote(e, `${e.w.name} · ${ctx.t('widgetStale')}`);
   }
@@ -464,11 +498,33 @@ export class CustomWidgets {
     }
     if (box === this.side) return [Math.max(0, this.side.clientWidth || this.side.parentElement?.clientWidth || 0), SIDE_H[e.w.size] * vh];
     const [bw, bh] = CORNER_BOX[e.w.size] ?? CORNER_BOX.m;
-    return [bw * vw, bh * vh];
+    let h = bh * vh;
+    if (box) {
+      // the corner's stack: the whole height, or half when the other corner of its side has widgets too (.uw-half),
+      // less its padding (the photo frame card's room included) and gaps; shared by its widgets in proportion to
+      // their sizes when they do not all fit
+      const cs = getComputedStyle(box);
+      const shown = [...box.children].filter((x) => x.classList.contains('uw') && !x.classList.contains('uw-wait') && !x.classList.contains('uw-failed'));
+      if (!shown.includes(e.el)) shown.push(e.el);
+      const gap = parseFloat(cs.rowGap) || 0;
+      const room = (box.classList.contains('uw-half') ? window.innerHeight / 2 : window.innerHeight)
+        - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0) - gap * (shown.length - 1);
+      const want = (x: Element) => (CORNER_BOX[(x as HTMLElement).dataset.size ?? ''] ?? CORNER_BOX.m)[1] * vh;
+      const sum = shown.reduce((n, x) => n + want(x), 0);
+      if (sum > room) h = (h * room) / sum;
+    }
+    return [bw * vw, Math.max(0, Math.floor(h))];
   }
 
-  private size(e: Entry, media: HTMLImageElement | HTMLIFrameElement | null = e.media): void {
-    if (!media) return;
+  private size(e: Entry, media: HTMLImageElement | HTMLIFrameElement | HTMLElement | null = e.media): void {
+    if (e.card) {
+      const box = e.el.parentElement;
+      if (!box) return;
+      const [cw, ch] = this.bounds(e);
+      e.card.layout(cw, ch, box === this.full ? 'full' : box === this.side ? 'side' : 'corner');
+      return;
+    }
+    if (!media || !(media instanceof HTMLImageElement || media instanceof HTMLIFrameElement)) return;
     const [mw, mh] = this.bounds(e);
     const full = e.el.parentElement === this.full;
     if (media instanceof HTMLIFrameElement) {
@@ -493,6 +549,24 @@ export class CustomWidgets {
     media.style.width = `${Math.max(1, Math.round(nat[0] * k))}px`;
     media.style.height = `${Math.max(1, Math.round(nat[1] * k))}px`;
   }
+
+  /**
+   * Widgets in both corners of one side (top-left and bottom-left, or top-right and bottom-right): each corner stack
+   * gets half the screen's height so they never overlap. `resize` sizes the widgets again when that changed.
+   */
+  private halves(resize = true): void {
+    const shown = (c: FrameCorner) => [...this.corners[c].children].filter((x) => x.classList.contains('uw') && !x.classList.contains('uw-wait') && !x.classList.contains('uw-failed')).length;
+    for (const [a, b] of [['tl', 'bl'], ['tr', 'br']] as [FrameCorner, FrameCorner][]) {
+      const both = shown(a) > 0 && shown(b) > 0;
+      for (const c of [a, b]) this.corners[c].classList.toggle('uw-half', both);
+    }
+    // what each corner shows changed (a widget loaded, failed, or the other corner filled): sized again
+    const sig = CORNERS.map((c) => `${shown(c)}${this.corners[c].classList.contains('uw-half') ? 'h' : ''}`).join(',');
+    const changed = sig !== this.cornerSig;
+    this.cornerSig = sig;
+    if (changed && resize) for (const e of this.entries.values()) if (e.el.parentElement !== this.side && e.el.parentElement !== this.full) this.size(e);
+  }
+  private cornerSig = '';
 
   /** Photo frame layout: widgets in the clock card's corner stack beside it, never over it. */
   private avoidPhotoFrame(): void {
