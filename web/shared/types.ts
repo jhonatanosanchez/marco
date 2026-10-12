@@ -2015,13 +2015,18 @@ export interface ImportPreview {
  *   insecureTls        calendars imported with certificate checks on (items)
  *   google             Google calendars of accounts not connected here (items)
  *   microsoft          Microsoft calendars of accounts not connected here, or on a server without them (items)
- *   blockedUrl         calendars and feeds on an address this server cannot fetch (items)
+ *   blockedUrl         calendars, feeds and image widgets on an address this server cannot fetch (items)
  *   refreshMin         calendars refreshed every 30 minutes at most (items)
  *   news               news feeds, while this server offers no news
  *   photos             screens show the gallery: photos are not in the file
+ *   webWidgets         web page widgets (this server shows images only; their placements go too) (items)
+ *   widgetHttps        image widgets on a plain http address (items)
+ *   widgetRefresh      image widgets refreshed more often than this server allows, now at its shortest (items)
  */
 export interface ImportNote {
-  code: 'secrets' | 'homeassistant' | 'signIn' | 'openDisplayAccess' | 'insecureTls' | 'google' | 'microsoft' | 'blockedUrl' | 'refreshMin' | 'news' | 'photos';
+  code:
+    | 'secrets' | 'homeassistant' | 'signIn' | 'openDisplayAccess' | 'insecureTls' | 'google' | 'microsoft' | 'blockedUrl' | 'refreshMin' | 'news' | 'photos'
+    | 'webWidgets' | 'widgetHttps' | 'widgetRefresh';
   items?: string[];
 }
 

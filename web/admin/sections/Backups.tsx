@@ -39,6 +39,12 @@ export function importNoteText(n: ImportNote): string {
       return t('Las fuentes de noticias no se importan: este servidor no ofrece noticias.');
     case 'photos':
       return t('Las fotos de la galería no van en la copia: súbelas en Fotos.');
+    case 'webWidgets':
+      return t('Los widgets de páginas web no se importan, aquí solo hay widgets de imagen: {list}.', { list });
+    case 'widgetHttps':
+      return t('Widgets que no se importan porque su dirección no empieza por https://: {list}.', { list });
+    case 'widgetRefresh':
+      return t('Se actualizarán cada 30 segundos, el mínimo aquí: {list}.', { list });
     default:
       return list;
   }

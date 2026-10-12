@@ -145,4 +145,16 @@ export const ROWS_WIDGETS: [string, string, string][] = [
     'It must start with https://. Marco downloads the image and serves it to your screens.',
     'Tem de começar por https://. O Marco descarrega a imagem e serve-a aos seus ecrãs.',
   ],
+  ['Este tipo de widget no está disponible aquí.', 'This kind of widget is not available here.', 'Este tipo de widget não está disponível aqui.'],
+  [
+    'Los widgets de páginas web no se importan, aquí solo hay widgets de imagen: {list}.',
+    'Web page widgets are not imported, only image widgets are offered here: {list}.',
+    'Os widgets de páginas web não são importados, aqui só há widgets de imagem: {list}.',
+  ],
+  [
+    'Widgets que no se importan porque su dirección no empieza por https://: {list}.',
+    'Widgets not imported because their address does not start with https://: {list}.',
+    'Widgets que não são importados porque o endereço não começa por https://: {list}.',
+  ],
+  ['Se actualizarán cada 30 segundos, el mínimo aquí: {list}.', 'They will refresh every 30 seconds, the shortest here: {list}.', 'Vão atualizar-se a cada 30 segundos, o mínimo aqui: {list}.'],
 ];

@@ -332,13 +332,14 @@ export class CustomWidgets {
       const path = addParam(e.w.src, 'v', e.w.v).replace(location.origin, '');
       const r = await fetch(withScreen(path), { headers: authHeaders(), cache: 'no-store', signal: ctl.signal });
       if (gen !== e.gen || e.dead) return;
-      if (r.status === 404) {
+      if (r.status === 404 && !isPreview) {
         // removed, or the screen went private: nothing to show until the config says otherwise
         e.el.classList.add('uw-wait');
         return;
       }
-      if (r.status === 409 && isPreview) {
-        // the admin preview of an unsaved widget: the copy the admin posted, or a note until it is saved
+      if ((r.status === 409 || r.status === 404) && isPreview) {
+        // the admin preview of an unsaved widget (a changed one is 409, a new one 404 until saved): the copy the
+        // admin posted, or a note until it is saved
         const pv = this.previewBlobs.get(e.w.id);
         if (pv && pv.v === e.w.v) return this.loadImage(e, pv.url, null);
         this.showNote(e, ctx.t('widgetSaveToSee'));

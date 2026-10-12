@@ -32,6 +32,8 @@ const ERROR_TEXT: Record<string, string> = {
   too_many_pixels: 'La imagen es demasiado grande en píxeles.',
   too_large_to_serve: 'La imagen es demasiado grande para mostrarla. Prueba con una de menos de 5 MB y 4096 px.',
   rate_limited: 'Demasiadas pruebas seguidas. Espera un minuto.',
+  not_available: 'Este tipo de widget no está disponible aquí.',
+  invalid_type: 'Este tipo de widget no está disponible aquí.',
 };
 const WARNING_TEXT: Record<string, string> = {
   refuses_framing: 'Esta página no deja que otras la muestren dentro de un marco: puede salir en blanco.',
