@@ -3,7 +3,7 @@
 // stripping it must give the original bytes back.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sniffImage, sniffWidgetImage, widgetImageInfo, stripImageMetadata } from '../core/imageInfo.js';
+import { imageInfo, sniffImage, sniffWidgetImage, widgetImageInfo, stripImageMetadata } from '../core/imageInfo.js';
 
 const b64 = (s) => new Uint8Array(Buffer.from(s, 'base64'));
 const cat = (...parts) => new Uint8Array(Buffer.concat(parts.map((p) => Buffer.from(p))));
@@ -117,4 +117,32 @@ test('stripImageMetadata: unknown types and non-bytes give null', () => {
   assert.equal(stripImageMetadata(PNG, 'image/svg+xml'), null);
   assert.equal(stripImageMetadata('not bytes', 'image/png'), null);
   assert.equal(stripImageMetadata(new Uint8Array(0), 'image/webp'), null);
+});
+
+test('widgetImageInfo: frames hidden from the header still count (APNG fcTL past acTL, WebP frames after junk)', () => {
+  const ihdrEnd = 8 + 25;
+  const fctl = chunk('fcTL', '\0'.repeat(26));
+  const iend = PNG.length - 12;
+  const apng = cat(PNG.subarray(0, ihdrEnd), chunk('acTL', '\0\0\0\x01\0\0\0\0'), fctl, PNG.subarray(ihdrEnd, iend), ...Array(400).fill(fctl), PNG.subarray(iend));
+  assert.equal(widgetImageInfo(apng).frames, 401, 'acTL says 1, 401 fcTL');
+  const le24 = (v) => [v & 255, (v >>> 8) & 255, (v >>> 16) & 255];
+  const vp8x = riffChunk('VP8X', Buffer.from([0x02, 0, 0, 0, ...le24(2), ...le24(1)]));
+  const anmf = riffChunk('ANMF', Buffer.from([...le24(0), ...le24(0), ...le24(2), ...le24(1), ...le24(100), 0]));
+  const body = cat(vp8x, riffChunk('ANIM', '\0'.repeat(6)), ...Array(100001).fill(riffChunk('JUNK', '')), ...Array(350).fill(anmf));
+  const len = Buffer.alloc(4);
+  len.writeUInt32LE(body.length + 4);
+  const webp = cat(Buffer.from('RIFF'), len, Buffer.from('WEBP'), body);
+  assert.equal(widgetImageInfo(webp).frames, 350);
+});
+
+test('stripImageMetadata: a JPEG keeps its EXIF orientation alone', () => {
+  const exif = 'Exif\0\0MM\0\x2a\0\0\0\x08\0\x02' + '\x01\x0f\0\x02\0\0\0\x04Can\0' + '\x01\x12\0\x03\0\0\0\x01\0\x06\0\0' + '\0\0\0\0GPSLatitude';
+  const clean = stripImageMetadata(cat(JPEG.subarray(0, 2), seg(0xe1, exif), JPEG.subarray(2)), 'image/jpeg');
+  assert.ok(!has(clean, 'GPS') && !has(clean, 'Can'));
+  const app1 = Buffer.from(clean).indexOf(Buffer.from('Exif\0\0', 'latin1'));
+  assert.ok(app1 > 0);
+  assert.equal(imageInfo(clean).orientation, 6);
+  // upright pictures get no EXIF at all
+  const upright = exif.replace('\x01\x12\0\x03\0\0\0\x01\0\x06', '\x01\x12\0\x03\0\0\0\x01\0\x01');
+  assert.ok(!has(stripImageMetadata(cat(JPEG.subarray(0, 2), seg(0xe1, upright), JPEG.subarray(2)), 'image/jpeg'), 'Exif'));
 });

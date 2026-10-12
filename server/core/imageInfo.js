@@ -162,7 +162,8 @@ export function looksLikeSvg(bytes) {
  * - `w`, `h`: the size a browser decodes it at. For a GIF that is the largest of the logical screen and every frame's
  *   own extent (browsers grow the canvas to a frame that sticks out, so a 1x1 header can hide an 8000x8000 frame);
  *   for an animated WebP the canvas and its frames likewise.
- * - `frames`: frame count (1 for a still image; APNG from acTL, GIF and WebP by walking the frames).
+ * - `frames`: frame count (1 for a still image; APNG from acTL and its fcTL chunks, GIF and WebP by walking the
+ *   frames).
  * - `area`: pixels decoded over all frames (what an animation costs), at least w * h.
  */
 export function widgetImageInfo(bytes) {
@@ -180,19 +181,20 @@ export function widgetImageInfo(bytes) {
 function pngInfo(b) {
   const w = u32be(b, 16), h = u32be(b, 20);
   if (w < 0 || h < 0) return null;
-  // APNG: acTL (before the first IDAT) holds the frame count; every frame fits inside the IHDR size
-  let frames = 1;
-  for (let pos = 8, guard = 0; pos + 8 <= b.length && guard < 10000; guard++) {
+  // APNG: acTL holds the frame count and every frame fits inside the IHDR size. The fcTL chunks are counted too (the
+  // whole file, every chunk), so an acTL that says 1 cannot hide more frames behind it.
+  let frames = 1, fctl = 0;
+  for (let pos = 8; pos + 8 <= b.length; ) {
     const len = u32be(b, pos);
     const t = ascii(b, pos + 4, pos + 8);
-    if (len < 0 || t === 'IDAT' || t === 'IEND') break;
+    if (len < 0 || t === 'IEND') break;
     if (t === 'acTL') {
       const n = u32be(b, pos + 8);
-      if (n > 0) frames = n;
-      break;
-    }
+      if (n > 0) frames = Math.max(frames, n);
+    } else if (t === 'fcTL') fctl++;
     pos += 12 + len;
   }
+  frames = Math.max(frames, fctl);
   return { w, h, frames, area: w * h * frames };
 }
 
@@ -249,10 +251,10 @@ function webpInfo(b) {
   if (w < 0 || h < 0) return null;
   w += 1;
   h += 1;
-  if (!(b[20] & 0x02)) return { w, h };
-  // animated: walk the chunks for ANMF frames (each one's offset and size)
+  // animated (or ANMF chunks without the flag): walk the chunks for frames (each one's offset and size)
   let frames = 0, area = 0;
-  for (let pos = 12, guard = 0; pos + 8 <= b.length && guard < 100000; guard++) {
+  // every chunk, however many come first (each step moves at least 8 bytes on)
+  for (let pos = 12; pos + 8 <= b.length; ) {
     const len = u32le(b, pos + 4);
     if (len < 0) break;
     if (ascii(b, pos, pos + 4) === 'ANMF') {
@@ -265,7 +267,7 @@ function webpInfo(b) {
     }
     pos += 8 + len + (len & 1);
   }
-  return { w, h, frames, area };
+  return frames ? { w, h, frames, area } : { w, h };
 }
 
 function jpegInfo(b) {
@@ -311,8 +313,9 @@ const concat = (parts) => {
  * The image without its metadata (where it was taken, the camera, comments, editing history...), ready to pass to
  * a screen as is. Keeps only what draws the picture (an allowlist per format) and cuts anything after its end
  * marker (a JPEG's hidden second image or video, data after a PNG's IEND, past a WebP's RIFF size or a GIF's
- * trailer). JPEG keeps APP0, the ICC profile (APP2 ICC_PROFILE) and APP14 Adobe; PNG and WebP keep the chunks above,
- * GIF its frames and loop extension. Returns a new Uint8Array, or null when the bytes do not parse as `mime`.
+ * trailer). JPEG keeps APP0, the ICC profile (APP2 ICC_PROFILE), APP14 Adobe and the EXIF orientation alone; PNG
+ * and WebP keep the chunks above, GIF its frames and loop extension. Returns a new Uint8Array, or null when the
+ * bytes do not parse as `mime`.
  */
 export function stripImageMetadata(bytes, mime) {
   if (!isBytes(bytes)) return null;
@@ -327,10 +330,17 @@ export function stripImageMetadata(bytes, mime) {
   return null;
 }
 
+/** An APP1 segment whose EXIF holds the orientation tag only (big-endian TIFF, one IFD entry). */
+function orientationApp1(o) {
+  // FF E1, length 34, "Exif\0\0", "MM" 42, IFD at 8, 1 entry: 0x0112 SHORT x1 = o, no next IFD
+  return Uint8Array.from([0xff, 0xe1, 0, 34, 0x45, 0x78, 0x69, 0x66, 0, 0, 0x4d, 0x4d, 0, 42, 0, 0, 0, 8, 0, 1, 0x01, 0x12, 0, 3, 0, 0, 0, 1, 0, o, 0, 0, 0, 0, 0, 0]);
+}
+
 function stripJpeg(b) {
   if (!isJpeg(b)) return null;
   const parts = [b.subarray(0, 2)];
   let pos = 2;
+  let oriented = false;
   for (let guard = 0; guard < 100000; guard++) {
     if (pos + 2 > b.length || b[pos] !== 0xff) return null;
     const marker = b[pos + 1];
@@ -352,6 +362,14 @@ function stripJpeg(b) {
     else if (marker >= 0xe1 && marker <= 0xef) {
       const id = ascii(b, pos + 4, Math.min(pos + 2 + len, pos + 16));
       keep = (marker === 0xe2 && id.startsWith('ICC_PROFILE\0')) || (marker === 0xee && id.startsWith('Adobe'));
+      // EXIF goes, but its orientation stays (browsers turn the picture by it): a new EXIF block with that tag only
+      if (marker === 0xe1 && !oriented) {
+        const o = exifOrientation(b.subarray(pos + 4, pos + 2 + len));
+        if (o >= 2 && o <= 8) {
+          parts.push(orientationApp1(o));
+          oriented = true;
+        }
+      }
     }
     if (keep) parts.push(seg);
     pos += 2 + len;

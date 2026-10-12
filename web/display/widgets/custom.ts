@@ -330,6 +330,8 @@ export class CustomWidgets {
     const to = setTimeout(() => ctl.abort(), IMAGE_TIMEOUT);
     try {
       const path = addParam(e.w.src, 'v', e.w.v).replace(location.origin, '');
+      // the display credential only ever goes to this server's widget route
+      if (!path.startsWith('/api/display/widget/')) throw new Error('not a widget route');
       const r = await fetch(withScreen(path), { headers: authHeaders(), cache: 'no-store', signal: ctl.signal });
       if (gen !== e.gen || e.dead) return;
       if (r.status === 404 && !isPreview) {
