@@ -113,6 +113,21 @@ test('the planner layout: accepted everywhere, and picking it sets automatic wee
   }
 });
 
+test('leaving the planner before saving gives the other layouts back their weeks and event style', async () => {
+  const [{ undoPlannerPick, PLANNER_CALENDAR: picked }] = await loadWebModules('/web/admin/components/PlannerFields.tsx');
+  const saved = { weeks: 5, eventStyle: 'lines' };
+  // picked and left as it was: both go back
+  const cal = { ...saved, ...picked };
+  undoPlannerPick(cal, saved);
+  assert.deepEqual(cal, saved);
+  // changed by hand on the planner: that one stays
+  const changed = { ...saved, ...picked, weeks: 3 };
+  undoPlannerPick(changed, saved);
+  assert.deepEqual(changed, { weeks: 3, eventStyle: 'lines' });
+  // the Layout page only does it when the saved screen was not on the planner already
+  assert.match(read('web/admin/sections/Layout.tsx'), /was\.layout\.preset !== 'planner'\) undoPlannerPick\(d\.calendar, was\.calendar\)/);
+});
+
 test('automatic weeks: between 2 and the cap, fewer rows when each day must fit more events', () => {
   const { autoWeeks, resolveWeeks, rangeWeeks, cardRowNeed, lineRowNeed, AUTO_WEEKS_MIN, AUTO_WEEKS_MAX } = cards;
   assert.equal(AUTO_WEEKS_MIN, 2);

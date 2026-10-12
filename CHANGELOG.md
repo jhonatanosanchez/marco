@@ -6,6 +6,7 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Fixed
+- Layout: picking the Planner and then another layout before saving left automatic weeks and cards on, so the other layout could show only two weeks.
 - Carousels: screens with different photo settings showed the first photo of each again at every switch. Each
   screen's slideshow now goes on where it was.
 

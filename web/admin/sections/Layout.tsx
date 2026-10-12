@@ -1,7 +1,7 @@
 import { GLASS_DEFAULTS, glassVars, normalizeGlass, type PhotoStats } from '../../shared/glass';
 import type { DisplayStyle, FrameCorner, GlassConfig, LayoutPreset } from '../../shared/types';
 import { Icon } from '../components/icons';
-import { EventStyleField, PLANNER_CALENDAR, WeeksField } from '../components/PlannerFields';
+import { EventStyleField, PLANNER_CALENDAR, undoPlannerPick, WeeksField } from '../components/PlannerFields';
 import { Button, Callout, Card, Field, PageHeader, Segmented, Slider, ToggleRow } from '../components/ui';
 import { t } from '../i18n';
 import { allSourceOptions } from '../util';
@@ -546,6 +546,11 @@ export function LayoutSection(props: SectionProps) {
               set((d) => {
                 // picking the planner also turns on what it is made for (automatic weeks, cards); both can be changed later
                 if (p.id === 'planner' && d.layout.preset !== 'planner') Object.assign(d.calendar, PLANNER_CALENDAR);
+                // leaving it before saving takes that back, so the other layouts keep the weeks and style they had
+                else if (p.id !== 'planner' && d.layout.preset === 'planner') {
+                  const was = props.saved.screens.find((s) => s.id === props.screenId);
+                  if (was && was.layout.preset !== 'planner') undoPlannerPick(d.calendar, was.calendar);
+                }
                 d.layout.preset = p.id;
               })
             }

@@ -8,6 +8,15 @@ import { Field, Segmented } from './ui';
 /** What picking the Planner layout sets (the same as PLANNER_CALENDAR in server/core/defaults.js). */
 export const PLANNER_CALENDAR: { weeks: CalendarWeeks; eventStyle: EventStyle } = { weeks: 'auto', eventStyle: 'cards' };
 
+/**
+ * Leaving the Planner layout before it is saved: what picking it turned on goes back to the saved values (`saved`,
+ * the screen's calendar as saved). A setting changed by hand since then (it no longer has the planner's value) stays.
+ */
+export function undoPlannerPick(cal: { weeks: CalendarWeeks; eventStyle: EventStyle }, saved: { weeks: CalendarWeeks; eventStyle: EventStyle }): void {
+  if (cal.weeks === PLANNER_CALENDAR.weeks) cal.weeks = saved.weeks;
+  if (cal.eventStyle === PLANNER_CALENDAR.eventStyle) cal.eventStyle = saved.eventStyle;
+}
+
 type Set = (fn: (d: AppConfig) => void) => void;
 
 export function WeeksField({ cfg, set, error, max = 6, min = 1 }: { cfg: AppConfig; set: Set; error?: string; max?: number; min?: number }) {
