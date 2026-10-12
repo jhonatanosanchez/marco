@@ -268,6 +268,8 @@ function applyLayout(): void {
   const side = params.get('side') || cfg.layout.sidePanel;
   const corner = params.get('corner') || cfg.layout.corner || 'br';
   app.className = [
+    // kept until revealApp() fades the screen in (with the Modern style over a photo, once the photo is there)
+    app.classList.contains('booting') ? 'booting' : '',
     `preset-${preset}`, `side-${side === 'right' ? 'right' : 'left'}`, portrait ? 'portrait' : 'landscape',
     cfg.background.enabled ? 'has-photo' : 'no-photo',
     presetBase(preset, portrait) ? `preset-${presetBase(preset, portrait)}` : '',

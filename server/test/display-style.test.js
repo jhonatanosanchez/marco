@@ -77,3 +77,18 @@ test('unknown styles are rejected with a path and fall back to classic', () => {
     assert.equal(value.screens[0].screen.style, 'classic');
   }
 });
+
+test('modern over a photo: the first fade-in waits for the photo, 1.8 s at most', () => {
+  const main = fs.readFileSync(new URL('../../web/display/main.ts', import.meta.url), 'utf8');
+  // applyLayout() rewrites the classes of #app: it must keep 'booting' for revealApp() (it used to drop it, so the
+  // screen always faded in at once, before the photo)
+  const layout = main.slice(main.indexOf('function applyLayout('), main.indexOf('function applyGlass('));
+  assert.match(layout, /app\.className = \[\s*(\/\/[^\n]*\n\s*)*app\.classList\.contains\('booting'\) \? 'booting' : '',/);
+  // applyConfig lays out and renders first, then reveals
+  const apply = main.slice(main.indexOf('function applyConfig('), main.indexOf('function revealApp('));
+  assert.ok(apply.indexOf('applyLayout();') < apply.indexOf('revealApp(cfg);'));
+  const reveal = main.slice(main.indexOf('function revealApp('), main.indexOf('let glFailed'));
+  assert.match(reveal, /cfg\.screen\.style === 'modern' && cfg\.background\.enabled && !lite/);
+  assert.match(reveal, /addEventListener\('marco:photo-tone', show, \{ once: true \}\)/);
+  assert.match(reveal, /setTimeout\(show, 1800\)/);
+});

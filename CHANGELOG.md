@@ -22,6 +22,8 @@ All notable changes to this project are documented here. The format is based on
 ### Fixed
 - Month grid: on load, a screen set to fewer weeks showed five rows for half a second before settling on its own
   number. Carousel switches no longer fade the rows of the previous screen out over the new one either.
+- Modern style over a photo: the screen now fades in once the background photo is there (1.8 s at most), instead of
+  appearing over black and changing a moment later.
 
 ### Security
 - Pages of the server only load inside a frame as the admin's own preview, so a web page cannot send its frame back
