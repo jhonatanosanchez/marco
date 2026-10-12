@@ -90,16 +90,55 @@ export function displayFamilyBlock(cfg, screen, priv, familyQr = null) {
   };
 }
 
+/** Short, stable hash of a string (FNV-1a, 32 bits, hex). Plain JS: the admin bundles this file (livePreview.ts). */
+function shortHash(s) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
+}
+
+/** What changes when a saved widget changes in a way the display must load again (its `v`). */
+export const widgetVersion = (w) => shortHash(JSON.stringify([w.type, w.options.url, w.options.refreshSec, w.options.bust]));
+
 /**
- * GET /api/display/config payload for one screen (no secrets, no URLs, no HA entity ids; the one link it carries is
- * the family page's, which the TV draws as a QR code).
+ * Widgets a screen shows, in display form. `widgetSrc(w)` = what the display loads: the URL itself on a server whose
+ * TVs load widgets directly (default), or a route of this server (Marco Cloud). None while private.
+ * The 'widget' layout's widget comes first, with place 'full'; then the screen's placements in order.
+ */
+export function displayWidgets(cfg, screen, { isPrivate = false, widgetSrc = null } = {}) {
+  if (isPrivate) return [];
+  const defs = new Map((Array.isArray(cfg.widgets) ? cfg.widgets : []).map((w) => [w.id, w]));
+  const one = (w, place, corner, size) => ({
+    id: w.id, type: w.type, name: w.name, place, corner, size,
+    refreshSec: w.options.refreshSec, fit: w.options.fit, bust: w.options.bust,
+    src: widgetSrc ? widgetSrc(w) : w.options.url,
+    via: widgetSrc ? 'proxy' : 'direct',
+    v: widgetVersion(w),
+  });
+  const out = [];
+  const full = screen.layout?.preset === 'widget' ? defs.get(screen.layout.widgetId) : null;
+  if (full) out.push(one(full, 'full', 'br', 'l'));
+  for (const p of Array.isArray(screen.widgets) ? screen.widgets : []) {
+    const w = defs.get(p.widgetId);
+    if (w) out.push(one(w, p.place, p.corner, p.size));
+  }
+  return out;
+}
+
+/**
+ * GET /api/display/config payload for one screen (no secrets, no HA entity ids, no URLs except two: the family page's,
+ * which the TV draws as a QR code, and the widgets' addresses on a server whose TVs load them directly).
  * `privacy` = { status, next } from core/privacy.js (privacyStatus, privacyNextChange); absent = not private.
  * While private with `hidePhotos`, the background only uses stock photos.
  * `carousel` = the carousel this display runs (the screen is one of its members), else null: the payload then says
  * which carousel (`target`, `carousel`) so the display can rotate through its screens.
  * `familyQr` = the family page URL (family.js familyQrUrl), or null without a family link.
+ * `widgetSrc` = how the display loads widgets (displayWidgets): null = the URL itself.
  */
-export function displayConfig(cfg, screen, { privacy = null, carousel = null, familyQr = null } = {}) {
+export function displayConfig(cfg, screen, { privacy = null, carousel = null, familyQr = null, widgetSrc = null } = {}) {
   const f = flatView(cfg, screen);
   const priv = displayPrivacy(screen, privacy?.status, privacy?.next ?? null);
   const background = priv.active && screen.privacy?.hidePhotos && f.background.source !== 'stock' ? { ...f.background, source: 'stock' } : f.background;
@@ -123,6 +162,7 @@ export function displayConfig(cfg, screen, { privacy = null, carousel = null, fa
     schedules: screenSchedules(cfg, screen).map(({ screenIds, ...m }) => m),
     privacy: priv,
     family: displayFamilyBlock(cfg, screen, priv.active, familyQr),
+    widgets: displayWidgets(cfg, screen, { isPrivate: priv.active, widgetSrc }),
     // what the display is bound to: this screen, or a carousel that shows it among others
     target: carousel
       ? { id: carousel.id, kind: 'carousel', slug: carousel.slug, name: carousel.name }

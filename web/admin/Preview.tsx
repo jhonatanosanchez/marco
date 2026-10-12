@@ -1,6 +1,21 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Icon } from './components/icons';
 import { t } from './i18n';
+import { draftWidgetPreviews } from './livePreview';
+
+/** Tested widget copies already read as Blobs (previewUrl → Blob), so a draft change does not read them again. */
+const widgetBlobs = new Map<string, Promise<Blob | null>>();
+const widgetBlob = (url: string) => {
+  let p = widgetBlobs.get(url);
+  if (!p) {
+    p = fetch(url, { credentials: 'same-origin' })
+      .then((r) => (r.ok ? r.blob() : null))
+      .then((b) => (b && b.type.startsWith('image/') ? b : null))
+      .catch(() => null);
+    widgetBlobs.set(url, p);
+  }
+  return p;
+};
 
 /**
  * Live, scaled-down preview of a screen in an iframe. Reloaded whenever `reloadKey` changes.
@@ -21,6 +36,12 @@ export function Preview({ reloadKey, portrait, onClose, variant, saved, url, ope
     try {
       const origin = new URL(url, location.href).origin;
       frame.current?.contentWindow?.postMessage({ type: 'marco:preview-draft', config: live }, origin);
+      // Marco Cloud: unsaved widgets show the copy their last test made (the server only serves saved ones)
+      for (const pv of live ? draftWidgetPreviews() : []) {
+        void widgetBlob(pv.url).then((blob) => {
+          if (blob) frame.current?.contentWindow?.postMessage({ type: 'marco:preview-widget', id: pv.id, v: pv.v, blob }, origin);
+        });
+      }
     } catch { /* the frame went away */ }
   }, [live, loaded, url]);
   useEffect(() => {

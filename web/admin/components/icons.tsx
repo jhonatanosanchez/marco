@@ -3,6 +3,7 @@ import type { SVGAttributes } from 'preact';
 // Minimal stroke icon set (Lucide-style, 24x24, currentColor).
 const P: Record<string, string> = {
   layout: 'M3 4h18v16H3z M9 4v16 M9 12h12',
+  widget: 'M5 4h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z M15 3.5h4.5a1 1 0 0 1 1 1V9a1 1 0 0 1-1 1H15a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1z M5 13h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1z M14 13h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1z',
   image: 'M3 5h18v14H3z M3 16l5-5 4 4 3-3 6 6 M15.5 9.5a1.5 1.5 0 1 0 0-.01',
   calendar: 'M4 6h16v14H4z M4 10h16 M8 3v5 M16 3v5',
   sparkles: 'M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z',

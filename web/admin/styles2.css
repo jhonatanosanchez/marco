@@ -5551,3 +5551,60 @@ button.immich-album:hover {
 }
 .car-fold__name strong { font-size: 16px; }
 .car-fold__name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+
+/* ---- Widgets (sections/Widgets.tsx, the Diseño card) ---- */
+.test-result.is-warn {
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  color: var(--text);
+}
+.widget-test { display: flex; flex-direction: column; gap: 8px; }
+.widget-thumb {
+  display: inline-flex;
+  align-self: flex-start;
+  max-width: 240px;
+  max-height: 160px;
+  border-radius: var(--r);
+  overflow: hidden;
+  background: repeating-conic-gradient(color-mix(in srgb, var(--text) 6%, transparent) 0% 25%, transparent 0% 50%) 0 0 / 16px 16px;
+  box-shadow: 0 0 0 1px var(--border);
+}
+.widget-thumb.is-hidden { display: none; }
+.widget-thumb img { display: block; max-width: 240px; max-height: 160px; object-fit: contain; }
+.widget-thumb--web { width: 240px; height: 135px; position: relative; background: #fff; }
+.widget-thumb--web iframe {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1280px;
+  height: 720px;
+  border: 0;
+  transform: scale(0.1875);
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+.widget-uses { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip--link { cursor: pointer; border: 0; font: inherit; font-size: 12.5px; }
+.chip--link:hover { background: color-mix(in srgb, var(--accent) 25%, transparent); }
+.widget-more { display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; }
+.widget-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.4fr) auto auto auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.widget-row:first-child { border-top: 0; }
+.widget-row .select { min-width: 0; }
+.corner-pick { display: grid; grid-template-columns: repeat(2, 22px); grid-template-rows: repeat(2, 16px); gap: 3px; }
+.corner-pick button {
+  border: 0;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  cursor: pointer;
+  padding: 0;
+}
+.corner-pick button.is-on { background: var(--accent); }
+@media (max-width: 760px) {
+  .widget-row { grid-template-columns: 1fr auto; }
+}

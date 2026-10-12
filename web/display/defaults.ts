@@ -37,6 +37,7 @@ export const DEFAULT_CONFIG: DisplayConfig = {
   countdowns: { enabled: true, max: 4 },
   alerts: { enabled: true, sound: true, volume: 0.6 },
   schedules: [],
+  widgets: [],
 };
 
 function isObj(v: unknown): v is Record<string, unknown> {
@@ -87,6 +88,7 @@ export function normalizeConfig(raw: unknown): DisplayConfig {
   if (c.countdowns) c.countdowns.max = clampInt(c.countdowns.max, 1, 12, 4);
   if (c.alerts) c.alerts.volume = Math.min(1, Math.max(0, Number(c.alerts.volume) || 0));
   if (!Array.isArray(c.schedules)) c.schedules = [];
+  if (!Array.isArray(c.widgets)) c.widgets = [];
   return c;
 }
 

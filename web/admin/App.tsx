@@ -51,6 +51,7 @@ import { ScreenSection, SecuritySection } from './sections/Screen';
 import { ScreensSection } from './sections/Screens';
 import { StatusSection } from './sections/Status';
 import { WeatherSection } from './sections/Weather';
+import { WidgetsSection } from './sections/Widgets';
 import { UNAUTHORIZED_EVENT } from './api';
 import { screenHref, useDisplayLinks, usesPrivateLinks, useScreenUrl } from './displayLinks';
 import { withPollNote } from './liveNote';
@@ -80,6 +81,7 @@ const SECTIONS: Record<string, (p: SectionProps) => any> = {
   message: MessageSection,
   alerts: AlertsSection,
   photos: PhotosSection,
+  widgets: WidgetsSection,
   homeassistant: HomeAssistantSection,
   immich: ImmichSection,
   api: ApiSection,

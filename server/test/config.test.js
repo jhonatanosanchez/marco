@@ -153,7 +153,7 @@ test('migration v1 → v2 keeps every value (global vs screens[0])', async () =>
   // the display style is back-filled as classic, the Modern glass options with their defaults
   assert.deepEqual(s.screen, { ...scr, style: 'classic', glass: { appearance: 'auto', opacity: 0.5, blur: 18, tint: 'dark', edge: true } });
   // v1 had no options for the newer layouts: they are back-filled with their defaults
-  assert.deepEqual(s.layout, { ...V1.layout, people: null, corner: 'br' });
+  assert.deepEqual(s.layout, { ...V1.layout, people: null, corner: 'br', widgetId: null });
   assert.deepEqual(s.background, { ...V1.background, order: 'random', panelBlur: 18, panelShade: 0.5, weatherFx: 'simple', portraitFit: 'auto', immich: { albumIds: [], favoritesOnly: false } }); // new keys back-filled with defaults
   assert.deepEqual(s.message, V1.message);
   const { sources, iconRules, ...calView } = V1.calendar;
@@ -177,7 +177,7 @@ test('migration v1 → v2 keeps every value (global vs screens[0])', async () =>
   assert.deepEqual(v.homeassistant, { ...V1.homeassistant, doorbell: { camera: '', seconds: 60, screenIds: [], sound: true } });
   assert.deepEqual(v.auth, V1.auth);
   // validateConfig also accepts v1 directly (old clients / imports)
-  assert.deepEqual(validateConfig(structuredClone(V1)).value.screens[0].layout, { ...V1.layout, people: null, corner: 'br' });
+  assert.deepEqual(validateConfig(structuredClone(V1)).value.screens[0].layout, { ...V1.layout, people: null, corner: 'br', widgetId: null });
   // already-v2 input is untouched
   assert.equal(migrateConfig(v), v);
 });

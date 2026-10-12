@@ -222,6 +222,8 @@ export class ScreenSwitcher {
       }
       if (s instanceof HTMLCanvasElement && s.width && s.height) canvases.push([i, s]);
       else if (d instanceof HTMLImageElement) d.removeAttribute('loading');
+      // a web widget is not loaded again for a still copy (an empty frame of the same size stands in)
+      else if (d instanceof HTMLIFrameElement) d.removeAttribute('src');
       else if (d instanceof HTMLMediaElement) {
         d.muted = true;
         d.removeAttribute('autoplay');

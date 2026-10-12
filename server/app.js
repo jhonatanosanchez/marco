@@ -24,6 +24,25 @@ import { redactSecrets } from './core/activityCore.js';
 import { displayAuth, mediaAuth } from './displayAccess.js';
 import { immichMedia } from './immich.js';
 
+const FRAME_DESTS = new Set(['iframe', 'frame', 'embed', 'object', 'fencedframe']);
+const PREVIEW_PAGE = /^\/(?:index\.html)?$|^\/d\/[^/]+$/;
+
+/**
+ * 403 for a request loaded into a frame (Sec-Fetch-Dest), except the admin preview of a display: GET /, /index.html
+ * or /d/<key> with ?preview=1, asked for by this origin itself (Sec-Fetch-Site same-origin). Browsers without
+ * Sec-Fetch-* headers are let through (frame-ancestors still applies).
+ */
+export function frameGuard(req, res, next) {
+  const dest = req.get('sec-fetch-dest');
+  if (!dest || !FRAME_DESTS.has(dest)) return next();
+  const site = req.get('sec-fetch-site');
+  const preview = req.method === 'GET' && PREVIEW_PAGE.test(req.path) && new URLSearchParams(req.url.split('?')[1] ?? '').get('preview') === '1';
+  if (preview && (!site || site === 'same-origin')) return next();
+  // the refusal itself runs nothing and gets an opaque origin
+  res.set('content-security-policy', "default-src 'none'; sandbox; frame-ancestors 'self'");
+  res.status(403).type('text/plain').send('Forbidden');
+}
+
 /** Display-facing JSON endpoints: private mode requires a display key, a device token or an admin session. */
 export const DISPLAY_API_PATHS = ['/api/display', '/api/events', '/api/weather', '/api/news', '/api/photos', '/api/countdowns'];
 
@@ -51,6 +70,10 @@ export function createApp({ version, dist = path.join(ROOT, 'dist'), updater = n
     res.set('content-security-policy', "frame-ancestors 'self'");
     next();
   });
+  // Framing: only the admin's live preview frames this server's pages (frame-ancestors above), and only the display
+  // with ?preview=1. Any other framed load is refused, so a web widget page that sends its frame here (a redirect,
+  // a script setting location) never gets a page of this origin inside the display's sandboxed widget frame.
+  app.use(frameGuard);
   // DNS-rebinding guard: only LAN host names, IP literals, PUBLIC_URL and ALLOWED_HOSTS (lib/net.js).
   app.use(hostGuard());
   app.use(sessionMiddleware());

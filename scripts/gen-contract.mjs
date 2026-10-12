@@ -41,6 +41,7 @@ const FEATURE_RULES = [
   [/^\/api\/admin\/feedback$/, 'feedback'],
   [/^\/api\/admin\/privacy$/, 'privacy'],
   [/^\/api\/admin\/doorbell$/, 'doorbell'],
+  [/^\/api\/admin\/(test\/widget$|widgets\/)/, 'widgets'],
 ];
 
 const featureFor = (path) => FEATURE_RULES.find(([re]) => re.test(path))?.[1] ?? null;

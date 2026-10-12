@@ -12,7 +12,7 @@ export const FEATURE_KEYS = Object.freeze([
   'openDisplayAccess', 'insecureTls', 'googleCalendar', 'googleLogin', 'passwordLogin', 'apiTokens',
   'webhooks', 'backups', 'importExport', 'includeSecrets', 'activity', 'setupWizard', 'status', 'accountMenu',
   'microsoftCalendar', 'updates', 'feedback', 'privacy', 'doorbell', 'doorbellLive', 'carousels', 'immich',
-  'family',
+  'family', 'widgets', 'webWidgets',
 ]);
 
 /** Feature flags of a self-hosted server: all on (`updates` too: the update banner and settings), Google and
@@ -21,7 +21,8 @@ export const FEATURE_KEYS = Object.freeze([
  *  from Home Assistant (a server without it serves the latest uploaded snapshot instead). `carousels`: several
  *  screens in a loop on one TV (config.carousels, server/core/carousels.js). `immich` is the Immich
  *  photo source (server/immich.js), which needs a server on the same network as the library. `family` is Familia:
- *  members, routines with stars, rewards, meals, the kids layouts and the family page on the phone (server/family.js). */
+ *  members, routines with stars, rewards, meals, the kids layouts and the family page on the phone (server/family.js).
+ *  `widgets` are images on screens (config.widgets); `webWidgets` adds web pages in a sandboxed frame. */
 export function selfHostedFeatures() {
   const google = googleConfigured();
   const out = {};

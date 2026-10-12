@@ -36,6 +36,7 @@ export const BUILTIN_LIMITS: Partial<Record<LimitName, number>> = {
   birthdays: 500,
   countdowns: 100,
   carousels: 6,
+  widgets: 20,
 };
 
 const DEFAULT_PAIR_CODE_LENGTH = 6;
@@ -79,8 +80,9 @@ export function capsFrom(health: Partial<HealthResponse> | null | undefined): Ca
  *  that have the update endpoints; feedback: Marco Cloud's help and feedback form; privacy: privacy mode (servers
  *  that filter events for it, see /api/admin/privacy); doorbell, doorbellLive: servers with POST /api/hooks/doorbell
  *  (live = frames proxied from Home Assistant); carousels: servers that keep config.carousels and serve displays
- *  bound to one; immich: servers that proxy an Immich library (self-hosted). */
-const OPT_IN: readonly FeatureName[] = ['accountMenu', 'microsoftCalendar', 'updates', 'feedback', 'privacy', 'doorbell', 'doorbellLive', 'carousels', 'immich', 'family'];
+ *  bound to one; immich: servers that proxy an Immich library (self-hosted); widgets: images (and with webWidgets,
+ *  web pages) the owner places on screens (config.widgets). */
+const OPT_IN: readonly FeatureName[] = ['accountMenu', 'microsoftCalendar', 'updates', 'feedback', 'privacy', 'doorbell', 'doorbellLive', 'carousels', 'immich', 'family', 'widgets', 'webWidgets'];
 
 export function hasFeature(caps: Caps, feature: FeatureName): boolean {
   if (!caps.features) return !OPT_IN.includes(feature);

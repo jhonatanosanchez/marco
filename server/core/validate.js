@@ -1,6 +1,9 @@
 // Config validation & sanitisation. Unknown keys are dropped, missing keys take defaults,
 // invalid values produce errors (PUT /api/admin/config answers 400 with the list).
-import { defaultConfig, defaultScreenProfile, CONFIG_VERSION, RESERVED_SOURCE_IDS, SCREEN_SPLIT_KEYS, SCREEN_ONLY_KEYS } from './defaults.js';
+import {
+  defaultConfig, defaultScreenProfile, CONFIG_VERSION, RESERVED_SOURCE_IDS, SCREEN_SPLIT_KEYS, SCREEN_ONLY_KEYS,
+  WIDGET_TYPES, WIDGET_REFRESH_SEC, WEB_WIDGET_REFRESH_SEC, MAX_WIDGETS, MAX_SCREEN_WIDGETS, WIDGET_PLACES, WIDGET_SIZES, WIDGET_FITS, WIDGET_PREFIX,
+} from './defaults.js';
 import { isValidTimeZone } from './lib/tz.js';
 import { randomId, fold } from './lib/text.js';
 import { LANGS } from './lib/i18n.js';
@@ -20,6 +23,8 @@ const ID = /^[A-Za-z0-9_-]{1,64}$/;
 /** Screen layouts (docs/ARCHITECTURE.md); the display, the admin and server/setup.js use the same ids. */
 export const LAYOUT_PRESETS = [
   'bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda', 'today', 'people', 'photoFrame', 'twoWeeks', 'board', 'bedside', 'planner',
+  // one widget fills the screen (layout.widgetId)
+  'widget',
   // kids layouts (Familia): the display shows them with the Modern style only
   ...KIDS_PRESETS,
 ];
@@ -213,7 +218,7 @@ function requiredStr(ctx, path, v, d, max) {
   return s;
 }
 
-function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs, familyMemberIds = []) {
+function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs, familyMemberIds = [], widgetIds = new Set()) {
   const D = defaultScreenProfile();
   const x = obj(ctx, p, raw);
   const name = str(ctx, `${p}.name`, x.name, '', 60).trim() || 'Screen';
@@ -262,6 +267,8 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs, familyMemberIds 
     people: ly.people === null || ly.people === undefined ? null : [...new Set(idList(ctx, `${p}.layout.people`, ly.people, 5))],
     // 'photoFrame' layout: corner of the clock card
     corner: oneOf(ctx, `${p}.layout.corner`, ly.corner, D.layout.corner, ['tl', 'tr', 'bl', 'br']),
+    // 'widget' layout: the widget shown full screen (a deleted one is dropped quietly)
+    widgetId: typeof ly.widgetId === 'string' && widgetIds.has(ly.widgetId) ? ly.widgetId : null,
   };
 
   const bg = obj(ctx, `${p}.background`, x.background);
@@ -366,12 +373,101 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs, familyMemberIds 
   };
   // Familia on this screen: who appears (unknown members dropped quietly), touch, QR card (familyCore.js)
   const family = sanitizeScreenFamily(x.family, (path, m) => ctx.err(path, m), `${p}.family`, familyMemberIds);
+  const widgets = sanitizeWidgetPlacements(ctx, `${p}.widgets`, x.widgets, widgetIds);
 
   return {
     // "v_" belongs to carousels (isCarouselId); a screen id with it gets a new one
     id: id(ctx, `${p}.id`, typeof x.id === 'string' && x.id.startsWith(CAROUSEL_PREFIX) ? undefined : x.id, 's_', seenIds), slug, name,
-    screen, layout, background, calendar, datetime, weather, news, todo, message, countdowns, alerts, privacy, family,
+    screen, layout, background, calendar, datetime, weather, news, todo, message, countdowns, alerts, privacy, family, widgets,
   };
+}
+
+/** Characters a widget URL may not carry, even where the URL parser would quietly drop or encode them. */
+const WIDGET_URL_BAD = /[\s"'<>\\\u0000-\u001f\u007f]/;
+
+/**
+ * Why a widget URL is refused, or null: written out as scheme://host (http(s) only, `protocols`), no user:password
+ * or a bare @ before the host, no spaces, quotes, angle brackets, backslashes or control characters.
+ * Exported for the test endpoint (server/widgets.js).
+ */
+export function widgetUrlError(url, protocols = ['http:', 'https:']) {
+  if (typeof url !== 'string' || WIDGET_URL_BAD.test(url)) return 'invalid URL';
+  const m = /^[a-z][a-z0-9+.-]*:\/\/([^/?#]*)/i.exec(url);
+  if (!m || !m[1]) return 'invalid URL';
+  let u;
+  try { u = new URL(url); } catch { return 'invalid URL'; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return 'invalid URL';
+  if (!u.hostname) return 'invalid URL';
+  if (!protocols.includes(u.protocol)) return 'https required';
+  if (m[1].includes('@') || u.username || u.password) return 'credentials not allowed in URL';
+  return null;
+}
+
+/** The stored form of a widget URL that widgetUrlError accepted: the URL parser's own (normalised) text. */
+export function widgetUrlHref(url) {
+  try { return new URL(url).href; } catch { return url; }
+}
+
+/**
+ * One widget of config.widgets. `opts` (validateConfig): widgetTypes (types this server offers), widgetProtocols
+ * (URL schemes it accepts), minWidgetRefreshSec (shortest refresh; 0 = never reload stays allowed for web pages).
+ */
+function sanitizeWidget(ctx, p, x, seen, opts) {
+  if (!isObj(x)) { ctx.err(p, 'expected object'); return null; }
+  if (!WIDGET_TYPES.includes(x.type)) { ctx.err(`${p}.type`, `must be one of ${WIDGET_TYPES.join(', ')}`); return null; }
+  const type = x.type;
+  if (!(opts.widgetTypes ?? WIDGET_TYPES).includes(type)) ctx.err(`${p}.type`, 'not available on this server');
+  const o = obj(ctx, `${p}.options`, x.options);
+  let url = str(ctx, `${p}.options.url`, o.url, '', 2048).trim();
+  if (!url) ctx.err(`${p}.options.url`, 'URL required');
+  else {
+    const bad = widgetUrlError(url, opts.widgetProtocols ?? ['http:', 'https:']);
+    if (bad) ctx.err(`${p}.options.url`, bad);
+    else url = widgetUrlHref(url);
+  }
+  const web = type === 'web';
+  const refreshSec = oneOf(ctx, `${p}.options.refreshSec`, o.refreshSec, web ? 0 : 900, web ? WEB_WIDGET_REFRESH_SEC : WIDGET_REFRESH_SEC);
+  const min = Number(opts.minWidgetRefreshSec) || 0;
+  if (min && refreshSec < min && !(web && refreshSec === 0)) ctx.err(`${p}.options.refreshSec`, `must be at least ${min} seconds`);
+  return {
+    // only "w_" ids: an id carried from another list gets a new one
+    id: id(ctx, `${p}.id`, typeof x.id === 'string' && x.id.startsWith(WIDGET_PREFIX) ? x.id : undefined, WIDGET_PREFIX, seen),
+    type,
+    name: str(ctx, `${p}.name`, x.name, '', 60).trim() || 'Widget',
+    options: {
+      url,
+      refreshSec,
+      fit: oneOf(ctx, `${p}.options.fit`, o.fit, 'contain', WIDGET_FITS),
+      // add _marco=<time> to the image URL on every refresh (off for addresses that change by themselves, e.g. signed)
+      bust: bool(ctx, `${p}.options.bust`, o.bust, true),
+    },
+  };
+}
+
+/**
+ * The widgets placed on one screen, in stacking order. Placements of widgets that no longer exist are dropped
+ * quietly (deleting a widget is legit), a widget placed twice keeps its first placement.
+ */
+function sanitizeWidgetPlacements(ctx, p, v, widgetIds) {
+  if (v === undefined || v === null) return [];
+  if (!Array.isArray(v)) { ctx.err(p, 'expected array'); return []; }
+  const out = [];
+  const seen = new Set();
+  v.forEach((x, i) => {
+    const q = `${p}[${i}]`;
+    if (!isObj(x)) { ctx.err(q, 'expected object'); return; }
+    if (typeof x.widgetId !== 'string' || !widgetIds.has(x.widgetId) || seen.has(x.widgetId)) return;
+    seen.add(x.widgetId);
+    out.push({
+      widgetId: x.widgetId,
+      place: oneOf(ctx, `${q}.place`, x.place, 'corner', WIDGET_PLACES),
+      // kept for side placements too: where it goes on layouts without a side column
+      corner: oneOf(ctx, `${q}.corner`, x.corner, 'br', ['tl', 'tr', 'bl', 'br']),
+      size: oneOf(ctx, `${q}.size`, x.size, 'm', WIDGET_SIZES),
+    });
+  });
+  if (out.length > MAX_SCREEN_WIDGETS) { ctx.err(p, `too many items (max ${MAX_SCREEN_WIDGETS})`); out.length = MAX_SCREEN_WIDGETS; }
+  return out;
 }
 
 /** A privacy schedule rule: days (0 = Sunday, [] = every day) and a from/to window (`to < from` crosses midnight). */
@@ -575,6 +671,9 @@ export function migrateConfig(raw) {
  * `value` is always a complete, sanitised config (defaults fill gaps); callers decide whether to persist it on errors.
  * `opts.weatherKeySet` (the admin save only): false when no weather API key is stored, so choosing a source that
  * needs one is refused (weather.apiKey 'API key required'). Left out, keys are not checked (imports, restores).
+ * Widgets: `opts.widgetTypes` (default every type) refuses other types with 'not available on this server',
+ * `opts.widgetProtocols` (default ['http:', 'https:']) refuses other URL schemes with 'https required', and
+ * `opts.minWidgetRefreshSec` (default none) refuses shorter refreshes. Marco Cloud passes ['image'], ['https:'], 30.
  * `opts.immichAvailable` false (servers without Immich, such as Marco Cloud): a screen with the Immich source is refused.
  */
 export function validateConfig(input, opts = {}) {
@@ -729,12 +828,18 @@ export function validateConfig(input, opts = {}) {
   const family = sanitizeFamily(c.family, (path, m) => ctx.err(path, m), [...RESERVED_SOURCE_IDS, ...calendar.sources.map((s) => s.id)]);
   const familyMemberIds = family.members.map((m) => m.id);
 
+  // ---- widgets (global definitions; screens place them, so they come first)
+  const widgetSeen = new Set();
+  const widgets = arr(ctx, 'widgets', c.widgets, [], MAX_WIDGETS)
+    .map((x, i) => sanitizeWidget(ctx, `widgets[${i}]`, x, widgetSeen, opts)).filter(Boolean);
+  const widgetIds = new Set(widgets.map((w) => w.id));
+
   // ---- F1 screens
   let rawScreens = arr(ctx, 'screens', c.screens, D.screens, MAX_SCREENS);
   if (!rawScreens.length) { ctx.err('screens', 'at least one screen'); rawScreens = D.screens; }
   const seenIds = new Set();
   const seenSlugs = new Set();
-  const screens = rawScreens.map((s, i) => sanitizeScreenProfile(ctx, `screens[${i}]`, s, seenIds, seenSlugs, familyMemberIds));
+  const screens = rawScreens.map((s, i) => sanitizeScreenProfile(ctx, `screens[${i}]`, s, seenIds, seenSlugs, familyMemberIds, widgetIds));
   if (opts.immichAvailable === false) {
     screens.forEach((s, i) => { if (s.background.source === 'immich') ctx.err(`screens[${i}].background.source`, 'Immich is not available'); });
   }
@@ -777,7 +882,7 @@ export function validateConfig(input, opts = {}) {
   const revision = Number.isInteger(c.revision) && c.revision > 0 ? c.revision : 1;
   const value = {
     version: CONFIG_VERSION, revision, defaultScreen, screens,
-    calendar, datetime, weather, news, todo, localEvents, birthdays, eventRules, countdowns, schedules, carousels, homeassistant, immich, auth, security, family,
+    calendar, datetime, weather, news, todo, localEvents, birthdays, eventRules, countdowns, schedules, carousels, widgets, homeassistant, immich, auth, security, family,
   };
   return { ok: ctx.errors.length === 0, errors: ctx.errors, value };
 }

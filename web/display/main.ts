@@ -61,6 +61,7 @@ import { showScreenMissing } from './widgets/screenMissing';
 import { healthOnce, loadEmojiWebFont } from './health';
 import { isKidsPreset, Kids, withToggle } from './widgets/kids';
 import { refreshMarquee } from './marquee';
+import { CustomWidgets } from './widgets/custom';
 
 const params = ctx.params;
 const forceDemo = params.get('demo') === '1';
@@ -110,6 +111,12 @@ const doorbell = new DoorbellOverlay($('#doorbell'), doorbellFrames, (on) => {
 });
 const views = new Views($('#view'));
 const kids = new Kids($('#kids'), (id, done) => toggleChore(id, done));
+const custom = new CustomWidgets();
+let sideFitT: ReturnType<typeof setTimeout> | null = null;
+custom.onSideChange = () => {
+  if (sideFitT) clearTimeout(sideFitT);
+  sideFitT = setTimeout(() => fitSide(), 50);
+};
 const statusDot = $('#status');
 const night = $('#night');
 let customStyle: HTMLStyleElement | null = null;
@@ -225,6 +232,8 @@ function hueShift(hex: string, deg: number): string {
 
 const PRESETS = [
   'bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda', 'today', 'people', 'photoFrame', 'twoWeeks', 'board', 'bedside', 'planner',
+  // one widget fills the screen (widgets/custom.ts)
+  'widget',
   // kids layouts (widgets/kids.ts): Modern style only
   'kidsRoutines', 'kidsFamily', 'kidsMeals',
 ];
@@ -395,7 +404,7 @@ function applyConfig(raw: DisplayConfig): void {
 
   // WebGL needs
   const preset = effectivePreset(cfg);
-  const wantAmbient = !lite && cfg.background.ambient !== 'none' && ['bigCalendar', 'agenda', 'topBottom', 'today', 'twoWeeks', 'people', 'planner'].includes(preset);
+  const wantAmbient = !lite && cfg.background.ambient !== 'none' && ['bigCalendar', 'agenda', 'topBottom', 'today', 'twoWeeks', 'people', 'planner', 'widget'].includes(preset);
   const wantGLPhoto = !lite && cfg.background.enabled && cfg.background.transition === 'webgl';
   if ((wantAmbient || wantGLPhoto) && !engine && !glFailed) {
     void initGL().then(() => {
@@ -410,6 +419,8 @@ function applyConfig(raw: DisplayConfig): void {
 
   announcements.applyConfig(cfg);
   renderAll();
+  // after the layout and the side content: a side widget goes to its corner when there is no side column
+  custom.render(cfg, preset);
   revealApp(cfg);
 }
 
@@ -562,6 +573,7 @@ function renderAll(): void {
 const FIT_STEPS = ['fit-1', 'fit-2', 'fit-3'];
 function fitSide(): void {
   fitSideContent();
+  custom.relayout(); // side widgets take the room the rest leaves; the photo frame card may have moved
   fitMidRows();
   views.fit();
   kids.fit();

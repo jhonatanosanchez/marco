@@ -6,6 +6,8 @@ export type Lang = 'es' | 'en' | 'pt';
 export type LayoutPreset =
   | 'bigCalendar' | 'leftRight' | 'topBottom' | 'bigTime' | 'agenda'
   | 'today' | 'people' | 'photoFrame' | 'twoWeeks' | 'board' | 'bedside' | 'planner'
+  // one widget fills the screen (layout.widgetId)
+  | 'widget'
   // kids layouts (Modern style only; with Classic the display shows bigCalendar)
   | 'kidsRoutines' | 'kidsFamily' | 'kidsMeals';
 /** Corner of the clock card in the 'photoFrame' layout: top-left, top-right, bottom-left, bottom-right. */
@@ -62,6 +64,71 @@ export interface LayoutConfig {
   people?: string[] | null;
   /** 'photoFrame' layout: corner of the clock card (default 'br'). */
   corner?: FrameCorner;
+  /** 'widget' layout: the widget shown full screen (null / missing = none chosen). */
+  widgetId?: string | null;
+}
+
+// ---- Widgets (server/validate.js sanitizeWidget, server/screens.js displayWidgets) ----
+
+export type WidgetType = 'image' | 'web';
+export type WidgetPlace = 'corner' | 'side';
+export type WidgetSize = 's' | 'm' | 'l';
+export type WidgetFit = 'contain' | 'cover';
+export interface WidgetOptions {
+  /** http(s) address of the image or page (<= 2048 chars, no user:password) */
+  url: string;
+  /** seconds between reloads; image: 1 .. 86400, web: 0 (never) or 30 .. 86400 */
+  refreshSec: number;
+  fit: WidgetFit;
+  /** image: add _marco=<time> to the address on every reload (off for addresses that change by themselves) */
+  bust: boolean;
+}
+/** config.widgets[]: what a widget shows. Where it shows is chosen per screen. */
+export interface WidgetDef {
+  id: string; // "w_xxx"
+  type: WidgetType;
+  name: string;
+  options: WidgetOptions;
+}
+/** screen.widgets[]: a widget on one screen, in stacking order. */
+export interface WidgetPlacement {
+  widgetId: string;
+  place: WidgetPlace;
+  /** where it goes (also for 'side' on layouts without a side column) */
+  corner: FrameCorner;
+  size: WidgetSize;
+}
+/** DisplayConfig.widgets[]: one widget as the display loads it. */
+export interface DisplayWidget {
+  id: string;
+  type: WidgetType;
+  name: string;
+  place: 'corner' | 'side' | 'full';
+  corner: FrameCorner;
+  size: WidgetSize;
+  refreshSec: number;
+  fit: WidgetFit;
+  bust: boolean;
+  /** what the display loads: the URL itself (self-hosted) or /api/display/widget/<id> (Marco Cloud) */
+  src: string;
+  /** 'direct' (img/iframe src = the URL) or 'proxy' (fetched with the display credential, shown as a blob) */
+  via: 'direct' | 'proxy';
+  /** short hash of type + url + refreshSec + bust: changes when the saved widget changes */
+  v: string;
+}
+/** POST /api/admin/test/widget { type, url } */
+export interface TestWidgetResponse {
+  ok: boolean;
+  /** invalid_url, timeout, fetch_failed, http_not_found, http_denied, http_error, too_many_redirects, too_large, not_image… */
+  error?: string;
+  format?: string;
+  width?: number;
+  height?: number;
+  bytes?: number;
+  /** 'http_on_https', 'refuses_framing', 'large_image', 'same_origin' */
+  warnings?: string[];
+  /** Marco Cloud: admin-only address of the copy the screens get */
+  previewUrl?: string;
 }
 
 /** Albums a screen plays when its background source is 'immich'. */
@@ -600,6 +667,8 @@ export interface AppConfig {
   carousels?: { items: Carousel[] };
   /** global family block + this screen's part */
   family: FamilyConfig & ScreenFamilyConfig;
+  /** the widgets placed on this screen (the global list is StoredConfig.widgets) */
+  widgets?: WidgetPlacement[];
 }
 
 /** GET /api/display/config[?screen=<slug|id>] */
@@ -629,6 +698,8 @@ export interface DisplayConfig {
   carousel?: CarouselBlock | null;
   /** Familia on this screen (older servers: absent) */
   family?: DisplayFamilyBlock;
+  /** widgets on this screen, the full-screen one first (older servers: absent; none while private) */
+  widgets?: DisplayWidget[];
 }
 
 // ---- Familia (server/core/familyCore.js, server/family.js) ----
@@ -1001,6 +1072,10 @@ export interface Features {
   immich: boolean;
   /** Familia: members, routines with stars, rewards, meals, the kids layouts and the family page (absent = off). */
   family: boolean;
+  /** Widgets: images the owner places on screens (config.widgets, the 'widget' layout; absent = off). */
+  widgets: boolean;
+  /** Web page widgets (a sandboxed iframe on the TV). Self-hosted only; absent = off. */
+  webWidgets: boolean;
 }
 
 export type FeatureName = keyof Features;
@@ -1027,6 +1102,9 @@ export interface Limits {
   birthdays?: number;
   countdowns?: number;
   carousels?: number;
+  widgets?: number;
+  /** shortest widget refresh this server allows, in seconds (absent = every choice) */
+  widgetMinRefreshSec?: number;
 }
 
 export interface HealthResponse {
@@ -1401,6 +1479,8 @@ export interface ScreenProfile {
   alerts: ScreenAlertsConfig;
   privacy: ScreenPrivacyConfig;
   family: ScreenFamilyConfig;
+  /** widgets on this screen (older servers: absent) */
+  widgets?: WidgetPlacement[];
 }
 
 export type RepeatFreq = 'none' | 'weekly' | 'monthly' | 'yearly';
@@ -1546,6 +1626,8 @@ export interface StoredConfig {
   schedules: { items: ScheduledMessage[] };
   /** servers without carousels leave it out */
   carousels?: { items: Carousel[] };
+  /** images and web pages shown on screens (older servers leave it out) */
+  widgets?: WidgetDef[];
   homeassistant: HomeAssistantConfig;
   immich: ImmichConfig;
   auth: AuthConfig;

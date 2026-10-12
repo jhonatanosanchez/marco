@@ -52,7 +52,7 @@ test('caps: old servers and self-hosted keep every feature on', () => {
   assert.equal(old.edition, 'self-hosted');
   assert.equal(old.features, null);
   // accountMenu, microsoftCalendar, updates, feedback, privacy and the doorbell only exist on servers that say so
-  for (const k of FEATURE_KEYS) assert.equal(hasFeature(old, k), !['accountMenu', 'microsoftCalendar', 'updates', 'feedback', 'privacy', 'doorbell', 'doorbellLive', 'carousels', 'immich', 'family'].includes(k), k);
+  for (const k of FEATURE_KEYS) assert.equal(hasFeature(old, k), !['accountMenu', 'microsoftCalendar', 'updates', 'feedback', 'privacy', 'doorbell', 'doorbellLive', 'carousels', 'immich', 'family', 'widgets', 'webWidgets'].includes(k), k);
   // carousels: on for this server, off for servers that do not say so (they would drop config.carousels)
   assert.equal(hasFeature(selfHosted(), 'carousels'), true);
   assert.equal(hasFeature(capsFrom({ ok: true, uptime: 1, version: '0.5.0', edition: 'self-hosted', features: { news: true } }), 'carousels'), false);
@@ -132,7 +132,7 @@ test('navFilter: self-hosted defaults and old servers show everything', () => {
   const all = nav.NAV_ITEMS.map((n) => n.id);
   assert.deepEqual(nav.filterNav(nav.NAV_ITEMS, selfHosted()).map((n) => n.id), all);
   // old servers have no carousels page (opt-in: it would drop the section on save), no Immich proxy and no Familia
-  assert.deepEqual(nav.filterNav(nav.NAV_ITEMS, oldServer()).map((n) => n.id), all.filter((id) => !['carousels', 'immich', 'family', 'meals'].includes(id)));
+  assert.deepEqual(nav.filterNav(nav.NAV_ITEMS, oldServer()).map((n) => n.id), all.filter((id) => !['carousels', 'immich', 'family', 'meals', 'widgets'].includes(id)));
   const routes = all;
   // every entry except the account ones (features.accountMenu, multi-tenant servers only), Microsoft calendars
   // (features.microsoftCalendar), updates (features.updates) and the doorbell (features.doorbell): an old server lists
@@ -150,7 +150,9 @@ test('navFilter: self-hosted defaults and old servers show everything', () => {
   assert.equal(immichEntries, 1);
   const familyEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'family').length;
   assert.equal(familyEntries, 8);
-  assert.equal(nav.filterSettings(search.SETTINGS_INDEX, oldServer(), routes).length, search.SETTINGS_INDEX.length - accountEntries - updateEntries - doorbellEntries - carouselEntries - immichEntries - familyEntries);
+  const widgetEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'widgets').length;
+  assert.equal(widgetEntries, 1);
+  assert.equal(nav.filterSettings(search.SETTINGS_INDEX, oldServer(), routes).length, search.SETTINGS_INDEX.length - accountEntries - updateEntries - doorbellEntries - carouselEntries - immichEntries - familyEntries - widgetEntries);
   // without Google credentials a self-hosted admin still lists the Google entries (with the setup hint); the doorbell
   // card is on the Home Assistant page there, so the entry for API & webhooks (servers without a live camera) is out
   const snapshotEntries = search.SETTINGS_INDEX.filter((e) => e.unless === 'doorbellLive').length;

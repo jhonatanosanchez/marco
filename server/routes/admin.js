@@ -21,6 +21,7 @@ import { isHttpUrl } from '../core/validate.js';
 import { logActivity } from '../activity.js';
 import { resolveScreenList } from '../displays.js';
 import { handlePrivacy, privacyResponse } from '../privacy.js';
+import { testWidget } from '../widgets.js';
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -103,6 +104,11 @@ export function adminRouter({ onConfigSaved } = {}) {
     const { url } = req.body || {};
     if (!isHttpUrl(url)) return res.json({ ok: false, title: '', count: 0, error: 'invalid URL' });
     res.json(await testFeed(url));
+  }));
+  // widgets: does the address answer with an image (or a page that can be framed)? Never 4xx for a bad address.
+  r.post('/test/widget', wrap(async (req, res) => {
+    const { type, url } = req.body || {};
+    res.json(await testWidget({ type, url, secure: req.secure, host: req.get('host') || '' }));
   }));
   r.post('/test/homeassistant', wrap(async (req, res) => {
     const { url, token } = req.body || {};

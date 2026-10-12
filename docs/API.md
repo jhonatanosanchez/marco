@@ -104,7 +104,7 @@ The admin and the display read these fields to decide which sections, actions an
   `announcements`, `displayCommands`, `openDisplayAccess`, `insecureTls`, `googleCalendar`, `googleLogin`,
   `passwordLogin`, `apiTokens`, `webhooks`, `backups`, `importExport`, `includeSecrets`, `activity`, `setupWizard`,
   `status`, `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`,
-  `carousels`, `immich`, `family`. A self-hosted server turns all of them on, except
+  `carousels`, `immich`, `family`, `widgets`, `webWidgets`. A self-hosted server turns all of them on, except
   `googleCalendar` and `googleLogin` (on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set),
   `microsoftCalendar` (Outlook and Microsoft 365 calendars, on when `MICROSOFT_CLIENT_ID` and
   `MICROSOFT_CLIENT_SECRET` are set), `accountMenu` and `feedback` (always off). `updates` is the update banner,
@@ -119,10 +119,13 @@ The admin and the display read these fields to decide which sections, actions an
   the *Carousels* page and `config.carousels` (a server without it would drop the section on save). `immich` is
   the Immich photo source and `/api/admin/immich/*` (Marco Cloud answers `false`). `family` is *Familia*: the
   `Familia` and `Menús` pages, the kids layouts, the family page on the phone and `/api/admin/family*`,
-  `/api/family/*` and `/api/display/family*` (see [Familia](#familia)).
+  `/api/family/*` and `/api/display/family*` (see [Familia](#familia)). `widgets` is the *Widgets* page, the
+  `widget` layout and `POST /api/admin/test/widget`; `webWidgets` allows the `web` type (a page in a sandboxed
+  frame). Marco Cloud answers `widgets: true`, `webWidgets: false` (see [Widgets](#widgets)).
 - `limits` (optional): plan limits such as `screens`, `sources` or `devices`. Absent means no limit beyond the
   config validator's own caps (12 screens, 50 calendars, 20 news feeds, 1000 local events, 500 birthdays,
-  100 countdowns, 6 carousels). The admin disables "add" at the limit and flags a config that goes over it.
+  100 countdowns, 6 carousels, 20 widgets). `widgetMinRefreshSec` is the shortest widget refresh the server takes
+  (Marco Cloud: 30). The admin disables "add" at the limit and flags a config that goes over it.
 - `displayOrigin` (optional): absolute origin that serves `/d/<key>` and `/pair`. Absent means the same origin. The
   admin opens screens (preview, *View screen*) at `<displayOrigin or its own origin>/d/<key>` when it has the private
   links (a server in private mode, or one without open display access), else at `/?screen=<slug>`. The preview adds
@@ -136,9 +139,9 @@ The admin and the display read these fields to decide which sections, actions an
 
 Clients treat a response with no `features` field (servers older than 0.5.0) as having every feature on, except
 `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`, `carousels`,
-`immich` and `family`. A key missing from `features` counts as off only when `edition` is not `'self-hosted'`, and a missing
+`immich`, `family`, `widgets` and `webWidgets`. A key missing from `features` counts as off only when `edition` is not `'self-hosted'`, and a missing
 `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`, `carousels`,
-`immich` or `family` is always off.
+`immich`, `family`, `widgets` or `webWidgets` is always off.
 
 ### Account mode
 
@@ -315,6 +318,7 @@ Rules for the mutating setup endpoints:
 | `GET /api/admin/microsoft/accounts` · `DELETE /api/admin/microsoft/accounts/:email` · `GET /api/admin/microsoft/calendars?account=` | Linked Microsoft accounts and their own and shared calendars (`MicrosoftAccount[]`, `MicrosoftCalendarListItem[]`). `404 feature_unavailable` without `features.microsoftCalendar`; the calendar list answers `409 microsoft_reconnect` when the account must be linked again. `DELETE` answers `{ ok, manageAccess }` (Microsoft has no revoke endpoint: the pages where the access is removed) |
 | `POST /api/admin/test/ics` | `{ url, insecureTls? }` → `{ ok, count, sample, error? }` |
 | `POST /api/admin/test/rss` | `{ url }` → `{ ok, title, count, error? }` |
+| `POST /api/admin/test/widget` | `{ type: 'image' \| 'web', url }` → `{ ok, error?, format?, width?, height?, bytes?, warnings? }` (see [Widgets](#widgets)) |
 | `POST /api/admin/test/homeassistant` | `{ url, token? }` → `{ ok, version?, error? }` |
 | `GET /api/admin/homeassistant/entities?domain=sensor\|weather\|camera` | `[{ entity_id, name, state, unit }]` |
 | `POST /api/admin/doorbell` | Same body and answer as `POST /api/hooks/doorbell` (the *Test* button of *Home Assistant → Doorbell and camera*, with the values on screen). Logged with `via: "admin"` |
@@ -436,6 +440,32 @@ Deleting a carousel drops its private link (its displays get `revoked`) and move
 A carousel left with no screens keeps its link, but the link then reads a blank screen (`screenId` = the carousel
 id, no calendar, stock photos, no countdowns), never the default screen. Carousel ids always start with `v_` and
 never match a screen id; a saved id that does not follow this gets a new one.
+
+## Widgets
+
+Images (and, on a server with `webWidgets`, web pages) the owner puts on screens. Saved with the config
+(`PUT /api/admin/config`), no endpoint of its own except the test.
+
+- `config.widgets[]`: `{ id: 'w_…', type: 'image' | 'web', name, options: { url, refreshSec, fit: 'contain' | 'cover',
+  bust } }`, at most 20. `url` must be written out as `http(s)://host` (no user or password, no spaces, quotes,
+  angle brackets, backslashes or control characters) and is stored normalised. Image refresh: 1, 10, 30 s, 1, 5,
+  15 min, 1, 6, 24 h (default 15 min); web: 0 (never reload, the default) or 30 s to 24 h. `bust` (images, default
+  on) adds `_marco=<time>` to the address at every reload, for servers that send long cache times.
+- Per screen: `screens[i].widgets[]` = `{ widgetId, place: 'corner' | 'side', corner: 'tl' | 'tr' | 'bl' | 'br',
+  size: 's' | 'm' | 'l' }`, at most 6, in stacking order. The `widget` layout shows `layout.widgetId` full screen.
+  Placements and `layout.widgetId` of a deleted widget are dropped on save.
+- `GET /api/display/config` carries `widgets[]` (`DisplayWidget`: the full-screen one first with `place: 'full'`,
+  then the placements). On a self-hosted server `src` is the address itself (`via: 'direct'`): the TV loads it, so
+  LAN addresses work. In open display mode anyone on the network can read that address; put tokens only behind a
+  private display access. Nothing while the screen is private.
+- `POST /api/admin/test/widget { type, url }` fetches the address once (LAN allowed, 10 s, 3 redirects, 20 MB):
+  for an image, its format (PNG, JPEG, WebP, GIF; SVG too on a self-hosted server) and size; for a page, whether it
+  lets itself be framed. Never a 4xx for a bad address: `{ ok: false, error }` with `invalid_url`, `timeout`,
+  `fetch_failed`, `http_not_found`, `http_denied`, `http_error`, `too_many_redirects`, `too_large` or `not_image`.
+  Warnings: `refuses_framing`, `http_on_https`, `large_image`, `same_origin`.
+- Web pages load in `<iframe sandbox="allow-scripts allow-same-origin">` with no referrer, no permissions and no
+  top navigation or popups, never from the display's own origin. Pages of this server only load in a frame as the
+  admin preview (`?preview=1`, same origin): any other framed request gets a sandboxed `403`.
 
 ## Familia
 

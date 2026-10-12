@@ -36,7 +36,20 @@ export const SCREEN_SPLIT_KEYS = {
 /** Calendar settings the 'planner' layout comes with (the admin and the setup wizard apply them when it is picked). */
 export const PLANNER_CALENDAR = { weeks: 'auto', eventStyle: 'cards' };
 /** Keys that only exist per screen (whole object lives in the screen profile). */
-export const SCREEN_ONLY_KEYS = ['screen', 'layout', 'background', 'message', 'alerts', 'privacy'];
+export const SCREEN_ONLY_KEYS = ['screen', 'layout', 'background', 'message', 'alerts', 'privacy', 'widgets'];
+
+// ---- Widgets: images and web pages the owner adds (config.widgets), placed per screen (screen.widgets) ----
+export const WIDGET_TYPES = ['image', 'web'];
+/** Refresh choices in seconds. Web pages also have 0 (never reload: many dashboards update themselves). */
+export const WIDGET_REFRESH_SEC = [1, 10, 30, 60, 300, 900, 3600, 21600, 86400];
+export const WEB_WIDGET_REFRESH_SEC = [0, 30, 60, 300, 900, 3600, 21600, 86400];
+export const MAX_WIDGETS = 20;
+/** Placements per screen (the full-screen layout's widget is not one of them). */
+export const MAX_SCREEN_WIDGETS = 6;
+export const WIDGET_PLACES = ['corner', 'side'];
+export const WIDGET_SIZES = ['s', 'm', 'l'];
+export const WIDGET_FITS = ['contain', 'cover'];
+export const WIDGET_PREFIX = 'w_';
 
 /** A complete screen profile with default values (screen.name lives in profile.name). */
 export function defaultScreenProfile({ id = 's_main', slug = 'living-room', name = 'Living room' } = {}) {
@@ -50,7 +63,8 @@ export function defaultScreenProfile({ id = 's_main', slug = 'living-room', name
     },
     // people: calendar ids shown as columns by the 'people' layout (null = automatic); corner: where the
     // 'photoFrame' layout puts its small clock card (tl, tr, bl, br)
-    layout: { preset: 'bigCalendar', sidePanel: 'left', sideWidth: 0.36, people: null, corner: 'br' },
+    // widgetId: the widget the 'widget' layout shows full screen (null = none chosen yet)
+    layout: { preset: 'bigCalendar', sidePanel: 'left', sideWidth: 0.36, people: null, corner: 'br', widgetId: null },
     background: {
       enabled: true, source: 'stock', stockTopic: 'nature', order: 'random', intervalSec: 120, brightness: 0.85, showMeta: false,
       cover: true, transition: 'webgl', ambient: 'aurora',
@@ -88,6 +102,8 @@ export function defaultScreenProfile({ id = 's_main', slug = 'living-room', name
     privacy: { hidePhotos: false, showLock: true, schedule: [] },
     // Familia on this screen (server/core/familyCore.js): memberIds null = every member, touch off, QR card on
     family: defaultScreenFamily(),
+    // widgets on this screen, in stacking order: { widgetId, place: 'corner' | 'side', corner, size: 's' | 'm' | 'l' }
+    widgets: [],
   });
 }
 
@@ -120,6 +136,9 @@ export function defaultConfig() {
     //   transitionSpeed: 'fast' | 'normal' | 'slow', holdOnAlert, nightRotate, offScreenId,
     //   schedule: [{ id, enabled, days, from, to }], steps: [{ screenId, seconds }] }
     carousels: { items: [] },
+    // widgets: { id: 'w_…', type: 'image' | 'web', name, options: { url, refreshSec, fit, bust } }. Where each one
+    // shows is chosen per screen (screen.widgets, layout.widgetId).
+    widgets: [],
     // doorbell: camera entity (camera.*), seconds on screen (10..300), screenIds ([] = all), door chime on/off
     homeassistant: {
       enabled: false, url: 'http://homeassistant.local:8123',

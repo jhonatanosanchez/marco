@@ -82,6 +82,7 @@ The stored config has **global** sections shared by every screen and a list of *
   "countdowns": { "items": [Countdown], "includeBirthdays": true, "birthdayDays": 30, "includeFlagged": true, "horizonDays": 365 },
   "schedules":  { "items": [ScheduledMessage] },
   "carousels":  { "items": [Carousel] },       // 0..6; see "Carousels" below
+  "widgets":    [Widget],                      // 0..20 images / web pages, placed per screen (screen.widgets, layout.widgetId); docs/API.md "Widgets"
   "homeassistant": { "enabled": false, "url": "http://homeassistant.local:8123",    // token in secrets.json
                   "doorbell": { "camera": "", "seconds": 60, "screenIds": [], "sound": true } },
                   // doorbell: camera.* entity ('' = no picture), seconds 10..300, screenIds ([] = all; when every chosen
@@ -168,14 +169,14 @@ Global vs per-screen for the "split" sections:
 
 | Section | Global part | Per-screen part |
 |---|---|---|
-| screen, layout, background, message, alerts, privacy | none | all |
+| screen, layout, background, message, alerts, privacy, widgets (placements) | none | all |
 | calendar | sources, iconRules | view settings + `sourceIds` |
 | datetime | timezone | clock and date format, enabled |
 | weather | provider, model, location, units, HA entities | enabled, forecastDays, showHourly, showPrecipChance |
 | news | feeds, maxItems | enabled, rotateSec |
 | todo | items | enabled |
 | countdowns | items + inclusion settings | enabled, max |
-| localEvents, birthdays, eventRules, schedules, carousels, homeassistant, immich, auth | all | none |
+| localEvents, birthdays, eventRules, schedules, carousels, widgets (definitions), homeassistant, immich, auth | all | none |
 
 The display and most admin pages work on a **flat view of one screen** (`AppConfig`): global sections merged with
 one profile (`flatView()` in `server/core/screens.js`, `projectScreen()` / `applyScreen()` in `web/shared/screens.ts`,
@@ -282,6 +283,16 @@ flagged by a local event or a style rule (nearest occurrence per title), sorted 
   `expiresAt`, on `doorbell-end`, or when `hello` / a poll reset names another ring. The server side lives in
   `server/doorbell.js` (rings in memory, Home Assistant proxy with a 500 ms shared frame cache) and
   `server/core/doorbellCore.js` (validation, ring / extend / dismiss, payload).
+- Widgets (`web/display/widgets/custom.ts`): images and web pages from `DisplayConfig.widgets` in a corner, in the
+  side column (in their corner when the layout has none) or full screen (the `widget` layout). Reconciled by
+  `id|place|v`, so config polls and preview edits never reload one. Images load off screen and replace the old one
+  once loaded; a failed reload keeps it with a small "not updated" mark. Only http(s) addresses are loaded, in the
+  unsaved preview too. Self-hosted TVs load the address themselves (`via: 'direct'`, LAN works); Marco Cloud serves
+  saved images from `/api/display/widget/<id>` with the display key (`via: 'proxy'`, shown as blobs) and has no web
+  widgets. Web pages get a sandboxed frame (`allow-scripts allow-same-origin`, no top navigation, popups, forms or
+  permissions) and are never framed from the display's own origin; the server answers any framed request other than
+  the admin preview with a sandboxed `403` (`server/app.js frameGuard`), so a page that sends its frame back to the
+  server gets nothing. Night dimming, alerts and the doorbell cover widgets; nothing shows while private.
 - Identity: `clientId` from `?client=`, else `localStorage`, else generated. `deploy/kiosk.sh` appends
   `client=<hostname>` because the kiosk runs incognito. If the server version changes, the display reloads once.
 - Access (`web/display/identity.ts`): the credential is the key in the path (`/d/<key>`), else a paired-device token

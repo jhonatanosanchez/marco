@@ -1,4 +1,6 @@
 import type {
+  TestWidgetResponse,
+  WidgetType,
   PrivacyChangeResponse,
   PrivacyRequest,
   PrivacyResponse,
@@ -171,6 +173,7 @@ export const api = {
   testIcs: (url: string, insecureTls?: boolean) =>
     request<TestIcsResponse>('POST', '/api/admin/test/ics', insecureTls ? { url, insecureTls: true } : { url }),
   testRss: (url: string) => request<TestRssResponse>('POST', '/api/admin/test/rss', { url }),
+  testWidget: (type: WidgetType, url: string) => request<TestWidgetResponse>('POST', '/api/admin/test/widget', { type, url }),
   testHomeAssistant: (url: string, token?: string) =>
     request<TestHomeAssistantResponse>('POST', '/api/admin/test/homeassistant', token ? { url, token } : { url }),
   haEntities: (domain: 'sensor' | 'weather' | 'camera') =>

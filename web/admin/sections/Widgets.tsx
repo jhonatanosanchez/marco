@@ -1,0 +1,362 @@
+import { useState } from 'preact/hooks';
+import type { StoredConfig, TestWidgetResponse, WidgetDef, WidgetType } from '../../shared/types';
+import { api, ApiError } from '../api';
+import { confirmDialog } from '../components/feedback';
+import { Icon } from '../components/icons';
+import { Button, Card, Empty, Field, PageHeader, ReorderButtons, Segmented, Select, TextInput, ToggleRow } from '../components/ui';
+import { t } from '../i18n';
+import { atLimit as reachesLimit, edition, has, limit } from '../caps';
+import { setWidgetPreview } from '../livePreview';
+import { moveItem, uid, WEB_WIDGET_REFRESH_SEC, WIDGET_REFRESH_SEC, widgetUrlProblem } from '../util';
+import type { SectionProps } from './common';
+
+/** Refresh choices as the admin shows them. */
+const REFRESH_LABEL: Record<number, string> = {
+  0: 'No recargar', 1: '1 s', 10: '10 s', 30: '30 s', 60: '1 min', 300: '5 min', 900: '15 min', 3600: '1 h', 21600: '6 h', 86400: '24 h',
+};
+
+/** One clear sentence per test error code (server/widgets.js), Spanish keys for t(). */
+const ERROR_TEXT: Record<string, string> = {
+  invalid_url: 'La dirección no es válida.',
+  https_required: 'En Marco Cloud la dirección debe empezar por https://.',
+  blocked_url: 'Esa dirección es de una red privada o local y Marco Cloud no puede llegar a ella.',
+  timeout: 'La dirección no respondió a tiempo.',
+  fetch_failed: 'No se pudo conectar con la dirección.',
+  http_not_found: 'La dirección respondió 404: no existe.',
+  http_denied: 'La dirección pide permiso (401/403).',
+  http_error: 'La dirección respondió con un error.',
+  too_many_redirects: 'Demasiadas redirecciones.',
+  too_large: 'La imagen pesa más de 20 MB.',
+  not_image: 'No es una imagen PNG, JPEG, WebP o GIF.',
+  svg_not_allowed: 'Las imágenes SVG no se admiten en Marco Cloud. Usa PNG o WebP.',
+  too_many_pixels: 'La imagen es demasiado grande en píxeles.',
+  too_large_to_serve: 'La imagen es demasiado grande para mostrarla. Prueba con una de menos de 5 MB y 4096 px.',
+  rate_limited: 'Demasiadas pruebas seguidas. Espera un minuto.',
+};
+const WARNING_TEXT: Record<string, string> = {
+  refuses_framing: 'Esta página no deja que otras la muestren dentro de un marco: puede salir en blanco.',
+  http_on_https: 'El panel va por https y la imagen por http: el navegador de la pantalla puede bloquearla.',
+  large_image: 'La imagen es grande: en algunas teles puede tardar o fallar.',
+  same_origin: 'No se puede incrustar una página de este mismo servidor.',
+};
+export const widgetErrorText = (code?: string) => t(ERROR_TEXT[code ?? ''] ?? 'No se pudo probar la dirección.');
+
+const formatBytes = (n: number) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+
+/** Screens that show a widget (placed on them, or full screen with the Widget layout). */
+export function widgetUses(full: StoredConfig, id: string) {
+  return full.screens.filter((s) => (s.widgets ?? []).some((p) => p.widgetId === id) || (s.layout.preset === 'widget' && s.layout.widgetId === id));
+}
+
+/** A widget leaves every screen: its placements and the full-screen layout that pointed at it. */
+export function pruneWidget(d: StoredConfig, id: string) {
+  d.widgets = (d.widgets ?? []).filter((w) => w.id !== id);
+  for (const s of d.screens) {
+    if (s.widgets) s.widgets = s.widgets.filter((p) => p.widgetId !== id);
+    if (s.layout.widgetId === id) s.layout.widgetId = null;
+  }
+}
+
+export const newWidget = (type: WidgetType = 'image'): WidgetDef => ({
+  id: uid('w'),
+  type,
+  name: '',
+  options: { url: '', refreshSec: type === 'web' ? 0 : 900, fit: 'contain', bust: true },
+});
+
+/** True for an http(s) address on another origin than this panel's (what may go in a thumbnail frame). */
+const frameable = (url: string) => {
+  try {
+    const u = new URL(url);
+    return (u.protocol === 'http:' || u.protocol === 'https:') && u.origin !== location.origin;
+  } catch {
+    return false;
+  }
+};
+
+/** Small sandboxed frame of a web widget, scaled down (same attributes as the screen's). */
+function WebThumb({ url, name }: { url: string; name: string }) {
+  // never this panel's own origin: scripts plus the same origin would lift the sandbox
+  if (!frameable(url)) return null;
+  return (
+    <div class="widget-thumb widget-thumb--web">
+      <iframe src={url} title={name} sandbox="allow-scripts allow-same-origin" referrerpolicy="no-referrer" allow="" loading="lazy" tabIndex={-1} />
+    </div>
+  );
+}
+
+function TestResult({ w, res }: { w: WidgetDef; res: TestWidgetResponse }) {
+  const [imgOk, setImgOk] = useState<boolean | null>(null);
+  const image = w.type === 'image';
+  // the browser of this panel may reach an address the server cannot (and the other way round): show both
+  const showImg = image && !!(res.previewUrl || !widgetUrlProblem(w.options.url)) && (res.ok || imgOk !== false);
+  return (
+    <div class="widget-test">
+      {showImg && (
+        <div class={`widget-thumb ${imgOk === false ? 'is-hidden' : ''}`}>
+          <img src={res.previewUrl ?? w.options.url} alt="" referrerpolicy="no-referrer" onLoad={() => setImgOk(true)} onError={() => setImgOk(false)} />
+        </div>
+      )}
+      {!image && res.ok && <WebThumb url={w.options.url} name={w.name} />}
+      <div class={`test-result ${res.ok ? 'is-ok' : imgOk ? 'is-warn' : 'is-err'}`}>
+        {res.ok ? (
+          <span>
+            <Icon name="check" size={14} />{' '}
+            {image ? (
+              <>
+                <strong>{(res.format ?? '').toUpperCase() || t('Imagen')}</strong>
+                {res.width && res.height ? ` · ${res.width} × ${res.height}` : ''}
+                {res.bytes ? ` · ${formatBytes(res.bytes)}` : ''}
+              </>
+            ) : (
+              <strong>{t('La página responde')}</strong>
+            )}
+          </span>
+        ) : (
+          <span>
+            <Icon name="alert" size={14} /> {widgetErrorText(res.error)}
+            {imgOk && <> {t('Este navegador sí la ve, así que la pantalla probablemente también.')}</>}
+          </span>
+        )}
+      </div>
+      {(res.warnings ?? []).map((k) => (
+        <div class="test-result is-warn" key={k}>
+          <span>
+            <Icon name="alert" size={14} /> {t(WARNING_TEXT[k] ?? k)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function WidgetCard({ w, i, n, full, errors, upd, remove, move, go, setScreenId }: {
+  w: WidgetDef; i: number; n: number; full: StoredConfig; errors: Record<string, string>;
+  upd: (fn: (x: WidgetDef) => void) => void; remove: () => void; move: (a: number, b: number) => void;
+  go: (route: string) => void; setScreenId: (id: string) => void;
+}) {
+  const [test, setTest] = useState<{ loading: boolean; res?: TestWidgetResponse; key?: string }>({ loading: false });
+  const [more, setMore] = useState(false);
+  const image = w.type === 'image';
+  // Marco Cloud fetches the image itself (https only) and serves it to the screens; self-hosted TVs load the address
+  const cloud = edition() === 'cloud';
+  const webOk = has('webWidgets');
+  const urlBad = widgetUrlProblem(w.options.url, cloud);
+  // choices below the server's shortest refresh are not offered (web pages keep "never reload")
+  const minRefresh = limit('widgetMinRefreshSec') ?? 0;
+  const refreshList = (image ? WIDGET_REFRESH_SEC : WEB_WIDGET_REFRESH_SEC).filter((s) => s === 0 || s >= minRefresh);
+  const belowMin = !refreshList.includes(w.options.refreshSec) && w.options.refreshSec > 0 && w.options.refreshSec < minRefresh;
+  const uses = widgetUses(full, w.id);
+  // open display access: the display config (and so the address) is readable by anyone on the network
+  const openTokenUrl = !cloud && !urlBad && /[?#]./.test(w.options.url) && full.security?.displayAccess !== 'private';
+  const run = async () => {
+    const key = `${w.type}|${w.options.url.trim()}`;
+    setTest({ loading: true, key });
+    try {
+      const r = await api.testWidget(w.type, w.options.url.trim());
+      // the unsaved preview shows this copy until the widget is saved (Marco Cloud, Preview.tsx)
+      if (r.ok && r.previewUrl) setWidgetPreview(w.options.url.trim(), r.previewUrl);
+      setTest({ loading: false, key, res: r });
+    } catch (e) {
+      setTest({ loading: false, key, res: { ok: false, error: (e as ApiError).message } });
+    }
+  };
+  // a result belongs to the address and type it was made for
+  const res = test.key === `${w.type}|${w.options.url.trim()}` ? test.res : undefined;
+  return (
+    <Card
+      id={`widget-${w.id}`}
+      icon={image ? 'image' : 'globe'}
+      title={w.name.trim() || t('Widget sin nombre')}
+      actions={
+        <div class="row-actions">
+          <ReorderButtons index={i} count={n} onMove={move} />
+          <button type="button" class="icon-btn icon-btn--danger" onClick={remove} aria-label={t('Eliminar')}>
+            <Icon name="trash" size={16} />
+          </button>
+        </div>
+      }
+    >
+      <div class="grid grid--2">
+        <Field label={t('Nombre')} error={errors[`wdg.${w.id}.name`]}>
+          <TextInput value={w.name} maxLength={60} placeholder={t('Precios de la luz')} onValue={(v) => upd((x) => void (x.name = v))} />
+        </Field>
+        <Field label={t('Tipo')} error={errors[`wdg.${w.id}.type`] ? t(errors[`wdg.${w.id}.type`]) : undefined} hint={image ? undefined : t('Solo para servidores propios. La página se carga en la pantalla dentro de un marco aislado.')}>
+          {!image && !webOk && <span class="chip chip--static chip--bad">{t('No disponible aquí')}</span>}
+          <Segmented
+            full
+            value={w.type}
+            options={[
+              { value: 'image', label: t('Imagen') },
+              ...(webOk || !image ? [{ value: 'web' as const, label: t('Web (iframe)') }] : []),
+            ]}
+            onChange={(v) =>
+              upd((x) => {
+                if (x.type === v) return;
+                x.type = v;
+                const list = v === 'web' ? WEB_WIDGET_REFRESH_SEC : WIDGET_REFRESH_SEC;
+                if (!list.includes(x.options.refreshSec)) x.options.refreshSec = v === 'web' ? 0 : 900;
+              })
+            }
+          />
+        </Field>
+      </div>
+      <Field
+        label={t('Dirección')}
+        error={errors[`wdg.${w.id}.url`] ? t(errors[`wdg.${w.id}.url`]) : undefined}
+        hint={
+          image
+            ? `${t('PNG, JPEG, WebP o GIF.')} ${cloud ? t('Debe empezar por https://. Marco descarga la imagen y la sirve a tus pantallas.') : t('La pantalla carga la dirección directamente: puede ser de tu red local.')}`
+            : undefined
+        }
+      >
+        <div class="search-row">
+          <TextInput
+            mono
+            inputMode="url"
+            value={w.options.url}
+            placeholder={image ? 'https://…/tarjeta.png' : 'https://…'}
+            error={!!errors[`wdg.${w.id}.url`]}
+            onValue={(v) => upd((x) => void (x.options.url = v))}
+          />
+          <Button size="sm" icon="play" disabled={!!urlBad} loading={test.loading} onClick={run}>
+            {t('Probar')}
+          </Button>
+        </div>
+      </Field>
+      {openTokenUrl && (
+        <p class="muted small">
+          {t('Las pantallas están en modo abierto: cualquiera en tu red puede leer esta dirección completa. Si lleva una clave, cambia el acceso a las pantallas a privado.')}{' '}
+          <button type="button" class="link-btn" onClick={() => go('security/sec-display')}>
+            {t('Acceso a las pantallas')}
+          </button>
+        </p>
+      )}
+      {res && <TestResult key={test.key} w={w} res={res} />}
+      <div class="grid grid--2">
+        <Field label={t('Recargar cada')} error={errors[`wdg.${w.id}.refreshSec`] ? t(errors[`wdg.${w.id}.refreshSec`]) : undefined}>
+          <Select
+            value={w.options.refreshSec}
+            options={[...(belowMin ? [w.options.refreshSec] : []), ...refreshList].map((s) => ({ value: s, label: t(REFRESH_LABEL[s] ?? `${s} s`) }))}
+            onChange={(v) => upd((x) => void (x.options.refreshSec = v))}
+          />
+          {belowMin && <p class="muted small">{t('Aquí lo mínimo es {n} s.', { n: minRefresh })}</p>}
+        </Field>
+        <Field label={t('Usado en')}>
+          {uses.length ? (
+            <div class="widget-uses">
+              {uses.map((s) => (
+                <button
+                  type="button"
+                  class="chip chip--static chip--link"
+                  onClick={() => {
+                    setScreenId(s.id);
+                    go('layout/layout-widgets');
+                  }}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p class="muted small">{t('Aún no está en ninguna pantalla. Colócalo en Diseño.')}</p>
+          )}
+        </Field>
+      </div>
+      <button type="button" class="link-btn widget-more" aria-expanded={more} onClick={() => setMore(!more)}>
+        <Icon name={more ? 'up' : 'chevron'} size={14} /> {t('Más opciones')}
+      </button>
+      {more && (
+        <div class="stack">
+          <Field label={t('Ajuste')} hint={t('Solo cuenta cuando el widget ocupa toda la pantalla.')}>
+            <Segmented
+              value={w.options.fit}
+              options={[
+                { value: 'contain', label: t('Completa') },
+                { value: 'cover', label: t('Rellenar') },
+              ]}
+              onChange={(v) => upd((x) => void (x.options.fit = v))}
+            />
+          </Field>
+          {image && !cloud && (
+            <ToggleRow
+              label={t('Pedir siempre la imagen nueva')}
+              hint={t('Desactívalo si la dirección ya cambia sola, por ejemplo con firma.')}
+              checked={w.options.bust}
+              onChange={(v) => upd((x) => void (x.options.bust = v))}
+            />
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+export function WidgetsSection({ full, setFull, errors, go, setScreenId }: SectionProps) {
+  const items = full.widgets ?? [];
+  const max = limit('widgets');
+  const atLimit = reachesLimit('widgets', items.length);
+  const add = () =>
+    setFull((d) => {
+      d.widgets = d.widgets ?? [];
+      d.widgets.push(newWidget());
+    });
+  const move = (a: number, b: number) => setFull((d) => void (d.widgets = moveItem(d.widgets ?? [], a, b)));
+  const remove = async (w: WidgetDef) => {
+    const n = widgetUses(full, w.id).length;
+    if (n) {
+      const ok = await confirmDialog({
+        title: t('Eliminar el widget “{name}”', { name: w.name.trim() || t('Widget sin nombre') }),
+        body: <p>{t('Se quitará también de {n} pantallas.', { n })}</p>,
+        confirm: t('Eliminar'),
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    setFull((d) => pruneWidget(d, w.id));
+  };
+  return (
+    <>
+      <PageHeader
+        title={t('Widgets')}
+        desc={t('Imágenes y páginas web que se muestran en tus pantallas. Aquí defines qué se muestra; dónde va cada uno lo eliges en Diseño de cada pantalla.')}
+      >
+        <Button variant="primary" icon="plus" disabled={atLimit} onClick={add}>
+          {t('Añadir widget')}
+        </Button>
+      </PageHeader>
+      {atLimit && max != null && <p class="muted small">{t('Máximo {n} widgets', { n: max })}</p>}
+      {items.length === 0 ? (
+        <Card>
+          <Empty icon="widget" title={t('Aún no hay widgets')}>
+            <p>{t('Un widget es una imagen o una página web que se ve en una esquina, en la columna lateral o a pantalla completa. Por ejemplo, una tarjeta de precios que se genera sola.')}</p>
+            <Button variant="primary" icon="plus" onClick={add}>
+              {t('Añadir widget')}
+            </Button>
+          </Empty>
+        </Card>
+      ) : (
+        items.map((w, i) => (
+          <WidgetCard
+            key={w.id}
+            w={w}
+            i={i}
+            n={items.length}
+            full={full}
+            errors={errors}
+            move={move}
+            go={go}
+            setScreenId={setScreenId}
+            remove={() => void remove(w)}
+            upd={(fn) =>
+              setFull((d) => {
+                const x = (d.widgets ?? []).find((y) => y.id === w.id);
+                if (x) fn(x);
+              })
+            }
+          />
+        ))
+      )}
+    </>
+  );
+}

@@ -29,7 +29,7 @@ export function sectionLabel(key: string): string {
     birthdays: 'Cumpleaños', eventRules: 'Filtros', countdowns: 'Cuentas atrás', schedules: 'Mensajes programados', homeassistant: 'Home Assistant', immich: 'Immich',
     auth: 'Seguridad', screens: 'Pantallas', defaultScreen: 'Pantalla predeterminada', screen: 'Ajustes', layout: 'Diseño', background: 'Fondo',
     message: 'Mensaje', alerts: 'Avisos', security: 'Acceso a las pantallas', privacy: 'Modo privado', carousels: 'Carruseles',
-    family: 'Familia',
+    family: 'Familia', widgets: 'Widgets',
   };
   if (m) return `${m[1]}${m[2] ? ` › ${t(names[m[2]] ?? m[2])}` : ''}`;
   return t(names[key] ?? key);

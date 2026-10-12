@@ -1,12 +1,12 @@
 import { useRef } from 'preact/hooks';
 import { GLASS_DEFAULTS, glassVars, normalizeGlass, type PhotoStats } from '../../shared/glass';
-import type { DisplayStyle, FrameCorner, GlassConfig, LayoutPreset } from '../../shared/types';
+import type { DisplayStyle, FrameCorner, GlassConfig, LayoutPreset, WidgetPlacement } from '../../shared/types';
 import { Icon } from '../components/icons';
 import { EventStyleField, PLANNER_CALENDAR, undoPlannerPick, WeeksField } from '../components/PlannerFields';
-import { Button, Callout, Card, Field, PageHeader, Segmented, Slider, ToggleRow } from '../components/ui';
+import { Button, Callout, Card, Field, PageHeader, ReorderButtons, Segmented, Select, Slider, ToggleRow } from '../components/ui';
 import { has } from '../caps';
 import { t } from '../i18n';
-import { allSourceOptions } from '../util';
+import { allSourceOptions, MAX_SCREEN_WIDGETS, moveItem } from '../util';
 import type { SectionProps } from './common';
 import { FamilyScreenOptions } from './Family';
 
@@ -23,6 +23,7 @@ export const PRESETS: { id: LayoutPreset; name: string; desc: string; wizard?: b
   { id: 'photoFrame', name: 'Marco de fotos', desc: 'La foto es la protagonista: solo un reloj pequeño, la temperatura y el próximo evento en una esquina. Ideal para un marco vertical.' },
   { id: 'bedside', name: 'Mesilla', desc: 'Reloj enorme, el próximo evento y la temperatura con muy poco brillo, para el dormitorio. Se atenúa más por la noche.' },
   { id: 'planner', name: 'Planificador', desc: 'Para familias con muchas citas: reloj, fecha y tiempo arriba, y debajo el mes con tarjetas que llenan cada día. Pensado para pantallas verticales.' },
+  { id: 'widget', name: 'Widget', desc: 'Un widget ocupa toda la pantalla. Útil en carruseles.' },
   // kids layouts (Familia): Modern style only, the display shows the big calendar with Classic
   { id: 'kidsRoutines', name: 'Rutinas', desc: 'Una columna por niño con sus rutinas de mañana, tarde y noche, su progreso y sus estrellas.', group: 'kids' },
   { id: 'kidsFamily', name: 'Familia', desc: 'El día de toda la familia: agenda de hoy, rutinas, comidas y tareas, con un saludo arriba.', group: 'kids' },
@@ -188,6 +189,14 @@ export function Schematic({ id, side }: { id: LayoutPreset; side: 'left' | 'righ
             )),
           )}
           <rect x={6.6 + 4 * 21.14 - 0.6} y={28} width="21.1" height="18.4" rx="1.5" fill="none" stroke={accent} stroke-width="1.2" />
+        </g>
+      )}
+      {id === 'widget' && (
+        <g>
+          <rect x="12" y="9" width="136" height="72" rx="7" fill={block} opacity=".92" />
+          <path d="M52 62 L70 42 L82 54 L92 46 L108 62 Z" fill="var(--schem-line)" opacity=".7" />
+          <circle cx="98" cy="32" r="5" fill={accent} />
+          <rect x="52" y="28" width="56" height="34" rx="3" fill="none" stroke="var(--schem-line)" stroke-width="1.6" opacity=".7" />
         </g>
       )}
       {id === 'bedside' && (
@@ -547,6 +556,100 @@ const CORNERS: { value: FrameCorner; label: string }[] = [
   { value: 'br', label: 'Abajo derecha' },
 ];
 
+const SIZES: { value: WidgetPlacement['size']; label: string }[] = [
+  { value: 's', label: 'Pequeño' },
+  { value: 'm', label: 'Mediano' },
+  { value: 'l', label: 'Grande' },
+];
+
+/** 2x2 corner picker (top-left, top-right, bottom-left, bottom-right). */
+function CornerPick({ value, onChange }: { value: FrameCorner; onChange: (v: FrameCorner) => void }) {
+  return (
+    <div class="corner-pick" role="radiogroup" aria-label={t('Esquina')}>
+      {CORNERS.map((c) => (
+        <button type="button" role="radio" aria-checked={value === c.value} class={value === c.value ? 'is-on' : ''} title={t(c.label)} onClick={() => onChange(c.value)} />
+      ))}
+    </div>
+  );
+}
+
+/** Widgets on this screen: which ones, where (corner or side column), how big, in what order. */
+export function ScreenWidgetsCard({ cfg, set, full, go }: Pick<SectionProps, 'cfg' | 'set' | 'full' | 'go'>) {
+  const defs = full.widgets ?? [];
+  const rows = cfg.widgets ?? [];
+  const placed = new Set(rows.map((p) => p.widgetId));
+  const free = defs.filter((w) => !placed.has(w.id));
+  const nameOf = (id: string) => defs.find((w) => w.id === id)?.name.trim() || t('Widget sin nombre');
+  const upd = (i: number, fn: (p: WidgetPlacement) => void) =>
+    set((d) => {
+      const p = d.widgets?.[i];
+      if (p) fn(p);
+    });
+  const add = () =>
+    set((d) => {
+      const next = defs.find((w) => !(d.widgets ?? []).some((p) => p.widgetId === w.id));
+      if (!next) return;
+      d.widgets = [...(d.widgets ?? []), { widgetId: next.id, place: 'corner', corner: 'br', size: 'm' }];
+    });
+  return (
+    <Card
+      id="layout-widgets"
+      scope="screen"
+      title={t('Widgets en esta pantalla')}
+      icon="widget"
+      desc={t('Imágenes y páginas de la sección Widgets, en una esquina o en la columna lateral. El primero va más cerca de la esquina.')}
+      actions={
+        defs.length > 0 && (
+          <Button size="sm" variant="primary" icon="plus" disabled={!free.length || rows.length >= MAX_SCREEN_WIDGETS} onClick={add}>
+            {t('Añadir a esta pantalla')}
+          </Button>
+        )
+      }
+    >
+      {defs.length === 0 ? (
+        <p class="muted small">
+          {t('Aún no hay widgets.')}{' '}
+          <button type="button" class="link-btn" onClick={() => go('widgets')}>
+            {t('Crear un widget')}
+          </button>
+        </p>
+      ) : rows.length === 0 ? (
+        <p class="muted small">{t('Ningún widget en esta pantalla.')}</p>
+      ) : (
+        <div class="widget-rows">
+          {rows.map((p, i) => (
+            <div class="widget-row" key={p.widgetId}>
+              <Select
+                value={p.widgetId}
+                options={[{ value: p.widgetId, label: nameOf(p.widgetId) }, ...free.map((w) => ({ value: w.id, label: w.name.trim() || t('Widget sin nombre') }))]}
+                onChange={(v) => upd(i, (x) => void (x.widgetId = v))}
+              />
+              <Segmented
+                value={p.place}
+                options={[
+                  { value: 'corner', label: t('Esquina') },
+                  { value: 'side', label: t('Lateral') },
+                ]}
+                onChange={(v) => upd(i, (x) => void (x.place = v))}
+              />
+              <CornerPick value={p.corner} onChange={(v) => upd(i, (x) => void (x.corner = v))} />
+              <Segmented value={p.size} options={SIZES.map((o) => ({ value: o.value, label: t(o.label) }))} onChange={(v) => upd(i, (x) => void (x.size = v))} />
+              <div class="row-actions">
+                <ReorderButtons index={i} count={rows.length} onMove={(a, b) => set((d) => void (d.widgets = moveItem(d.widgets ?? [], a, b)))} />
+                <button type="button" class="icon-btn icon-btn--danger" aria-label={t('Quitar')} onClick={() => set((d) => void (d.widgets = (d.widgets ?? []).filter((x) => x.widgetId !== p.widgetId)))}>
+                  <Icon name="x" size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {rows.some((p) => p.place === 'side') && <p class="muted small">{t('Si este diseño no tiene columna lateral, va a la esquina elegida.')}</p>}
+      {rows.length > 0 && <p class="muted small">{t('En modo privado los widgets no se muestran.')}</p>}
+    </Card>
+  );
+}
+
 /** Settings of the layouts that have any: the people columns (Por persona) and the corner (Marco de fotos). */
 function PresetOptions({ cfg, set, full, go }: SectionProps) {
   const l = cfg.layout;
@@ -577,6 +680,36 @@ function PresetOptions({ cfg, set, full, go }: SectionProps) {
         <Field label={t('Esquina')}>
           <Segmented full value={l.corner ?? 'br'} options={CORNERS.map((c) => ({ value: c.value, label: t(c.label) }))} onChange={(v) => set((d) => void (d.layout.corner = v))} />
         </Field>
+      </Card>
+    );
+  }
+  if (l.preset === 'widget') {
+    const defs = full.widgets ?? [];
+    return (
+      <Card
+        id="layout-options"
+        scope="screen"
+        title={t('Widget a pantalla completa')}
+        icon="widget"
+        desc={t('La imagen o la página ocupa la pantalla entera. Con «Completa» la foto de fondo se ve alrededor; con «Rellenar» la cubre.')}
+      >
+        {defs.length ? (
+          <Field label={t('Widget')}>
+            <Select
+              value={l.widgetId ?? ''}
+              options={[{ value: '', label: t('Ninguno') }, ...defs.map((w) => ({ value: w.id, label: w.name.trim() || t('Widget sin nombre') }))]}
+              onChange={(v) => set((d) => void (d.layout.widgetId = v || null))}
+            />
+          </Field>
+        ) : (
+          <p class="muted small">
+            {t('Aún no hay widgets.')}{' '}
+            <button type="button" class="link-btn" onClick={() => go('widgets')}>
+              {t('Crear un widget')}
+            </button>
+          </p>
+        )}
+        {defs.length > 0 && !l.widgetId && <Callout kind="warn">{t('Elige qué widget se ve: hasta entonces la pantalla muestra un aviso.')}</Callout>}
       </Card>
     );
   }
@@ -735,7 +868,7 @@ export function LayoutSection(props: SectionProps) {
         </Callout>
       )}
       <div class="preset-grid" id="layout-presets">
-        {PRESETS.filter((p) => kids === (p.group === 'kids')).map((p) => (
+        {PRESETS.filter((p) => kids === (p.group === 'kids') && (p.id !== 'widget' || has('widgets') || l.preset === 'widget')).map((p) => (
           <button
             type="button"
             class={`preset ${l.preset === p.id ? 'is-active' : ''}`}
@@ -765,6 +898,7 @@ export function LayoutSection(props: SectionProps) {
         ))}
       </div>
       <PresetOptions {...props} />
+      {has('widgets') && <ScreenWidgetsCard cfg={cfg} set={set} full={props.full} go={props.go} />}
       <Card id="layout-side" scope="screen" title={t('Panel lateral')} icon="layout" desc={t('Solo para los diseños con columna lateral.')} muted={!hasSide}>
         <div class="grid grid--2">
           <Field label={t('Posición')}>

@@ -178,7 +178,7 @@ function listSummary(d, noun, l) {
 
 /** Top-level keys that make up a v2 config (except version/revision). */
 export const IMPORT_SECTIONS = ['screens', 'defaultScreen', 'calendar', 'datetime', 'weather', 'news', 'todo', 'localEvents',
-  'birthdays', 'eventRules', 'countdowns', 'schedules', 'carousels', 'homeassistant', 'immich', 'auth', 'family'];
+  'birthdays', 'eventRules', 'countdowns', 'schedules', 'carousels', 'widgets', 'homeassistant', 'immich', 'auth', 'family'];
 
 /** Short localized summary of what changes per section (ImportPreview.sections); `l` = es | en | pt. */
 export function sectionSummaries(cur, next, l = 'en', absent = new Set()) {
@@ -322,6 +322,8 @@ export function mergeImport(current, imported, sections, absent = new Set()) {
   if (take.has('screens')) take.add('defaultScreen');
   // carousels only make sense with the screens they show: they travel with them (unless the file has none)
   if (take.has('screens') && !absent.has('carousels')) take.add('carousels');
+  // the same for widgets: screens place them (a file without widgets keeps the current ones)
+  if (take.has('screens') && !absent.has('widgets')) take.add('widgets');
   const out = structuredClone(current);
   for (const k of take) out[k] = structuredClone(imported[k]);
   if (!out.screens.some((s) => s.id === out.defaultScreen)) out.defaultScreen = out.screens[0].id;

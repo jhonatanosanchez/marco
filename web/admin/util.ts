@@ -52,6 +52,32 @@ export const HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 export const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** Widget refresh choices in seconds (server/defaults.js); web pages also have 0 = never reload. */
+export const WIDGET_REFRESH_SEC = [1, 10, 30, 60, 300, 900, 3600, 21600, 86400];
+export const WEB_WIDGET_REFRESH_SEC = [0, 30, 60, 300, 900, 3600, 21600, 86400];
+export const MAX_WIDGETS = 20;
+export const MAX_SCREEN_WIDGETS = 6;
+
+/** Why a widget address is refused (Spanish key for t()), or '' (same rules as server/validate.js widgetUrlError). */
+export function widgetUrlProblem(url: string, httpsOnly = false): string {
+  const s = (url ?? '').trim();
+  if (!s) return 'Obligatorio';
+  if (s.length > 2048) return 'Demasiado larga';
+  // written out as scheme://host, without spaces, quotes, angle brackets, backslashes or control characters
+  const m = /^[a-z][a-z0-9+.-]*:\/\/([^/?#]*)/i.exec(s);
+  if (!m || !m[1] || /[\s"'<>\\\u0000-\u001f\u007f]/.test(s)) return 'La dirección no es válida.';
+  let u: URL;
+  try {
+    u = new URL(s);
+  } catch {
+    return 'La dirección no es válida.';
+  }
+  if ((u.protocol !== 'http:' && u.protocol !== 'https:') || !u.hostname) return 'La dirección no es válida.';
+  if (httpsOnly && u.protocol !== 'https:') return 'Debe empezar por https://';
+  if (m[1].includes('@') || u.username || u.password) return 'Sin usuario ni contraseña en la dirección';
+  return '';
+}
+
 export function isHttpUrl(s: string, allowWebcal = false): boolean {
   try {
     const u = new URL(s.trim());
@@ -232,7 +258,7 @@ const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 export const daysInMonth = (m: number) => DAYS_IN_MONTH[m - 1] ?? 31;
 
 /** Keys produced by validateConfig() that belong to the selected screen (the rest are global). */
-const PER_SCREEN_KEY = /^(screen\.|background\.|layout\.|message\.|alerts\.|privacy\.|calendar\.(weeks|maxEventsPerDay)$|news\.rotateSec$|countdowns\.max$|family\.(memberIds|touch|showQr)$)/;
+const PER_SCREEN_KEY = /^(screen\.|background\.|layout\.|widgets\.|message\.|alerts\.|privacy\.|calendar\.(weeks|maxEventsPerDay)$|news\.rotateSec$|countdowns\.max$|family\.(memberIds|touch|showQr)$)/;
 export const isPerScreenKey = (k: string) => PER_SCREEN_KEY.test(k);
 
 /** Validation of the global v2 lists (local events, birthdays, rules, countdowns, schedules, screens). */
@@ -297,6 +323,19 @@ export function validateGlobal(c: StoredConfig): Errors {
       if (!(Number.isInteger(st.seconds) && st.seconds >= 10 && st.seconds <= 3600)) e[`${p}.step${j}.seconds`] = 'Entre 10 s y 1 h';
     });
     for (const r of x.schedule ?? []) if (r.from === r.to) e[`${p}.sched.${r.id}.to`] = 'Debe ser distinta de la hora de inicio';
+  }
+  // widgets: an address the server takes (http or https, no user:password; https only on Marco Cloud), a type and a
+  // refresh it offers
+  const wcaps = currentCaps();
+  const minRefresh = limitOf(wcaps, 'widgetMinRefreshSec') ?? 0;
+  for (const w of c.widgets ?? []) {
+    const p = `wdg.${w.id}`;
+    const bad = widgetUrlProblem(w.options.url, wcaps.edition === 'cloud');
+    if (bad) e[`${p}.url`] = bad;
+    if (w.type === 'web' && !hasFeature(wcaps, 'webWidgets')) e[`${p}.type`] = 'No disponible aquí';
+    const list = w.type === 'web' ? WEB_WIDGET_REFRESH_SEC : WIDGET_REFRESH_SEC;
+    if (!list.includes(w.options.refreshSec)) e[`${p}.refreshSec`] = 'Elige un intervalo de la lista';
+    else if (w.options.refreshSec > 0 && w.options.refreshSec < minRefresh) e[`${p}.refreshSec`] = 'Elige un intervalo de la lista';
   }
   for (const m of c.schedules?.items ?? []) {
     const p = `sched.${m.id}`;
@@ -363,7 +402,7 @@ export function sectionForServerPath(path: string): { screenIndex: number | null
   const m = /^screens\[(\d+)\]\.?([a-zA-Z]+)?/.exec(path);
   if (m) {
     const sec = m[2] ?? '';
-    const map: Record<string, string> = { screen: 'screen', layout: 'layout', background: 'background', message: 'message', calendar: 'calendars', datetime: 'datetime', weather: 'weather', news: 'news', todo: 'todo', countdowns: 'countdowns', alerts: 'alerts', privacy: 'screen', family: 'family' };
+    const map: Record<string, string> = { screen: 'screen', layout: 'layout', background: 'background', message: 'message', calendar: 'calendars', datetime: 'datetime', weather: 'weather', news: 'news', todo: 'todo', countdowns: 'countdowns', alerts: 'alerts', privacy: 'screen', family: 'family', widgets: 'layout' };
     return { screenIndex: Number(m[1]), section: map[sec] ?? 'screens' };
   }
   const top = path.split(/[.[]/)[0];
@@ -371,7 +410,7 @@ export function sectionForServerPath(path: string): { screenIndex: number | null
     calendar: path.includes('iconRules') ? 'icons' : 'calendars',
     datetime: 'datetime', weather: 'weather', news: 'news', todo: 'todo', localEvents: 'local', birthdays: 'birthdays',
     eventRules: 'filters', countdowns: 'countdowns', schedules: 'alerts', homeassistant: 'homeassistant', immich: 'immich', auth: 'security',
-    screens: 'screens', defaultScreen: 'screens', carousels: 'carousels', family: path.startsWith('family.meals') ? 'meals' : 'family',
+    screens: 'screens', defaultScreen: 'screens', carousels: 'carousels', widgets: 'widgets', family: path.startsWith('family.meals') ? 'meals' : 'family',
   };
   return { screenIndex: null, section: map[top] ?? 'home' };
 }
@@ -391,6 +430,8 @@ export function sectionForError(key: string): string {
   if (key.startsWith('frule.')) return 'filters';
   if (key.startsWith('scr.')) return 'screens';
   if (key.startsWith('car.')) return 'carousels';
+  if (key.startsWith('wdg.')) return 'widgets';
+  if (key.startsWith('widgets.')) return 'layout';
   if (key.startsWith('background.')) return 'background';
   if (key.startsWith('calendar.') || key.startsWith('source.')) return 'calendars';
   if (key.startsWith('rule.')) return 'icons';

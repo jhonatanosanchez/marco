@@ -251,6 +251,7 @@
         "countdowns",
         "schedules",
         "carousels?",
+        "widgets?",
         "homeassistant",
         "immich",
         "auth",
@@ -285,6 +286,7 @@
         "countdowns",
         "schedules",
         "carousels?",
+        "widgets?",
         "homeassistant",
         "immich",
         "auth",
@@ -1224,7 +1226,8 @@
         "countdowns",
         "alerts",
         "privacy",
-        "family"
+        "family",
+        "widgets?"
       ]
     },
     {
@@ -1315,6 +1318,28 @@
         "title?",
         "count?",
         "error?"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/test/widget",
+      "query": [],
+      "feature": "widgets",
+      "callers": [
+        "testWidget"
+      ],
+      "request": "{type, url}",
+      "response": "TestWidgetResponse",
+      "responseArray": false,
+      "responseKeys": [
+        "ok",
+        "error?",
+        "format?",
+        "width?",
+        "height?",
+        "bytes?",
+        "warnings?",
+        "previewUrl?"
       ]
     },
     {
