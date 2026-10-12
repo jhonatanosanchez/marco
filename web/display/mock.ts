@@ -1,8 +1,9 @@
 // Built-in realistic demo dataset (used with ?demo=1 or when /api is unreachable in dev).
 // Everything is generated relative to "today" so screenshots always look populated.
 import type {
-  AlertStyle, Announcement, CalEvent, CarouselTransition, CountdownItem, CountdownsResponse, DisplayConfig, EventsResponse, NewsResponse,
-  PhotosResponse, PublicCalendarSource, SourceKind, WeatherResponse,
+  AlertStyle, Announcement, CalEvent, CarouselTransition, ChoreSlot, CountdownItem, CountdownsResponse, DisplayConfig, EventsResponse,
+  FamilyChoreView, FamilyDisplayState, FamilyMemberView, MealSlot, NewsResponse, PhotosResponse, PublicCalendarSource, SourceKind,
+  WeatherResponse,
 } from '../shared/types';
 import { DEFAULT_ICON_RULES, resolveEventStyle } from '../shared/emoji';
 import { addDays, dateKeyInTz, keyToUTC, pad2, startOfWeek, zonedParts } from '../shared/i18n';
@@ -79,6 +80,14 @@ export function mockConfig(): DisplayConfig {
         { id: 't3', text: L('Fresh sheets for the beach house', 'Sábanas limpias para la casa de la playa', 'Lençóis lavados para a casa da praia'), done: false },
       ],
     },
+    // Familia (kids layouts): taps on, the QR of a family page (?touch=0, ?qr=0 turn them off)
+    family: {
+      // what the server sends while private: no stars, no taps, no QR
+      enabled: q.get('family') !== '0', mealsEnabled: q.get('meals') !== '0', showPoints: q.get('stars') !== '0' && !PRIVATE, touch: q.get('touch') !== '0' && !PRIVATE,
+      qrUrl: q.get('qr') === '0' || PRIVATE ? null : 'http://192.168.0.50:3000/f/fk_demoDemoDemoDemoDemoDemoDemoDemo',
+      // ?famPrivacy=hide (with ?private=1): routines hidden while private
+      privacy: q.get('famPrivacy') === 'hide' ? 'hide' : 'initials',
+    },
     message: { enabled: q.get('msg') === '1', text: L('Have a great weekend, everyone!', '¡Buen fin de semana, familia!', 'Bom fim de semana, família!'), emoji: '💛' },
   });
   // ?planner=1: the Planner layout with what picking it in the admin sets (automatic weeks, cards)
@@ -95,13 +104,127 @@ export function mockConfig(): DisplayConfig {
  * and &trSpeed=fast|normal|slow to film one animation),
  * for filming the rotation. Every config carries the same carousel block, as the server sends it.
  */
+// ---------------------------------------------------------------------------------------------
+// Familia demo (kids layouts): three kids and two parents, routines about half done (what is over is done, a bit of
+// what is on now), a week of meals and three rewards. Demo data, so in Spanish. ?members=6 adds a grandmother and
+// gives the parents routines too (the compact two-row Rutinas layout).
+// ---------------------------------------------------------------------------------------------
+const MOCK_MEMBERS: [string, string, string, string, boolean, number, string | null][] = [
+  ['m_lucia', 'Lucía', '🦊', '#ff8fab', true, 12, 'c_kids'],
+  ['m_mateo', 'Mateo', '🐻', '#7cc6fe', true, 8, null],
+  ['m_sofia', 'Sofía', '🐼', '#9be3a0', true, 5, null],
+  ['m_mama', 'Mamá', '🌷', '#c3a6ff', false, 0, 'c_work'],
+  ['m_papa', 'Papá', '☕', '#ffc46b', false, 0, null],
+  ['m_abuela', 'Abuela Carmen', '🌻', '#7fe0d6', false, 0, null],
+];
+const MOCK_CHORES: [string, ChoreSlot, string, string, number][] = [
+  ['m_lucia', 'morning', '🪥', 'Lavarse los dientes', 1],
+  ['m_lucia', 'morning', '🛏️', 'Hacer la cama', 2],
+  ['m_lucia', 'afternoon', '📚', 'Deberes', 3],
+  ['m_lucia', 'evening', '🍽️', 'Poner la mesa', 2],
+  ['m_lucia', 'evening', '🪥', 'Lavarse los dientes', 1],
+  ['m_mateo', 'morning', '🪥', 'Lavarse los dientes', 1],
+  ['m_mateo', 'morning', '👕', 'Vestirse solo', 1],
+  ['m_mateo', 'afternoon', '🎒', 'Preparar la mochila', 2],
+  ['m_mateo', 'evening', '🧸', 'Recoger los juguetes', 2],
+  ['m_mateo', 'any', '🐶', 'Dar de comer a Toby', 2],
+  ['m_sofia', 'morning', '🪥', 'Lavarse los dientes', 1],
+  ['m_sofia', 'morning', '🥛', 'Llevar el vaso al fregadero', 1],
+  ['m_sofia', 'afternoon', '🎹', 'Practicar piano', 2],
+  ['m_sofia', 'evening', '🛁', 'Baño', 1],
+  ['m_papa', 'evening', '🗑️', 'Sacar la basura', 0],
+  ['m_mama', 'afternoon', '🌱', 'Regar las plantas', 0],
+  ['m_abuela', 'any', '📞', 'Llamar a los nietos', 0],
+];
+const MOCK_MEALS: Record<MealSlot, string>[] = [
+  { breakfast: 'Tostadas con tomate', lunch: 'Lentejas con verduras', snack: 'Fruta y yogur', dinner: 'Tortilla de patatas' },
+  { breakfast: 'Cereales con leche', lunch: 'Pollo asado con patatas', snack: 'Bocadillo de queso', dinner: 'Crema de calabaza' },
+  { breakfast: 'Yogur con fruta', lunch: 'Macarrones con tomate', snack: 'Plátano', dinner: 'Pescado al horno con arroz' },
+  { breakfast: 'Tostadas con aceite', lunch: 'Garbanzos con espinacas', snack: 'Galletas y leche', dinner: 'Sopa de fideos' },
+  { breakfast: 'Tortitas', lunch: 'Arroz a la cubana', snack: 'Manzana', dinner: 'Pizza casera' },
+  { breakfast: 'Churros con chocolate', lunch: 'Paella', snack: 'Helado', dinner: 'Huevos rotos con jamón' },
+  { breakfast: 'Fruta y tostadas', lunch: 'Cocido madrileño', snack: 'Bizcocho', dinner: 'Ensalada y croquetas' },
+];
+const MOCK_REWARDS = [
+  { title: 'Elegir la peli del viernes', emoji: '🎬', cost: 10 },
+  { title: 'Helado', emoji: '🍦', cost: 15 },
+  { title: '30 min más de tablet', emoji: '📱', cost: 20 },
+];
+
+/** What GET /api/display/family answers for the demo screen. */
+export function mockFamily(now = new Date(), cfg: DisplayConfig = DEFAULT_CONFIG): FamilyDisplayState {
+  const q = new URLSearchParams(location.search);
+  const today = dateKeyInTz(now, TZ);
+  const p = zonedParts(now, TZ);
+  const hhmm = p.hour * 60 + p.minute;
+  const slotNow: Exclude<ChoreSlot, 'any'> = hhmm < 12 * 60 ? 'morning' : hhmm < 18 * 60 ? 'afternoon' : 'evening';
+  const order: ChoreSlot[] = ['morning', 'afternoon', 'evening', 'any'];
+  const many = q.get('members') === '6';
+  const fam = cfg.family;
+  const priv = PRIVATE || !!cfg.privacy?.active;
+  const hidden = priv && fam?.privacy === 'hide';
+  const showPoints = fam?.showPoints !== false && !priv;
+  const members = MOCK_MEMBERS.filter(([id]) => many || id !== 'm_abuela');
+  const kidOf = new Map(members.map((m) => [m[0], m[4]]));
+  const firstOfSlot = new Set<string>();
+  const chores: FamilyChoreView[] = EMPTY ? [] : MOCK_CHORES
+    .filter(([mid]) => kidOf.has(mid) && (many || mid !== 'm_mama'))
+    .map(([memberId, slot, emoji, title, points], i) => {
+      // what is over is done (Mateo forgot one), what is on now is half done, the rest is still to do
+      const idx = order.indexOf(slot), now = order.indexOf(slotNow);
+      const key = `${memberId}|${slot}`;
+      const first = !firstOfSlot.has(key);
+      firstOfSlot.add(key);
+      const done = slot === 'any' ? false : idx < now ? !(memberId === 'm_mateo' && !first) : idx === now ? first && memberId !== 'm_sofia' : false;
+      return { id: `h_demo${i}`, memberId, title, emoji, slot, points: showPoints && kidOf.get(memberId) ? points : 0, done };
+    })
+    .sort((a, b) => order.indexOf(a.slot) - order.indexOf(b.slot));
+  chores.sort((a, b) => members.findIndex((m) => m[0] === a.memberId) - members.findIndex((m) => m[0] === b.memberId));
+  const views: FamilyMemberView[] = members.map(([id, name, avatar, color, kid, stars, calendarId]) => {
+    const mine = chores.filter((c) => c.memberId === id);
+    const initials = name.split(/\s+/).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
+    return {
+      id, name: priv ? initials : name, initials, color, avatar, kid, calendarId,
+      points: showPoints && kid ? stars + mine.filter((c) => c.done).reduce((s, c) => s + c.points, 0) : null,
+      done: mine.filter((c) => c.done).length, total: mine.length,
+    };
+  });
+  const nextReward: FamilyDisplayState['nextReward'] = {};
+  for (const m of views) {
+    if (m.points === null) continue;
+    const pts = m.points;
+    const w = MOCK_REWARDS.find((r) => r.cost > pts) ?? MOCK_REWARDS[MOCK_REWARDS.length - 1];
+    nextReward[m.id] = { ...w, missing: Math.max(0, w.cost - pts) };
+  }
+  const start = startOfWeek(today, cfg.calendar.weekStart ?? 1);
+  const slots: MealSlot[] = q.get('snack') === '1' ? ['breakfast', 'lunch', 'snack', 'dinner'] : ['breakfast', 'lunch', 'dinner'];
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const date = addDays(start, i);
+    const dow = keyToUTC(date).getUTCDay();
+    const all = MOCK_MEALS[(dow + 6) % 7];
+    // the weekend breakfast is left open: an empty cell
+    const meals = Object.fromEntries(slots.filter((s) => !(dow === 0 && s === 'breakfast')).map((s) => [s, all[s]]));
+    return { date, dow, meals };
+  });
+  return {
+    today, slotNow, rev: 1, private: priv, hidden, showPoints, touch: !!fam?.touch && !priv,
+    qrUrl: priv ? null : fam?.qrUrl ?? null,
+    members: hidden ? [] : views,
+    chores: hidden ? [] : chores,
+    meals: fam?.mealsEnabled === false ? null : { slots, days },
+    ...(showPoints && !hidden ? { nextReward } : {}),
+    generatedAt: now.toISOString(),
+  };
+}
+
 export function mockCarouselConfigs(): DisplayConfig[] {
   const q = new URLSearchParams(location.search);
   const sec = Math.min(3600, Math.max(3, Number(q.get('stepSec')) || 8));
   const screens: [string, string, string, string][] = [
     // &planner=1: the first step is the Planner (automatic weeks and cards on every step)
     ['s_main', 'living-room', L('Living room', 'Salón', 'Sala'), q.get('planner') === '1' ? 'planner' : 'bigCalendar'],
-    ['s_today', 'today', L('Today', 'Hoy', 'Hoje'), 'today'],
+    // &kids=1: the second step is the Rutinas layout (with &style=modern)
+    ['s_today', 'today', L('Today', 'Hoy', 'Hoje'), q.get('kids') === '1' ? 'kidsRoutines' : 'today'],
     ['s_photos', 'photos', L('Photos', 'Fotos', 'Fotos'), 'photoFrame'],
     ['s_agenda', 'agenda', L('Agenda', 'Agenda', 'Agenda'), 'agenda'],
   ];

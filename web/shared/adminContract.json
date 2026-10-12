@@ -254,7 +254,8 @@
         "homeassistant",
         "immich",
         "auth",
-        "security"
+        "security",
+        "family"
       ]
     },
     {
@@ -287,7 +288,8 @@
         "homeassistant",
         "immich",
         "auth",
-        "security"
+        "security",
+        "family"
       ]
     },
     {
@@ -521,6 +523,124 @@
         "appVersion",
         "config",
         "secrets?"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/family",
+      "query": [],
+      "feature": null,
+      "callers": [
+        "family"
+      ],
+      "request": null,
+      "response": "FamilyAdminState",
+      "responseArray": false,
+      "responseKeys": [
+        "today",
+        "rev",
+        "points",
+        "progress",
+        "completions",
+        "redemptions",
+        "adjustments",
+        "link",
+        "lanAddresses?",
+        "publicUrl?"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/family/:param/:id",
+      "query": [],
+      "feature": null,
+      "callers": [
+        "familyUndo"
+      ],
+      "request": null,
+      "response": "inline",
+      "responseArray": false,
+      "responseKeys": [
+        "ok",
+        "state"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/family/adjust",
+      "query": [],
+      "feature": null,
+      "callers": [
+        "familyAdjust"
+      ],
+      "request": "{ memberId: string; delta: number; note?: string }",
+      "response": "inline",
+      "responseArray": false,
+      "responseKeys": [
+        "ok",
+        "state"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/family/link",
+      "query": [],
+      "feature": null,
+      "callers": [
+        "revokeFamilyLink"
+      ],
+      "request": null,
+      "response": "inline",
+      "responseArray": false,
+      "responseKeys": [
+        "ok"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/family/link",
+      "query": [],
+      "feature": null,
+      "callers": [
+        "familyLink"
+      ],
+      "request": "{}",
+      "response": "inline",
+      "responseArray": false,
+      "responseKeys": [
+        "link"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/family/redeem",
+      "query": [],
+      "feature": null,
+      "callers": [
+        "familyRedeem"
+      ],
+      "request": "{ rewardId: string; memberId: string; force?: boolean }",
+      "response": "inline",
+      "responseArray": false,
+      "responseKeys": [
+        "ok",
+        "state"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/family/toggle",
+      "query": [],
+      "feature": null,
+      "callers": [
+        "familyToggle"
+      ],
+      "request": "{ choreId: string; done: boolean; date?: string }",
+      "response": "inline",
+      "responseArray": false,
+      "responseKeys": [
+        "ok",
+        "state"
       ]
     },
     {
@@ -1103,7 +1223,8 @@
         "message",
         "countdowns",
         "alerts",
-        "privacy"
+        "privacy",
+        "family"
       ]
     },
     {

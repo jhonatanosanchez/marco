@@ -157,6 +157,18 @@ export function hostGuard({ exempt = ['/api/health', '/api/hooks'] } = {}) {
   };
 }
 
+/** PUBLIC_URL's origin when it points somewhere else than this machine (http(s) only), else null. */
+export function publicOrigin() {
+  const v = String(process.env.PUBLIC_URL || '').trim().replace(/\/+$/, '');
+  try {
+    const u = new URL(v);
+    if (!/^https?:$/.test(u.protocol) || /^(localhost|127\.|\[::1\])/.test(u.hostname)) return null;
+    return u.origin;
+  } catch {
+    return null;
+  }
+}
+
 // ------------------------------------------------------------------------------------------------------------
 // Outbound fetch filter (SSRF) for unauthenticated endpoints: no loopback, link-local (incl. cloud metadata
 // 169.254.169.254 / fd00:ec2::254), unspecified, multicast or the metadata names.

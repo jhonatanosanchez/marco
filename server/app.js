@@ -17,6 +17,7 @@ import { eventsAdminRouter, eventsPublicRouter } from './routes/localEvents.js';
 import { accessAdminRouter, pairPublicRouter } from './routes/access.js';
 import { doorbellAdminRouter, doorbellPublicRouter } from './routes/doorbell.js';
 import { setupRouter } from './setup.js';
+import { familyAdminRouter, familyPublicRouter, familyDisplayRouter } from './routes/family.js';
 import { geocodeRouter } from './geocode.js';
 import { hostGuard } from './lib/net.js';
 import { redactSecrets } from './core/activityCore.js';
@@ -58,6 +59,7 @@ export function createApp({ version, dist = path.join(ROOT, 'dist'), updater = n
   app.use('/api/display/heartbeat', express.json({ limit: '4kb' }));
   app.use('/api/pair', express.json({ limit: '2kb' }));
   app.use('/api/hooks', express.json({ limit: '16kb' }));
+  app.use(['/api/family', '/api/display/family'], express.json({ limit: '4kb' }));
   app.use(express.json({ limit: '1mb' }));
   app.use(['/api/admin', '/api/auth', '/api/setup'], csrfGuard({ multipartPaths: ['/photos', /^\/photos\/[^/]+\/thumb$/] }));
 
@@ -82,13 +84,14 @@ export function createApp({ version, dist = path.join(ROOT, 'dist'), updater = n
   // Admin routers: each one applies requireAuth; unmatched paths fall through to the next one.
   app.use('/api/admin', adminRouter());
   app.use('/api/admin', updatesRouter({ version, updater }));
-  app.use('/api/admin', screensAdminRouter(), announceRouter(), systemRouter({ version }), eventsAdminRouter(), accessAdminRouter(), doorbellAdminRouter());
+  app.use('/api/admin', screensAdminRouter(), announceRouter(), systemRouter({ version }), eventsAdminRouter(), accessAdminRouter(), doorbellAdminRouter(), familyAdminRouter());
   // Display access (private links / paired devices / admin session; open mode = legacy LAN). displayAccess.js
   app.use(DISPLAY_API_PATHS, displayAuth());
   app.use('/api/stream', displayAuth({ allowQuery: true }));
-  // Pairing (unauthenticated, rate-limited) and the public (display) routers.
-  app.use('/api', pairPublicRouter());
-  app.use('/api', displayPublicRouter(), eventsPublicRouter(), doorbellPublicRouter());
+  // Pairing (unauthenticated, rate-limited), the family page (its own key, rate-limited) and the public (display)
+  // routers.
+  app.use('/api', pairPublicRouter(), familyPublicRouter());
+  app.use('/api', displayPublicRouter(), eventsPublicRouter(), doorbellPublicRouter(), familyDisplayRouter());
   app.use('/api', publicRouter({ version }));
   app.use('/api', (req, res) => res.status(404).json({ error: 'not found' }));
 
@@ -128,6 +131,12 @@ export function createApp({ version, dist = path.join(ROOT, 'dist'), updater = n
     app.get('/d/:key', (req, res) => {
       res.set('x-robots-tag', 'noindex, nofollow');
       sendHtml('index.html', 'private, no-store')(req, res);
+    });
+    // Family page (/f/<key>, or /f with the key the phone remembers): the key is read from the path by the page.
+    app.get(['/f', '/f/', '/f/:key'], (req, res, next) => {
+      if (!fs.existsSync(path.join(dist, 'family', 'index.html'))) return next();
+      res.set('x-robots-tag', 'noindex, nofollow');
+      sendHtml('family/index.html', 'private, no-store')(req, res);
     });
   } else {
     app.get('/', (req, res) => res.type('text/plain').send(

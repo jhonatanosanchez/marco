@@ -80,7 +80,7 @@ export function capsFrom(health: Partial<HealthResponse> | null | undefined): Ca
  *  that filter events for it, see /api/admin/privacy); doorbell, doorbellLive: servers with POST /api/hooks/doorbell
  *  (live = frames proxied from Home Assistant); carousels: servers that keep config.carousels and serve displays
  *  bound to one; immich: servers that proxy an Immich library (self-hosted). */
-const OPT_IN: readonly FeatureName[] = ['accountMenu', 'microsoftCalendar', 'updates', 'feedback', 'privacy', 'doorbell', 'doorbellLive', 'carousels', 'immich'];
+const OPT_IN: readonly FeatureName[] = ['accountMenu', 'microsoftCalendar', 'updates', 'feedback', 'privacy', 'doorbell', 'doorbellLive', 'carousels', 'immich', 'family'];
 
 export function hasFeature(caps: Caps, feature: FeatureName): boolean {
   if (!caps.features) return !OPT_IN.includes(feature);

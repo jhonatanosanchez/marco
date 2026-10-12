@@ -7,6 +7,7 @@ import { stableStringify } from './lib/text.js';
 import { countNoun, countChanged, summaryWord } from './lib/i18n.js';
 import { carouselList, targetInfo } from './carousels.js';
 import { IMMICH_KEY_RE } from './immichCore.js';
+import { FAMILY_KEY_RE } from './familyCore.js';
 
 /** Rotated backups kept per installation (or per household in the cloud). */
 export const KEEP_BACKUPS = 20;
@@ -33,19 +34,29 @@ export function exportSecrets(sec) {
     // screen's link and paired device working.
     displayKeys: sec.displayKeys || {},
     devices: sec.devices || [],
+    // The family link, so the phones keep working after a rebuild.
+    ...(typeof sec.family?.key === 'string' && FAMILY_KEY_RE.test(sec.family.key) ? { family: { key: sec.family.key, createdAt: sec.family.createdAt ?? null } } : {}),
   });
 }
 
-export function makeBundle(cfg, { appVersion, secrets = null, now = new Date() }) {
+/**
+ * `familyState` = the family state (routines done, rewards redeemed, stars; data/family.json here): always in the
+ * bundle when there is one, it holds no secret; an import that takes the `family` section restores it.
+ */
+export function makeBundle(cfg, { appVersion, secrets = null, now = new Date(), familyState = null }) {
   return {
     format: 'marco-backup',
     formatVersion: 1,
     exportedAt: now.toISOString(),
     appVersion,
     config: structuredClone(cfg),
+    ...(familyState ? { familyState: structuredClone(familyState) } : {}),
     ...(secrets ? { secrets: exportSecrets(secrets) } : {}),
   };
 }
+
+/** The bundle's family state (an object) or null (a bare config, an older export). */
+export const bundleFamilyState = (bundle) => (isObj(bundle) && bundle.format === 'marco-backup' && isObj(bundle.familyState) ? bundle.familyState : null);
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
@@ -117,6 +128,9 @@ export function sanitizeImportedSecrets(s) {
     }
     if (Object.keys(keys).length) out.displayKeys = keys;
   }
+  if (isObj(s.family) && typeof s.family.key === 'string' && FAMILY_KEY_RE.test(s.family.key)) {
+    out.familyKey = { key: s.family.key, createdAt: typeof s.family.createdAt === 'string' ? s.family.createdAt.slice(0, 40) : new Date().toISOString() };
+  }
   if (Array.isArray(s.devices)) {
     out.devices = s.devices.filter((d) => isObj(d) && /^dv_[a-f0-9]{12}$/.test(d.id || '') && /^[a-f0-9]{64}$/.test(d.hash || '')
       && typeof d.screenId === 'string' && typeof d.name === 'string').slice(0, 50).map((d) => ({
@@ -164,7 +178,7 @@ function listSummary(d, noun, l) {
 
 /** Top-level keys that make up a v2 config (except version/revision). */
 export const IMPORT_SECTIONS = ['screens', 'defaultScreen', 'calendar', 'datetime', 'weather', 'news', 'todo', 'localEvents',
-  'birthdays', 'eventRules', 'countdowns', 'schedules', 'carousels', 'homeassistant', 'immich', 'auth'];
+  'birthdays', 'eventRules', 'countdowns', 'schedules', 'carousels', 'homeassistant', 'immich', 'auth', 'family'];
 
 /** Short localized summary of what changes per section (ImportPreview.sections); `l` = es | en | pt. */
 export function sectionSummaries(cur, next, l = 'en', absent = new Set()) {
@@ -185,6 +199,9 @@ export function sectionSummaries(cur, next, l = 'en', absent = new Set()) {
         summary = parts.join('; ') || modified;
       } else if (key === 'defaultScreen') {
         summary = `→ ${next.screens.find((s) => s.id === next.defaultScreen)?.name || next.defaultScreen}`;
+      } else if (key === 'family') {
+        const f = next.family;
+        summary = [countNoun(f.members.length, 'member', l), countNoun(f.chores.length, 'chore', l), countNoun(f.rewards.length, 'reward', l)].join(', ');
       } else if (key === 'news') {
         summary = listSummary(diffById(cur.news.feeds, next.news.feeds), 'feed', l) || modified;
       } else if (next[key] && Array.isArray(next[key].items)) {
@@ -195,6 +212,14 @@ export function sectionSummaries(cur, next, l = 'en', absent = new Set()) {
     out.push({ key, changed, summary });
   }
   return out;
+}
+
+/** A bundle with the family state replaces the stars and the history too (data/family.json): the family line says so. */
+function familyStateNote(sections, bundle, l) {
+  if (!bundleFamilyState(bundle)) return sections;
+  const note = summaryWord('familyState', l);
+  return sections.map((s) => (s.key !== 'family' || absentSections(bundle).has('family') ? s
+    : { ...s, changed: true, summary: s.changed ? `${s.summary}; ${note}` : note }));
 }
 
 /**
@@ -270,7 +295,7 @@ export function importPreview(bundle, current, l = 'en', currentSecrets = null) 
     exportedAt: p.exportedAt,
     hasSecrets: Boolean(p.secrets && Object.keys(sanitizeImportedSecrets(p.secrets)).length),
     secretsImpact: secretsImpact(p.secrets, currentSecrets, current, v),
-    sections: sectionSummaries(current, v, l, absentSections(bundle)),
+    sections: familyStateNote(sectionSummaries(current, v, l, absentSections(bundle)), bundle, l),
     screens: diffById(current.screens, v.screens),
     sources: diffById(userSources(current), userSources(v)),
     orphanSchedules: orphanSchedules(current, v),

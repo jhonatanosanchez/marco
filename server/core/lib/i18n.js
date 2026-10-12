@@ -88,11 +88,15 @@ const NOUNS = {
   feed: { es: ['feed', 'feeds', 'm'], en: ['feed', 'feeds'], pt: ['feed', 'feeds', 'm'] },
   item: { es: ['elemento', 'elementos', 'm'], en: ['item', 'items'], pt: ['elemento', 'elementos', 'm'] },
   iconRule: { es: ['regla de iconos', 'reglas de iconos', 'f'], en: ['icon rule', 'icon rules'], pt: ['regra de ícones', 'regras de ícones', 'f'] },
+  member: { es: ['miembro', 'miembros', 'm'], en: ['member', 'members'], pt: ['membro', 'membros', 'm'] },
+  chore: { es: ['rutina', 'rutinas', 'f'], en: ['routine', 'routines'], pt: ['rotina', 'rotinas', 'f'] },
+  reward: { es: ['premio', 'premios', 'm'], en: ['reward', 'rewards'], pt: ['prémio', 'prémios', 'm'] },
 };
 const SUMMARY = {
   modified: { es: 'modificado', en: 'modified', pt: 'modificado' },
   unchanged: { es: 'sin cambios', en: 'unchanged', pt: 'sem alterações' },
   settingsModified: { es: 'ajustes modificados', en: 'settings modified', pt: 'definições modificadas' },
+  familyState: { es: 'también se sustituyen las estrellas y el historial', en: 'stars and history are replaced too', pt: 'as estrelas e o histórico também são substituídos' },
 };
 
 /** "3 pantallas" / "1 screen" */

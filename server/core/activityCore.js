@@ -2,12 +2,14 @@
 // changed, the secret redaction used for log lines and entries, and the size cap on entry data.
 import { stableStringify } from './lib/text.js';
 
-// Keep display credentials out of logs: private-link keys (/d/<key>, ?k=<key>), device tokens (md_…) and pairing
-// session ids. Used for server log lines that include URLs and as a safety net in the activity log.
+// Keep display credentials out of logs: private-link keys (/d/<key>, ?k=<key>), device tokens (md_…), pairing
+// session ids and the family link (/f/<key>, fk_…). Used for server log lines that include URLs and as a safety net
+// in the activity log.
 const PATTERNS = [
-  [/(\/d\/)[^/?#\s"']+/gi, '$1[redacted]'],
+  [/(\/[df]\/)[^/?#\s"']+/gi, '$1[redacted]'],
   [/([?&](?:k|key|sessionId|sid)=)[^&#\s"']+/gi, '$1[redacted]'],
   [/\bmd_[A-Za-z0-9_-]{20,}/g, 'md_[redacted]'],
+  [/\bfk_[A-Za-z0-9_-]{20,}/g, 'fk_[redacted]'],
 ];
 
 /** `s` with display keys, device tokens and pairing ids replaced by "[redacted]". */

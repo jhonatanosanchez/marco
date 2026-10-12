@@ -17,6 +17,7 @@ import { hostAllowed, hostnameOf, untrustedProxy } from '../lib/net.js';
 import { screenPrivacy, screenPrivacyNext } from '../privacy.js';
 import { privatizeEvents } from '../core/privacy.js';
 import { hash } from '../lib/text.js';
+import { familyQrUrl } from '../family.js';
 
 /** Privacy of a screen as displayConfig() takes it ({ status, next }). */
 const privacyOf = (cfg, screen) => ({ status: screenPrivacy(cfg, screen), next: screenPrivacyNext(cfg, screen) });
@@ -29,7 +30,7 @@ export function displayConfig(cfg, screenKey) {
 /** Display config for a request (screen or carousel bound to its key / device, else ?screen=). */
 function displayConfigFor(cfg, req) {
   const { screen, carousel } = requestScreen(cfg, req);
-  return projectDisplayConfig(cfg, screen, { privacy: privacyOf(cfg, screen), carousel });
+  return projectDisplayConfig(cfg, screen, { privacy: privacyOf(cfg, screen), carousel, familyQr: familyQrUrl(req) });
 }
 
 /**

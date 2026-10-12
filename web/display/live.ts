@@ -96,6 +96,8 @@ export interface StreamHandlers {
   /** doorbell ring on this screen (a later one with the same id extends it) */
   doorbell?: (d: DoorbellRing) => void;
   doorbellEnd?: (d: { id: string | null }) => void;
+  /** Familia changed (a routine ticked, stars, a new family link): refetch the family state */
+  family?: (d: { rev?: number }) => void;
   /** link regenerated / device revoked / display access switched to private */
   revoked?: (d: { code: string }) => void;
   open?: () => void;
@@ -121,6 +123,7 @@ export function dispatch(name: string, d: any, h: StreamHandlers): boolean {
     case 'night': if (d?.mode === 'on' || d?.mode === 'off' || d?.mode === 'auto') h.night?.(d); return true;
     case 'privacy': h.privacy?.({ active: d?.active === true, ...(typeof d?.screenId === 'string' ? { screenId: d.screenId } : {}) }); return true;
     case 'doorbell': if (d && typeof d.id === 'string' && typeof d.expiresAt === 'string') h.doorbell?.(d); return true;
+    case 'family': h.family?.({ ...(typeof d?.rev === 'number' ? { rev: d.rev } : {}) }); return true;
     case 'doorbell-end': h.doorbellEnd?.({ id: typeof d?.id === 'string' ? d.id : null }); return true;
     case 'revoked': h.revoked?.({ code: typeof d?.code === 'string' ? d.code : 'invalid_key' }); return true;
     default: return false;

@@ -36,6 +36,7 @@ import type { SectionProps } from './sections/common';
 import { CountdownsSection } from './sections/Countdowns';
 import { DateTimeSection } from './sections/DateTime';
 import { DisplaysSection } from './sections/Displays';
+import { FamilySection } from './sections/Family';
 import { FiltersSection } from './sections/Filters';
 import { HomeSection } from './sections/Home';
 import { HomeAssistantSection } from './sections/HomeAssistant';
@@ -43,6 +44,7 @@ import { ImmichSection } from './sections/Immich';
 import { IconRulesSection } from './sections/IconRules';
 import { LayoutSection } from './sections/Layout';
 import { LocalEventsSection } from './sections/LocalEvents';
+import { MealsSection } from './sections/Meals';
 import { MessageSection, NewsSection, TodoSection } from './sections/News';
 import { PhotosSection } from './sections/Photos';
 import { ScreenSection, SecuritySection } from './sections/Screen';
@@ -73,6 +75,8 @@ const SECTIONS: Record<string, (p: SectionProps) => any> = {
   weather: WeatherSection,
   news: NewsSection,
   todo: TodoSection,
+  family: FamilySection,
+  meals: MealsSection,
   message: MessageSection,
   alerts: AlertsSection,
   photos: PhotosSection,

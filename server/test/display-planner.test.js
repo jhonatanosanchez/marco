@@ -215,7 +215,7 @@ test('cards: heights, title lines and how a busy day is split into pages', () =>
 
 test('the planner has texts in Spanish, English and Portuguese, and the docs mention it', () => {
   const dict = read('web/admin/i18n-dict-planner.ts');
-  assert.match(read('web/admin/i18n-dict.ts'), /\.\.\.ROWS_PLANNER\]/);
+  assert.match(read('web/admin/i18n-dict.ts'), /\.\.\.ROWS_PLANNER[,\]]/);
   for (const m of read('web/admin/components/PlannerFields.tsx').matchAll(/t\('([^']+)'\)/g)) {
     if (['Semanas a mostrar', 'Auto', 'Automático'].includes(m[1])) continue; // older rows
     assert.ok(dict.includes(`'${m[1]}'`), `no row for "${m[1]}"`);

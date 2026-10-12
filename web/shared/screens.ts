@@ -11,6 +11,7 @@ export const SCREEN_SPLIT_KEYS = {
   news: ['enabled', 'rotateSec'],
   todo: ['enabled'],
   countdowns: ['enabled', 'max'],
+  family: ['memberIds', 'touch', 'showQr'],
 } as const;
 /** Sections that live entirely in the screen profile. */
 export const SCREEN_ONLY_KEYS = ['screen', 'layout', 'background', 'message', 'alerts', 'privacy'] as const;

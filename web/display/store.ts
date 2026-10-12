@@ -1,5 +1,5 @@
 // Minimal reactive store for the display.
-import type { CountdownsResponse, DisplayConfig, EventsResponse, NewsResponse, PhotosResponse, WeatherResponse } from '../shared/types';
+import type { CountdownsResponse, DisplayConfig, EventsResponse, FamilyDisplayState, NewsResponse, PhotosResponse, WeatherResponse } from '../shared/types';
 import { isPreview, screenNs } from './identity';
 
 export interface State {
@@ -9,6 +9,8 @@ export interface State {
   news: NewsResponse | null;
   photos: PhotosResponse | null;
   countdowns: CountdownsResponse | null;
+  /** Familia of the screen on display (kids layouts only) */
+  family: FamilyDisplayState | null;
   online: boolean;
   demo: boolean;
 }
@@ -19,7 +21,7 @@ type Fn = (s: State) => void;
 const subs = new Map<Topic, Set<Fn>>();
 
 export const state: State = {
-  config: null, events: null, weather: null, news: null, photos: null, countdowns: null, online: true, demo: false,
+  config: null, events: null, weather: null, news: null, photos: null, countdowns: null, family: null, online: true, demo: false,
 };
 
 /** Admin preview only: unsaved settings laid over every config the server sends (null = none). */
@@ -86,9 +88,10 @@ export function loadCache<T>(k: Topic): T | null {
 
 /**
  * Per-screen copies for a carousel (`cs.cache.<ns>.m.<screenId>.<part>`): a display that boots offline keeps
- * looping through the screens it has data for. Config, events and countdowns only (photos are refetched).
+ * looping through the screens it has data for. Config, events and countdowns only (photos are refetched). The
+ * family data is only kept here (every screen shows its own members and QR), also without a carousel.
  */
-const CAROUSEL_PARTS = ['config', 'events', 'countdowns'];
+const CAROUSEL_PARTS = ['config', 'events', 'countdowns', 'family'];
 export function saveScreenCache(screenId: string, part: string, v: unknown): void {
   if (isPreview || !CAROUSEL_PARTS.includes(part) || !/^[A-Za-z0-9_-]{1,64}$/.test(screenId)) return;
   try {

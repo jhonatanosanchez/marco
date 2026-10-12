@@ -7,8 +7,9 @@ import './styles.css';
 import './styles-views.css';
 import './styles-modern.css';
 import './styles-planner.css';
+import './styles-kids.css';
 import type {
-  Announcement, CountdownsResponse, DisplayConfig, EventsResponse, Lang, NewsResponse, NightCommand, PhotosResponse, StreamHello, WeatherResponse,
+  Announcement, CountdownsResponse, DisplayConfig, EventsResponse, FamilyDisplayState, Lang, NewsResponse, NightCommand, PhotosResponse, StreamHello, WeatherResponse,
 } from '../shared/types';
 import { addDays, startOfWeek } from '../shared/i18n';
 import { api, ApiError } from './api';
@@ -31,7 +32,9 @@ import type { PhotoLayer } from './gl/photoLayer';
 import type { PrecipLayer } from './gl/precipLayer';
 import type { WeatherFxLayer } from './gl/weatherFxLayer';
 import { weatherFxOf } from './icons';
-import { mockAnnouncements, mockCarouselConfigs, mockConfig, mockCountdowns, mockEvents, mockNews, mockPhotos, mockWeather } from './mock';
+import {
+  mockAnnouncements, mockCarouselConfigs, mockConfig, mockCountdowns, mockEvents, mockFamily, mockNews, mockPhotos, mockWeather,
+} from './mock';
 import { loadCache, loadScreenCache, on, saveCache, saveScreenCache, set, setConfigOverlay, state } from './store';
 import { detectLiveMode, startConfigPoll, startPoll, type StreamHandlers } from './live';
 import { connectStream, pollUrl } from './stream';
@@ -56,6 +59,7 @@ import { checkSetup, showWelcome, waitForSetup } from './widgets/welcome';
 import { afterPairUrl, pairHealth, pairingLang, showPairing } from './widgets/pairing';
 import { showScreenMissing } from './widgets/screenMissing';
 import { healthOnce, loadEmojiWebFont } from './health';
+import { isKidsPreset, Kids, withToggle } from './widgets/kids';
 import { refreshMarquee } from './marquee';
 
 const params = ctx.params;
@@ -105,6 +109,7 @@ const doorbell = new DoorbellOverlay($('#doorbell'), doorbellFrames, (on) => {
   if (!on) carousel?.tick();
 });
 const views = new Views($('#view'));
+const kids = new Kids($('#kids'), (id, done) => toggleChore(id, done));
 const statusDot = $('#status');
 const night = $('#night');
 let customStyle: HTMLStyleElement | null = null;
@@ -218,7 +223,11 @@ function hueShift(hex: string, deg: number): string {
   return toHex([(r1 + m) * 255, (g1 + m) * 255, (b1 + m) * 255]);
 }
 
-const PRESETS = ['bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda', 'today', 'people', 'photoFrame', 'twoWeeks', 'board', 'bedside', 'planner'];
+const PRESETS = [
+  'bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda', 'today', 'people', 'photoFrame', 'twoWeeks', 'board', 'bedside', 'planner',
+  // kids layouts (widgets/kids.ts): Modern style only
+  'kidsRoutines', 'kidsFamily', 'kidsMeals',
+];
 /** Newer layouts built on an older one's frame: they also get its class, so its rules (and the Modern ones) apply. */
 const PRESET_BASE: Record<string, string> = { today: 'bigCalendar', twoWeeks: 'bigCalendar', people: 'topBottom', board: 'topBottom' };
 
@@ -230,7 +239,10 @@ function presetBase(preset: string, portrait: boolean): string {
 
 function effectivePreset(cfg: DisplayConfig): string {
   const p = params.get('preset') || cfg.layout.preset;
-  return PRESETS.includes(p) ? p : 'bigCalendar';
+  if (!PRESETS.includes(p)) return 'bigCalendar';
+  // the kids layouts are drawn with the Modern style only: Classic shows the big calendar
+  if (isKidsPreset(p) && cfg.screen.style !== 'modern') return 'bigCalendar';
+  return p;
 }
 
 function isPortrait(cfg: DisplayConfig): boolean {
@@ -253,7 +265,9 @@ function applyLayout(): void {
     preset === 'photoFrame' ? `corner-${['tl', 'tr', 'bl', 'br'].includes(corner) ? corner : 'br'}` : '',
   ].filter(Boolean).join(' ');
   app.classList.toggle('has-view', VIEW_PRESETS.includes(preset));
+  app.classList.toggle('is-kids', isKidsPreset(preset));
   views.setPreset(preset);
+  kids.setPreset(preset);
   const view = params.get('view') || cfg.calendar.view;
   const showAgendaMain = preset === 'agenda' || view === 'agenda';
   app.classList.toggle('view-agenda', showAgendaMain);
@@ -343,8 +357,8 @@ function applyConfig(raw: DisplayConfig): void {
     cfg.calendar.weeks = 2;
     cfg.calendar.maxEventsPerDay = Math.max(cfg.calendar.maxEventsPerDay, 8);
   }
-  // Bedside: a dark room, no photo and no animated background
-  if (effectivePreset(cfg) === 'bedside') {
+  // Bedside: a dark room, no photo and no animated background. The kids layouts: the same pastel page everywhere.
+  if (effectivePreset(cfg) === 'bedside' || isKidsPreset(effectivePreset(cfg))) {
     cfg.background.enabled = false;
     cfg.background.ambient = 'none';
   }
@@ -451,6 +465,7 @@ function renderCalendar(tick: Tick): void {
   const cfg = ctx.cfg;
   const preset = effectivePreset(cfg);
   renderView(tick);
+  renderKids(tick);
   if (!cfg.calendar.enabled) return;
   // layouts with their own view (today, people, …) do not show the month grid / agenda
   if (VIEW_PRESETS.includes(preset)) {
@@ -472,6 +487,34 @@ function renderView(tick: Tick): void {
   views.render({ events: ctx.cfg.calendar.enabled ? eventsNormalized() : [], weather: state.weather, countdowns: state.countdowns }, tick);
 }
 
+/**
+ * Taps check routines off: the screen allows it, the server answers and the screen is not private. Never in the
+ * admin's preview (a click there would tick a real routine).
+ */
+function kidsTouch(): boolean {
+  return !!state.family?.touch && !!ctx.cfg.family?.touch && (state.online || state.demo) && !state.config?.privacy?.active && !isPreview;
+}
+
+/** Last time the family data was asked for again because it was from another day. */
+let staleFamilyAsk = 0;
+
+/** The kids layouts (no-op for the others). */
+function renderKids(tick: Tick): void {
+  if (!kids.active) return;
+  let fam = ctx.cfg.family?.enabled ? state.family : null;
+  // Data of another day (offline boot from the cache, a missed fetch at midnight): yesterday's ticks must not show
+  // as today's. Nothing is done yet, taps wait for today's data, which is asked for (at most once a minute).
+  const stale = !!fam && !state.demo && fam.today !== tick.dayKey;
+  if (stale && fam) {
+    fam = { ...fam, touch: false, chores: fam.chores.map((c) => ({ ...c, done: false })), members: fam.members.map((m) => ({ ...m, done: 0 })) };
+    if (Date.now() - staleFamilyAsk > 60_000) {
+      staleFamilyAsk = Date.now();
+      void fetchFamily();
+    }
+  }
+  kids.render({ family: fam, events: ctx.cfg.calendar.enabled ? eventsNormalized() : [], weather: state.weather, touch: kidsTouch() && !stale }, tick);
+}
+
 function renderCountdowns(tick: Tick): void {
   // birthdays already shown today as a highlight pill are not repeated as a "¡Hoy!" countdown chip
   const today = tick.dayKey;
@@ -488,6 +531,7 @@ function renderWeather(tick: Tick): void {
   weather.render(state.weather, tick.dayKey);
   const p = effectivePreset(ctx.cfg);
   if (p === 'photoFrame' || p === 'bedside') renderView(tick);
+  renderKids(tick);
   const cur = ctx.cfg.weather.enabled ? state.weather?.current : undefined;
   const plan = cur ? weatherFxOf(cur.code, cur.isDay) : { mode: null, level: 0, storm: false };
   if (precip) {
@@ -520,6 +564,7 @@ function fitSide(): void {
   fitSideContent();
   fitMidRows();
   views.fit();
+  kids.fit();
   photos.reframe(); // what's left uncovered of the photo may have changed
   refreshMarquee(); // titles are measured once everything that does not fit is gone
 }
@@ -652,7 +697,10 @@ function updateNight(tick: Tick): void {
 }
 
 function setOnline(ok: boolean): void {
+  const was = state.online;
   set('online', ok);
+  // offline: routines are plain rows (a tap could not reach the server)
+  if (was !== ok && kids.active) renderKids(current());
   statusDot.classList.toggle('show', !ok && !state.demo);
 }
 
@@ -686,7 +734,7 @@ function stopDisplay(): Lang {
   carousel?.stop();
   heartbeat.stop();
   const lang = state.config ? ctx.lang : pairingLang(params);
-  for (const k of ['config', 'events', 'weather', 'news', 'photos', 'countdowns'] as const) state[k] = null;
+  for (const k of ['config', 'events', 'weather', 'news', 'photos', 'countdowns', 'family'] as const) state[k] = null;
   return lang;
 }
 
@@ -859,6 +907,100 @@ async function fetchCountdowns(): Promise<void> {
   }
 }
 
+// ---------------------------------------------------------------------------------------------
+// Familia (kids layouts): today's routines, stars and the meals of the week of the screen on display. Asked for only
+// when a kids layout is on and Familia is on; a carousel keeps the last answer of each screen for when it is back.
+// ---------------------------------------------------------------------------------------------
+const familyOf = new Map<string, FamilyDisplayState>();
+let familyScreen = '';
+let familySig = '';
+/** Requests are numbered when they leave; an answer to a request older than the one shown last is dropped. */
+let familySeq = 0;
+let familyTaken = 0;
+/** Taps still on their way (routine → done, and which tap): laid over every answer, so a tick never jumps back. */
+const familyPending = new Map<string, { done: boolean; n: number }>();
+let familyTaps = 0;
+
+const wantsFamily = () => !!state.config && isKidsPreset(effectivePreset(ctx.cfg)) && !!ctx.cfg.family?.enabled;
+
+/** The answer to request `seq` for screen `sid`: kept unless a newer request was answered first, with the taps on top. */
+function takeFamily(sid: string, seq: number, r: FamilyDisplayState): void {
+  if (sid !== familyScreen || seq < familyTaken) return;
+  familyTaken = seq;
+  familyOf.set(sid, r);
+  saveScreenCache(sid, 'family', r);
+  let shown = r;
+  for (const [id, p] of familyPending) shown = withToggle(shown, id, p.done);
+  set('family', shown);
+}
+
+async function fetchFamily(): Promise<void> {
+  if (!wantsFamily()) return;
+  if (state.demo) return set('family', mockFamily(current().now, ctx.cfg));
+  const sid = familyScreen;
+  const seq = ++familySeq;
+  try {
+    takeFamily(sid, seq, await api.family());
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404 && e.code === 'family_off') return set('family', null);
+    if (deniedBy(e)) return;
+    console.warn('[family]', (e as Error).message);
+  }
+}
+
+/**
+ * A new config: another carousel screen shows its own family data at once (the last one seen), and the family data is
+ * asked for again when what decides it changed (screen, saved settings, layout, privacy).
+ */
+function syncFamily(c: DisplayConfig): void {
+  const id = c.screenId || '';
+  if (id !== familyScreen) {
+    // the first config keeps what came from this browser's cache (offline boot)
+    if (familyScreen) state.family = familyOf.get(id) ?? null;
+    familyScreen = id;
+    familyTaken = 0;
+    familyPending.clear();
+  }
+  const sig = `${id}|${c.revision}|${effectivePreset(ctx.cfg)}|${c.privacy?.active ? 1 : 0}|${JSON.stringify(c.family ?? null)}`;
+  if (sig === familySig) return;
+  familySig = sig;
+  void fetchFamily();
+}
+
+/** A tap on a routine: shown at once, sent to the server, put back if it says no. */
+function toggleChore(choreId: string, done: boolean): void {
+  const fam = state.family;
+  if (!fam || !kidsTouch()) return;
+  kids.pop(choreId);
+  set('family', withToggle(fam, choreId, done));
+  if (state.demo) return;
+  const sid = familyScreen;
+  const seq = ++familySeq;
+  const n = ++familyTaps;
+  familyPending.set(choreId, { done, n });
+  // this tap is settled (a later tap on the same routine keeps its own)
+  const settle = () => {
+    if (familyPending.get(choreId)?.n === n) familyPending.delete(choreId);
+  };
+  api.familyToggle(choreId, done).then(
+    (r) => {
+      settle();
+      takeFamily(sid, seq, r.state);
+    },
+    (e: unknown) => {
+      settle();
+      // 403 touch_off: taps were turned off (or the screen went private) meanwhile; other 401 / 403: access is gone
+      if (e instanceof ApiError && (e.status === 401 || e.status === 403) && e.code !== 'touch_off' && deniedBy(e)) return;
+      console.warn('[family] toggle', (e as Error).message);
+      const base = familyOf.get(sid);
+      if (sid === familyScreen && state.family && !familyPending.has(choreId)) {
+        set('family', withToggle(state.family, choreId, base?.chores.find((c) => c.id === choreId)?.done ?? !done));
+      }
+      void fetchFamily();
+    },
+  );
+}
+
 async function fetchConfig(): Promise<boolean> {
   try {
     const sid = getActiveScreen();
@@ -908,6 +1050,7 @@ on('config', (s) => {
   if (photoSig && sig !== photoSig) void fetchPhotos().then(() => (privChanged ? photos.next() : undefined));
   photoSig = sig;
   syncCarousel(s.config);
+  syncFamily(s.config);
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -1159,7 +1302,7 @@ function applyPrivacy(p: DisplayConfig['privacy']): void {
   privacyTimer = setTimeout(() => refreshForPrivacy(), ms);
 }
 function refreshForPrivacy(): void {
-  void fetchConfig().then((ok) => (ok ? Promise.all([fetchEvents(), fetchCountdowns()]) : undefined));
+  void fetchConfig().then((ok) => (ok ? Promise.all([fetchEvents(), fetchCountdowns(), fetchFamily()]) : undefined));
 }
 on('events', () => {
   renderCalendar(current());
@@ -1176,6 +1319,7 @@ on('countdowns', () => {
   fitSide();
 });
 on('photos', (s) => s.photos && photos.setList(s.photos.photos || []));
+on('family', () => renderKids(current()));
 photos.onExhausted = () => fetchPhotos();
 // a carousel switch and a new photo at the same moment look like a glitch: the slideshow steps around switches
 photos.switchAt = () => {
@@ -1195,6 +1339,7 @@ function startPolling(): void {
   intervals.push(setInterval(fetchNews, 15 * 60_000));
   intervals.push(setInterval(fetchPhotos, 60 * 60_000));
   intervals.push(setInterval(fetchCountdowns, 30 * 60_000));
+  intervals.push(setInterval(fetchFamily, 5 * 60_000));
 }
 
 onTick((tick) => {
@@ -1210,6 +1355,7 @@ onTick((tick) => {
     carousel?.tick(); // night mode may have started or ended
   }
   if (tick.dayChanged) {
+    void fetchFamily();
     void fetchEvents();
     void fetchWeather();
     void fetchCountdowns();
@@ -1288,6 +1434,7 @@ function enterDemo(): void {
   void fetchNews();
   void fetchPhotos();
   void fetchCountdowns();
+  void fetchFamily();
   // ?demo=1&announce=1|info|success|warning|urgent|all → sample announcements; &identify=1 → identify overlay
   const an = params.get('announce');
   if (an) setTimeout(() => mockAnnouncements(an).forEach((a: Announcement) => announcements.show(a)), 900);
@@ -1353,6 +1500,7 @@ async function boot(): Promise<void> {
     set('weather', loadCache<WeatherResponse>('weather'));
     set('news', loadCache<NewsResponse>('news'));
     set('countdowns', own ? loadScreenCache<CountdownsResponse>(own, 'countdowns') : loadCache<CountdownsResponse>('countdowns'));
+    set('family', cached.screenId ? loadScreenCache<FamilyDisplayState>(cached.screenId, 'family') : null);
     set('config', cached);
   }
   const ok = await fetchConfig();
@@ -1397,6 +1545,7 @@ async function goLive(): Promise<void> {
   void fetchNews();
   void fetchPhotos();
   void fetchCountdowns();
+  void fetchFamily();
   if (streamStarted) return;
   streamStarted = true;
   // A server without SSE (live: 'poll' in /api/health) gets the poll channel instead of the stream.
@@ -1461,6 +1610,7 @@ function onHello(d: Partial<StreamHello>): void {
   if (typeof d.revision === 'number' && d.revision !== state.config?.revision) void fetchConfig();
   void fetchEvents();
   void fetchCountdowns();
+  void fetchFamily();
   heartbeat.soon();
   if (d.serverVersion) void maybeReloadForVersion(d.serverVersion);
 }
@@ -1483,6 +1633,8 @@ const liveHandlers: StreamHandlers = {
     if (!state.events || d.hash !== state.events.hash) void fetchEvents();
     void fetchCountdowns();
   },
+  // a routine ticked (here, on a phone or in the admin), stars, a new family link
+  family: () => void fetchFamily(),
   reload: () => location.reload(),
   announce: (a) => announcements.show(a),
   announceClear: (d) => announcements.clear(d.id),

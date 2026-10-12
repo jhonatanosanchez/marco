@@ -204,6 +204,20 @@ export function validateConfig(c: AppConfig, caps: Caps = currentCaps()): Errors
   });
   const cssMax = caps.limits.customCssBytes;
   if (typeof cssMax === 'number' && hasFeature(caps, 'customCss') && cssBytes(s.customCss) > cssMax) e['screen.customCss'] = LIMIT_EXCEEDED;
+  // Familia (same limits as server/core/familyCore.js)
+  const fam = c.family;
+  fam?.members.forEach((m) => {
+    if (!m.name.trim()) e[`fam.m.${m.id}.name`] = 'Obligatorio';
+    if (!/^#[0-9a-f]{6}$/i.test(m.color)) e[`fam.m.${m.id}.color`] = 'Color no válido';
+  });
+  fam?.chores.forEach((h) => {
+    if (!h.title.trim()) e[`fam.h.${h.id}.title`] = 'Obligatorio';
+    if (!(Number.isInteger(h.points) && h.points >= 0 && h.points <= 20)) e[`fam.h.${h.id}.points`] = 'Entre 0 y 20';
+  });
+  fam?.rewards.forEach((w) => {
+    if (!w.title.trim()) e[`fam.w.${w.id}.title`] = 'Obligatorio';
+    if (!(Number.isInteger(w.cost) && w.cost >= 1 && w.cost <= 500)) e[`fam.w.${w.id}.cost`] = 'Entre 1 y 500';
+  });
   return e;
 }
 
@@ -218,7 +232,7 @@ const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 export const daysInMonth = (m: number) => DAYS_IN_MONTH[m - 1] ?? 31;
 
 /** Keys produced by validateConfig() that belong to the selected screen (the rest are global). */
-const PER_SCREEN_KEY = /^(screen\.|background\.|layout\.|message\.|alerts\.|privacy\.|calendar\.(weeks|maxEventsPerDay)$|news\.rotateSec$|countdowns\.max$)/;
+const PER_SCREEN_KEY = /^(screen\.|background\.|layout\.|message\.|alerts\.|privacy\.|calendar\.(weeks|maxEventsPerDay)$|news\.rotateSec$|countdowns\.max$|family\.(memberIds|touch|showQr)$)/;
 export const isPerScreenKey = (k: string) => PER_SCREEN_KEY.test(k);
 
 /** Validation of the global v2 lists (local events, birthdays, rules, countdowns, schedules, screens). */
@@ -349,7 +363,7 @@ export function sectionForServerPath(path: string): { screenIndex: number | null
   const m = /^screens\[(\d+)\]\.?([a-zA-Z]+)?/.exec(path);
   if (m) {
     const sec = m[2] ?? '';
-    const map: Record<string, string> = { screen: 'screen', layout: 'layout', background: 'background', message: 'message', calendar: 'calendars', datetime: 'datetime', weather: 'weather', news: 'news', todo: 'todo', countdowns: 'countdowns', alerts: 'alerts', privacy: 'screen' };
+    const map: Record<string, string> = { screen: 'screen', layout: 'layout', background: 'background', message: 'message', calendar: 'calendars', datetime: 'datetime', weather: 'weather', news: 'news', todo: 'todo', countdowns: 'countdowns', alerts: 'alerts', privacy: 'screen', family: 'family' };
     return { screenIndex: Number(m[1]), section: map[sec] ?? 'screens' };
   }
   const top = path.split(/[.[]/)[0];
@@ -357,7 +371,7 @@ export function sectionForServerPath(path: string): { screenIndex: number | null
     calendar: path.includes('iconRules') ? 'icons' : 'calendars',
     datetime: 'datetime', weather: 'weather', news: 'news', todo: 'todo', localEvents: 'local', birthdays: 'birthdays',
     eventRules: 'filters', countdowns: 'countdowns', schedules: 'alerts', homeassistant: 'homeassistant', immich: 'immich', auth: 'security',
-    screens: 'screens', defaultScreen: 'screens', carousels: 'carousels',
+    screens: 'screens', defaultScreen: 'screens', carousels: 'carousels', family: path.startsWith('family.meals') ? 'meals' : 'family',
   };
   return { screenIndex: null, section: map[top] ?? 'home' };
 }
@@ -386,6 +400,7 @@ export function sectionForError(key: string): string {
   if (key.startsWith('homeassistant.')) return 'homeassistant';
   if (key.startsWith('immich.')) return 'immich';
   if (key.startsWith('auth.')) return 'security';
+  if (key.startsWith('fam.') || key.startsWith('family.')) return 'family';
   return 'screen';
 }
 

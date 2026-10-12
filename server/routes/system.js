@@ -11,8 +11,9 @@ import { requireAuth, rotateSessionEpoch } from '../auth.js';
 import { getConfig, getSecrets, saveConfig, updateSecrets } from '../store.js';
 import {
   listBackups, writeBackup, backupPath, readBackup, deleteBackup, makeBundle, importPreview, parseImport,
-  mergeImport, absentSections, sanitizeImportedSecrets, repairConfig,
+  mergeImport, absentSections, sanitizeImportedSecrets, repairConfig, bundleFamilyState,
 } from '../backups.js';
+import { familyState, replaceFamilyState, notifyFamily } from '../family.js';
 import { logActivity, listActivity, clearActivity, recentActivity } from '../activity.js';
 import { syncDisplayKeys, revalidateStreams } from '../displayAccess.js';
 import { listDisplays, getServerVersion } from '../displays.js';
@@ -112,7 +113,7 @@ export function systemRouter({ version = getServerVersion() } = {}) {
   // ---------------- export / import (§6.2, §6.3) ----------------
   r.post('/export', (req, res) => {
     const includeSecrets = req.body?.includeSecrets === true;
-    const bundle = makeBundle(getConfig(), { appVersion: version, secrets: includeSecrets ? getSecrets() : null });
+    const bundle = makeBundle(getConfig(), { appVersion: version, secrets: includeSecrets ? getSecrets() : null, familyState: familyState() });
     logActivity('config.exported', { req, level: includeSecrets ? 'warn' : 'info', data: { secrets: includeSecrets } });
     res.set('content-disposition', `attachment; filename="marco-${localDate(new Date(), getConfig().datetime.timezone)}.json"`);
     res.json(bundle);
@@ -131,7 +132,8 @@ export function systemRouter({ version = getServerVersion() } = {}) {
     if (b.sections !== undefined && !Array.isArray(b.sections)) return res.status(400).json({ error: 'sections must be an array' });
     const cur = getConfig();
     // Same as restore: an import never changes the display access mode (see keepSecurity).
-    const merged = { ...mergeImport(cur, parsed.value, b.sections, absentSections(b.bundle)), security: keepSecurity(cur, parsed.value) };
+    const absent = absentSections(b.bundle);
+    const merged = { ...mergeImport(cur, parsed.value, b.sections, absent), security: keepSecurity(cur, parsed.value) };
     writeBackup(cur, 'import');
     const result = saveConfig(merged, { reason: 'import', req, backup: false });
     if (!result.ok) return res.status(400).json({ error: 'invalid', details: result.errors });
@@ -148,6 +150,7 @@ export function systemRouter({ version = getServerVersion() } = {}) {
         if (s.apiTokens) { x.apiTokens = s.apiTokens; applied.push('apiTokens'); }
         if (s.displayKeys) { x.displayKeys = { ...(x.displayKeys || {}), ...s.displayKeys }; applied.push('displayKeys'); }
         if (s.devices) { x.devices = s.devices; applied.push('devices'); }
+        if (s.familyKey) { x.family = s.familyKey; applied.push('family'); }
         if (s.passwordHash && s.passwordHash !== x.passwordHash) {
           x.passwordHash = s.passwordHash;
           x.passwordIsDefault = false;
@@ -157,6 +160,11 @@ export function systemRouter({ version = getServerVersion() } = {}) {
         }
       });
     }
+    // The family section brings back what was done too (routines, rewards, stars), when the file has it.
+    const takesFamily = !absent.has('family') && (!Array.isArray(b.sections) || !b.sections.length || b.sections.includes('family'));
+    const famState = takesFamily ? bundleFamilyState(b.bundle) : null;
+    if (famState) replaceFamilyState(famState);
+    else if (applied.includes('family')) notifyFamily();
     // Keys of screens that are not in the imported config are dropped; devices of missing screens move to the default.
     if (applied.includes('displayKeys') || applied.includes('devices')) syncDisplayKeys();
     // Keys replaced / devices dropped by the import: close the streams still reading with the old credentials
@@ -165,7 +173,7 @@ export function systemRouter({ version = getServerVersion() } = {}) {
     logActivity('config.imported', {
       req,
       level: applied.length ? 'warn' : 'info',
-      data: { revision: result.config.revision, sections: Array.isArray(b.sections) && b.sections.length ? b.sections : 'all', secrets: applied, fromVersion: parsed.fromVersion },
+      data: { revision: result.config.revision, sections: Array.isArray(b.sections) && b.sections.length ? b.sections : 'all', secrets: applied, fromVersion: parsed.fromVersion, ...(famState ? { familyState: true } : {}) },
     });
     if (loggedOut) {
       rotateSessionEpoch();

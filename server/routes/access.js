@@ -12,22 +12,11 @@
 import { Router } from 'express';
 import { requireAuth } from '../auth.js';
 import { lanAddresses } from '../setup.js';
+import { publicOrigin } from '../lib/net.js';
 import {
   displayAccessMode, listDisplayLinks, regenerateKey, listDevices, updateDevice, revokeDevice,
 } from '../displayAccess.js';
 import { startPairing, pairingStatus, claimPairing } from '../pairing.js';
-
-/** PUBLIC_URL when it points somewhere else than this machine (http(s) only), else null. */
-function publicUrl() {
-  const v = String(process.env.PUBLIC_URL || '').trim().replace(/\/+$/, '');
-  try {
-    const u = new URL(v);
-    if (!/^https?:$/.test(u.protocol) || /^(localhost|127\.|\[::1\])/.test(u.hostname)) return null;
-    return u.origin;
-  } catch {
-    return null;
-  }
-}
 
 export function accessAdminRouter() {
   const r = Router();
@@ -36,7 +25,7 @@ export function accessAdminRouter() {
 
   // lanAddresses / publicUrl: an admin opened on the server itself (http://localhost) builds the links, QR codes and
   // kiosk commands for other devices from these instead of "localhost".
-  r.get('/display-links', (req, res) => res.json({ mode: displayAccessMode(), links: listDisplayLinks(), lanAddresses: lanAddresses(), publicUrl: publicUrl() }));
+  r.get('/display-links', (req, res) => res.json({ mode: displayAccessMode(), links: listDisplayLinks(), lanAddresses: lanAddresses(), publicUrl: publicOrigin() }));
 
   r.post('/display-links/:screenId/regenerate', (req, res) => {
     const key = regenerateKey(String(req.params.screenId), { req });

@@ -29,6 +29,7 @@ import type {
   GeocodeResponse,
   PairedDevice,
   EventsPreviewRequest,
+  FamilyAdminState,
   EventsPreviewResponse,
   ExportBundle,
   ImportApplyRequest,
@@ -227,6 +228,16 @@ export const api = {
   // Place search through the server (the setup wizard sends its setup token, there is no session yet).
   geocode: (query: string, lang: string, setupToken?: string) =>
     request<GeocodeResponse>('GET', `/api/admin/geocode${q({ q: query, lang })}`, undefined, setupToken ? { headers: { 'x-setup-token': setupToken }, silent401: true } : {}),
+
+  // ---- Familia: what was done, stars, the family link (server/routes/family.js) ----
+  family: () => request<FamilyAdminState>('GET', '/api/admin/family'),
+  familyToggle: (body: { choreId: string; done: boolean; date?: string }) => request<{ ok: true; state: FamilyAdminState }>('POST', '/api/admin/family/toggle', body),
+  familyAdjust: (body: { memberId: string; delta: number; note?: string }) => request<{ ok: true; state: FamilyAdminState }>('POST', '/api/admin/family/adjust', body),
+  familyRedeem: (body: { rewardId: string; memberId: string; force?: boolean }) => request<{ ok: true; state: FamilyAdminState }>('POST', '/api/admin/family/redeem', body),
+  familyUndo: (kind: 'redemption' | 'adjustment', id: string) =>
+    request<{ ok: true; state: FamilyAdminState }>('DELETE', `/api/admin/family/${kind === 'redemption' ? 'redemptions' : 'adjustments'}/${encodeURIComponent(id)}`),
+  familyLink: () => request<{ link: FamilyAdminState['link'] }>('POST', '/api/admin/family/link', {}),
+  revokeFamilyLink: () => request<{ ok: true }>('DELETE', '/api/admin/family/link'),
 
   eventsPreview: (body: EventsPreviewRequest) => request<EventsPreviewResponse>('POST', '/api/admin/events/preview', body),
   parseBirthdaysCsv: (text: string) => request<BirthdayCsvResult>('POST', '/api/admin/birthdays/parse-csv', { text }),

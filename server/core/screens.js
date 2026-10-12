@@ -3,6 +3,7 @@
 // Mirror for the admin panel: web/shared/screens.ts (keep both in sync).
 import { SCREEN_SPLIT_KEYS, SCREEN_ONLY_KEYS, LOCAL_SOURCE_ID, BIRTHDAYS_SOURCE_ID } from './defaults.js';
 import { displayPrivacy } from './privacy.js';
+import { showsFamilyQr } from './familyCore.js';
 import { carouselBlock } from './carousels.js';
 
 /** Default screen profile (cfg.defaultScreen, falling back to the first one). */
@@ -71,13 +72,34 @@ export function screenSchedules(cfg, screen) {
 }
 
 /**
- * GET /api/display/config payload for one screen (no secrets, no URLs, no HA entity ids).
+ * The `family` block of the display config: what the kids layouts need to know before asking for the family state
+ * (GET /api/display/family). `qrUrl` = the family page (familyQr, from server/family.js; the cloud passes its own) when the screen shows the QR, has a
+ * kids layout and is not private. While private there are no stars and no touch.
+ */
+export function displayFamilyBlock(cfg, screen, priv, familyQr = null) {
+  const fam = cfg.family;
+  const sf = screen.family || {};
+  const on = Boolean(fam?.enabled);
+  return {
+    enabled: on,
+    mealsEnabled: Boolean(on && fam.meals?.enabled),
+    showPoints: Boolean(on && fam.showPoints && !priv),
+    touch: Boolean(on && sf.touch && !priv),
+    qrUrl: on && sf.showQr !== false && !priv && familyQr && showsFamilyQr(screen) ? familyQr : null,
+    privacy: fam?.privacy === 'hide' ? 'hide' : 'initials',
+  };
+}
+
+/**
+ * GET /api/display/config payload for one screen (no secrets, no URLs, no HA entity ids; the one link it carries is
+ * the family page's, which the TV draws as a QR code).
  * `privacy` = { status, next } from core/privacy.js (privacyStatus, privacyNextChange); absent = not private.
  * While private with `hidePhotos`, the background only uses stock photos.
  * `carousel` = the carousel this display runs (the screen is one of its members), else null: the payload then says
  * which carousel (`target`, `carousel`) so the display can rotate through its screens.
+ * `familyQr` = the family page URL (family.js familyQrUrl), or null without a family link.
  */
-export function displayConfig(cfg, screen, { privacy = null, carousel = null } = {}) {
+export function displayConfig(cfg, screen, { privacy = null, carousel = null, familyQr = null } = {}) {
   const f = flatView(cfg, screen);
   const priv = displayPrivacy(screen, privacy?.status, privacy?.next ?? null);
   const background = priv.active && screen.privacy?.hidePhotos && f.background.source !== 'stock' ? { ...f.background, source: 'stock' } : f.background;
@@ -100,6 +122,7 @@ export function displayConfig(cfg, screen, { privacy = null, carousel = null } =
     alerts: f.alerts,
     schedules: screenSchedules(cfg, screen).map(({ screenIds, ...m }) => m),
     privacy: priv,
+    family: displayFamilyBlock(cfg, screen, priv.active, familyQr),
     // what the display is bound to: this screen, or a carousel that shows it among others
     target: carousel
       ? { id: carousel.id, kind: 'carousel', slug: carousel.slug, name: carousel.name }

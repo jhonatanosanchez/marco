@@ -17,6 +17,7 @@ export const ACTIVITY_GROUPS: { value: string; label: string; icon: IconName }[]
   { value: 'token', label: 'API', icon: 'key' },
   { value: 'display', label: 'Pantallas', icon: 'monitor' },
   { value: 'privacy', label: 'Modo privado', icon: 'lock' },
+  { value: 'family', label: 'Familia', icon: 'star' },
   { value: 'google', label: 'Google', icon: 'google' },
 ];
 
@@ -28,6 +29,7 @@ export function sectionLabel(key: string): string {
     birthdays: 'Cumpleaños', eventRules: 'Filtros', countdowns: 'Cuentas atrás', schedules: 'Mensajes programados', homeassistant: 'Home Assistant', immich: 'Immich',
     auth: 'Seguridad', screens: 'Pantallas', defaultScreen: 'Pantalla predeterminada', screen: 'Ajustes', layout: 'Diseño', background: 'Fondo',
     message: 'Mensaje', alerts: 'Avisos', security: 'Acceso a las pantallas', privacy: 'Modo privado', carousels: 'Carruseles',
+    family: 'Familia',
   };
   if (m) return `${m[1]}${m[2] ? ` › ${t(names[m[2]] ?? m[2])}` : ''}`;
   return t(names[key] ?? key);
@@ -137,6 +139,34 @@ export function describeActivity(e: ActivityEntry): { icon: IconName; text: stri
       };
     case 'update.settings':
       return { icon: 'settings', text: d.auto ? t('Actualizaciones automáticas activadas ({from}–{to})', { from: str(d.from), to: str(d.to) }) : t('Ajustes de actualización guardados') };
+    case 'family.chore': {
+      const vars = { chore: q(d.chore), member: str(d.member) };
+      const via = d.via === 'phone' ? t('desde el móvil') : d.via === 'display' ? t('tocando la pantalla {screen}', { screen: str(d.screen) }) : t('desde el panel');
+      return {
+        icon: d.done ? 'check' : 'x',
+        text: (d.done ? t('Rutina hecha: {chore} ({member})', vars) : t('Rutina desmarcada: {chore} ({member})', vars)) + ` · ${via}` + (d.date ? ` · ${str(d.date)}` : ''),
+      };
+    }
+    case 'family.redeemed':
+      return {
+        icon: 'star',
+        text: t('Premio canjeado: {reward} ({member}, {cost} ⭐)', { reward: q(d.reward), member: str(d.member), cost: str(d.cost) }) + (d.via === 'phone' ? ` · ${t('desde el móvil')}` : ''),
+      };
+    case 'family.points': {
+      const delta = Number(d.delta) > 0 ? `+${str(d.delta)}` : str(d.delta);
+      return { icon: 'star', text: t('Estrellas de {member}: {delta} ⭐', { member: str(d.member), delta }) + (d.note ? ` · ${q(d.note)}` : '') };
+    }
+    case 'family.undone':
+      return d.kind === 'redemption'
+        ? { icon: 'history', text: t('Canje deshecho: {reward} ({member})', { reward: q(d.reward), member: str(d.member) }) }
+        : { icon: 'history', text: t('Ajuste de estrellas deshecho ({member})', { member: str(d.member) }) };
+    case 'family.link':
+      return {
+        icon: 'link',
+        text: d.action === 'revoked' ? t('Enlace familiar quitado') : d.action === 'regenerated' ? t('Enlace familiar cambiado por uno nuevo') : t('Enlace familiar creado'),
+      };
+    case 'family.key_rejected':
+      return { icon: 'alert', text: d.reason === 'rate_limited' ? t('Demasiados intentos con un enlace familiar no válido') : t('Enlace familiar no válido') };
     case 'activity.cleared':
       return { icon: 'trash', text: t('Registro de actividad vaciado') };
     default:
@@ -151,5 +181,7 @@ export function actorLabel(a: string): string {
   if (a === 'anonymous') return t('Anónimo');
   if (a === 'password') return t('Contraseña');
   if (a.startsWith('token:')) return `${a.slice(6)} (API)`;
+  if (a === 'family-link') return t('Enlace familiar');
+  if (a.startsWith('display:')) return t('Pantalla {screen}', { screen: a.slice(8) });
   return a;
 }

@@ -1,13 +1,16 @@
+import { useRef } from 'preact/hooks';
 import { GLASS_DEFAULTS, glassVars, normalizeGlass, type PhotoStats } from '../../shared/glass';
 import type { DisplayStyle, FrameCorner, GlassConfig, LayoutPreset } from '../../shared/types';
 import { Icon } from '../components/icons';
 import { EventStyleField, PLANNER_CALENDAR, undoPlannerPick, WeeksField } from '../components/PlannerFields';
 import { Button, Callout, Card, Field, PageHeader, Segmented, Slider, ToggleRow } from '../components/ui';
+import { has } from '../caps';
 import { t } from '../i18n';
 import { allSourceOptions } from '../util';
 import type { SectionProps } from './common';
+import { FamilyScreenOptions } from './Family';
 
-export const PRESETS: { id: LayoutPreset; name: string; desc: string; wizard?: boolean }[] = [
+export const PRESETS: { id: LayoutPreset; name: string; desc: string; wizard?: boolean; group?: 'kids' }[] = [
   { id: 'bigCalendar', name: 'Calendario grande', desc: 'Mes completo a pantalla grande con reloj, tiempo y noticias en una columna lateral.', wizard: true },
   { id: 'twoWeeks', name: 'Dos semanas', desc: 'Esta semana y la siguiente, con más sitio para cada día. Hoy se ve resaltado.' },
   { id: 'leftRight', name: 'Izquierda / Derecha', desc: 'Foto a un lado; reloj, tiempo y agenda al otro. Ideal para pantallas horizontales.', wizard: true },
@@ -20,7 +23,12 @@ export const PRESETS: { id: LayoutPreset; name: string; desc: string; wizard?: b
   { id: 'photoFrame', name: 'Marco de fotos', desc: 'La foto es la protagonista: solo un reloj pequeño, la temperatura y el próximo evento en una esquina. Ideal para un marco vertical.' },
   { id: 'bedside', name: 'Mesilla', desc: 'Reloj enorme, el próximo evento y la temperatura con muy poco brillo, para el dormitorio. Se atenúa más por la noche.' },
   { id: 'planner', name: 'Planificador', desc: 'Para familias con muchas citas: reloj, fecha y tiempo arriba, y debajo el mes con tarjetas que llenan cada día. Pensado para pantallas verticales.' },
+  // kids layouts (Familia): Modern style only, the display shows the big calendar with Classic
+  { id: 'kidsRoutines', name: 'Rutinas', desc: 'Una columna por niño con sus rutinas de mañana, tarde y noche, su progreso y sus estrellas.', group: 'kids' },
+  { id: 'kidsFamily', name: 'Familia', desc: 'El día de toda la familia: agenda de hoy, rutinas, comidas y tareas, con un saludo arriba.', group: 'kids' },
+  { id: 'kidsMeals', name: 'Semana de comidas', desc: 'El menú de toda la semana con hoy resaltado, la hora y lo próximo de hoy.', group: 'kids' },
 ];
+const isKidsPreset = (id: string) => PRESETS.some((p) => p.id === id && p.group === 'kids');
 
 /** Tiny schematic drawing of each layout preset. */
 export function Schematic({ id, side }: { id: LayoutPreset; side: 'left' | 'right' }) {
@@ -204,17 +212,146 @@ export function Schematic({ id, side }: { id: LayoutPreset; side: 'left' | 'righ
           ))}
         </g>
       )}
+      {id === 'kidsRoutines' && (
+        <g>
+          <rect width="160" height="90" rx="6" fill="#f6f3ee" />
+          <rect x="8" y="7" width="30" height="9" rx="2" fill="#2b2b33" opacity=".85" />
+          <rect x="8" y="18" width="20" height="3" rx="1.5" fill="#2b2b33" opacity=".35" />
+          <rect x="136" y="6" width="16" height="16" rx="2.5" fill="#fff" stroke="#2b2b33" stroke-opacity=".12" stroke-width=".6" />
+          <path d="M139 9h4v4h-4z M145 9h4v4h-4z M139 15h4v4h-4z M146 16h2v2h-2z" fill="#2b2b33" opacity=".75" />
+          {['#ff8fab', '#7cc6fe', '#9be3a0'].map((c, i) => (
+            <g>
+              <rect x={8 + i * 49} y="27" width="45" height="57" rx="5" fill="#fff" />
+              <circle cx={16 + i * 49} cy="35" r="4.5" fill={c} opacity=".45" stroke={c} stroke-width="1.2" />
+              <rect x={23 + i * 49} y="32.5" width="16" height="3.5" rx="1.5" fill="#2b2b33" opacity=".7" />
+              <rect x={12 + i * 49} y="43" width="37" height="2.4" rx="1.2" fill="#000" opacity=".07" />
+              <rect x={12 + i * 49} y="43" width={[24, 14, 30][i]} height="2.4" rx="1.2" fill={c} />
+              {[0, 1, 2].map((j) => (
+                <g>
+                  <rect x={12 + i * 49} y={49 + j * 11} width="37" height="9" rx="2.5" fill={c} opacity={(i + j) % 2 ? 0.12 : 0.28} />
+                  <circle cx={44 + i * 49} cy={53.5 + j * 11} r="2.6" fill={(i + j) % 2 ? 'none' : c} stroke={c} stroke-width="1" />
+                  <rect x={15 + i * 49} y={52.2 + j * 11} width={18 - j * 3} height="2.6" rx="1.2" fill="#2b2b33" opacity=".55" />
+                </g>
+              ))}
+            </g>
+          ))}
+        </g>
+      )}
+      {id === 'kidsFamily' && (
+        <g>
+          <rect width="160" height="90" rx="6" fill="#f6f3ee" />
+          <rect x="8" y="7" width="44" height="7" rx="2" fill="#2b2b33" opacity=".8" />
+          <rect x="8" y="17" width="60" height="3" rx="1.5" fill="#2b2b33" opacity=".35" />
+          <rect x="118" y="7" width="22" height="9" rx="2" fill="#2b2b33" opacity=".8" />
+          <rect x="8" y="26" width="47" height="58" rx="5" fill="#fff" />
+          <rect x="58" y="26" width="47" height="58" rx="5" fill="#fff" />
+          <rect x="108" y="26" width="44" height="28" rx="5" fill="#fff" />
+          <rect x="108" y="57" width="44" height="27" rx="5" fill="#fff" />
+          {[0, 1, 2, 3].map((i) => (
+            <g>
+              <rect x="12" y={32 + i * 12} width="2" height="8" rx="1" fill={['#4c8dff', '#ff9f1c', '#2ec4b6', '#9b5de5'][i]} />
+              <rect x="17" y={33 + i * 12} width={30 - (i % 2) * 8} height="3" rx="1.5" fill="#2b2b33" opacity=".55" />
+            </g>
+          ))}
+          {['#ff8fab', '#7cc6fe', '#9be3a0', '#ffc46b'].map((c, i) => (
+            <g>
+              <circle cx="65" cy={35 + i * 12} r="3.6" fill={c} opacity=".45" stroke={c} stroke-width="1" />
+              <rect x="71" y={33 + i * 12} width="18" height="2.6" rx="1.3" fill="#2b2b33" opacity=".6" />
+              <rect x="71" y={37.4 + i * 12} width="28" height="1.8" rx=".9" fill="#000" opacity=".07" />
+              <rect x="71" y={37.4 + i * 12} width={[20, 9, 28, 14][i]} height="1.8" rx=".9" fill={c} />
+            </g>
+          ))}
+          {[0, 1, 2].map((i) => (
+            <rect x="112" y={32 + i * 7} width={30 - i * 5} height="3" rx="1.5" fill="#2b2b33" opacity=".5" />
+          ))}
+          {[0, 1, 2].map((i) => (
+            <g>
+              <circle cx="114" cy={64.5 + i * 6.5} r="1.8" fill="none" stroke="#2b2b33" stroke-opacity=".45" stroke-width=".8" />
+              <rect x="118" y={63.3 + i * 6.5} width={24 - i * 4} height="2.4" rx="1.2" fill="#2b2b33" opacity=".45" />
+            </g>
+          ))}
+        </g>
+      )}
+      {id === 'kidsMeals' && (
+        <g>
+          <rect width="160" height="90" rx="6" fill="#f6f3ee" />
+          <rect x="8" y="7" width="26" height="8" rx="2" fill="#2b2b33" opacity=".8" />
+          <rect x="38" y="9" width="34" height="3.5" rx="1.5" fill="#2b2b33" opacity=".35" />
+          <rect x="120" y="7" width="32" height="8" rx="2.5" fill="#2b2b33" opacity=".15" />
+          <rect x={22 + 2 * 19} y="20" width="18.4" height="64" rx="3" fill={accent} opacity=".14" />
+          {[0, 1, 2, 3, 4, 5, 6].map((c) => (
+            <rect x={24 + c * 19} y="23" width="12" height="3" rx="1.5" fill={c === 2 ? accent : '#2b2b33'} opacity={c === 2 ? 1 : 0.45} />
+          ))}
+          {[0, 1, 2].map((r) => (
+            <g>
+              <circle cx="14" cy={38 + r * 18} r="3.2" fill={['#ffc46b', '#9be3a0', '#c3a6ff'][r]} />
+              {[0, 1, 2, 3, 4, 5, 6].map((c) => (
+                <g>
+                  <rect x={22.6 + c * 19} y={30 + r * 18} width="17.2" height="15.5" rx="2.5" fill="#fff" />
+                  <rect x={25 + c * 19} y={35 + r * 18} width={(c + r) % 3 === 0 ? 9 : 12.4} height="2.4" rx="1.2" fill="#2b2b33" opacity=".5" />
+                  {(c + r) % 2 === 0 && <rect x={25 + c * 19} y={39 + r * 18} width="8" height="2.4" rx="1.2" fill="#2b2b33" opacity=".35" />}
+                </g>
+              ))}
+            </g>
+          ))}
+        </g>
+      )}
     </svg>
   );
 }
 
-export const STYLES: { id: DisplayStyle; name: string; desc: string }[] = [
+/**
+ * The style cards of Diseño. 'kids' is not a stored style: it is the Modern style with one of the kids layouts
+ * (screen.style 'modern' + layout.preset kidsRoutines / kidsFamily / kidsMeals), so older configs and the display
+ * need nothing new. Picking it selects a kids layout; Moderno or Clásico go back to a normal one.
+ */
+export type StyleChoice = DisplayStyle | 'kids';
+export const STYLES: { id: StyleChoice; name: string; desc: string }[] = [
   { id: 'modern', name: 'Moderno', desc: 'Más minimalista, al estilo de Apple: tarjetas de cristal sobre la foto, reloj de pantalla de bloqueo y menos líneas.' },
   { id: 'classic', name: 'Clásico', desc: 'El aspecto de siempre: reloj fino, tarjetas con borde y la cuadrícula completa.' },
+  { id: 'kids', name: 'Niños', desc: 'Colores suaves, rutinas con estrellas y el menú de la semana. Basado en el moderno.' },
 ];
 
+/** Style card shown as chosen for a screen. */
+export const styleChoiceOf = (style: string | undefined, preset: string): StyleChoice => (isKidsPreset(preset) ? 'kids' : style === 'modern' ? 'modern' : 'classic');
+
+/** Tiny drawing of the kids style: pastel cards with avatar circles, progress bars and check circles. */
+function KidsStyleThumb() {
+  const colors = ['#ff8fab', '#7cc6fe', '#9be3a0'];
+  return (
+    <svg viewBox="0 0 160 90" class="schematic" aria-hidden="true">
+      <rect width="160" height="90" rx="6" fill="#f6f3ee" />
+      <text x="9" y="21" fill="#2b2b33" font-size="15" font-weight="600" letter-spacing="-0.6" font-family="system-ui, sans-serif">
+        9:41
+      </text>
+      <rect x="9" y="25" width="26" height="3" rx="1.5" fill="#2b2b33" opacity=".3" />
+      <text x="118" y="20" font-size="10" font-family="system-ui, sans-serif">
+        ⭐
+      </text>
+      <rect x="131" y="13" width="18" height="5" rx="2" fill="#f5a524" opacity=".85" />
+      {colors.map((c, i) => (
+        <g>
+          <rect x={8 + i * 49} y="34" width="45" height="50" rx="7" fill="#fff" />
+          <circle cx={19 + i * 49} cy="45" r="6" fill={c} opacity=".35" stroke={c} stroke-width="1.6" />
+          <rect x={28 + i * 49} y="42.5" width="18" height="4" rx="2" fill="#2b2b33" opacity=".7" />
+          <rect x={13 + i * 49} y="55" width="35" height="3" rx="1.5" fill="#000" opacity=".07" />
+          <rect x={13 + i * 49} y="55" width={[26, 12, 35][i]} height="3" rx="1.5" fill={c} />
+          {[0, 1].map((j) => (
+            <g>
+              <rect x={13 + i * 49} y={62 + j * 10} width="35" height="8" rx="3" fill={c} opacity=".2" />
+              <circle cx={43 + i * 49} cy={66 + j * 10} r="2.6" fill={(i + j) % 2 ? 'none' : c} stroke={c} stroke-width="1.1" />
+              <rect x={16 + i * 49} y={64.8 + j * 10} width={16 - j * 4} height="2.4" rx="1.2" fill="#2b2b33" opacity=".5" />
+            </g>
+          ))}
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 /** Tiny drawing of each display style (same scene: photo with clock + widgets, calendar on the right). */
-export function StyleThumb({ id }: { id: DisplayStyle }) {
+export function StyleThumb({ id }: { id: StyleChoice }) {
+  if (id === 'kids') return <KidsStyleThumb />;
   const modern = id === 'modern';
   const accent = 'var(--accent)';
   const rows = [0, 1, 2, 3];
@@ -411,8 +548,29 @@ const CORNERS: { value: FrameCorner; label: string }[] = [
 ];
 
 /** Settings of the layouts that have any: the people columns (Por persona) and the corner (Marco de fotos). */
-function PresetOptions({ cfg, set, full }: SectionProps) {
+function PresetOptions({ cfg, set, full, go }: SectionProps) {
   const l = cfg.layout;
+  if (isKidsPreset(l.preset)) {
+    return (
+      <Card
+        id="layout-options"
+        scope="screen"
+        title={t('Familia en esta pantalla')}
+        icon="users"
+        desc={
+          <>
+            {t('Los miembros, las rutinas y el enlace familiar se configuran en')}{' '}
+            <button type="button" class="link-btn" onClick={() => go('family')}>
+              {t('Familia')}
+            </button>
+            .
+          </>
+        }
+      >
+        <FamilyScreenOptions cfg={cfg} set={set} compact />
+      </Card>
+    );
+  }
   if (l.preset === 'photoFrame') {
     return (
       <Card id="layout-options" scope="screen" title={t('Marco de fotos')} icon="image" desc={t('Dónde va la tarjeta con la hora, la temperatura y el próximo evento.')}>
@@ -499,6 +657,38 @@ export function LayoutSection(props: SectionProps) {
   // the planner has a side column on landscape screens
   const hasSide = ['bigCalendar', 'leftRight', 'today', 'twoWeeks', 'planner'].includes(l.preset);
   const style: DisplayStyle = cfg.screen.style === 'modern' ? 'modern' : 'classic';
+  const choice = styleChoiceOf(cfg.screen.style, l.preset);
+  const kids = choice === 'kids';
+  // a server without Familia (features.family) offers no kids style, unless this screen already has one
+  const styles = STYLES.filter((o) => o.id !== 'kids' || kids || has('family'));
+  // the normal layout to go back to when leaving Niños: the last one picked here on this screen, else the saved one,
+  // else the big calendar (the page stays mounted when another screen is picked, so it is kept per screen)
+  const lastNormal = useRef(new Map<string, LayoutPreset>());
+  if (!isKidsPreset(l.preset)) lastNormal.current.set(props.screenId, l.preset);
+  const pickStyle = (v: StyleChoice) =>
+    set((d) => {
+      if (v === 'kids') {
+        // the kids layouts are drawn with the Modern style underneath
+        d.screen.style = 'modern';
+        if (!isKidsPreset(d.layout.preset)) {
+          if (d.layout.preset === 'planner') {
+            const was = props.saved.screens.find((s) => s.id === props.screenId);
+            if (was && was.layout.preset !== 'planner') undoPlannerPick(d.calendar, was.calendar);
+          }
+          d.layout.preset = 'kidsFamily';
+        }
+        return;
+      }
+      d.screen.style = v;
+      if (isKidsPreset(d.layout.preset)) {
+        const was = props.saved.screens.find((s) => s.id === props.screenId);
+        const savedPreset = was?.layout.preset;
+        const back = lastNormal.current.get(props.screenId) ?? (savedPreset && !isKidsPreset(savedPreset) ? savedPreset : 'bigCalendar');
+        // back to the planner: what it is made for comes back too (entering Niños took it away, see above)
+        if (back === 'planner' && savedPreset !== 'planner') Object.assign(d.calendar, PLANNER_CALENDAR);
+        d.layout.preset = back;
+      }
+    });
   return (
     <>
       <PageHeader title={t('Diseño')} scope="screen" desc={t('Elige cómo se distribuyen los elementos en la pantalla.')} />
@@ -510,20 +700,11 @@ export function LayoutSection(props: SectionProps) {
         desc={t('Independiente de la plantilla: cada pantalla puede tener su propio estilo.')}
       >
         <Field label={t('Estilo')}>
-          <Segmented
-            value={style}
-            options={STYLES.map((o) => ({ value: o.id, label: t(o.name) }))}
-            onChange={(v) => set((d) => void (d.screen.style = v))}
-          />
+          <Segmented value={choice} options={styles.map((o) => ({ value: o.id, label: t(o.name) }))} onChange={pickStyle} />
         </Field>
-        <div class="preset-grid style-grid">
-          {STYLES.map((o) => (
-            <button
-              type="button"
-              class={`preset ${style === o.id ? 'is-active' : ''}`}
-              onClick={() => set((d) => void (d.screen.style = o.id))}
-              aria-pressed={style === o.id}
-            >
+        <div class="preset-grid style-grid" id="layout-kids">
+          {styles.map((o) => (
+            <button type="button" class={`preset ${choice === o.id ? 'is-active' : ''}`} onClick={() => pickStyle(o.id)} aria-pressed={choice === o.id}>
               <StyleThumb id={o.id} />
               <div class="preset__text">
                 <div class="preset__name">
@@ -535,10 +716,26 @@ export function LayoutSection(props: SectionProps) {
             </button>
           ))}
         </div>
+        {kids && style !== 'modern' && (
+          <Callout kind="warn">
+            {t('Estos diseños solo funcionan con el estilo Moderno.')}{' '}
+            <Button size="sm" variant="primary" onClick={() => set((d) => void (d.screen.style = 'modern'))}>
+              {t('Cambiar a Moderno')}
+            </Button>
+          </Callout>
+        )}
       </Card>
-      {style === 'modern' ? <GlassCard cfg={cfg} set={set} /> : <WeatherPanelCard cfg={cfg} set={set} />}
+      {!kids && (style === 'modern' ? <GlassCard cfg={cfg} set={set} /> : <WeatherPanelCard cfg={cfg} set={set} />)}
+      {kids && !cfg.family.enabled && (
+        <Callout>
+          {t('Activa la familia en la sección Familia para ver rutinas.')}{' '}
+          <button type="button" class="link-btn" onClick={() => props.go('family')}>
+            {t('Ir a Familia')}
+          </button>
+        </Callout>
+      )}
       <div class="preset-grid" id="layout-presets">
-        {PRESETS.map((p) => (
+        {PRESETS.filter((p) => kids === (p.group === 'kids')).map((p) => (
           <button
             type="button"
             class={`preset ${l.preset === p.id ? 'is-active' : ''}`}

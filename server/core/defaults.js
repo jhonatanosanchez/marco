@@ -1,4 +1,5 @@
 import ICON_RULES from './iconRules.js';
+import { defaultFamily, defaultScreenFamily } from './familyCore.js';
 
 // Default configuration (created on first run, and used to back-fill missing keys on load).
 // Icon rules are shared with the admin and display (server/core/iconRules.js).
@@ -29,6 +30,8 @@ export const SCREEN_SPLIT_KEYS = {
   news: ['enabled', 'rotateSec'],
   todo: ['enabled'],
   countdowns: ['enabled', 'max'],
+  // who appears on this screen (null = everyone), checking routines off by touching it, the QR of the family page
+  family: ['memberIds', 'touch', 'showQr'],
 };
 /** Calendar settings the 'planner' layout comes with (the admin and the setup wizard apply them when it is picked). */
 export const PLANNER_CALENDAR = { weeks: 'auto', eventStyle: 'cards' };
@@ -83,6 +86,8 @@ export function defaultScreenProfile({ id = 's_main', slug = 'living-room', name
     // privacy mode (server/core/privacy.js): photos replaced by stock ones while private, a small lock on screen,
     // and rules that turn it on by themselves ({ id, enabled, days, from, to }, `to < from` crosses midnight)
     privacy: { hidePhotos: false, showLock: true, schedule: [] },
+    // Familia on this screen (server/core/familyCore.js): memberIds null = every member, touch off, QR card on
+    family: defaultScreenFamily(),
   });
 }
 
@@ -126,5 +131,8 @@ export function defaultConfig() {
     // 'private': every display needs its private link (/d/<key>) or a paired-device token (server/displayAccess.js).
     // 'open': legacy LAN mode (/ and /?screen= work without a key). Configs saved before 0.3 load as 'open'.
     security: { displayAccess: 'private' },
+    // Familia (core/familyCore.js): members, routines with stars, rewards and the week's meals. What was done
+    // lives in data/family.json (server/family.js), not here.
+    family: defaultFamily(),
   });
 }

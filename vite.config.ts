@@ -22,10 +22,22 @@ function changelogSection(version: string): string {
   return lines.slice(start + 1, end).filter((l) => !/^\[[^\]]+\]: /.test(l)).join('\n').trim();
 }
 
-// Multi-page build: / -> display (Raspberry Pi screen), /admin/ -> management panel.
+// Multi-page build: / -> display (Raspberry Pi screen), /admin/ -> management panel, /f/<key> -> family page (phone).
 export default defineConfig({
   root: 'web',
-  plugins: [preact()],
+  plugins: [
+    preact(),
+    // Dev server only: /f and /f/<key> open the family page, as the Express server does in production (app.js).
+    {
+      name: 'family-page-dev',
+      configureServer(server) {
+        server.middlewares.use((req, _res, next) => {
+          if (req.url && /^\/f(\/[^/?#]*)?\/?(\?.*)?$/.test(req.url)) req.url = '/family/index.html';
+          next();
+        });
+      },
+    },
+  ],
   // Build identity reported by displays (docs/ARCHITECTURE.md), declared in web/shared/env.d.ts.
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
@@ -43,6 +55,7 @@ export default defineConfig({
       input: {
         display: resolve(root, 'web/index.html'),
         admin: resolve(root, 'web/admin/index.html'),
+        family: resolve(root, 'web/family/index.html'),
       },
     },
   },

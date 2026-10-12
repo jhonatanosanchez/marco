@@ -1,0 +1,489 @@
+/* ==========================================================================
+   Familia and Menús pages (sections/Family.tsx, sections/Meals.tsx)
+   ========================================================================== */
+
+.fam-tabs {
+  margin: 4px 0 2px;
+}
+/* on a phone the four tab names need the room of their icons */
+@media (max-width: 520px) {
+  .fam-tabs .seg button > svg {
+    display: none;
+  }
+}
+.fam-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* avatar: emoji in a soft circle with the member's colour ring */
+.fam-avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--mc, var(--surface-3)) 28%, var(--surface));
+  box-shadow: inset 0 0 0 2px var(--mc, var(--border-strong));
+  line-height: 1;
+}
+
+/* ---------------------------------------------------------------- Miembros */
+.fam-members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fam-member {
+  display: flex;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--mc);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+}
+.fam-member__avatar .emoji-btn,
+.fam-member__avatar button {
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--mc) 28%, var(--surface));
+  box-shadow: inset 0 0 0 2px var(--mc);
+}
+.fam-member__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fam-member__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fam-member__name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+.fam-swatches {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fam-member__opts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+}
+.fam-member__cal {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.fam-member__cal .select {
+  min-width: 170px;
+}
+
+/* ---------------------------------------------------------------- Rutinas */
+.fam-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.fam-group__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.fam-empty-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fam-chores {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.fam-chore {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.fam-chore:last-child {
+  border-bottom: 0;
+}
+.fam-chore.is-off .fam-chore__top {
+  opacity: 0.5;
+}
+.fam-chore__top,
+.fam-chore__bottom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.fam-chore__title {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-weight: 600;
+}
+.fam-chore__slot .select {
+  min-width: 170px;
+}
+.fam-chore__pts .input-group,
+.fam-reward__cost .input-group {
+  width: 104px;
+}
+.fam-chore__spacer {
+  flex: 1;
+}
+.fam-chore .wd-picker button {
+  min-width: 34px;
+  height: 30px;
+}
+.pill--sm {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+/* today's ticks in each member card */
+.fam-today {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+.fam-today__note {
+  margin: 0 0 6px;
+}
+.fam-today__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.fam-today__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.fam-bar {
+  flex: 1;
+  max-width: 220px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.fam-bar span {
+  display: block;
+  height: 100%;
+  width: var(--pct);
+  background: var(--mc);
+  border-radius: inherit;
+  transition: width 0.3s var(--ease);
+}
+.fam-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.fam-check:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.fam-check__box {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 0 0 2px var(--border-strong);
+  color: #fff;
+}
+.fam-check.is-done {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--mc) 22%, var(--surface));
+}
+.fam-check.is-done .fam-check__box {
+  background: var(--mc);
+  box-shadow: none;
+  color: #1a1a1f;
+}
+
+/* ---------------------------------------------------------------- Premios */
+.fam-rewards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.fam-reward {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.fam-reward:last-child {
+  border-bottom: 0;
+}
+.fam-reward__title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+.fam-balances {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fam-balance {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+.fam-balance__who {
+  flex: 1;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+}
+.fam-stars {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #f5a524;
+}
+.fam-balance__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.fam-adjust {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.fam-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.fam-history li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+.fam-history li:last-child {
+  border-bottom: 0;
+}
+.fam-history__text {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fam-history__delta {
+  font-weight: 700;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ok);
+}
+.fam-history__delta.is-neg {
+  color: var(--muted);
+}
+.fam-history__when {
+  min-width: 80px;
+  text-align: right;
+}
+.fam-history__undo-space {
+  width: 84px;
+}
+
+/* ---------------------------------------------------------------- Acceso */
+.fam-link-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.fam-help {
+  margin-top: 6px;
+  padding: 12px 14px;
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+.fam-help ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.fam-who {
+  margin-top: 10px;
+}
+
+/* ---------------------------------------------------------------- Menús */
+.meals-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.meals-slots__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.meals-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.meals-nav__label {
+  font-weight: 600;
+  font-size: 13.5px;
+  min-width: 190px;
+  text-align: center;
+}
+.meals-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.meals-grid__head,
+.meals-day {
+  display: grid;
+  grid-template-columns: 130px repeat(var(--meal-n, 3), minmax(0, 1fr));
+  align-items: center;
+  gap: 8px;
+}
+.meals-grid__head {
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.meals-day {
+  padding: 6px 8px;
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.meals-day.is-today {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface-2));
+}
+.meals-day__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 6px;
+  min-width: 0;
+}
+.meals-day__today {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.meals-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.meals-cell__label {
+  display: none;
+  font-size: 11px;
+  color: var(--muted);
+}
+.meals-cell .input {
+  height: 34px;
+  font-size: 13px;
+  padding: 0 10px;
+}
+.meals-grid.is-faded .meals-cell .input {
+  color: var(--muted);
+  font-style: italic;
+}
+.meals-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+@media (max-width: 720px) {
+  /* one card per day on a phone */
+  .meals-grid__head {
+    display: none;
+  }
+  .meals-day {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .meals-cell__label {
+    display: block;
+  }
+  .meals-nav__label {
+    min-width: 0;
+    flex: 1;
+  }
+  .fam-member {
+    flex-direction: column;
+  }
+  .fam-history__when {
+    display: none;
+  }
+  .fam-history__undo-space {
+    display: none;
+  }
+}
+.fam-history li > .btn {
+  min-width: 76px;
+  flex: none;
+}
+
+/* Diseño: the three style cards (Moderno, Clásico, Niños) side by side when there is room */
+.preset-grid.style-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr));
+}

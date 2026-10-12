@@ -5,7 +5,9 @@ import type { PhotoFrame } from './focus';
 export type Lang = 'es' | 'en' | 'pt';
 export type LayoutPreset =
   | 'bigCalendar' | 'leftRight' | 'topBottom' | 'bigTime' | 'agenda'
-  | 'today' | 'people' | 'photoFrame' | 'twoWeeks' | 'board' | 'bedside' | 'planner';
+  | 'today' | 'people' | 'photoFrame' | 'twoWeeks' | 'board' | 'bedside' | 'planner'
+  // kids layouts (Modern style only; with Classic the display shows bigCalendar)
+  | 'kidsRoutines' | 'kidsFamily' | 'kidsMeals';
 /** Corner of the clock card in the 'photoFrame' layout: top-left, top-right, bottom-left, bottom-right. */
 export type FrameCorner = 'tl' | 'tr' | 'bl' | 'br';
 export type SourceKind = 'generic' | 'airbnb' | 'birthdays' | 'holidays';
@@ -596,6 +598,8 @@ export interface AppConfig {
   privacy: ScreenPrivacyConfig;
   /** global (servers without carousels leave it out) */
   carousels?: { items: Carousel[] };
+  /** global family block + this screen's part */
+  family: FamilyConfig & ScreenFamilyConfig;
 }
 
 /** GET /api/display/config[?screen=<slug|id>] */
@@ -623,6 +627,192 @@ export interface DisplayConfig {
   target?: DisplayTarget;
   /** the carousel the display runs (null or absent: a plain screen) */
   carousel?: CarouselBlock | null;
+  /** Familia on this screen (older servers: absent) */
+  family?: DisplayFamilyBlock;
+}
+
+// ---- Familia (server/core/familyCore.js, server/family.js) ----
+
+export type ChoreSlot = 'morning' | 'afternoon' | 'evening' | 'any';
+export type MealSlot = 'breakfast' | 'lunch' | 'snack' | 'dinner';
+/** Meals of one week or of the template: { '0'..'6' (0 = Sunday): { slot: text } }. */
+export type MealDays = Record<string, Partial<Record<MealSlot, string>>>;
+
+export interface FamilyMember {
+  id: string; // "m_xxx"
+  name: string;
+  color: string; // '#rrggbb'
+  avatar: string; // emoji
+  /** only kids earn stars and redeem rewards */
+  kid: boolean;
+  /** calendar source id of this person (their events get the avatar on the Familia layout) */
+  calendarId: string | null;
+}
+
+export interface FamilyChore {
+  id: string; // "h_xxx"
+  memberId: string;
+  title: string;
+  emoji: string;
+  /** 0 = Sunday … 6; [] = every day */
+  days: number[];
+  slot: ChoreSlot;
+  /** stars, 0..20 */
+  points: number;
+  enabled: boolean;
+}
+
+export interface FamilyReward {
+  id: string; // "w_xxx"
+  title: string;
+  emoji: string;
+  /** stars, 1..500 */
+  cost: number;
+}
+
+export interface MealsConfig {
+  enabled: boolean;
+  /** ordered subset of breakfast, lunch, snack, dinner */
+  slots: MealSlot[];
+  /** a week without its own plan shows the template */
+  useTemplate: boolean;
+  template: MealDays;
+  /** ISO week ('2026-W42') → its plan; the newest 26 are kept */
+  weeks: Record<string, MealDays>;
+}
+
+/** Global `family` block (StoredConfig.family). */
+export interface FamilyConfig {
+  enabled: boolean;
+  members: FamilyMember[];
+  chores: FamilyChore[];
+  rewards: FamilyReward[];
+  showPoints: boolean;
+  allowRedeemFromPhone: boolean;
+  /** what privacy mode does on the TV */
+  privacy: 'initials' | 'hide';
+  meals: MealsConfig;
+}
+
+/** Per-screen part (ScreenProfile.family). */
+export interface ScreenFamilyConfig {
+  /** null = every member */
+  memberIds: string[] | null;
+  /** check routines off by touching this screen */
+  touch: boolean;
+  /** QR card of the family page on the kids layouts */
+  showQr: boolean;
+}
+
+/** `family` of GET /api/display/config. */
+export interface DisplayFamilyBlock {
+  enabled: boolean;
+  mealsEnabled: boolean;
+  showPoints: boolean;
+  touch: boolean;
+  qrUrl: string | null;
+  privacy: 'initials' | 'hide';
+}
+
+export interface FamilyCompletionRow {
+  date: string;
+  choreId: string;
+  memberId: string;
+  title: string;
+  emoji: string;
+  points: number;
+  by: 'phone' | 'display' | 'admin';
+  at: string;
+}
+
+export interface FamilyRedemption {
+  id: string;
+  rewardId: string;
+  memberId: string;
+  title: string;
+  emoji: string;
+  cost: number;
+  by: 'phone' | 'admin';
+  at: string;
+}
+
+export interface FamilyAdjustment {
+  id: string;
+  memberId: string;
+  delta: number;
+  note: string;
+  at: string;
+}
+
+/** GET /api/admin/family */
+export interface FamilyAdminState {
+  today: string;
+  rev: number;
+  points: Record<string, number>;
+  progress: Record<string, { done: number; total: number }>;
+  /** last 14 days, newest first */
+  completions: FamilyCompletionRow[];
+  /** newest first */
+  redemptions: FamilyRedemption[];
+  adjustments: FamilyAdjustment[];
+  link: { exists: boolean; path: string | null; createdAt: string | null };
+  lanAddresses?: string[];
+  publicUrl?: string | null;
+}
+
+export interface FamilyMemberView {
+  id: string;
+  name: string;
+  initials?: string;
+  color: string;
+  avatar: string;
+  kid: boolean;
+  /** TV only: this person's calendar source (FamilyMember.calendarId) */
+  calendarId?: string | null;
+  points: number | null;
+  done: number;
+  total: number;
+}
+
+export interface FamilyChoreView {
+  id: string;
+  memberId: string;
+  title: string;
+  emoji: string;
+  slot: ChoreSlot;
+  points: number;
+  done: boolean;
+}
+
+/** GET /api/display/family */
+export interface FamilyDisplayState {
+  today: string;
+  slotNow: Exclude<ChoreSlot, 'any'>;
+  rev: number;
+  private: boolean;
+  hidden: boolean;
+  showPoints: boolean;
+  touch: boolean;
+  qrUrl?: string | null;
+  members: FamilyMemberView[];
+  chores: FamilyChoreView[];
+  meals: { slots: MealSlot[]; days: { date: string; dow: number; meals: Partial<Record<MealSlot, string>> }[] } | null;
+  nextReward?: Record<string, { title: string; emoji: string; cost: number; missing: number }>;
+  generatedAt: string | null;
+}
+
+/** GET /api/family/state (the family page on a phone). */
+export interface FamilyPhoneState {
+  today: string;
+  slotNow: Exclude<ChoreSlot, 'any'>;
+  lang: Lang;
+  rev: number;
+  showPoints: boolean;
+  allowRedeem: boolean;
+  members: FamilyMemberView[];
+  chores: FamilyChoreView[];
+  rewards: { id: string; title: string; emoji: string; cost: number }[];
+  meals: { slots: MealSlot[]; today: Partial<Record<MealSlot, string>> } | null;
 }
 
 /** CalEvent from GET /api/events */
@@ -809,6 +999,8 @@ export interface Features {
   carousels: boolean;
   /** Immich albums as a background source, proxied by this server (self-hosted; absent = off). */
   immich: boolean;
+  /** Familia: members, routines with stars, rewards, meals, the kids layouts and the family page (absent = off). */
+  family: boolean;
 }
 
 export type FeatureName = keyof Features;
@@ -1207,6 +1399,7 @@ export interface ScreenProfile {
   countdowns: ScreenCountdownsConfig;
   alerts: ScreenAlertsConfig;
   privacy: ScreenPrivacyConfig;
+  family: ScreenFamilyConfig;
 }
 
 export type RepeatFreq = 'none' | 'weekly' | 'monthly' | 'yearly';
@@ -1356,6 +1549,7 @@ export interface StoredConfig {
   immich: ImmichConfig;
   auth: AuthConfig;
   security: SecurityConfig;
+  family: FamilyConfig;
 }
 
 /** PUT /api/admin/config body: the whole config plus the revision the admin loaded it at. A stale `baseRevision`
@@ -1789,6 +1983,12 @@ export type ActivityType =
   | 'display.device_updated'
   | 'display.device_revoked'
   | 'display.doorbell'
+  | 'family.chore'
+  | 'family.redeemed'
+  | 'family.points'
+  | 'family.undone'
+  | 'family.link'
+  | 'family.key_rejected'
   | 'activity.cleared'
   | 'update.requested'
   | 'update.finished'

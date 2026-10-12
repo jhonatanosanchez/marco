@@ -11,13 +11,18 @@ import {
   CAROUSEL_PREFIX, MAX_CAROUSELS, MAX_CAROUSEL_STEPS, MIN_STEP_SEC, MAX_STEP_SEC, DEFAULT_STEP_SEC, CAROUSEL_TRANSITIONS, CAROUSEL_SPEEDS, DEFAULT_TRANSITION, DEFAULT_SPEED, pruneCarousels,
 } from './carousels.js';
 import { IMMICH_ID_RE, MAX_IMMICH_ALBUMS, PORTRAIT_FITS, normalizeImmichUrl } from './immichCore.js';
+import { sanitizeFamily, sanitizeScreenFamily, KIDS_PRESETS } from './familyCore.js';
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 /** Screen layouts (docs/ARCHITECTURE.md); the display, the admin and server/setup.js use the same ids. */
-export const LAYOUT_PRESETS = ['bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda', 'today', 'people', 'photoFrame', 'twoWeeks', 'board', 'bedside', 'planner'];
+export const LAYOUT_PRESETS = [
+  'bigCalendar', 'leftRight', 'topBottom', 'bigTime', 'agenda', 'today', 'people', 'photoFrame', 'twoWeeks', 'board', 'bedside', 'planner',
+  // kids layouts (Familia): the display shows them with the Modern style only
+  ...KIDS_PRESETS,
+];
 /** calendar.eventStyle: 'lines' (one-line chips, the original look) or 'cards' (time on top, title below). */
 export const EVENT_STYLES = ['lines', 'cards'];
 /** calendar.agendaDays: days the agenda view looks ahead, or 'auto' (fills the agenda with the next days that have events). */
@@ -208,7 +213,7 @@ function requiredStr(ctx, path, v, d, max) {
   return s;
 }
 
-function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
+function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs, familyMemberIds = []) {
   const D = defaultScreenProfile();
   const x = obj(ctx, p, raw);
   const name = str(ctx, `${p}.name`, x.name, '', 60).trim() || 'Screen';
@@ -359,11 +364,13 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs) {
     showLock: bool(ctx, `${p}.privacy.showLock`, pv.showLock, D.privacy.showLock),
     schedule: list(ctx, `${p}.privacy.schedule`, pv.schedule, [], MAX_PRIVACY_RULES, sanitizePrivacyRule),
   };
+  // Familia on this screen: who appears (unknown members dropped quietly), touch, QR card (familyCore.js)
+  const family = sanitizeScreenFamily(x.family, (path, m) => ctx.err(path, m), `${p}.family`, familyMemberIds);
 
   return {
     // "v_" belongs to carousels (isCarouselId); a screen id with it gets a new one
     id: id(ctx, `${p}.id`, typeof x.id === 'string' && x.id.startsWith(CAROUSEL_PREFIX) ? undefined : x.id, 's_', seenIds), slug, name,
-    screen, layout, background, calendar, datetime, weather, news, todo, message, countdowns, alerts, privacy,
+    screen, layout, background, calendar, datetime, weather, news, todo, message, countdowns, alerts, privacy, family,
   };
 }
 
@@ -718,12 +725,16 @@ export function validateConfig(input, opts = {}) {
     displayAccess: oneOf(ctx, 'security.displayAccess', se.displayAccess, D.security.displayAccess, ['private', 'open']),
   };
 
+  // ---- Familia (familyCore.js): members may be linked to any calendar, built-in ones included
+  const family = sanitizeFamily(c.family, (path, m) => ctx.err(path, m), [...RESERVED_SOURCE_IDS, ...calendar.sources.map((s) => s.id)]);
+  const familyMemberIds = family.members.map((m) => m.id);
+
   // ---- F1 screens
   let rawScreens = arr(ctx, 'screens', c.screens, D.screens, MAX_SCREENS);
   if (!rawScreens.length) { ctx.err('screens', 'at least one screen'); rawScreens = D.screens; }
   const seenIds = new Set();
   const seenSlugs = new Set();
-  const screens = rawScreens.map((s, i) => sanitizeScreenProfile(ctx, `screens[${i}]`, s, seenIds, seenSlugs));
+  const screens = rawScreens.map((s, i) => sanitizeScreenProfile(ctx, `screens[${i}]`, s, seenIds, seenSlugs, familyMemberIds));
   if (opts.immichAvailable === false) {
     screens.forEach((s, i) => { if (s.background.source === 'immich') ctx.err(`screens[${i}].background.source`, 'Immich is not available'); });
   }
@@ -766,7 +777,7 @@ export function validateConfig(input, opts = {}) {
   const revision = Number.isInteger(c.revision) && c.revision > 0 ? c.revision : 1;
   const value = {
     version: CONFIG_VERSION, revision, defaultScreen, screens,
-    calendar, datetime, weather, news, todo, localEvents, birthdays, eventRules, countdowns, schedules, carousels, homeassistant, immich, auth, security,
+    calendar, datetime, weather, news, todo, localEvents, birthdays, eventRules, countdowns, schedules, carousels, homeassistant, immich, auth, security, family,
   };
   return { ok: ctx.errors.length === 0, errors: ctx.errors, value };
 }
