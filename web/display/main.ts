@@ -48,7 +48,7 @@ import { Clock } from './widgets/clock';
 import { renderMessage, renderTodo } from './widgets/extras';
 import { Highlights } from './widgets/highlights';
 import { News } from './widgets/news';
-import { Photos, photoStats } from './widgets/photos';
+import { Photos, photoStats, type SlideshowPosition } from './widgets/photos';
 import { glassVars, normalizeGlass } from '../shared/glass';
 import { Weather } from './widgets/weather';
 import { VIEW_PRESETS, Views } from './widgets/views';
@@ -1092,6 +1092,9 @@ function checkGPU(): void {
   } catch { /* no name: keep what we know */ }
 }
 
+/** Carousel screens with other photos: where each slideshow was when its screen left (by photo settings). */
+const photoSpots = new Map<string, { photos: PhotosResponse; at: SlideshowPosition }>();
+
 /** Put one carousel screen on display from its bundle: no request, animated as the carousel says (switchPlan.ts). */
 function showScreen(id: string, b: Bundle, sw: SwitchInfo): void {
   // from now on, answers for the screen that leaves are kept for it and never shown
@@ -1103,6 +1106,8 @@ function showScreen(id: string, b: Bundle, sw: SwitchInfo): void {
     // the photo list only changes when the photo settings differ (same source: the slideshow just goes on)
     const sig = photoSigOf(b.config.background);
     const newPhotos = !!photoSig && sig !== photoSig;
+    // the slideshow of the screen that leaves is kept where it is, so it goes on from there when that screen is back
+    if (newPhotos && state.photos) photoSpots.set(photoSig, { photos: state.photos, at: photos.position() });
     photoSig = sig;
     if (b.config.screen?.language && b.config.screen.language !== ctx.lang) {
       const w = weatherByLang.get(b.config.screen.language);
@@ -1110,7 +1115,11 @@ function showScreen(id: string, b: Bundle, sw: SwitchInfo): void {
     }
     set('config', b.config);
     saveShown(b);
-    if (newPhotos) {
+    const spot = newPhotos ? photoSpots.get(sig) : undefined;
+    if (spot) {
+      set('photos', spot.photos);
+      photos.resume(spot.at);
+    } else if (newPhotos) {
       if (b.photos) {
         set('photos', b.photos as PhotosResponse);
         void photos.next();

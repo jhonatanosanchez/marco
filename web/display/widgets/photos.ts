@@ -73,6 +73,12 @@ function dropNode(n: PhNode | null | undefined): void {
 /** set once the first photo's tone has been applied (see measureTone) */
 let toneSeen = false;
 
+/** A slideshow's place, kept by a carousel while another screen shows (Photos.position / resume). */
+export interface SlideshowPosition {
+  list: Photo[];
+  idx: number;
+}
+
 export class Photos {
   private list: Photo[] = [];
   private idx = -1;
@@ -285,6 +291,19 @@ export class Photos {
       });
     }
     return { img, src, tone: img };
+  }
+
+  /** Where the slideshow is: its list and the photo on screen (a carousel keeps it while another screen shows). */
+  position(): SlideshowPosition {
+    return { list: this.list.slice(), idx: this.idx };
+  }
+
+  /** Go on from a saved position: the photo after the one that was on screen then. */
+  resume(p: SlideshowPosition): void {
+    if (!p.list.length) return void this.next();
+    this.list = p.list.slice();
+    this.idx = Math.min(p.idx, p.list.length - 1);
+    void this.next();
   }
 
   async next(): Promise<void> {

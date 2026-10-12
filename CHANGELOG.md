@@ -5,6 +5,10 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- Carousels: screens with different photo settings showed the first photo of each again at every switch. Each
+  screen's slideshow now goes on where it was.
+
 ## [0.7.1] - 2026-10-12
 
 ### Added
