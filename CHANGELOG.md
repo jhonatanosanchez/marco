@@ -5,6 +5,32 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-12
+
+### Added
+- The side preview in the admin shows unsaved changes: theme, layout, colours, font size, widgets and the rest of a
+  screen's settings show as you change them. Calendars, photos and new events still show once saved.
+- On the *Carousels* page the side preview plays a carousel, and a picker in its bar switches to another carousel or
+  to a single screen. There it changes screen every 4 s with the animation and speed chosen now, saved or not.
+  *Vista previa* on a carousel card shows that carousel there.
+- Carousel cards fold to one line with their screens, times and what is on now (remembered per browser). With more
+  than three carousels a search box filters them by name, address or screen.
+- Screen and carousel cards show the whole `?screen=` address in open mode, ready to select.
+
+### Changed
+- The *Probar* button and the preview dialog of a carousel are gone: the side preview does that now.
+- Copy buttons only appear where the browser allows copying (HTTPS or localhost). On a plain-http LAN address the
+  text is shown in full instead.
+- The photo slideshow keeps its own pace across carousel switches, and a new photo that would come within a few
+  seconds of a switch moves to the middle of the next screen's turn, so the two never change together.
+
+### Fixed
+- Carousel animations: the screen that leaves took the theme, style and font size of the one that comes in during the
+  animation (a dark calendar went blank under a light theme, for example). Its copy is now drawn in its own document
+  and keeps its look until the end.
+- The carousel countdown in the admin no longer reads *0 s*.
+- The private mode store no longer fails when no config is loaded yet (tests on Node 20).
+
 ## [0.7.0] - 2026-10-11
 
 ### Added
