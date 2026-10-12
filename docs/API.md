@@ -213,7 +213,7 @@ Answer `{ revision, screenId, targetKind, now, serverVersion, cursor, reset, com
 
 - `commands`: in order and already filtered to this display. Each one is `{ type, ...payload }` with the SSE event
   names and payloads: `reload`, `night`, `identify` (filled in for this display), `announce`, `announce-clear`,
-  `photos`, `events`, `privacy`, `doorbell` and `doorbell-end`.
+  `photos`, `events`, `privacy`, `doorbell`, `doorbell-end` and `family`.
 - `reset: true` on the first poll, after a server restart, or for a cursor the server no longer knows. `commands` then
   only holds the announcements still active on this screen, like the replay on `/api/stream`, and old commands are
   never replayed.

@@ -1154,6 +1154,7 @@ export type StreamEvent =
   | { type: 'privacy'; active: boolean; screenId?: string }
   | ({ type: 'doorbell' } & DoorbellRing)
   | { type: 'doorbell-end'; id: string }
+  | { type: 'family'; rev: number }
   | { type: 'ping'; t: number };
 
 // ---- Admin API ----
@@ -1734,7 +1735,9 @@ export type DisplayCommand =
   /** privacy mode turned on or off for `screenId`: refetch config, events, countdowns and photos */
   | { type: 'privacy'; active: boolean; screenId?: string }
   | ({ type: 'doorbell' } & DoorbellRing)
-  | { type: 'doorbell-end'; id: string };
+  | { type: 'doorbell-end'; id: string }
+  /** Familia changed (a routine ticked, stars, the family link): fetch the family state again */
+  | { type: 'family'; rev?: number };
 
 /** GET /api/display/poll?client=&cursor=&rev=&hidden=&preview= (docs/API.md) */
 export interface PollResponse {
