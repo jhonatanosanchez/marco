@@ -2,6 +2,7 @@
 // config from the server never breaks the screen.
 import type { AgendaDays, DisplayConfig } from '../shared/types';
 import { DEFAULT_ICON_RULES } from '../shared/emoji';
+import { ECHO_DEFAULTS, normalizeEcho } from './echoCore';
 import { CALENDAR_BLUR_DEFAULT, CALENDAR_OPACITY_DEFAULT, GLASS_DEFAULTS, normalizeGlass } from '../shared/glass';
 
 export const DEFAULT_CONFIG: DisplayConfig = {
@@ -10,6 +11,7 @@ export const DEFAULT_CONFIG: DisplayConfig = {
     name: 'Living room', language: 'en', fontScale: 1, theme: 'dark', style: 'classic', accent: '#ff5a4e', orientation: 'auto', customCss: '',
     nightMode: { enabled: false, from: '23:00', to: '07:00', dim: 0.35 },
     glass: { ...GLASS_DEFAULTS },
+    echo: { ...ECHO_DEFAULTS },
   },
   layout: { preset: 'bigCalendar', sidePanel: 'left', sideWidth: 0.36, people: null, corner: 'br', plannerBar: 'side' },
   background: {
@@ -88,6 +90,7 @@ export function normalizeConfig(raw: unknown): DisplayConfig {
   c.weather.forecastDays = clampInt(c.weather.forecastDays, 1, 7, 5);
   if (c.screen.style !== 'modern') c.screen.style = 'classic';
   c.screen.glass = normalizeGlass(c.screen.glass);
+  c.screen.echo = normalizeEcho(isObj(raw) && isObj(raw.screen) ? raw.screen.echo : undefined);
   if (!/^#[0-9a-f]{3,8}$/i.test(c.screen.accent)) c.screen.accent = '#ff5a4e';
   if (c.countdowns) c.countdowns.max = clampInt(c.countdowns.max, 1, 12, 4);
   if (c.alerts) c.alerts.volume = Math.min(1, Math.max(0, Number(c.alerts.volume) || 0));
