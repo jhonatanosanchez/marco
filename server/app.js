@@ -23,6 +23,7 @@ import { geocodeRouter } from './geocode.js';
 import { hostGuard } from './lib/net.js';
 import { redactSecrets } from './core/activityCore.js';
 import { displayAuth, mediaAuth } from './displayAccess.js';
+import { camerasMediaRouter } from './frigate.js';
 import { immichMedia } from './immich.js';
 import { galleryMedia, thumbMedia } from './photos.js';
 
@@ -131,6 +132,8 @@ export function createApp({ version, dist = path.join(ROOT, 'dist'), updater = n
   // Family photos: private mode → display key / device token (?k=) or admin session; open mode → LAN clients or
   // an admin session (and valid keys). displayAccess.js mediaAuth
   app.use('/media', mediaAuth);
+  // Cámaras Frigate (fork fsrhome, server/frigate.js): MJPEG, H.264 y fotos de eventos, solo cámaras de la lista.
+  app.use('/media', camerasMediaRouter());
   // Immich photos (server/immich.js): proxied with the server's API key, only assets of albums a screen plays.
   app.get('/media/immich/:id', (req, res, next) => immichMedia(req, res).catch(next));
   // Gallery URLs carry ?v=<mtime> (replaced photos get a new URL), so they can be cached for long, privately. A
