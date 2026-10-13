@@ -39,7 +39,7 @@ export const PLANNER_CALENDAR = { weeks: 'auto', eventStyle: 'cards' };
 export const SCREEN_ONLY_KEYS = ['screen', 'layout', 'background', 'message', 'alerts', 'privacy', 'widgets'];
 
 // ---- Widgets: images and web pages the owner adds (config.widgets), placed per screen (screen.widgets) ----
-export const WIDGET_TYPES = ['image', 'web', 'prices'];
+export const WIDGET_TYPES = ['image', 'web', 'prices', 'cameras'];
 /** Refresh choices in seconds. Web pages also have 0 (never reload: many dashboards update themselves). */
 export const WIDGET_REFRESH_SEC = [1, 10, 30, 60, 300, 900, 3600, 21600, 86400];
 export const WEB_WIDGET_REFRESH_SEC = [0, 30, 60, 300, 900, 3600, 21600, 86400];
@@ -61,6 +61,8 @@ export function defaultScreenProfile({ id = 's_main', slug = 'living-room', name
       // Echo Show (fork fsrhome): mantener viva la página en Silk, horario de apertura, pantalla completa al tocar y
       // guardia de fps. Apagado = la pantalla se comporta como Marco original.
       echo: { enabled: false, keepAlive: 'mp3', openFrom: '05:00', openTo: '16:00', fullscreenOnTap: true, fpsGuard: true },
+      // Cámaras Frigate (fork fsrhome): esta pantalla abre la alerta de persona a pantalla completa
+      cameras: { personAlerts: true },
       // Modern style glass material (ignored by Classic). The defaults reproduce the original Modern look.
       glass: { appearance: 'auto', opacity: 0.5, blur: 18, tint: 'dark', edge: true },
     },
@@ -156,6 +158,19 @@ export function defaultConfig() {
     },
     // Immich photo library (server/immich.js): the API key is in secrets.json, never in the config
     immich: { enabled: false, url: '', insecureTls: false },
+    // Cámaras Frigate (fork fsrhome, server/frigate.js): API interna sin auth en la red homelab; go2rtc para H.264.
+    frigate: {
+      enabled: false,
+      url: 'http://frigate:5000',
+      go2rtcUrl: 'http://frigate:1984',
+      cameras: [
+        { id: 'patio', name: 'Patio' },
+        { id: 'ext_izquierda', name: 'Exterior izquierda' },
+        { id: 'cochera', name: 'Cochera' },
+        { id: 'ext_derecha', name: 'Exterior derecha' },
+      ],
+      zones: ['pipol', 'pipol2', 'Entrada', 'mi-patio'],
+    },
     auth: { allowedGoogleEmails: [], passwordLoginEnabled: true },
     // 'private': every display needs its private link (/d/<key>) or a paired-device token (server/displayAccess.js).
     // 'open': legacy LAN mode (/ and /?screen= work without a key). Configs saved before 0.3 load as 'open'.

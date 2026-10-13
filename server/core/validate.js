@@ -14,6 +14,7 @@ import {
   CAROUSEL_PREFIX, MAX_CAROUSELS, MAX_CAROUSEL_STEPS, MIN_STEP_SEC, MAX_STEP_SEC, DEFAULT_STEP_SEC, CAROUSEL_TRANSITIONS, CAROUSEL_SPEEDS, DEFAULT_TRANSITION, DEFAULT_SPEED, pruneCarousels,
 } from './carousels.js';
 import { IMMICH_ID_RE, MAX_IMMICH_ALBUMS, PORTRAIT_FITS, normalizeImmichUrl } from './immichCore.js';
+import { CAMERA_ID_RE, ZONE_RE, MAX_CAMERAS, MAX_ZONES } from './camerasCore.js';
 import {
   BAND_NAME_MAX, BAND_PRESET_IDS, GRID_IDS, gridCompany, HOLIDAY_SETS, MAX_BAND_PRICE, MAX_BANDS, MIN_BAND_PRICE, TARIFF_MODES,
 } from './tariffsCore.js';
@@ -239,6 +240,7 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs, familyMemberIds 
   const sc = obj(ctx, `${p}.screen`, x.screen);
   const nm = obj(ctx, `${p}.screen.nightMode`, sc.nightMode);
   const ec = obj(ctx, `${p}.screen.echo`, sc.echo);
+  const cm = obj(ctx, `${p}.screen.cameras`, sc.cameras);
   const ED = D.screen.echo;
   const gl = obj(ctx, `${p}.screen.glass`, sc.glass);
   const GD = D.screen.glass;
@@ -266,6 +268,10 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs, familyMemberIds 
       openTo: hhmm(ctx, `${p}.screen.echo.openTo`, ec.openTo, ED.openTo),
       fullscreenOnTap: bool(ctx, `${p}.screen.echo.fullscreenOnTap`, ec.fullscreenOnTap, ED.fullscreenOnTap),
       fpsGuard: bool(ctx, `${p}.screen.echo.fpsGuard`, ec.fpsGuard, ED.fpsGuard),
+    },
+    // Cámaras Frigate (fork fsrhome)
+    cameras: {
+      personAlerts: bool(ctx, `${p}.screen.cameras.personAlerts`, cm.personAlerts, D.screen.cameras.personAlerts),
     },
     // glass material of the Modern style: appearance, transparency (0 = see-through, 1 = solid), blur, tint, light edge
     glass: {
@@ -450,6 +456,15 @@ function sanitizeWidget(ctx, p, x, seen, opts) {
       name: str(ctx, `${p}.name`, x.name, '', 60).trim() || 'Widget',
       // the screens ask this server for the prices: no address, no reload interval of their own
       options: { url: '', refreshSec: 900, fit: 'contain', bust: false, prices: sanitizePriceOptions(ctx, `${p}.options.prices`, o.prices) },
+    };
+  }
+  if (type === 'cameras') {
+    // la pantalla pide las cámaras a este servidor (/media/cameras): sin dirección ni recarga propia
+    return {
+      id: id(ctx, `${p}.id`, typeof x.id === 'string' && x.id.startsWith(WIDGET_PREFIX) ? x.id : undefined, WIDGET_PREFIX, seen),
+      type,
+      name: str(ctx, `${p}.name`, x.name, '', 60).trim() || 'Widget',
+      options: { url: '', refreshSec: 0, fit: 'contain', bust: false },
     };
   }
   let url = str(ctx, `${p}.options.url`, o.url, '', 2048).trim();
@@ -919,6 +934,32 @@ export function validateConfig(input, opts = {}) {
     insecureTls: bool(ctx, 'immich.insecureTls', imm.insecureTls, D.immich.insecureTls),
   };
 
+  // ---- Cámaras Frigate (fork fsrhome)
+  const fr = obj(ctx, 'frigate', c.frigate);
+  const FD = D.frigate;
+  const frUrl = (key) => {
+    const u = str(ctx, `frigate.${key}`, fr[key], FD[key], 512).trim().replace(/\/+$/, '');
+    if (!u || !isHttpUrl(u)) { ctx.err(`frigate.${key}`, 'invalid URL'); return FD[key]; }
+    return u;
+  };
+  const camSeen = new Set();
+  const frigate = {
+    enabled: bool(ctx, 'frigate.enabled', fr.enabled, FD.enabled),
+    url: frUrl('url'),
+    go2rtcUrl: frUrl('go2rtcUrl'),
+    cameras: arr(ctx, 'frigate.cameras', fr.cameras, FD.cameras, MAX_CAMERAS).map((x, i) => {
+      const q = `frigate.cameras[${i}]`;
+      if (!isObj(x) || typeof x.id !== 'string' || !CAMERA_ID_RE.test(x.id) || camSeen.has(x.id)) { ctx.err(`${q}.id`, 'invalid camera id'); return null; }
+      camSeen.add(x.id);
+      return { id: x.id, name: str(ctx, `${q}.name`, x.name, x.id, 40).trim() || x.id };
+    }).filter(Boolean),
+    zones: arr(ctx, 'frigate.zones', fr.zones, FD.zones, MAX_ZONES).filter((z) => {
+      const ok = typeof z === 'string' && ZONE_RE.test(z);
+      if (!ok) ctx.err('frigate.zones', 'invalid zone');
+      return ok;
+    }),
+  };
+
   const au = obj(ctx, 'auth', c.auth);
   const emails = arr(ctx, 'auth.allowedGoogleEmails', au.allowedGoogleEmails, [], 50)
     .filter((e) => typeof e === 'string').map((e) => e.trim().toLowerCase()).filter(Boolean);
@@ -991,7 +1032,7 @@ export function validateConfig(input, opts = {}) {
   const revision = Number.isInteger(c.revision) && c.revision > 0 ? c.revision : 1;
   const value = {
     version: CONFIG_VERSION, revision, defaultScreen, screens,
-    calendar, datetime, weather, news, todo, localEvents, birthdays, eventRules, countdowns, schedules, carousels, widgets, homeassistant, immich, auth, security, family,
+    calendar, datetime, weather, news, todo, localEvents, birthdays, eventRules, countdowns, schedules, carousels, widgets, homeassistant, immich, frigate, auth, security, family,
   };
   return { ok: ctx.errors.length === 0, errors: ctx.errors, value };
 }

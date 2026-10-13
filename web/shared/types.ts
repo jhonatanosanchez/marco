@@ -44,6 +44,20 @@ export interface EchoStatus {
   liteByGuard: boolean; // la guardia la pasó a lite
 }
 
+// ---- Cámaras Frigate (fork fsrhome; server/frigate.js) ----
+export interface FrigateCamera { id: string; name: string }
+export interface FrigateSettings { enabled: boolean; url: string; go2rtcUrl: string; cameras: FrigateCamera[]; zones: string[] }
+/** lo más reciente en zona de una cámara (start_time de Frigate, en segundos) */
+export interface CameraActivity { label: string; startTime: number }
+/** evento en vivo `cameras` y GET /api/display/cameras */
+export interface CamerasActivityEvent { activity: Record<string, CameraActivity> }
+/** evento en vivo `cameraAlert` (solo a pantallas con screen.cameras.personAlerts) */
+export interface CameraAlert { camera: string; name: string; label: string; startTime: number; eventId: string | null; test?: boolean }
+/** GET /api/admin/cameras/status */
+export interface CamerasStatus { enabled: boolean; lastOkAt: string | null; lastError: string | null; lastEventAt: string | null }
+/** POST /api/admin/cameras/test-alert */
+export interface CameraTestAlertResponse { ok: boolean; delivered: number; screens: string[] }
+
 export type DisplayStyle = 'classic' | 'modern';
 
 /** Glass material of the Modern style (like iOS Liquid Glass): ignored by Classic. */
@@ -75,6 +89,8 @@ export interface ScreenConfig {
   nightMode: NightMode;
   /** Echo Show (fork fsrhome). Missing = disabled (ECHO_DEFAULTS in web/display/echoCore.ts). */
   echo?: EchoSettings;
+  /** cámaras Frigate (fork fsrhome): esta pantalla abre la alerta de persona */
+  cameras?: { personAlerts: boolean };
 }
 
 export interface LayoutConfig {
@@ -95,7 +111,7 @@ export type PlannerBar = 'side' | 'top' | 'bottom';
 
 // ---- Widgets (server/validate.js sanitizeWidget, server/screens.js displayWidgets) ----
 
-export type WidgetType = 'image' | 'web' | 'prices';
+export type WidgetType = 'image' | 'web' | 'prices' | 'cameras';
 export type WidgetPlace = 'corner' | 'side';
 export type WidgetSize = 's' | 'm' | 'l';
 export type WidgetFit = 'contain' | 'cover';
@@ -218,6 +234,8 @@ export interface DisplayWidget {
   v: string;
   /** type 'prices': what to draw (the display fetches /api/display/prices?zone=) */
   prices?: PriceWidgetOptions;
+  /** type 'cameras': las cámaras de la cuadrícula (fork fsrhome) */
+  cameras?: FrigateCamera[];
 }
 /** POST /api/admin/test/widget { type, url } */
 export interface TestWidgetResponse {
@@ -773,6 +791,7 @@ export interface AppConfig {
   schedules: { items: ScheduledMessage[] };
   homeassistant: HomeAssistantConfig;
   immich: ImmichConfig;
+  frigate: FrigateSettings;
   auth: AuthConfig;
   security: SecurityConfig;
   privacy: ScreenPrivacyConfig;
@@ -1789,6 +1808,7 @@ export interface StoredConfig {
   widgets?: WidgetDef[];
   homeassistant: HomeAssistantConfig;
   immich: ImmichConfig;
+  frigate: FrigateSettings;
   auth: AuthConfig;
   security: SecurityConfig;
   family: FamilyConfig;

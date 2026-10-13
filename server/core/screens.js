@@ -101,7 +101,10 @@ function shortHash(s) {
 }
 
 /** What changes when a saved widget changes in a way the display must load again (its `v`). */
-export const widgetVersion = (w) => shortHash(JSON.stringify(w.type === 'prices' ? [w.type, w.options.prices?.zone, ...(w.options.prices?.tariff === 'grid' ? [w.options.prices.grid] : [])] : [w.type, w.options.url, w.options.refreshSec, w.options.bust]));
+export const widgetVersion = (w) => shortHash(JSON.stringify(
+  w.type === 'prices' ? [w.type, w.options.prices?.zone, ...(w.options.prices?.tariff === 'grid' ? [w.options.prices.grid] : [])]
+    : w.type === 'cameras' ? [w.type]
+      : [w.type, w.options.url, w.options.refreshSec, w.options.bust]));
 
 /**
  * Widgets a screen shows, in display form. `widgetSrc(w)` = what the display loads: the URL itself on a server whose
@@ -111,7 +114,13 @@ export const widgetVersion = (w) => shortHash(JSON.stringify(w.type === 'prices'
 export function displayWidgets(cfg, screen, { isPrivate = false, widgetSrc = null } = {}) {
   if (isPrivate) return [];
   const defs = new Map((Array.isArray(cfg.widgets) ? cfg.widgets : []).map((w) => [w.id, w]));
-  const one = (w, place, corner, size) => (w.type === 'prices'
+  const fr = cfg.frigate;
+  // cámaras (fork fsrhome): sin Frigate activado la pantalla no las recibe
+  const shown = (w) => !!w && !(w.type === 'cameras' && !fr?.enabled);
+  const one = (w, place, corner, size) => (w.type === 'cameras'
+    // la pantalla pide el video a este servidor (/media/cameras/<id>.mjpeg) y dibuja la cuadrícula
+    ? { id: w.id, type: w.type, name: w.name, place, corner, size, refreshSec: 0, fit: 'contain', bust: false, src: '', via: 'direct', v: widgetVersion(w), cameras: fr.cameras.map((c) => ({ id: c.id, name: c.name })) }
+    : w.type === 'prices'
     // the display asks this server for the zone's prices (GET /api/display/prices) and draws them itself
     ? { id: w.id, type: w.type, name: w.name, place, corner, size, refreshSec: 0, fit: 'contain', bust: false, src: '', via: 'direct', v: widgetVersion(w), prices: { ...w.options.prices } }
     : {
@@ -123,10 +132,10 @@ export function displayWidgets(cfg, screen, { isPrivate = false, widgetSrc = nul
       });
   const out = [];
   const full = screen.layout?.preset === 'widget' ? defs.get(screen.layout.widgetId) : null;
-  if (full) out.push(one(full, 'full', 'br', 'l'));
+  if (shown(full)) out.push(one(full, 'full', 'br', 'l'));
   for (const p of Array.isArray(screen.widgets) ? screen.widgets : []) {
     const w = defs.get(p.widgetId);
-    if (w) out.push(one(w, p.place, p.corner, p.size));
+    if (shown(w)) out.push(one(w, p.place, p.corner, p.size));
   }
   return out;
 }

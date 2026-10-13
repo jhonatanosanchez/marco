@@ -334,6 +334,7 @@
         "widgets?",
         "homeassistant",
         "immich",
+        "frigate",
         "auth",
         "security",
         "family"
@@ -369,6 +370,7 @@
         "widgets?",
         "homeassistant",
         "immich",
+        "frigate",
         "auth",
         "security",
         "family"
