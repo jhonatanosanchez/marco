@@ -952,7 +952,11 @@ export function LayoutSection(props: SectionProps) {
             onClick={() =>
               set((d) => {
                 // picking the planner also turns on what it is made for (automatic weeks, cards); both can be changed later
-                if (p.id === 'planner' && d.layout.preset !== 'planner') Object.assign(d.calendar, PLANNER_CALENDAR);
+                if (p.id === 'planner' && d.layout.preset !== 'planner') {
+                  Object.assign(d.calendar, PLANNER_CALENDAR);
+                  // the time and the weather start in the strip on top (a portrait screen ignores it)
+                  d.layout.plannerBar = 'top';
+                }
                 // leaving it before saving takes that back, so the other layouts keep the weeks and style they had
                 else if (p.id !== 'planner' && d.layout.preset === 'planner') {
                   const was = props.saved.screens.find((s) => s.id === props.screenId);
