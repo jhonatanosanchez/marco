@@ -109,7 +109,7 @@ color de la foto, transparencia, desenfoque y borde de luz:
   cristal sobre la foto, reloj de pantalla de bloqueo y una cuadrícula de mes como la de iOS, o *Clásico*. El estilo
   es independiente del diseño. Una tercera tarjeta, *Niños*, es el estilo Moderno con los diseños para niños: colores
   suaves sobre un fondo liso.
-- **Rutinas, estrellas y comidas de la familia:** hasta seis personas con un emoji y un color, rutinas de mañana,
+- **Rutinas, estrellas y comidas de la familia:** hasta seis personas con un emoji o una foto y un color, rutinas de mañana,
   tarde y noche que dan estrellas, premios en los que gastarlas y el menú de la semana. Los niños marcan sus rutinas
   en la tele (pantallas táctiles) o en el móvil, con un código QR de la pantalla; mira
   [Familia: rutinas, estrellas y comidas](#familia-rutinas-estrellas-y-comidas).
@@ -542,8 +542,11 @@ semana. Con tarjetas no se usan los *Días llenos en compacto* (las tarjetas ya 
 
 *Contenido → Familia* (se activa arriba de la página) tiene cuatro pestañas:
 
-- **Miembros:** hasta seis personas, cada una con nombre, emoji, color y, si quieres, su propio calendario (su avatar
-  sale entonces en esos eventos). Marca a los niños: solo los niños ganan estrellas.
+- **Miembros:** hasta seis personas, cada una con nombre, emoji o foto, color y, si quieres, su propio calendario (su
+  avatar sale entonces en esos eventos). Marca a los niños: solo los niños ganan estrellas. Toca el avatar para elegir
+  un emoji o *Subir foto*: arrastra la foto para encuadrar la cara, acerca con la barra (o con la rueda del ratón, o
+  con dos dedos) y guarda. El recorte se hace en el navegador y solo se envía un cuadrado pequeño; el servidor lo
+  guarda sin los datos de la cámara (ubicación, fecha, móvil).
 - **Rutinas:** qué hace cada persona y cuándo (por la mañana, por la tarde, por la noche o en cualquier momento), qué
   días y cuántas estrellas da (de 0 a 20). *Añadir rutinas de ejemplo* pone unas cuantas para empezar. Las rutinas de
   hoy también se pueden marcar aquí.
@@ -581,6 +584,11 @@ funciona mientras la pantalla está en modo privado ni dentro de la vista previa
 Lo que se ha hecho (rutinas marcadas, premios canjeados, ajustes) se guarda en `data/family.json` durante 90 días; lo
 más antiguo se suma al saldo de cada niño, así que las estrellas no cambian. *Exportar* lo incluye, e importar la
 sección *Familia* lo recupera.
+
+Las fotos de perfil se guardan en `data/avatars` y solo llegan a la página familiar (con su enlace), al panel y a las
+pantallas que muestran a esa persona. Una pantalla en modo privado sigue con el emoji. Al exportar se incluyen las
+fotos. Una foto que cambias o quitas, o la de alguien que borras, se elimina una semana después, así que restaurar una
+copia reciente la recupera.
 
 ## Enlaces privados y vinculación de pantallas
 

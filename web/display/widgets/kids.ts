@@ -11,7 +11,7 @@ import { qrSvg } from '../../shared/qr';
 import { chipColors } from '../color';
 import { ctx } from '../ctx';
 import { esc, setHTML } from '../dom';
-import { isPreview } from '../identity';
+import { isPreview, mediaUrl, withScreen } from '../identity';
 import type { NEvent } from '../eventModel';
 import { weatherIcon } from '../icons';
 import type { Tick } from '../time';
@@ -47,8 +47,33 @@ function memberStyle(color: string): string {
   const c = chipColors(color);
   return `--kc:${esc(color)};--kc-tint:${c.tint};--kc-shade:${c.shade};--kc-on:${c.onSolid}`;
 }
-const avatar = (m: Pick<FamilyMemberView, 'avatar' | 'initials' | 'name'>) =>
-  `<span class="k-av"><i>${esc(m.avatar || m.initials || m.name.slice(0, 1))}</i></span>`;
+/**
+ * Photo addresses that did not load (a server restarting, a photo just replaced, an address that expired): those
+ * people show their emoji, and the photo is tried again after PHOTO_RETRY_MS.
+ */
+const brokenPhotos = new Map<string, number>();
+const PHOTO_RETRY_MS = 5 * 60_000;
+/**
+ * A person's profile photo address for this display, or ''. Any same-origin path: /media/avatars/<id> gets this
+ * display's screen and credential; a signed address (Marco Cloud: /m/...?e=&s=) is used as it is.
+ */
+const photoSrc = (m: Pick<FamilyMemberView, 'photo'>) => {
+  const p = m.photo;
+  if (!p || !p.startsWith('/') || p.startsWith('//')) return '';
+  const src = p.startsWith('/media/') ? mediaUrl(withScreen(p)) : p;
+  const failed = brokenPhotos.get(src);
+  if (failed !== undefined) {
+    if (Date.now() - failed < PHOTO_RETRY_MS) return '';
+    brokenPhotos.delete(src);
+  }
+  return src;
+};
+/** Round avatar: the profile photo over the emoji (the emoji shows when there is none or it fails to load). */
+const avatar = (m: Pick<FamilyMemberView, 'avatar' | 'initials' | 'name' | 'photo'>) => {
+  const src = photoSrc(m);
+  const img = src ? `<img class="k-av-img" src="${esc(src)}" alt="" decoding="async" draggable="false">` : '';
+  return `<span class="k-av${img ? ' has-photo' : ''}">${img}<i>${esc(m.avatar || m.initials || m.name.slice(0, 1))}</i></span>`;
+};
 const hm = (ms: number) => formatTime(new Date(ms), ctx.tz, ctx.cfg.datetime.format24, ctx.cfg.datetime.showAmPm);
 
 /** Hide rows until `box` stops overflowing (like views.ts): `pick()` gives the next one, `after(row)` runs after each. */
@@ -93,7 +118,16 @@ export class Kids {
   private last: { d: KidsData; tick: Tick } | null = null;
 
   /** `onToggle(choreId, done)`: a tap on a routine. */
-  constructor(private root: HTMLElement, private onToggle: (choreId: string, done: boolean) => void) {}
+  constructor(private root: HTMLElement, private onToggle: (choreId: string, done: boolean) => void) {
+    // a photo that does not load: the emoji instead, now and in the drawings of the next few minutes
+    root.addEventListener('error', (e) => {
+      const img = e.target as HTMLImageElement | null;
+      if (!img || img.tagName !== 'IMG' || !img.classList.contains('k-av-img')) return;
+      brokenPhotos.set(img.getAttribute('src') || '', Date.now());
+      img.parentElement?.classList.remove('has-photo');
+      img.remove();
+    }, true);
+  }
 
   /** Build the skeleton of a kids layout (empty for every other layout). */
   setPreset(preset: string): void {

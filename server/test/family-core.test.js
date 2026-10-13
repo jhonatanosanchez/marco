@@ -457,10 +457,13 @@ test('adminFamily: last 14 days newest first, last 50 entries', () => {
   assert.deepEqual(a.progress.m_mateo, { done: 1, total: 1 });
 });
 
-test('familyCore stays portable: no fs, no express, no store; only lib/tz.js', () => {
+test('familyCore stays portable: no fs, no express, no store; only lib/tz.js and the pure photo checks', () => {
   const src = fs.readFileSync(new URL('../core/familyCore.js', import.meta.url), 'utf8');
   const imports = [...src.matchAll(/^import .* from '([^']+)';$/gm)].map((m) => m[1]);
-  assert.deepEqual(imports, ['./lib/tz.js']);
+  assert.deepEqual(imports, ['./lib/tz.js', './familyPhotoCore.js']);
+  const photo = fs.readFileSync(new URL('../core/familyPhotoCore.js', import.meta.url), 'utf8');
+  assert.deepEqual([...photo.matchAll(/^import .* from '([^']+)';$/gm)].map((m) => m[1]), ['./imageInfo.js']);
+  assert.doesNotMatch(photo, /\bBuffer\b|node:/);
   assert.ok(FAMILY_KEY_RE.test(`fk_${'a'.repeat(32)}`));
   assert.ok(!FAMILY_KEY_RE.test(`fk_${'a'.repeat(31)}`));
 });

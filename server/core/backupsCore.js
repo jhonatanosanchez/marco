@@ -44,8 +44,10 @@ export function exportSecrets(sec) {
 /**
  * `familyState` = the family state (routines done, rewards redeemed, stars; data/family.json here): always in the
  * bundle when there is one, it holds no secret; an import that takes the `family` section restores it.
+ * `familyPhotos` = the members' profile photos ({ id: base64 }, server/familyPhotos.js), restored with the family
+ * section too.
  */
-export function makeBundle(cfg, { appVersion, secrets = null, now = new Date(), familyState = null }) {
+export function makeBundle(cfg, { appVersion, secrets = null, now = new Date(), familyState = null, familyPhotos = null }) {
   return {
     format: 'marco-backup',
     formatVersion: 1,
@@ -53,12 +55,19 @@ export function makeBundle(cfg, { appVersion, secrets = null, now = new Date(), 
     appVersion,
     config: structuredClone(cfg),
     ...(familyState ? { familyState: structuredClone(familyState) } : {}),
+    ...(familyPhotos && Object.keys(familyPhotos).length ? { familyPhotos: { ...familyPhotos } } : {}),
     ...(secrets ? { secrets: exportSecrets(secrets) } : {}),
   };
 }
 
 /** The bundle's family state (an object) or null (a bare config, an older export). */
 export const bundleFamilyState = (bundle) => (isObj(bundle) && bundle.format === 'marco-backup' && isObj(bundle.familyState) ? bundle.familyState : null);
+
+/**
+ * The bundle's profile photos ({ id: base64 }) or null. Exports of the older calendar-screen format carry them under
+ * the same name.
+ */
+export const bundleFamilyPhotos = (bundle) => (isObj(bundle) && (bundle.format === 'marco-backup' || bundle.format === 'calendar-screen-backup') && isObj(bundle.familyPhotos) ? bundle.familyPhotos : null);
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 

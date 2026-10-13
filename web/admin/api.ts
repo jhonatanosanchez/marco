@@ -245,6 +245,8 @@ export const api = {
     request<{ ok: true; state: FamilyAdminState }>('DELETE', `/api/admin/family/${kind === 'redemption' ? 'redemptions' : 'adjustments'}/${encodeURIComponent(id)}`),
   familyLink: () => request<{ link: FamilyAdminState['link'] }>('POST', '/api/admin/family/link', {}),
   revokeFamilyLink: () => request<{ ok: true }>('DELETE', '/api/admin/family/link'),
+  /** A cropped profile photo (base64 of a small square JPEG): its id, for family.members[].photo. */
+  familyPhoto: (data: string) => request<{ photo: string }>('POST', '/api/admin/family/photos', { data }),
 
   eventsPreview: (body: EventsPreviewRequest) => request<EventsPreviewResponse>('POST', '/api/admin/events/preview', body),
   parseBirthdaysCsv: (text: string) => request<BirthdayCsvResult>('POST', '/api/admin/birthdays/parse-csv', { text }),

@@ -17,6 +17,7 @@ import { logSetupHint } from './setup.js';
 import { invalidateIcsParsing } from './calendars.js';
 import { serverUpdater } from './routes/updates.js';
 import { onPrivacyConfig, syncPrivacy, stopPrivacy } from './privacy.js';
+import { startPhotoSweep } from './familyPhotos.js';
 
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 
@@ -40,6 +41,8 @@ await ensurePassword();
 
 // Every display screen gets its private-link key (secrets.json; displayAccess.js).
 syncDisplayKeys();
+// Profile photos the config does not use go a week after they were last used (familyPhotos.js).
+startPhotoSweep();
 // Every heartbeat re-checks each open stream's credential (sessions expire, keys / devices change).
 setStreamValidator(() => revalidateStreams());
 const app = createApp({ version: pkg.version });

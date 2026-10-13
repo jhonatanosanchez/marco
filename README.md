@@ -107,7 +107,7 @@ transparency, blur and a light edge:
 - **Two styles per screen:** *Modern* (the default), a minimal Apple-like look with glass cards over the photo,
   a Lock Screen clock and an iOS-style month grid, or *Classic*. The style is independent of the layout. A third
   card, *Kids*, is the Modern style with the kids layouts: soft colours on a plain background.
-- **Family routines, stars and meals:** up to six people with an emoji and a colour, morning, afternoon and evening
+- **Family routines, stars and meals:** up to six people with an emoji or a photo and a colour, morning, afternoon and evening
   routines that earn stars, rewards to spend them on, and the meals of the week. Kids tick their routines on the TV
   (touch screens) or on a phone, from a QR code on the screen; see [Family: routines, stars and meals](#family-routines-stars-and-meals).
 - **Glass options** for the Modern style, per screen: automatic (adapts to each photo), clear or tinted; transparency,
@@ -514,8 +514,11 @@ days* is not used (cards already stack up in each day).
 
 *Content → Family* (turn it on at the top of the page) has four tabs:
 
-- **Members:** up to six people, each with a name, an emoji, a colour and, if you like, their own calendar (their
-  avatar then shows on its events). Mark the kids: only kids earn stars.
+- **Members:** up to six people, each with a name, an emoji or a photo, a colour and, if you like, their own calendar
+  (their avatar then shows on its events). Mark the kids: only kids earn stars. Tap the avatar to pick an emoji or
+  *Upload photo*: drag the photo to frame the face, zoom with the slider (or the mouse wheel, or two fingers), and
+  save. The crop happens in the browser and only a small square is sent; the server keeps it without its camera data
+  (location, date, device).
 - **Routines:** what each person does and when (morning, afternoon, evening or any time), on which days and for how
   many stars (0 to 20). *Add example routines* fills in a few to start with. Today's routines can be ticked here too.
 - **Rewards:** what the stars buy ("Pick Friday's film 🎬, 10 stars"), whether stars are shown at all and whether
@@ -551,6 +554,11 @@ the screen is in privacy mode, and inside the admin's preview.
 What was done (routines ticked, rewards redeemed, adjustments) is kept in `data/family.json` for 90 days; older entries
 are folded into each kid's balance, so stars never change. *Export* includes it, and importing the *Family* section
 brings it back.
+
+Profile photos are stored in `data/avatars` and only reach the family page (with its link), the admin and the
+screens that show that person. A screen in privacy mode keeps the emoji. Exports include the photos. A photo you
+replace or remove, or the photo of someone you remove, is deleted a week later, so restoring a recent backup brings
+it back.
 
 ## Private display links & pairing
 

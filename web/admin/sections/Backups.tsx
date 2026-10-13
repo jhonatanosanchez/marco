@@ -59,7 +59,8 @@ function backupFileName(b: BackupInfo): string {
 
 const REASON: Record<string, string> = { save: 'Al guardar', manual: 'Manual', restore: 'Antes de restaurar', import: 'Antes de importar', migration: 'Migración v1' };
 
-export function BackupsSection({ dirty, replaceConfig }: SectionProps) {
+export function BackupsSection({ dirty, replaceConfig, full }: SectionProps) {
+  const hasPhotos = !!full?.family?.members?.some((m) => !!m.photo);
   const [secrets, setSecrets] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [list, setList] = useState<BackupInfo[] | null>(null);
@@ -306,6 +307,7 @@ export function BackupsSection({ dirty, replaceConfig }: SectionProps) {
             </label>
           )}
           {secretsOn && secrets && <Callout kind="warn">{t('Con secretos, quien tenga el archivo podría acceder a tus calendarios de Google y a Home Assistant. Guárdalo en un lugar seguro.')}</Callout>}
+          {hasPhotos && <p class="muted small">{t('El archivo incluye las fotos de perfil de los miembros de Familia.')}</p>}
           {!secretsOn && !isSelfHosted() && (
             <p class="muted small">
               {t('Sirve también para pasar a un Marco instalado en casa: impórtalo en su panel. No lleva enlaces privados, dispositivos vinculados, tokens de API ni cuentas de Google, así que después vincula de nuevo las pantallas y vuelve a conectar Google Calendar.')}{' '}

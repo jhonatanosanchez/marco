@@ -796,6 +796,8 @@ export interface FamilyMember {
   name: string;
   color: string; // '#rrggbb'
   avatar: string; // emoji
+  /** profile photo id (POST /api/admin/family/photos; GET /media/avatars/<id>), shown instead of the emoji */
+  photo?: string | null;
   /** only kids earn stars and redeem rewards */
   kid: boolean;
   /** calendar source id of this person (their events get the avatar on the Familia layout) */
@@ -919,6 +921,8 @@ export interface FamilyMemberView {
   initials?: string;
   color: string;
   avatar: string;
+  /** address of the profile photo (/media/avatars/<id>) or null: the emoji. Null on a private screen. */
+  photo?: string | null;
   kid: boolean;
   /** TV only: this person's calendar source (FamilyMember.calendarId) */
   calendarId?: string | null;
@@ -1160,6 +1164,8 @@ export interface Features {
   webWidgets: boolean;
   /** Electricity price widgets (type 'prices': GET /api/display/prices, POST /api/admin/test/prices); absent = off. */
   priceWidgets: boolean;
+  /** Profile photos of the family members (POST /api/admin/family/photos and where the photos are served); absent = off. */
+  familyPhotos: boolean;
 }
 
 export type FeatureName = keyof Features;

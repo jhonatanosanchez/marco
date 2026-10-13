@@ -12,7 +12,7 @@ export const FEATURE_KEYS = Object.freeze([
   'openDisplayAccess', 'insecureTls', 'googleCalendar', 'googleLogin', 'passwordLogin', 'apiTokens',
   'webhooks', 'backups', 'importExport', 'includeSecrets', 'activity', 'setupWizard', 'status', 'accountMenu',
   'microsoftCalendar', 'updates', 'feedback', 'privacy', 'doorbell', 'doorbellLive', 'carousels', 'immich',
-  'family', 'widgets', 'webWidgets', 'priceWidgets',
+  'family', 'widgets', 'webWidgets', 'priceWidgets', 'familyPhotos',
 ]);
 
 /** Feature flags of a self-hosted server: all on (`updates` too: the update banner and settings), Google and
@@ -23,7 +23,8 @@ export const FEATURE_KEYS = Object.freeze([
  *  photo source (server/immich.js), which needs a server on the same network as the library. `family` is Familia:
  *  members, routines with stars, rewards, meals, the kids layouts and the family page on the phone (server/family.js).
  *  `widgets` are images on screens (config.widgets); `webWidgets` adds web pages in a sandboxed frame;
- *  `priceWidgets` the electricity price card (server/prices.js). */
+ *  `priceWidgets` the electricity price card (server/prices.js). `familyPhotos`: profile photos of the family members
+ *  (POST /api/admin/family/photos, GET /media/avatars/<id>; server/familyPhotos.js). */
 export function selfHostedFeatures() {
   const google = googleConfigured();
   const out = {};

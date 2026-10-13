@@ -7,6 +7,7 @@ import type { AppConfig, ChoreSlot, FamilyAdminState, FamilyChore, FamilyMember,
 import { api, ApiError } from '../api';
 import { isLocalhost, shareOrigin } from '../components/DisplayAccess';
 import { choiceDialog, confirmDialog, toast } from '../components/feedback';
+import { AvatarFace, MemberAvatarPicker } from '../components/AvatarPhoto';
 import { Icon, type IconName } from '../components/icons';
 import { CopyField, Qr } from '../components/share';
 import { Button, Callout, Card, ColorPicker, EmojiPicker, Empty, Field, Modal, NumberInput, PageHeader, ReorderButtons, Segmented, Select, TextInput, Toggle, ToggleRow, WeekdayPicker } from '../components/ui';
@@ -111,10 +112,10 @@ function useFamilyState(revision: number) {
 type FamilyStateApi = ReturnType<typeof useFamilyState>;
 
 /** Round avatar with the member's colour ring. */
-export function Avatar({ m, size = 34 }: { m: Pick<FamilyMember, 'avatar' | 'color'>; size?: number }) {
+export function Avatar({ m, size = 34 }: { m: Pick<FamilyMember, 'avatar' | 'color' | 'photo'>; size?: number }) {
   return (
     <span class="fam-avatar" style={{ '--mc': m.color, width: `${size}px`, height: `${size}px`, fontSize: `${Math.round(size * 0.55)}px` } as any} aria-hidden="true">
-      {m.avatar || '🙂'}
+      <AvatarFace m={m} />
     </span>
   );
 }
@@ -217,7 +218,7 @@ function MembersTab({ full, setFull, errors }: SectionProps) {
     >
       {f.members.length === 0 ? (
         <Empty icon="users" title={t('Todavía no hay nadie')}>
-          {t('Añade a cada persona de la casa con su nombre, un emoji y un color.')}
+          {t('Añade a cada persona de la casa con su nombre, un emoji o una foto y un color.')}
         </Empty>
       ) : (
         <ul class="fam-members">
@@ -226,7 +227,7 @@ function MembersTab({ full, setFull, errors }: SectionProps) {
             return (
               <li class="fam-member" key={m.id} style={{ '--mc': m.color } as any}>
                 <div class="fam-member__avatar">
-                  <EmojiPicker size="lg" value={m.avatar} onChange={(v) => upd(m.id, (x) => void (x.avatar = v || '🙂'))} />
+                  <MemberAvatarPicker m={m} onChange={(patch) => upd(m.id, (x) => void Object.assign(x, patch))} />
                 </div>
                 <div class="fam-member__main">
                   <div class="fam-member__row">
@@ -277,7 +278,7 @@ function MembersTab({ full, setFull, errors }: SectionProps) {
       {atMax ? (
         <p class="muted small">{t('Máximo 6 personas.')}</p>
       ) : (
-        <p class="muted small">{t('El calendario es opcional: sus eventos llevan su emoji en el diseño Familia.')}</p>
+        <p class="muted small">{t('El calendario es opcional: sus eventos llevan su foto o su emoji en el diseño Familia.')}</p>
       )}
     </Card>
   );
@@ -340,7 +341,7 @@ function RoutinesTab({ full, setFull, saved, errors, fam }: SectionProps & { fam
           </button>
           {f.members.map((m) => (
             <button type="button" class={`pill ${only === m.id ? 'is-on' : ''}`} onClick={() => setOnly(m.id)}>
-              {m.avatar} {m.name || t('Sin nombre')}
+              <Avatar m={m} size={20} /> {m.name || t('Sin nombre')}
             </button>
           ))}
         </div>

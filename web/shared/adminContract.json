@@ -615,6 +615,21 @@
     },
     {
       "method": "POST",
+      "path": "/api/admin/family/photos",
+      "query": [],
+      "feature": null,
+      "callers": [
+        "familyPhoto"
+      ],
+      "request": "{data}",
+      "response": "inline",
+      "responseArray": false,
+      "responseKeys": [
+        "photo"
+      ]
+    },
+    {
+      "method": "POST",
       "path": "/api/admin/family/redeem",
       "query": [],
       "feature": null,

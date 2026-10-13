@@ -489,7 +489,19 @@ const canHover = () => {
   }
 };
 
-export function EmojiPicker(props: { value: string; onChange: (v: string) => void; allowNone?: boolean; error?: boolean; size?: 'lg' }) {
+export function EmojiPicker(props: {
+  value: string;
+  onChange: (v: string) => void;
+  allowNone?: boolean;
+  error?: boolean;
+  size?: 'lg';
+  /** what the button shows instead of the emoji (a profile photo) */
+  face?: ComponentChildren;
+  /** button label (default "Elegir emoji") */
+  label?: string;
+  /** extra actions above the search (`close` shuts the panel) */
+  top?: (close: () => void) => ComponentChildren;
+}) {
   const panelRef = useRef<HTMLDivElement>(null);
   const { open, setOpen, ref } = usePopover(panelRef);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -503,16 +515,31 @@ export function EmojiPicker(props: { value: string; onChange: (v: string) => voi
       <button
         type="button"
         ref={btnRef}
-        class={`emoji-btn ${props.size === 'lg' ? 'emoji-btn--lg' : ''} ${props.error ? 'is-invalid' : ''} ${props.value ? '' : 'is-empty'}`}
+        class={`emoji-btn ${props.size === 'lg' ? 'emoji-btn--lg' : ''} ${props.error ? 'is-invalid' : ''} ${props.value ? '' : 'is-empty'} ${props.face ? 'has-face' : ''}`}
         onClick={() => setOpen(!open)}
-        aria-label={t('Elegir emoji')}
+        aria-label={props.label ?? t('Elegir emoji')}
         aria-haspopup="dialog"
         aria-expanded={open}
-        title={t('Elegir emoji')}
+        title={props.label ?? t('Elegir emoji')}
       >
-        {props.value || <Icon name="plus" size={14} />}
+        {props.face ?? (props.value || <Icon name="plus" size={14} />)}
       </button>
-      {open && createPortal(<EmojiPanel panelRef={panelRef} anchor={btnRef} value={props.value} allowNone={props.allowNone} onPick={pick} />, document.body)}
+      {open &&
+        createPortal(
+          <EmojiPanel
+            panelRef={panelRef}
+            anchor={btnRef}
+            value={props.value}
+            allowNone={props.allowNone}
+            onPick={pick}
+            top={props.top?.(() => {
+              setOpen(false);
+              btnRef.current?.focus({ preventScroll: true });
+            })}
+            label={props.label}
+          />,
+          document.body,
+        )}
     </div>
   );
 }
@@ -523,6 +550,8 @@ function EmojiPanel(props: {
   value: string;
   allowNone?: boolean;
   onPick: (v: string) => void;
+  top?: ComponentChildren;
+  label?: string;
 }) {
   const idx = emojiIndex();
   const lang = getLang();
@@ -634,8 +663,9 @@ function EmojiPanel(props: {
       class={`pop__panel pop__panel--emoji pop__panel--fixed ${pos?.up ? 'is-up' : ''}`}
       style={style}
       role="dialog"
-      aria-label={t('Elegir emoji')}
+      aria-label={props.label ?? t('Elegir emoji')}
     >
+      {props.top && <div class="emoji-top">{props.top}</div>}
       <div class="emoji-search search-input">
         <Icon name="search" size={15} />
         <input

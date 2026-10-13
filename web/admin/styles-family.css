@@ -490,3 +490,120 @@
 .preset-grid.style-grid {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
 }
+
+/* ---------------------------------------------------------------- profile photos (components/AvatarPhoto.tsx) */
+.fam-avatar,
+.emoji-btn.has-face {
+  position: relative;
+  overflow: hidden;
+}
+.avatar-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+/* the colour ring stays on top of the photo */
+.fam-avatar::after,
+.emoji-btn.has-face::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: inherit;
+  pointer-events: none;
+}
+.fam-member__avatar .emoji-btn.has-face {
+  padding: 0;
+}
+.emoji-top {
+  padding: 10px 10px 4px;
+}
+.avatar-photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.avatar-photo-actions p {
+  flex-basis: 100%;
+  margin: 2px 0 0;
+}
+
+.avatar-crop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 0 2px;
+}
+.avatar-crop__stage {
+  position: relative;
+  width: min(100%, 340px);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #111;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.avatar-crop__stage:active {
+  cursor: grabbing;
+}
+.avatar-crop__stage:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.avatar-crop__stage img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  max-width: none;
+  pointer-events: none;
+  transform-origin: 0 0;
+}
+/* the round window, a little in from the edges: the rest of the photo shows dimmed around it, the member's colour
+   on its inside edge (never cut by the stage) */
+.avatar-crop__ring {
+  position: absolute;
+  inset: var(--pad, 0);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 3px var(--mc, #fff), 0 0 0 999px rgb(0 0 0 / 0.55);
+  pointer-events: none;
+}
+.avatar-crop__stage.is-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--surface-2);
+  cursor: default;
+}
+.avatar-crop__zoom {
+  width: min(100%, 340px);
+  color: var(--muted);
+}
+.avatar-crop__zoom input {
+  flex: 1;
+}
+.avatar-crop__hint {
+  margin: 0;
+  text-align: center;
+}
+.avatar-crop__error {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 14px;
+  border-radius: var(--r);
+  background: color-mix(in srgb, var(--err) 10%, var(--surface));
+  color: var(--text);
+}
+.avatar-crop__error p {
+  margin: 0;
+}

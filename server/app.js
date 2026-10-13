@@ -17,7 +17,7 @@ import { eventsAdminRouter, eventsPublicRouter } from './routes/localEvents.js';
 import { accessAdminRouter, pairPublicRouter } from './routes/access.js';
 import { doorbellAdminRouter, doorbellPublicRouter } from './routes/doorbell.js';
 import { setupRouter } from './setup.js';
-import { familyAdminRouter, familyPublicRouter, familyDisplayRouter } from './routes/family.js';
+import { familyAdminRouter, familyPublicRouter, familyDisplayRouter, familyPhotoMedia } from './routes/family.js';
 import { geocodeRouter } from './geocode.js';
 import { hostGuard } from './lib/net.js';
 import { redactSecrets } from './core/activityCore.js';
@@ -119,6 +119,9 @@ export function createApp({ version, dist = path.join(ROOT, 'dist'), updater = n
   app.use('/api', (req, res) => res.status(404).json({ error: 'not found' }));
 
   // --- media ---
+  // Profile photos of the family members: their own rules (family key, admin session, or a display that shows that
+  // member), so before the /media guard. routes/family.js familyPhotoMedia
+  app.get('/media/avatars/:id', familyPhotoMedia);
   // Family photos: private mode → display key / device token (?k=) or admin session; open mode → LAN clients or
   // an admin session (and valid keys). displayAccess.js mediaAuth
   app.use('/media', mediaAuth);

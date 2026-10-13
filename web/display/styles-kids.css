@@ -103,6 +103,11 @@
   background: var(--kc-soft); box-shadow: inset 0 0 0 0.4rem var(--kc);
 }
 .style-modern #app.is-kids .k-av i { font-style: normal; font-family: var(--font-emoji); font-size: 4.6rem; line-height: 1; }
+/* profile photo: fills the circle, the colour ring drawn on top of it (same shadow as the avatar's own) */
+.style-modern #app.is-kids .k-av.has-photo { position: relative; overflow: hidden; }
+.style-modern #app.is-kids .k-av.has-photo i { visibility: hidden; }
+.style-modern #app.is-kids .k-av-img { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.style-modern #app.is-kids .k-av.has-photo::after { content: ''; position: absolute; inset: 0; border-radius: 50%; box-shadow: inherit; pointer-events: none; }
 .style-modern #app.is-kids .k-name { font-size: 3rem; font-weight: 700; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .style-modern #app.is-kids .k-stars {
   flex: none; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.3rem 1.1rem 0.3rem 0.8rem; border-radius: 99rem;

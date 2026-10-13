@@ -8,6 +8,7 @@
 // than RETENTION_DAYS, folded in so balances never change when old entries are dropped). Points are never stored
 // as a balance: pointsOf() adds them up from the entries.
 import { addDays } from './lib/tz.js';
+import { PHOTO_ID_RE, photoPath } from './familyPhotoCore.js';
 
 export const MAX_MEMBERS = 6;
 export const MAX_CHORES = 80;
@@ -105,6 +106,14 @@ function list(err, path, v, max) {
   if (v.length > max) { err(path, `too many items (max ${max})`); return v.slice(0, max); }
   return v;
 }
+/** A profile photo id (familyPhotoCore.js) or null: the emoji avatar. */
+function photoId(err, path, v) {
+  if (v === undefined || v === null || v === '') return null;
+  if (typeof v === 'string' && PHOTO_ID_RE.test(v)) return v;
+  err(path, 'invalid photo id');
+  return null;
+}
+
 function id(v, prefix, seen) {
   let s = typeof v === 'string' && ID.test(v) ? v : newId(prefix);
   while (seen.has(s)) s = newId(prefix);
@@ -162,6 +171,7 @@ export function sanitizeFamily(raw, err = () => {}, sourceIds) {
       name: required(err, `${p}.name`, m.name, 30),
       color,
       avatar: text(err, `${p}.avatar`, m.avatar, '', 16) || '🙂',
+      photo: photoId(err, `${p}.photo`, m.photo),
       kid: bool(err, `${p}.kid`, m.kid, true),
       calendarId: cal,
     };
@@ -546,7 +556,11 @@ const choreRow = (c, done, member, showPoints) => ({
  * names become initials and stars, rewards, touch and the QR go; with 'hide' routines and members go too
  * (`hidden`). Meals always stay. `qrUrl` = the family link, or null; it is only passed on by a kids layout.
  */
-export function displayFamily(cfg, screen, state, { today, hhmm = '00:00', private: priv = false, qrUrl = null, generatedAt = null }) {
+/**
+ * `photoUrl(id)` turns a member's photo id into the address the screen loads (default /media/avatars/<id>; the
+ * server can answer null when the file is gone, Marco Cloud gives a signed address). Not called in privacy mode.
+ */
+export function displayFamily(cfg, screen, state, { today, hhmm = '00:00', private: priv = false, qrUrl = null, generatedAt = null, photoUrl = photoPath }) {
   const fam = cfg.family;
   const sf = screen.family || defaultScreenFamily();
   const hidden = Boolean(priv && fam.privacy === 'hide');
@@ -564,6 +578,9 @@ export function displayFamily(cfg, screen, state, { today, hhmm = '00:00', priva
     .map((c) => choreRow(c, done, byId.get(c.memberId), showPoints));
   const members = hidden ? [] : shown.map((m) => ({
     id: m.id, name: priv ? initials(m.name) : m.name, initials: initials(m.name), color: m.color, avatar: m.avatar, kid: m.kid,
+    // a photo says more than a name: in privacy mode the emoji stays and the photo goes (the photo address answers
+    // 404 for a private screen too, routes/family.js)
+    photo: priv || !m.photo ? null : photoUrl(m.photo) ?? null,
     // the Familia layout puts the avatar on this person's calendar events
     calendarId: m.calendarId ?? null,
     points: showPoints && m.kid ? Math.max(0, points[m.id] || 0) : null,
@@ -589,8 +606,11 @@ export function displayFamily(cfg, screen, state, { today, hhmm = '00:00', priva
   };
 }
 
-/** FamilyPhoneState: what the family page (/f/<key>) needs and nothing else (no calendars, screens or config). */
-export function phoneFamily(cfg, state, { today, hhmm = '00:00', lang = 'en' }) {
+/**
+ * FamilyPhoneState: what the family page (/f/<key>) needs and nothing else (no calendars, screens or config).
+ * `photoUrl` as in displayFamily().
+ */
+export function phoneFamily(cfg, state, { today, hhmm = '00:00', lang = 'en', photoUrl = photoPath }) {
   const fam = cfg.family;
   const progress = todayProgress(fam, state, today);
   const points = pointsOf(fam, state);
@@ -604,7 +624,7 @@ export function phoneFamily(cfg, state, { today, hhmm = '00:00', lang = 'en' }) 
     showPoints: fam.showPoints,
     allowRedeem: fam.allowRedeemFromPhone,
     members: fam.members.map((m) => ({
-      id: m.id, name: m.name, color: m.color, avatar: m.avatar, kid: m.kid,
+      id: m.id, name: m.name, color: m.color, avatar: m.avatar, photo: m.photo ? photoUrl(m.photo) ?? null : null, kid: m.kid,
       points: fam.showPoints && m.kid ? Math.max(0, points[m.id] || 0) : null,
       done: progress[m.id].done, total: progress[m.id].total,
     })),

@@ -143,10 +143,57 @@ const BACK = (
 
 // ---- small pieces ----
 
+/**
+ * Profile photos. /media/avatars/<id> is loaded with the family key in the header (an <img> cannot send it) and kept
+ * as a blob address for the life of the page; the address changes with every new photo, so a cached one is never
+ * stale. Any other same-origin address (Marco Cloud signs its own) goes straight into the <img>.
+ */
+const photoBlobs = new Map<string, Promise<string | null>>();
+function loadPhoto(url: string): Promise<string | null> {
+  let p = photoBlobs.get(url);
+  if (!p) {
+    p = fetch(url, { headers: { 'X-Family-Key': KEY.key || '' } })
+      .then(async (r) => (r.ok && (r.headers.get('content-type') || '').startsWith('image/') ? URL.createObjectURL(await r.blob()) : null))
+      .catch(() => null);
+    // a failed load is forgotten, so the next fresh data tries again
+    void p.then((v) => v === null && photoBlobs.delete(url));
+    photoBlobs.set(url, p);
+  }
+  return p;
+}
+
+/** Goes up with every fresh family state (App's take()): a photo that failed is tried again then. */
+let dataGen = 0;
+
+const samePath = (url: string | null | undefined): url is string => !!url && url.startsWith('/') && !url.startsWith('//');
+
+function usePhoto(url: string | null | undefined, gen: number): string | null {
+  const [src, setSrc] = useState<{ url: string; src: string | null } | null>(null);
+  const direct = samePath(url) && !url.startsWith('/media/');
+  useEffect(() => {
+    let live = true;
+    if (!samePath(url) || direct) return;
+    // keep showing what is there while a retry runs; only a different photo starts empty
+    void loadPhoto(url).then((v) => live && setSrc((cur) => (v === null && cur?.url === url && cur.src ? cur : { url, src: v })));
+    return () => {
+      live = false;
+    };
+  }, [url, gen]);
+  if (!samePath(url)) return null;
+  if (direct) return url;
+  return src?.url === url ? src.src : null;
+}
+
 function Avatar({ m, size }: { m: FamilyMemberView; size: 'sm' | 'md' | 'lg' }) {
+  const gen = dataGen;
+  const photo = usePhoto(m.photo, gen);
+  // a photo that did not draw: the emoji until it changes or fresh data arrives
+  const [broken, setBroken] = useState<string | null>(null);
+  const key = `${gen}|${photo}`;
+  const show = photo && broken !== key;
   return (
-    <span class={`f-avatar f-avatar-${size}`} aria-hidden="true">
-      <span>{m.avatar || '🙂'}</span>
+    <span class={`f-avatar f-avatar-${size}${show ? ' has-photo' : ''}`} aria-hidden="true">
+      {show ? <img src={photo} alt="" draggable={false} onError={() => setBroken(key)} /> : <span>{m.avatar || '🙂'}</span>}
     </span>
   );
 }
@@ -464,6 +511,7 @@ function App() {
   const take = (s: FamilyPhoneState) => {
     if (s.lang && s.lang !== getLang()) setLang(s.lang);
     hasData.current = true;
+    dataGen++;
     setData(s);
     setStatus('ok');
     setOffline(false);

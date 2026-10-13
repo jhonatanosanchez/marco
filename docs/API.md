@@ -104,7 +104,7 @@ The admin and the display read these fields to decide which sections, actions an
   `announcements`, `displayCommands`, `openDisplayAccess`, `insecureTls`, `googleCalendar`, `googleLogin`,
   `passwordLogin`, `apiTokens`, `webhooks`, `backups`, `importExport`, `includeSecrets`, `activity`, `setupWizard`,
   `status`, `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`,
-  `carousels`, `immich`, `family`, `widgets`, `webWidgets`, `priceWidgets`. A self-hosted server turns all of them on, except
+  `carousels`, `immich`, `family`, `widgets`, `webWidgets`, `priceWidgets`, `familyPhotos`. A self-hosted server turns all of them on, except
   `googleCalendar` and `googleLogin` (on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set),
   `microsoftCalendar` (Outlook and Microsoft 365 calendars, on when `MICROSOFT_CLIENT_ID` and
   `MICROSOFT_CLIENT_SECRET` are set), `accountMenu` and `feedback` (always off). `updates` is the update banner,
@@ -123,7 +123,9 @@ The admin and the display read these fields to decide which sections, actions an
   `widget` layout and `POST /api/admin/test/widget`; `webWidgets` allows the `web` type (a page in a sandboxed
   frame). Marco Cloud answers `widgets: true`, `webWidgets: false` (see [Widgets](#widgets)). `priceWidgets` allows
   the `prices` type, `GET /api/display/prices` and `/api/admin/test/prices`, `/api/admin/prices/token` (see
-  [Electricity prices](#electricity-prices)).
+  [Electricity prices](#electricity-prices)). `familyPhotos` allows profile photos of the family members
+  (`POST /api/admin/family/photos` and `GET /media/avatars/<id>`, see [Familia](#familia)); without it the admin
+  offers emoji only.
 - `limits` (optional): plan limits such as `screens`, `sources` or `devices`. Absent means no limit beyond the
   config validator's own caps (12 screens, 50 calendars, 20 news feeds, 1000 local events, 500 birthdays,
   100 countdowns, 6 carousels, 20 widgets). `widgetMinRefreshSec` is the shortest widget refresh the server takes
@@ -141,9 +143,9 @@ The admin and the display read these fields to decide which sections, actions an
 
 Clients treat a response with no `features` field (servers older than 0.5.0) as having every feature on, except
 `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`, `carousels`,
-`immich`, `family`, `widgets`, `webWidgets` and `priceWidgets`. A key missing from `features` counts as off only when `edition` is not `'self-hosted'`, and a missing
+`immich`, `family`, `widgets`, `webWidgets`, `priceWidgets` and `familyPhotos`. A key missing from `features` counts as off only when `edition` is not `'self-hosted'`, and a missing
 `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`, `carousels`,
-`immich`, `family`, `widgets`, `webWidgets` or `priceWidgets` is always off.
+`immich`, `family`, `widgets`, `webWidgets`, `priceWidgets` or `familyPhotos` is always off.
 
 ### Account mode
 
@@ -531,6 +533,7 @@ and what was done in `data/family.json`. The rules are in `server/core/familyCor
 | DELETE | `/api/admin/family/redemptions/:id`, `/api/admin/family/adjustments/:id` | | undo → `{ ok, state }` |
 | POST | `/api/admin/family/link` | | create or replace the family link (the old one stops working at once) → `{ link }` |
 | DELETE | `/api/admin/family/link` | | remove it → `{ ok }` |
+| POST | `/api/admin/family/photos` | `{ data: base64 }` (a data: URL prefix is accepted) | a profile photo, cropped in the browser → `{ photo: id }`; needs `features.familyPhotos` |
 
 **Family page** (`/f/<key>` on a phone; header `X-Family-Key: fk_…`):
 
@@ -562,6 +565,30 @@ address) only when a family link exists, the screen has `family.showQr`, a kids 
 private, and the request comes from a display we know (key, paired device, admin session, or the local network in
 open mode). While private there are no stars and no touch; with `family.privacy: "initials"` names become initials,
 with `"hide"` the routines are left out (`hidden: true`).
+
+**Profile photos** (`features.familyPhotos`). A member can have `photo`: the id of a stored picture (24 hex
+characters, the start of the SHA-256 of its clean bytes), shown instead of `avatar`, which stays as the fallback. The
+admin crops the photo in the browser and uploads one small square. The server (`server/core/familyPhotoCore.js`)
+takes JPEG, PNG or WebP only (never SVG, GIF or anything animated), at most 150 KB, square, 64 to 1024 px, and
+rewrites it keeping only what draws the picture: EXIF, XMP, ICC profiles, comments, text chunks and anything after
+the end of the image are dropped. Errors: `400` `empty`, `svg`, `not_image`, `animated`, `bad_size`,
+`not_square`, `corrupt`; `413 too_big`; `409 too_many` (40 stored files, all in use). Files live in
+`data/avatars/<id>.<jpg|png|webp>`.
+
+`GET /media/avatars/<id>` answers with the picture (`Cache-Control: private, no-cache`, `ETag` = the id, `304` on a
+match) to:
+
+- the family page: header `X-Family-Key`, only the photos of current members;
+- an admin session: any stored photo, also one uploaded and not saved yet;
+- a display: link key or paired device (`?k=`), or open mode from the local network naming its screen
+  (`?screen=<slug>`), only the photos of the members that screen shows, never while it is private.
+
+Anything else gets `404` (`401` / `403` for a missing or wrong display credential, before the id is looked up).
+`members[].photo` in `FamilyDisplayState` and `FamilyPhoneState` is that address, or `null` with no photo, while the
+screen is private (the emoji stays) or when the file is gone. A photo the config stops using is deleted a week after
+it was last used or uploaded, so a config backup restored within that week brings it back. Exports carry the photos
+in `familyPhotos` (`{ id: base64 }`); an import that takes the `family` section stores the ones its config names,
+after the same checks.
 
 Activity log types: `family.chore`, `family.redeemed`, `family.points`, `family.undone`, `family.link`,
 `family.key_rejected`. The family key and `/f/<key>` are redacted from logs. An export carries `familyState` (and

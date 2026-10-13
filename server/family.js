@@ -12,6 +12,7 @@ import { ipBucket, publicOrigin, hostnameOf, isLanClient } from './lib/net.js';
 import { lanAddresses } from './setup.js';
 import { zonedParts, addDays, isDateStr } from './core/lib/tz.js';
 import { defaultScreen } from './core/screens.js';
+import { photoUrl } from './familyPhotos.js';
 import {
   FAMILY_KEY_RE, sanitizeState, pruneState, applyToggle, applyRedeem, applyAdjust, undoEntry,
   adminFamily, phoneFamily, displayFamily, hhmmOf,
@@ -343,14 +344,14 @@ export function phoneFamilyState() {
   load();
   const cfg = getConfig();
   const c = familyClock(cfg);
-  return phoneFamily(cfg, state, { today: c.today, hhmm: c.hhmm, lang: defaultScreen(cfg)?.screen?.language || 'en' });
+  return phoneFamily(cfg, state, { today: c.today, hhmm: c.hhmm, lang: defaultScreen(cfg)?.screen?.language || 'en', photoUrl });
 }
 
 /** FamilyDisplayState of `screen` (`priv` = its privacy mode is on, `qrUrl` = familyQrUrl()). */
 export function displayFamilyState(cfg, screen, { priv = false, qrUrl = null } = {}) {
   load();
   const c = familyClock(cfg);
-  return displayFamily(cfg, screen, state, { today: c.today, hhmm: c.hhmm, private: priv, qrUrl, generatedAt: c.at });
+  return displayFamily(cfg, screen, state, { today: c.today, hhmm: c.hhmm, private: priv, qrUrl, generatedAt: c.at, photoUrl });
 }
 
 /** Tests only: forget the in-memory state (next call reloads from disk) and the rate limits. */

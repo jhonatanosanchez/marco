@@ -8,6 +8,8 @@
 //     DELETE /family/redemptions/:id, /family/adjustments/:id → { ok, state }
 //     POST   /family/link      → { link }  (create, or replace: the old link stops working)
 //     DELETE /family/link      → { ok }
+//     POST   /family/photos    { data: base64 } → { photo: id }  (a profile photo, cropped in the browser; the
+//                               config's family.members[].photo then names it; familyPhotos.js)
 //   familyPublicRouter() mounted at /api (the family page, header X-Family-Key):
 //     GET    /family/state     → FamilyPhoneState
 //     POST   /family/toggle    { choreId, done } → { ok, state }  (today)
@@ -15,10 +17,22 @@
 //   familyDisplayRouter() mounted at /api (after displayAuth):
 //     GET    /display/family   → FamilyDisplayState of the request's screen
 //     POST   /display/family/toggle { choreId, done } → { ok, state }  (only screens with touch on, not private)
+//   familyPhotoMedia: GET /media/avatars/<id> (app.js, before the /media guard), a member's profile photo for
+//     - the family page: X-Family-Key (the photo of a current member)
+//     - an admin session: any stored photo (also one uploaded and not saved yet, for the preview)
+//     - a display: link key, paired device (?k=) or open mode (LAN only), naming its screen like every display request; only
+//       the photos of the members that screen shows, never while its privacy mode is on
+//     Anything else: 404 (401/403 for a missing or wrong display credential). Private, no-cache, ETag = the id.
 import { Router } from 'express';
-import { requireAuth } from '../auth.js';
+import { requireAuth, isLanClient } from '../auth.js';
 import { getConfig } from '../store.js';
-import { requestScreen } from '../displayAccess.js';
+import {
+  requestScreen, resolveDisplayAccess, unknownScreenRequest, bareScreenRequest, SCREEN_NOT_FOUND,
+} from '../displayAccess.js';
+import { KEY_HEADER as FAMILY_KEY_HEADER } from '../family.js';
+import { storeFamilyPhoto, photoFile } from '../familyPhotos.js';
+import { PHOTO_ID_RE, photoIdsOf, MAX_PHOTO_BYTES } from '../core/familyPhotoCore.js';
+import fs from 'node:fs';
 import { screenPrivacy } from '../privacy.js';
 import {
   adminFamilyState, phoneFamilyState, displayFamilyState, toggleChore, redeemReward, adjustPoints, undoFamilyEntry,
@@ -77,6 +91,18 @@ export function familyAdminRouter() {
       res.json({ ok: true, state: adminFamilyState() });
     });
   }
+
+  r.post('/family/photos', (req, res) => {
+    const data = body(req).data;
+    if (typeof data !== 'string' || !data || data.length > Math.ceil(MAX_PHOTO_BYTES / 3) * 4 + 64) {
+      return res.status(typeof data === 'string' && data ? 413 : 400).json({ error: 'too_big', code: typeof data === 'string' && data ? 'too_big' : 'empty' });
+    }
+    const b64 = data.replace(/^data:[^,]*,/, '');
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(b64)) return res.status(400).json({ error: 'not_image', code: 'not_image' });
+    const out = storeFamilyPhoto(new Uint8Array(Buffer.from(b64, 'base64')));
+    if (out.error) return res.status(out.error === 'too_many' ? 409 : out.error === 'too_big' ? 413 : 400).json({ error: out.error, code: out.error });
+    res.json({ photo: out.id });
+  });
 
   r.post('/family/link', (req, res) => res.json({ link: rotateFamilyLink({ req }) }));
   r.delete('/family/link', (req, res) => {
@@ -157,4 +183,48 @@ export function familyDisplayRouter() {
     res.json({ ok: true, state: displayState(cfg, req) });
   });
   return r;
+}
+
+const DISPLAY_ERRORS = { key_required: 'display key required', invalid_key: 'this display link or device is no longer valid' };
+
+/** GET /media/avatars/:id (see the top of this file). */
+export function familyPhotoMedia(req, res) {
+  res.set('cache-control', 'private, no-store');
+  const notFound = () => res.status(404).type('text/plain').send('not found');
+  const id = String(req.params.id || '');
+  if (!PHOTO_ID_RE.test(id)) return notFound();
+  const cfg = getConfig();
+  const send = () => {
+    const f = photoFile(id);
+    if (!f) return notFound();
+    // the id is the content: same id, same bytes
+    const etag = `"${id}"`;
+    // no-cache: every load asks again (a 304 when nothing changed), so a revoked key or a screen gone private stops
+    // showing it at once
+    res.set({ etag, 'cache-control': 'private, no-cache', 'content-security-policy': "default-src 'none'; frame-ancestors 'self'" });
+    if (String(req.get('if-none-match') || '').split(/\s*,\s*/).includes(etag)) return res.status(304).end();
+    let bytes;
+    try { bytes = fs.readFileSync(f.file); } catch { return notFound(); }
+    res.type(f.type).send(bytes);
+  };
+
+  // The family page (its key travels in the header: the page loads the photo with fetch)
+  if (req.get(FAMILY_KEY_HEADER) !== undefined) {
+    return familyKeyAuth(req, res, () => (photoIdsOf(getConfig().family).has(id) ? send() : notFound()));
+  }
+
+  const a = resolveDisplayAccess(req, { allowQuery: true });
+  if (!a.ok) return res.status(a.status).type('text/plain').send(DISPLAY_ERRORS[a.code] || 'forbidden');
+  req.displayAccess = a;
+  if (a.via === 'session') return send();
+  // open mode serves the LAN only, like every other display request (displayAccess.js)
+  if (a.via === 'open' && !isLanClient(req)) return notFound();
+  if (!cfg.family.enabled) return notFound();
+  // like any display request: an unknown screen, or (open mode, from another machine) no screen at all, gets nothing
+  if (unknownScreenRequest(cfg, req) || bareScreenRequest(cfg, req)) return res.status(404).json(SCREEN_NOT_FOUND);
+  const { screen, empty } = requestScreen(cfg, req);
+  if (empty || screenPrivacy(cfg, screen).active) return notFound();
+  const ids = screen.family?.memberIds;
+  const shown = cfg.family.members.some((m) => m.photo === id && (!ids || ids.includes(m.id)));
+  return shown ? send() : notFound();
 }

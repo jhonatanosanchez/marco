@@ -5,6 +5,21 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-13
+
+### Added
+- Family profile photos with a simple round crop: in *Family → Members*, tap the avatar and choose *Upload photo*.
+  Drag to frame the face and zoom with the slider, the mouse wheel or two fingers; the arrow keys and + / - work too.
+  The photo is turned upright, HEIC photos open where the browser can read them, and only a small square leaves the
+  browser. The server checks it again (JPEG, PNG or WebP only, never SVG or animations) and keeps it without its
+  camera data. The photo shows inside the person's colour ring on the routines, family board and rewards, on their
+  calendar events, on the phone page and in the admin, with the emoji as the fallback. A screen in privacy mode keeps
+  the emoji. Photos are served only to the family page, the admin and the screens that show that person.
+- Exports include the profile photos and importing the *Family* section brings them back. A photo that is replaced
+  or removed, or the photo of someone removed, is deleted a week later.
+- `features.familyPhotos` in `/api/health`, `POST /api/admin/family/photos` and `GET /media/avatars/<id>`
+  (docs/API.md, Familia).
+
 ## [0.12.0] - 2026-10-13
 
 ### Added

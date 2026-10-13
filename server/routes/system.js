@@ -11,9 +11,10 @@ import { requireAuth, rotateSessionEpoch } from '../auth.js';
 import { getConfig, getSecrets, saveConfig, updateSecrets } from '../store.js';
 import {
   listBackups, writeBackup, backupPath, readBackup, deleteBackup, makeBundle, importPreview, parseImport,
-  mergeImport, absentSections, sanitizeImportedSecrets, repairConfig, bundleFamilyState,
+  mergeImport, absentSections, sanitizeImportedSecrets, repairConfig, bundleFamilyState, bundleFamilyPhotos,
 } from '../backups.js';
 import { familyState, replaceFamilyState, notifyFamily } from '../family.js';
+import { exportFamilyPhotos, importFamilyPhotos } from '../familyPhotos.js';
 import { logActivity, listActivity, clearActivity, recentActivity } from '../activity.js';
 import { syncDisplayKeys, revalidateStreams } from '../displayAccess.js';
 import { listDisplays, getServerVersion } from '../displays.js';
@@ -113,7 +114,7 @@ export function systemRouter({ version = getServerVersion() } = {}) {
   // ---------------- export / import (§6.2, §6.3) ----------------
   r.post('/export', (req, res) => {
     const includeSecrets = req.body?.includeSecrets === true;
-    const bundle = makeBundle(getConfig(), { appVersion: version, secrets: includeSecrets ? getSecrets() : null, familyState: familyState() });
+    const bundle = makeBundle(getConfig(), { appVersion: version, secrets: includeSecrets ? getSecrets() : null, familyState: familyState(), familyPhotos: exportFamilyPhotos() });
     logActivity('config.exported', { req, level: includeSecrets ? 'warn' : 'info', data: { secrets: includeSecrets } });
     res.set('content-disposition', `attachment; filename="marco-${localDate(new Date(), getConfig().datetime.timezone)}.json"`);
     res.json(bundle);
@@ -164,8 +165,10 @@ export function systemRouter({ version = getServerVersion() } = {}) {
     // The family section brings back what was done too (routines, rewards, stars), when the file has it.
     const takesFamily = !absent.has('family') && (!Array.isArray(b.sections) || !b.sections.length || b.sections.includes('family'));
     const famState = takesFamily ? bundleFamilyState(b.bundle) : null;
+    // and the members' profile photos (the config saved above already names them)
+    const photos = takesFamily ? importFamilyPhotos(bundleFamilyPhotos(b.bundle), result.config) : 0;
     if (famState) replaceFamilyState(famState);
-    else if (applied.includes('family')) notifyFamily();
+    else if (applied.includes('family') || photos) notifyFamily();
     // Keys of screens that are not in the imported config are dropped; devices of missing screens move to the default.
     if (applied.includes('displayKeys') || applied.includes('devices')) syncDisplayKeys();
     // Keys replaced / devices dropped by the import: close the streams still reading with the old credentials

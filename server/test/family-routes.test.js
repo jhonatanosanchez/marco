@@ -20,6 +20,8 @@ import { addDays } from '../core/lib/tz.js';
 import { RETENTION_DAYS } from '../core/familyCore.js';
 import { redactSecrets } from '../core/activityCore.js';
 import { displayKeyFor } from '../displayAccess.js';
+import { makeJpeg, makePng, makeWebp } from './photoBytes.js';
+import { collectUnused, UNUSED_GRACE_MS, MAX_STORED } from '../familyPhotos.js';
 
 const realFetch = globalThis.fetch;
 const offlineFetch = (url, opts) => (/^https?:\/\/127\.0\.0\.1[:/]/.test(String(url)) ? realFetch(url, opts) : Promise.reject(new Error('offline test')));
@@ -511,4 +513,161 @@ test('activity: no family key or /f/<key> in any entry; redaction patterns', asy
   const k = `fk_${'x'.repeat(32)}`;
   assert.equal(redactSecrets(`/f/${k}?a=1`), '/f/[redacted]?a=1');
   assert.equal(redactSecrets(`key ${k} used`), 'key fk_[redacted] used');
+});
+
+// ---------------------------------------------------------------- profile photos
+
+const LAN = { 'x-forwarded-for': '192.168.1.77' };
+const b64 = (buf) => Buffer.from(buf).toString('base64');
+
+test('profile photos: upload checks, who may load them, privacy, deletion with the member', async () => {
+  await withServer(async ({ call, login, makeLink, phone, dir }) => {
+    const cookie = await login();
+    const up = (data, c = cookie) => call('POST', '/api/admin/family/photos', { cookie: c, body: { data } });
+    assert.equal((await up(b64(makeJpeg(384, 384)), '')).status, 401, 'admin only');
+    for (const [bytes, code] of [
+      [Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'), 'svg'],
+      [Buffer.from('GIF89a\x10\x00\x10\x00\x00\x00\x00;', 'latin1'), 'not_image'],
+      [makeJpeg(500, 300), 'not_square'],
+    ]) {
+      const r = await up(b64(bytes));
+      assert.equal(r.status, 400, r.text);
+      assert.equal(r.json.code, code);
+    }
+    assert.equal((await up('###')).json.code, 'not_image');
+    assert.equal((await up('')).status, 400);
+    assert.equal((await up('A'.repeat(700_000))).status, 413);
+
+    const r = await up(`data:image/jpeg;base64,${b64(makeJpeg(384, 384))}`);
+    assert.equal(r.status, 200, r.text);
+    const id = r.json.photo;
+    assert.match(id, /^[a-f0-9]{24}$/);
+    const file = path.join(dir, 'avatars', `${id}.jpg`);
+    assert.ok(fs.existsSync(file));
+    assert.ok(!fs.readFileSync(file).includes('GPS'), 'stored without its metadata');
+    assert.equal((await up(b64(makeJpeg(384, 384)))).json.photo, id, 'same picture, same id');
+
+    const url = `/media/avatars/${id}`;
+    // not saved yet: only the admin sees it (the preview of unsaved settings)
+    const adm = await call('GET', url, { cookie });
+    assert.equal(adm.status, 200);
+    assert.equal(adm.headers.get('content-type'), 'image/jpeg');
+    assert.match(adm.headers.get('cache-control'), /^private/);
+    assert.equal(adm.headers.get('etag'), `"${id}"`);
+    assert.equal((await call('GET', url, { cookie, headers: { 'if-none-match': `"${id}"` } })).status, 304);
+    assert.equal((await call('GET', `${url}?screen=living-room`)).status, 404, 'a display: nobody uses it yet');
+
+    setConfig((c) => { c.family.members[0].photo = id; });
+    // a display in open mode names its screen; from another machine the bare address gets nothing
+    assert.equal((await call('GET', `${url}?screen=living-room`, { headers: LAN })).status, 200);
+    assert.equal((await call('GET', url, { headers: LAN })).status, 404);
+    // open mode serves the local network only
+    assert.equal((await call('GET', `${url}?screen=living-room`, { headers: { 'x-forwarded-for': '203.0.113.9' } })).status, 404);
+    assert.equal((await call('GET', `${url}?screen=nope`, { headers: LAN })).status, 404);
+    assert.equal((await call('GET', `/media/avatars/${'0'.repeat(24)}?screen=living-room`)).status, 404);
+    assert.equal((await call('GET', '/media/avatars/..%2Fconfig.json?screen=living-room')).status, 404);
+    // a screen that does not show Lucía
+    setConfig((c) => { c.screens[1].family = { memberIds: ['m_mateo'], touch: false, showQr: true }; });
+    assert.equal((await call('GET', `${url}?screen=kitchen`, { headers: LAN })).status, 404);
+
+    // the family page: the key in the header; nothing without it or with a wrong one
+    const key = await makeLink(cookie);
+    const ph = await call('GET', url, { headers: phone(key) });
+    assert.equal(ph.status, 200);
+    assert.equal((await call('GET', url, { headers: phone(`fk_${'b'.repeat(32)}`) })).status, 403);
+    assert.equal((await call('GET', '/api/family/state', { headers: phone(key) })).json.members[0].photo, url);
+
+    // privacy mode: the TV gets the emoji and the photo address answers 404
+    assert.equal((await call('GET', '/api/display/family?screen=living-room')).json.members[0].photo, url);
+    await call('POST', '/api/admin/privacy', { cookie, body: { mode: 'on', screens: ['living-room'] } });
+    assert.equal((await call('GET', '/api/display/family?screen=living-room')).json.members[0].photo, null);
+    assert.equal((await call('GET', `${url}?screen=living-room`)).status, 404);
+    await call('POST', '/api/admin/privacy', { cookie, body: { mode: 'off', screens: ['living-room'] } });
+    assert.equal((await call('GET', `${url}?screen=living-room`)).status, 200);
+
+    // family off: displays and phones get nothing
+    setConfig((c) => { c.family.enabled = false; });
+    assert.equal((await call('GET', `${url}?screen=living-room`)).status, 404);
+    assert.equal((await call('GET', url, { headers: phone(key) })).status, 404);
+    setConfig((c) => { c.family.enabled = true; });
+
+    // removing the member: screens and phones lose the photo at once, the file goes a week later
+    setConfig((c) => {
+      c.family.members = c.family.members.filter((m) => m.id !== 'm_lucia');
+      c.family.chores = c.family.chores.filter((h) => h.memberId !== 'm_lucia');
+      for (const s of c.screens) if (s.family?.memberIds) s.family.memberIds = s.family.memberIds.filter((x) => x !== 'm_lucia');
+    });
+    assert.equal((await call('GET', `${url}?screen=living-room`)).status, 404);
+    assert.equal((await call('GET', url, { headers: phone(key) })).status, 404);
+    assert.ok(fs.existsSync(file), 'kept for a week (a backup restored soon after brings it back)');
+    assert.deepEqual(collectUnused({ now: Date.now() + UNUSED_GRACE_MS - 60_000 }), []);
+    assert.deepEqual(collectUnused({ now: Date.now() + UNUSED_GRACE_MS + 60_000 }), [id]);
+    assert.ok(!fs.existsSync(file), 'the photo is gone with the member');
+    assert.equal((await call('GET', url, { cookie })).status, 404);
+  });
+});
+
+test('profile photos in private access mode: the screen credential, never without it', async () => {
+  await withServer(async ({ call, login }) => {
+    const cookie = await login();
+    const id = (await call('POST', '/api/admin/family/photos', { cookie, body: { data: b64(makePng(128, 128)) } })).json.photo;
+    setConfig((c) => { c.family.members[1].photo = id; });
+    const url = `/media/avatars/${id}`;
+    assert.equal((await call('GET', `${url}?screen=living-room`)).status, 401);
+    assert.equal((await call('GET', `${url}?k=${'0'.repeat(8)}-0000-4000-8000-${'0'.repeat(12)}`)).status, 403);
+    const ok = await call('GET', `${url}?k=${displayKeyFor('s_main')}`);
+    assert.equal(ok.status, 200);
+    assert.equal(ok.headers.get('content-type'), 'image/png');
+  }, { mut: (c) => { c.security.displayAccess = 'private'; } });
+});
+
+test('profile photos travel in the export and come back with the family section', async () => {
+  await withServer(async ({ call, login, dir }) => {
+    const cookie = await login();
+    const id = (await call('POST', '/api/admin/family/photos', { cookie, body: { data: b64(makeWebp(256, 256)) } })).json.photo;
+    setConfig((c) => { c.family.members[0].photo = id; });
+    const bundle = (await call('POST', '/api/admin/export', { cookie, body: {} })).json;
+    assert.ok(bundle.familyPhotos[id], 'the photo is in the file');
+    // the photo is taken away and, a week later, cleaned up
+    setConfig((c) => { c.family.members[0].photo = null; });
+    collectUnused({ now: Date.now() + UNUSED_GRACE_MS + 60_000 });
+    assert.ok(!fs.existsSync(path.join(dir, 'avatars', `${id}.webp`)));
+    // a forged extra entry is not stored
+    bundle.familyPhotos['f'.repeat(24)] = b64(makePng(96, 96));
+    const r = await call('POST', '/api/admin/import/apply', { cookie, body: { bundle, sections: ['family'] } });
+    assert.equal(r.status, 200, r.text);
+    assert.equal(store.getConfig().family.members[0].photo, id);
+    assert.ok(fs.existsSync(path.join(dir, 'avatars', `${id}.webp`)), 'restored');
+    assert.deepEqual(fs.readdirSync(path.join(dir, 'avatars')), [`${id}.webp`]);
+    assert.equal((await call('GET', `/media/avatars/${id}?screen=living-room`)).status, 200);
+  });
+});
+
+test('profile photos: a config naming a photo whose file is gone gives the screens no address', async () => {
+  await withServer(async ({ call, login, dir }) => {
+    const cookie = await login();
+    const id = (await call('POST', '/api/admin/family/photos', { cookie, body: { data: b64(makeJpeg(256, 256)) } })).json.photo;
+    setConfig((c) => { c.family.members[0].photo = id; });
+    assert.equal((await call('GET', '/api/display/family?screen=living-room')).json.members[0].photo, `/media/avatars/${id}`);
+    fs.rmSync(path.join(dir, 'avatars', `${id}.jpg`));
+    assert.equal((await call('GET', '/api/display/family?screen=living-room')).json.members[0].photo, null);
+  });
+});
+
+test('profile photos: many unsaved crops never lock the uploads, the photos in use always stay', async () => {
+  await withServer(async ({ call, login, dir }) => {
+    const cookie = await login();
+    const up = (n) => call('POST', '/api/admin/family/photos', { cookie, body: { data: b64(makePng(64 + n, 64 + n)) } });
+    const used = (await up(0)).json.photo;
+    setConfig((c) => { c.family.members[0].photo = used; });
+    let last;
+    for (let i = 1; i <= MAX_STORED + 5; i++) {
+      last = await up(i);
+      assert.equal(last.status, 200, last.text);
+    }
+    const files = fs.readdirSync(path.join(dir, 'avatars'));
+    assert.ok(files.length <= MAX_STORED);
+    assert.ok(files.includes(`${used}.png`), 'the photo in use is never the one that goes');
+    assert.ok(files.includes(`${last.json.photo}.png`));
+  });
 });
