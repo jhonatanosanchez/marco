@@ -2103,6 +2103,10 @@ export const NL: Record<string, string> = {
 
 /** Singular forms of the count strings (i18n-plural.ts), used by t() when vars.n === 1. */
 export const NL_SINGULAR: Record<string, string> = {
+  'Funciona: {n} eventos en los próximos meses': 'Werkt: 1 afspraak in de komende maanden',
+  'Timbre enviado a {n} pantallas': 'Deurbel naar 1 scherm gestuurd',
+  '{n} fotos': '1 foto',
+  'Se quitará también de {n} pantallas.': 'Hij verdwijnt ook van 1 scherm.',
   'Copia restaurada · se corrigieron {n} valores no válidos (ver Actividad)': 'Back-up teruggezet · 1 ongeldige waarde is verbeterd (zie Activiteit)',
   'Aviso enviado a {n} pantallas': 'Melding naar 1 scherm gestuurd',
   'Borrar {n} eventos pasados': '1 voorbije afspraak verwijderen',

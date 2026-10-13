@@ -3,6 +3,10 @@ import { SINGULAR12 } from './i18n-dict12';
 import { SINGULAR_FAMILY } from './i18n-dict-family';
 // Singular forms for count strings (used by t() when vars.n === 1): Spanish key → [es, en, pt].
 export const SINGULAR: Record<string, [string, string, string]> = {
+  'Funciona: {n} eventos en los próximos meses': ['Funciona: 1 evento en los próximos meses', 'Works: 1 event in the coming months', 'Funciona: 1 evento nos próximos meses'],
+  'Timbre enviado a {n} pantallas': ['Timbre enviado a 1 pantalla', 'Doorbell sent to 1 screen', 'Campainha enviada para 1 ecrã'],
+  '{n} fotos': ['1 foto', '1 photo', '1 foto'],
+  'Se quitará también de {n} pantallas.': ['Se quitará también de 1 pantalla.', 'It will also leave 1 screen.', 'Também sai de 1 ecrã.'],
   'Copia restaurada · se corrigieron {n} valores no válidos (ver Actividad)': ['Copia restaurada · se corrigió 1 valor no válido (ver Actividad)', 'Backup restored · 1 invalid value was fixed (see Activity)', 'Cópia restaurada · foi corrigido 1 valor inválido (ver Atividade)'],
   'Aviso enviado a {n} pantallas': ['Aviso enviado a 1 pantalla', 'Alert sent to 1 screen', 'Aviso enviado para 1 ecrã'],
   'Borrar {n} eventos pasados': ['Borrar 1 evento pasado', 'Delete 1 past event', 'Apagar 1 evento passado'],
