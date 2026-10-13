@@ -1,11 +1,15 @@
-// Cámaras Frigate (fork fsrhome). Intermediario de video para las pantallas y, desde la Tarea 4, el ciclo de eventos.
+// Cámaras Frigate (fork fsrhome): intermediario de video para las pantallas y ciclo de eventos (actividad y alertas).
 // Solo las cámaras de cfg.frigate.cameras; nunca la API de go2rtc más allá de stream.mp4 (/api/streams trae la clave
 // del DVR). Spec: homelab-docs/specs/2026-10-13-marco-camaras-design.md
 import http from 'node:http';
 import https from 'node:https';
 import { Router } from 'express';
 import { getConfig } from './store.js';
-import { CAMERA_ID_RE, EVENT_ID_RE } from './core/camerasCore.js';
+import { publish, listPollers } from './pollHub.js';
+import { listClients } from './sse.js';
+import { requireAuth } from './auth.js';
+import { logActivity } from './activity.js';
+import { CAMERA_ID_RE, EVENT_ID_RE, activityByCamera, alertScreenIds, emptyAlertState, newAlerts, screensWantingCameras, validEvents } from './core/camerasCore.js';
 
 /** User-Agent neutro: con uno tipo Safari (Silk), go2rtc redirige a HLS. */
 export const UPSTREAM_UA = 'marco-frigate';
@@ -51,6 +55,117 @@ export function camerasMediaRouter() {
     if (!f?.enabled || !m || !CAMERA_ID_RE.test(m[1]) || !f.cameras.some((c) => c.id === m[1])) return notFound(res);
     const cam = encodeURIComponent(m[1]);
     relay(req, res, m[2] === 'mjpeg' ? `${f.url}/api/${cam}?fps=4&h=360` : `${f.go2rtcUrl}/api/stream.mp4?src=${cam}`);
+  });
+  return r;
+}
+
+export const POLL_MS = 5000;
+const FETCH_TIMEOUT_MS = 4000;
+
+let startedAtS = Date.now() / 1000;
+let alertState = emptyAlertState();
+let activity = {};
+let activitySig = '{}';
+let status = { lastOkAt: null, lastError: null, lastEventAt: null };
+let busy = false;
+let timer = null;
+
+export const currentActivity = () => activity;
+
+export function camerasStatus() {
+  const iso = (ms) => (ms ? new Date(ms).toISOString() : null);
+  return { enabled: getConfig().frigate?.enabled === true, lastOkAt: iso(status.lastOkAt), lastError: status.lastError, lastEventAt: iso(status.lastEventAt) };
+}
+
+export function _resetCameras(startedAtMs = Date.now()) {
+  startedAtS = startedAtMs / 1000;
+  alertState = emptyAlertState();
+  activity = {};
+  activitySig = '{}';
+  status = { lastOkAt: null, lastError: null, lastEventAt: null };
+  busy = false;
+}
+
+/** ¿Hay una pantalla conectada (SSE o sondeo) que muestre cámaras o tenga alertas? */
+function someoneWatching(cfg, now) {
+  const want = screensWantingCameras(cfg);
+  if (!want.size) return false;
+  return listClients().some((c) => !c.preview && want.has(c.screenId)) || listPollers(now).some((p) => want.has(p.screenId));
+}
+
+/** Una vuelta del ciclo: pide eventos a Frigate, publica actividad (si cambió) y alertas nuevas. */
+export async function tickCameras(now = Date.now(), { force = false } = {}) {
+  const cfg = getConfig();
+  const f = cfg.frigate;
+  if (!f?.enabled || busy || (!force && !someoneWatching(cfg, now))) return;
+  busy = true;
+  try {
+    const q = new URLSearchParams({ limit: '40', labels: 'person,car', zones: f.zones.join(',') });
+    const r = await fetch(`${f.url}/api/events?${q}`, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), headers: { 'user-agent': UPSTREAM_UA } });
+    if (!r.ok) throw new Error(`http ${r.status}`);
+    const events = validEvents(await r.json(), new Set(f.cameras.map((c) => c.id)));
+    const newest = events.reduce((m, e) => Math.max(m, e.start_time * 1000), 0);
+    status = { lastOkAt: now, lastError: null, lastEventAt: Math.max(newest, status.lastEventAt || 0) || null };
+    const act = activityByCamera(events, now / 1000);
+    const sig = JSON.stringify(act);
+    if (sig !== activitySig) {
+      activity = act;
+      activitySig = sig;
+      publish('cameras', { activity });
+    }
+    const out = newAlerts(alertState, events, startedAtS);
+    alertState = out.state;
+    const screenIds = alertScreenIds(cfg);
+    if (screenIds.length) {
+      for (const a of out.alerts) {
+        const name = f.cameras.find((c) => c.id === a.camera)?.name || a.camera;
+        publish('cameraAlert', { ...a, name }, { screenIds });
+      }
+    }
+  } catch (e) {
+    status = { ...status, lastError: e?.name === 'TimeoutError' ? 'timeout' : 'unreachable' };
+  } finally {
+    busy = false;
+  }
+}
+
+export function startCameras() {
+  if (timer) return;
+  startedAtS = Date.now() / 1000;
+  timer = setInterval(() => { tickCameras().catch(() => {}); }, POLL_MS);
+  timer.unref?.();
+}
+
+export function stopCameras() {
+  if (timer) clearInterval(timer);
+  timer = null;
+}
+
+/** Montado bajo /api después de displayAuth (DISPLAY_API_PATHS cubre /api/display). */
+export function camerasDisplayRouter() {
+  const r = Router();
+  r.get('/display/cameras', (req, res) => {
+    res.set('cache-control', 'private, no-store');
+    res.json({ activity: getConfig().frigate?.enabled ? activity : {} });
+  });
+  return r;
+}
+
+export function camerasAdminRouter() {
+  const r = Router();
+  r.get('/cameras/status', requireAuth, (req, res) => res.set('cache-control', 'no-store').json(camerasStatus()));
+  r.post('/cameras/test-alert', requireAuth, (req, res) => {
+    const cfg = getConfig();
+    const f = cfg.frigate;
+    const cam = f?.enabled ? f.cameras.find((c) => c.id === req.body?.camera) : null;
+    if (!cam) return res.status(400).json({ error: 'unknown camera' });
+    const screenIds = alertScreenIds(cfg);
+    const delivered = screenIds.length
+      ? publish('cameraAlert', { camera: cam.id, name: cam.name, label: 'person', startTime: Date.now() / 1000, eventId: null, test: true }, { screenIds })
+      : 0;
+    const screens = screenIds.map((id) => cfg.screens.find((s) => s.id === id)?.slug || id);
+    logActivity('display.cameraTest', { req, data: { camera: cam.id, screens, delivered } });
+    res.json({ ok: true, delivered, screens });
   });
   return r;
 }

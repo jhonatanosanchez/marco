@@ -19,6 +19,7 @@ import { serverUpdater } from './routes/updates.js';
 import { onPrivacyConfig, syncPrivacy, stopPrivacy } from './privacy.js';
 import { startPhotoSweep } from './familyPhotos.js';
 import { cleanStoredPhotos } from './photos.js';
+import { startCameras, stopCameras } from './frigate.js';
 
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 
@@ -80,6 +81,8 @@ const server = app.listen(PORT, process.env.HOST || '0.0.0.0', (err) => {
   console.log(`[server] Marco v${pkg.version} on http://localhost:${PORT} (data: ${paths.data})`);
   logSetupHint(PORT);
   startRefresher();
+  // Cámaras Frigate (fork fsrhome): eventos cada 5 s mientras alguna pantalla las muestra
+  startCameras();
   // Privacy periods that end and schedule rules that start while the server runs (server/privacy.js)
   syncPrivacy();
   // Daily check for a newer release (MARCO_UPDATE_CHECK=0 or the admin switch turn it off); server/updates.js
@@ -89,6 +92,7 @@ const server = app.listen(PORT, process.env.HOST || '0.0.0.0', (err) => {
 function shutdown(sig) {
   console.log(`[server] ${sig}, shutting down`);
   stopRefresher();
+  stopCameras();
   stopPrivacy();
   serverUpdater(pkg.version).stop();
   try { flushDisplays(); flushTokenUsage(); } catch { /* ignore */ }
