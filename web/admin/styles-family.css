@@ -5,10 +5,13 @@
 .fam-tabs {
   margin: 4px 0 2px;
 }
-/* on a phone the four tab names need the room of their icons */
+/* on a phone the four tab names need the room of their icons (and of most of their padding: "Belønninger") */
 @media (max-width: 520px) {
   .fam-tabs .seg button > svg {
     display: none;
+  }
+  .fam-tabs .seg button {
+    padding-inline: 4px;
   }
 }
 .fam-stack {

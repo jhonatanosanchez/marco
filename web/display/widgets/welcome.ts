@@ -3,6 +3,7 @@
 import { logoSvg } from '../../shared/logo';
 import { qrSvg } from '../../shared/qr';
 import type { Lang, SetupStatus } from '../../shared/types';
+import { LOCALES } from '../../shared/i18n';
 
 const TEXT: Record<Lang, Record<string, string>> = {
   en: {
@@ -34,6 +35,26 @@ const TEXT: Record<Lang, Record<string, string>> = {
     code: 'Pede um código de configuração? Está no registo do servidor.',
     local: 'Noutro dispositivo, troca «localhost» pelo endereço deste computador.',
     scan: 'Lê para configurar',
+  },
+  nl: {
+    hello: 'Welkom',
+    ready: 'Dit scherm is klaar. Rond het instellen af op je telefoon of computer:',
+    s1: 'Scan de code of open het adres',
+    s2: 'Maak een wachtwoord voor het beheer en kies je agenda\'s',
+    s3: 'Dit scherm werkt zichzelf bij',
+    code: 'Vraagt hij om een installatiecode? Die staat in het serverlogboek.',
+    local: 'Op een ander apparaat vervang je “localhost” door het adres van deze computer.',
+    scan: 'Scan om in te stellen',
+  },
+  da: {
+    hello: 'Velkommen',
+    ready: 'Skærmen er klar. Gør opsætningen færdig fra din telefon eller computer:',
+    s1: 'Scan koden, eller åbn adressen',
+    s2: 'Opret adgangskoden til adminpanelet, og vælg dine kalendere',
+    s3: 'Skærmen opdaterer sig selv',
+    code: 'Bliver du bedt om en opsætningskode? Den står i serverens log.',
+    local: 'På en anden enhed skal du skrive denne computers adresse i stedet for “localhost”.',
+    scan: 'Scan for at komme i gang',
   },
 };
 
@@ -87,7 +108,7 @@ export function showWelcome(status: SetupStatus, lang: Lang): void {
       ${qr ? `<div class="wl-qr"><div class="wl-qr__img">${qr}</div><span>${esc(T.scan)}</span></div>` : ''}
     </div>
     <div class="wl-clock" aria-hidden="true"></div>`;
-  const loc = lang === 'en' ? 'en-GB' : lang === 'pt' ? 'pt-PT' : 'es-ES';
+  const loc = LOCALES[lang] ?? 'en-GB';
   const clock = el.querySelector('.wl-clock') as HTMLElement;
   const tick = () => {
     clock.textContent = new Date().toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' });

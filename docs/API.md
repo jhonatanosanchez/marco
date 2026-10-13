@@ -263,7 +263,7 @@ installs) and setup is skipped; the panel then offers to change it (`passwordFro
 | `POST /api/setup/test-ics` | `{ url }` → `TestIcsResponse` (the wizard's "Test" button). Unauthenticated, so it refuses loopback, link-local / cloud-metadata, multicast and unspecified destinations (also after redirects) and returns only generic errors (`address not allowed`, `HTTP <status>`, `could not load the calendar`) |
 | `POST /api/setup/complete` | `SetupRequest` → `{ ok, user, screen: { id, slug, name, displayPath }, displayAccess }` and a session cookie (logged in). `displayPath` = the screen's private link `/d/<key>` |
 
-`SetupRequest`: `{ password, passwordConfirm, language: es|en|pt, screenName, location?: { name, lat, lon, timezone },
+`SetupRequest`: `{ password, passwordConfirm, language: es|en|pt|nl|da, screenName, location?: { name, lat, lon, timezone },
 timezone? (when the location is skipped), units?: metric|imperial, format24?, calendars?: [{ name, url, kind: holidays|generic }] (≤ 20), photos?: { source:
 stock|gallery|mixed }, layout?: { preset }, accent?: #rrggbb, ambient?: aurora|particles|none, theme?: dark|light }`.
 `layout.preset: "planner"` also sets the screen's `calendar.weeks` to `"auto"` and `calendar.eventStyle` to

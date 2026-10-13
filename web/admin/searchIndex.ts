@@ -1,5 +1,5 @@
 // Static index of individual settings for the command palette (Ctrl/Cmd+K).
-// label = Spanish source string (translated with t()), keywords = extra words in es/en/pt, anchor = element id.
+// label = Spanish source string (translated with t()), keywords = extra words (mostly es/en/pt), anchor = element id.
 // feature = hidden when the server turns it off (navFilter.ts); the page's own feature applies too.
 // unless = hidden when the server turns this feature on (the setting lives on another page there).
 import type { FeatureName } from '../shared/types';
@@ -27,7 +27,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { label: 'Efecto ambiental (aurora, partículas)', route: 'background', anchor: 'bg-ambient', keywords: 'ambient aurora particles three webgl animación' },
   { label: 'Efecto del tiempo (lluvia, nieve, sol)', route: 'background', anchor: 'bg-weather', keywords: 'weather effect rain snow sun drops lluvia nieve sol gotas webgl' },
   { label: 'Nombre de la pantalla', route: 'screen', anchor: 'scr-general', keywords: 'name nombre nome' },
-  { label: 'Idioma de la pantalla', route: 'screen', anchor: 'scr-general', keywords: 'language idioma lingua español english português' },
+  { label: 'Idioma de la pantalla', route: 'screen', anchor: 'scr-general', keywords: 'language idioma lingua taal sprog español english português nederlands dansk' },
   { label: 'Orientación (horizontal / vertical)', route: 'screen', anchor: 'scr-general', keywords: 'orientation portrait landscape vertical rotar' },
   { label: 'Tamaño de letra', route: 'screen', anchor: 'scr-general', keywords: 'font size escala texto grande' },
   { label: 'Tema claro / oscuro', route: 'layout', anchor: 'layout-look', keywords: 'theme dark light tema' },

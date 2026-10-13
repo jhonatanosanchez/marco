@@ -490,8 +490,10 @@ starts normally once the screen exists. A credential's own screen always wins ov
 - Photo pipeline in the browser (`web/admin/photoTools.ts`): EXIF rotation, resize to ≤ 2560 px JPEG, 480 px
   thumbnail, HEIC decoding through a lazily loaded chunk, automatic focal point (spectral saliency + skin tones,
   `web/admin/saliency.ts`). The server never decodes images.
-- i18n: Spanish strings are the keys; English and Portuguese live in `web/admin/i18n-dict*.ts`. The first visit
-  follows the browser language.
+- i18n: Spanish strings are the keys; English and Portuguese live in `web/admin/i18n-dict*.ts`, Dutch and Danish
+  in `web/admin/i18n-dict-nl.ts` and `i18n-dict-da.ts` (one object per language keyed by the Spanish string; the
+  Familia rows sit in `i18n-dict-family.ts` so the family page stays small). A missing Dutch or Danish value falls
+  back to English. The first visit follows the browser language.
 
 ## Security model
 

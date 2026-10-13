@@ -3678,7 +3678,7 @@ h1 .scope {
 }
 .wz-langs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 .wz-lang {
@@ -4120,6 +4120,7 @@ h1 .scope {
     padding: 10px 12px;
   }
   .wz-langs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
   }
   .wz-lang {

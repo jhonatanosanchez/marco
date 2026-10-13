@@ -76,7 +76,7 @@ function loadConfig() {
   if (!raw) {
     const c = defaultConfig();
     writeFileAtomic(paths.config, JSON.stringify(c, null, 2));
-    mergeIconRuleUpdates(c); // fresh install: already the v2 rule set, only records the marker
+    mergeIconRuleUpdates(c); // fresh install: already the current rule set, only records the marker
     return c;
   }
   // v1 (single screen) → v2 (screens[]): keep an untouched copy of the old file, then persist the migrated one.
@@ -114,11 +114,12 @@ function loadConfig() {
 
 /**
  * One-time, additive update of the icon rules in an existing config (v2 rule set: more keywords in English,
- * Spanish and Portuguese, and new categories). Rules the user kept from the defaults gain the missing keywords;
- * new default rules are appended after the user's own, so custom rules keep their priority. Nothing is removed.
+ * Spanish and Portuguese, and new categories; v3: Dutch and Danish keywords). Rules the user kept from the defaults
+ * gain the missing keywords; new default rules are appended after the user's own, so custom rules keep their
+ * priority. Nothing is removed.
  * A marker file in the data folder makes it run once: rules deleted afterwards stay deleted.
  */
-const ICON_RULES_MARKER = '.iconrules-v2';
+const ICON_RULES_MARKER = '.iconrules-v3';
 function mergeIconRuleUpdates(cfg) {
   const marker = path.join(paths.data, ICON_RULES_MARKER);
   if (fs.existsSync(marker)) return;
@@ -136,7 +137,7 @@ function mergeIconRuleUpdates(cfg) {
       }
       const have = new Set(mine.match.map((m) => m.toLowerCase()));
       for (const m of def.match) {
-        if (mine.match.length >= 50) break; // validate.js limit per rule
+        if (mine.match.length >= 100) break; // validate.js limit per rule
         if (!have.has(m.toLowerCase())) { mine.match.push(m); added++; }
       }
     }

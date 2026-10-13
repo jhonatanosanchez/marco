@@ -1,17 +1,17 @@
 // Emoji picker index and search. Pure functions (no imports at runtime) so the server tests can load them.
 
-export type EmojiLang = 'es' | 'en' | 'pt';
+export type EmojiLang = 'es' | 'en' | 'pt' | 'nl' | 'da';
 export type EmojiEntry = {
   e: string;
-  /** keywords per language [es, en, pt]; the first one is the name */
-  kw: [string[], string[], string[]];
+  /** keywords per language [es, en, pt, nl, da]; the first one is the name */
+  kw: string[][];
   /** folded words of every keyword, per language */
-  words: [string[], string[], string[]];
+  words: string[][];
 };
 export type EmojiSection = { id: string; icon: string; title: string; list: EmojiEntry[] };
 export type EmojiIndex = { sections: EmojiSection[]; all: EmojiEntry[]; byEmoji: Map<string, EmojiEntry> };
 
-const LANGS: EmojiLang[] = ['es', 'en', 'pt'];
+const LANGS: EmojiLang[] = ['es', 'en', 'pt', 'nl', 'da'];
 
 /** Lowercase, no accents, no punctuation: "Avión" and "avion" match. */
 export function foldText(s: string): string {
@@ -31,8 +31,8 @@ function parse(item: string): EmojiEntry {
   const sp = item.indexOf(' ');
   const e = item.slice(0, sp);
   const parts = item.slice(sp + 1).split('|');
-  const kw = [0, 1, 2].map((i) => (parts[i] ?? '').split(',').map((k) => k.trim()).filter(Boolean)) as EmojiEntry['kw'];
-  const words = kw.map((list) => [...new Set(list.flatMap((k) => foldText(k).split(' ')).filter(Boolean))]) as EmojiEntry['words'];
+  const kw = LANGS.map((_, i) => (parts[i] ?? '').split(',').map((k) => k.trim()).filter(Boolean));
+  const words = kw.map((list) => [...new Set(list.flatMap((k) => foldText(k).split(' ')).filter(Boolean))]);
   return { e, kw, words };
 }
 
@@ -60,7 +60,7 @@ export function buildEmojiIndex(
     id: frequent.id,
     icon: frequent.icon,
     title: frequent.title,
-    list: frequent.emojis.map((e) => byEmoji.get(e) ?? { e, kw: [[], [], []], words: [[], [], []] }),
+    list: frequent.emojis.map((e) => byEmoji.get(e) ?? { e, kw: LANGS.map(() => []), words: LANGS.map(() => []) }),
   };
   return { sections: [freq, ...sections], all, byEmoji };
 }
@@ -87,7 +87,7 @@ function tokenScore(words: string[], tok: string): number {
 
 /**
  * Every word of the query has to match the start of a keyword word (or, from 3 letters, the
- * middle of one) in any of the three languages. Matches in the current language rank first.
+ * middle of one) in any of the languages. Matches in the current language rank first.
  */
 export function searchEmoji(index: EmojiIndex, query: string, lang: EmojiLang): EmojiEntry[] {
   const raw = query.trim();
@@ -99,10 +99,10 @@ export function searchEmoji(index: EmojiIndex, query: string, lang: EmojiLang): 
   const scored: { en: EmojiEntry; s: number; i: number }[] = [];
   index.all.forEach((en, i) => {
     let best = -1;
-    for (let l = 0; l < 3; l++) {
+    for (let l = 0; l < LANGS.length; l++) {
       let sum = 0;
       for (const tok of toks) {
-        const s = tokenScore(en.words[l as 0 | 1 | 2], tok);
+        const s = tokenScore(en.words[l] ?? [], tok);
         if (s < 0) {
           sum = -1;
           break;

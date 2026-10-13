@@ -260,7 +260,29 @@ test('background.weatherFx: default simple, back-filled into stored screens, val
   assert.equal(validateConfig(mergeDefaults({ revision: 1, background: { source: 'gallery' } })).value.screens[0].background.weatherFx, 'simple');
 });
 
-test('icon rules v2: one-time additive merge into an existing config', async () => {
+test('icon rules merge stays within the validation limits (200 rules, 100 keywords per rule)', async () => {
+  const store = await import('../store.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'marco-iconcap-'));
+  try {
+    const old = defaultConfig();
+    const birthday = { id: 'r_birthday', match: Array.from({ length: 99 }, (_, i) => `kw${i}`), emoji: '🎈', color: null };
+    const mine = Array.from({ length: 199 }, (_, i) => ({ id: `r_mine${i}`, match: [`word${i}`], emoji: '⭐', color: null }));
+    old.calendar.iconRules = [birthday, ...mine];
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify(old));
+    store.initStore(dir);
+    const rules = store.getConfig().calendar.iconRules;
+    assert.equal(rules.length, 200); // no default rule appended past the limit
+    assert.equal(rules[0].match.length, 100); // one keyword added, then the per-rule limit
+    const saved = JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8'));
+    const v = validateConfig(saved);
+    assert.equal(v.ok, true, JSON.stringify(v.errors));
+    assert.equal(v.value.calendar.iconRules.length, 200);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('icon rules v3: one-time additive merge into an existing config', async () => {
   const store = await import('../store.js');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'marco-iconrules-'));
   try {
@@ -280,7 +302,7 @@ test('icon rules v2: one-time additive merge into an existing config', async () 
     // new categories appended once
     assert.ok(rules.some((r) => r.id === 'r_swim'));
     assert.equal(rules.filter((r) => r.id === 'r_birthday').length, 1);
-    assert.ok(fs.existsSync(path.join(dir, '.iconrules-v2')));
+    assert.ok(fs.existsSync(path.join(dir, '.iconrules-v3')));
     const saved = JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8'));
     assert.equal(saved.calendar.iconRules.length, rules.length);
     // the merge runs once: rules removed afterwards stay removed

@@ -9,6 +9,7 @@ import * as microsoft from './microsoft.js';
 import { logActivity, logActivityThrottled } from './activity.js';
 import { passwordProblem, PASSWORD_MESSAGES } from './lib/password.js';
 import { isPrivateIp, isLanClient, ipBucket, hostAllowed, hostnameOf } from './lib/net.js';
+import { LANGS } from './core/lib/i18n.js';
 
 export { isPrivateIp, isLanClient };
 
@@ -357,7 +358,7 @@ const MS_BACK = '#/calendars/cal-accounts';
 export function microsoftConnectHandler(req, res) {
   if (!microsoft.microsoftConfigured()) return res.redirect(`/admin/?error=microsoft_not_configured${MS_BACK}`);
   if (!sessionValid(req)) return res.redirect('/admin/?error=login_required');
-  const lang = ['es', 'en', 'pt'].includes(getConfig().screens?.[0]?.screen?.language) ? getConfig().screens[0].screen.language : '';
+  const lang = LANGS.includes(getConfig().screens?.[0]?.screen?.language) ? getConfig().screens[0].screen.language : '';
   res.redirect(microsoft.startConnect(req, lang));
 }
 

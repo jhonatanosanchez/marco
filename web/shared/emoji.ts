@@ -2,6 +2,7 @@
 // (used by the mock dataset and the admin preview).
 import type { IconRule, SourceKind } from './types';
 import RULES from '../../server/core/iconRules.js';
+import { findKeyword } from '../../server/lib/keywords.js';
 
 export const DEFAULT_ICON_RULES: IconRule[] = RULES.map((r) => ({
   id: r.id, match: r.match, emoji: r.emoji, color: null,
@@ -14,21 +15,9 @@ export const KIND_EMOJI: Record<SourceKind, string | null> = {
   holidays: '🎉',
 };
 
-/** Lowercase + strip diacritics. */
-export function normalizeText(s: string): string {
-  return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-}
-
-/** First matching rule (case/accent-insensitive substring on title + description). */
+/** First matching rule on title + description, the server's rule (short keywords match whole words only). */
 export function matchIconRule(rules: IconRule[], title: string, description = ''): IconRule | null {
-  const hay = normalizeText(`${title} ${description}`);
-  for (const r of rules) {
-    for (const m of r.match || []) {
-      const n = normalizeText(m).trim();
-      if (n && hay.includes(n)) return r;
-    }
-  }
-  return null;
+  return findKeyword(rules, `${title} ${description}`)?.rule ?? null;
 }
 
 /** Emoji priority: iconRule > source.emoji > kind default > none. Color: iconRule.color > source.color. */

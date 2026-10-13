@@ -123,7 +123,7 @@ test('display, admin and types know every layout', () => {
   for (const p of NEW) assert.ok(admin.includes(`id === '${p}'`), `no schematic for ${p}`);
 });
 
-test('the new layouts have Spanish, English and Portuguese texts', () => {
+test('the new layouts have Spanish, English and Portuguese texts (Dutch and Danish: i18n-complete.test.js)', () => {
   const admin = read('web/admin/sections/Layout.tsx');
   const dict = ['', '2', '3', '4', '5', '6', '7', '-planner', '-family'].map((n) => read(`web/admin/i18n-dict${n}.ts`)).join('\n');
   for (const m of admin.matchAll(/\{ id: '(\w+)', name: '([^']+)', desc: '([^']+)'/g)) {
@@ -136,7 +136,7 @@ test('the new layouts have Spanish, English and Portuguese texts', () => {
   }
   const i18n = read('web/shared/i18n.ts');
   for (const k of ['upNext', 'nothingMoreToday', 'everyone', 'birthdays', 'allDone', 'noPeople', 'nothingPlanned', 'daysWord']) {
-    assert.equal(i18n.split(`  ${k}: '`).length - 1, 3, `display string ${k} not in es, en and pt`);
+    assert.equal(i18n.split(`  ${k}: '`).length - 1, 5, `display string ${k} not in es, en, pt, nl and da`);
   }
 });
 

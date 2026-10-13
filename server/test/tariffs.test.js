@@ -436,7 +436,7 @@ test('routes: &grid= on the display prices, refused for another zone; the admin 
   }
 });
 
-test('display and admin wiring: next 24 h view in every look, strings in three languages, no em dashes', () => {
+test('display and admin wiring: next 24 h view in every look, strings in every language, no em dashes', () => {
   const read = (p) => fs.readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
   const prices = read('web/display/widgets/prices.ts');
   assert.match(prices, /&grid=\$\{encodeURIComponent\(grid\)\}/);
@@ -449,7 +449,7 @@ test('display and admin wiring: next 24 h view in every look, strings in three l
   assert.match(modern, /#app\.is-kids \.pw-stat/);
   const i18n = read('web/shared/i18n.ts');
   for (const k of ['priceNowIs', 'priceLowest', 'priceAverage', 'priceHighest', 'priceNextHours', 'priceInclGrid', 'priceInclGridEst', 'priceInclBands', 'priceNoGrid']) {
-    assert.equal(i18n.split(`  ${k}: '`).length, 4, k);
+    assert.equal(i18n.split(`  ${k}: '`).length, 6, k);
   }
   for (const f of ['server/core/tariffsCore.js', 'server/tariffs.js', 'web/admin/sections/PriceTariff.tsx', 'web/admin/sections/PriceWidget.tsx', 'web/admin/i18n-dict-prices.ts', 'web/display/widgets/prices.ts']) {
     assert.doesNotMatch(read(f), /—/, `no em dashes in ${f}`);

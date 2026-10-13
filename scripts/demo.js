@@ -5,7 +5,7 @@
 //
 //   npm run demo                       # admin: http://localhost:3000/admin/ (password: demo-calendar); the display links are printed
 //   npm run demo -- --port 3080        # another port
-//   npm run demo -- --lang es          # Spanish (also: pt)
+//   npm run demo -- --lang es          # Spanish (also: pt, nl, da)
 //   npm run demo -- --no-photos        # skip downloading sample photos from picsum.photos
 //   npm run demo -- --data ./demo-data --keep   # keep the generated data directory afterwards
 //
@@ -35,11 +35,66 @@ if (flag('help') || flag('h')) {
 }
 
 const PORT = Number(opt('port', process.env.PORT || 3000));
-const LANG = ['es', 'pt'].includes(opt('lang', 'en')) ? opt('lang', 'en') : 'en';
+const LANG = ['es', 'pt', 'nl', 'da'].includes(opt('lang', 'en')) ? opt('lang', 'en') : 'en';
 const PASSWORD = 'demo-calendar';
 const keep = flag('keep');
 const dataDir = path.resolve(opt('data', fs.mkdtempSync(path.join(os.tmpdir(), 'marco-demo-'))));
-const L = (en, es, pt = en) => (LANG === 'es' ? es : LANG === 'pt' ? pt : en);
+// Dutch and Danish demo text, keyed by the English string: [nl, da].
+const NL_DA = {
+  'Swimming lesson – Lucía': ['Zwemles – Lucía', 'Svømning – Lucía'],
+  'Municipal pool': ['Gemeentelijk zwembad', 'Svømmehallen'],
+  'Football practice – Mateo': ['Voetbaltraining – Mateo', 'Fodboldtræning – Mateo'],
+  'School trip to the science museum': ['Schoolreisje naar het wetenschapsmuseum', 'Skoleudflugt til videnskabsmuseet'],
+  'School play': ['Schoolvoorstelling', 'Skolekomedie'],
+  'Beach house': ['Strandhuis', 'Sommerhuset'],
+  'School & activities': ['School en activiteiten', 'Skole og aktiviteter'],
+  'Public holidays': ['Feestdagen', 'Helligdage'],
+  'Family': ['Gezin', 'Familie'],
+  'Birthdays': ['Verjaardagen', 'Fødselsdage'],
+  'Weekly meeting': ['Weekoverleg', 'Ugemøde'],
+  'Padel with Rui': ['Padel met Rui', 'Padel med Rui'],
+  'Farmers market': ['Weekmarkt', 'Torvedag'],
+  'Pay the rent': ['Huur betalen', 'Betal husleje'],
+  'Dentist – Lucía': ['Tandarts – Lucía', 'Tandlæge – Lucía'],
+  'Smile Clinic': ['Tandartspraktijk De Glimlach', 'Smilets Tandklinik'],
+  'Dinner with Ana & Pedro': ['Uit eten met Ana en Pedro', 'Middag med Ana og Pedro'],
+  'Seaside restaurant': ['Restaurant aan de haven', 'Restauranten ved havnen'],
+  'Vet – Luna': ['Dierenarts – Luna', 'Dyrlæge – Luna'],
+  'Car service': ['Auto naar de garage', 'Bilen til service'],
+  'Cinema night': ['Bioscoopavond', 'Biografaften'],
+  'Flight to Madeira': ['Vlucht naar Madeira', 'Fly til Madeira'],
+  'Vacation in the Algarve': ['Vakantie in de Algarve', 'Ferie i Algarve'],
+  "Inês & Duarte's wedding": ['Bruiloft van Inês en Duarte', 'Inês og Duartes bryllup'],
+  'Pediatrician – Mateo': ['Kinderarts – Mateo', 'Børnelæge – Mateo'],
+  'Grandpa Luis': ['Opa Luis', 'Morfar Luis'],
+  'Grandma Isabel': ['Oma Isabel', 'Mormor Isabel'],
+  'Aunt Rosa': ['Tante Rosa', 'Moster Rosa'],
+  // the server's own "Not available" title (server/core/lib/i18n.js), so the filter still hides the blocked dates
+  'Not available': ['Niet beschikbaar', 'Ikke ledig'],
+  'Blocked dates': ['Geblokkeerde data', 'Blokerede datoer'],
+  'Football practice': ['Voetbaltraining', 'Fodboldtræning'],
+  'Football': ['Voetbal', 'Fodbold'],
+  'Shorter titles': ['Kortere titels', 'Kortere titler'],
+  'Swimming': ['Zwemles', 'Svømning'],
+  'Christmas': ['Kerst', 'Jul'],
+  'Halloween party': ['Halloweenfeest', 'Halloweenfest'],
+  'Take out the bins': ['Vuilnis buitenzetten', 'Skrald ud'],
+  'Recycling & organic': ['Plastic en gft', 'Genbrug og madaffald'],
+  'School run!': ['Naar school!', 'Afsted i skole!'],
+  'Backpacks, snacks, water bottles': ['Schooltassen, tussendoortjes, drinkflessen', 'Skoletasker, madpakker, vandflasker'],
+  'Buy batteries for the remote': ['Batterijen kopen voor de afstandsbediening', 'Køb batterier til fjernbetjeningen'],
+  'Call the plumber': ['Loodgieter bellen', 'Ring til blikkenslageren'],
+  'Living room': ['Woonkamer', 'Stue'],
+  'Kitchen': ['Keuken', 'Køkken'],
+  'Hall tablet': ['Tablet in de hal', 'Tablet i entréen'],
+  'The washing machine is done': ['De wasmachine is klaar', 'Vaskemaskinen er færdig'],
+  'Time to hang the laundry': ['De was kan opgehangen worden', 'Tøjet kan hænges op'],
+  'A parcel has arrived': ['Er is een pakketje bezorgd', 'Der er kommet en pakke'],
+  "It's in the mailbox": ['Het ligt in de brievenbus', 'Den ligger i postkassen'],
+  'Dinner is ready!': ['Het eten is klaar!', 'Maden er klar!'],
+};
+const L = (en, es, pt = en) =>
+  LANG === 'es' ? es : LANG === 'pt' ? pt : LANG === 'nl' || LANG === 'da' ? NL_DA[en]?.[LANG === 'nl' ? 0 : 1] ?? en : en;
 
 // ------------------------------------------------------------------ dates
 const TZ = 'Europe/Lisbon';

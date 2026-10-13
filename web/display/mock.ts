@@ -7,7 +7,8 @@ import type {
   WeatherResponse,
 } from '../shared/types';
 import { DEFAULT_ICON_RULES, resolveEventStyle } from '../shared/emoji';
-import { addDays, dateKeyInTz, keyToUTC, pad2, startOfWeek, zonedParts } from '../shared/i18n';
+import { addDays, dateKeyInTz, keyToUTC, normLang, pad2, startOfWeek, zonedParts } from '../shared/i18n';
+import { DEMO_NEWS, DEMO_NL_DA } from './mock-text';
 import { DEFAULT_CONFIG, deepMerge } from './defaults';
 
 // The demo runs in Lisbon unless ?tz= names another IANA zone (the website passes the visitor's own zone).
@@ -22,11 +23,10 @@ const TZ = (() => {
   }
 })();
 
-// Demo text follows ?lang=en|es|pt (English by default).
-const DEMO_LANG = (() => {
-  const l = new URLSearchParams(location.search).get('lang');
-  return l === 'es' || l === 'pt' ? l : 'en';
-})();
+// Demo text follows ?lang=en|es|pt|nl|da (English by default).
+const DEMO_LANG = normLang(new URLSearchParams(location.search).get('lang'));
+/** Column of DEMO_NL_DA for Dutch and Danish, else null. */
+const NL_DA: 0 | 1 | null = DEMO_LANG === 'nl' ? 0 : DEMO_LANG === 'da' ? 1 : null;
 /** ?empty=1: no events, no countdowns, no to-dos (empty states). */
 const EMPTY = new URLSearchParams(location.search).get('empty') === '1';
 /** ?sparse=1: a quiet calendar, a few events and most of them weeks away (to see how far the agenda looks ahead). */
@@ -38,8 +38,12 @@ const BUSY_MONTH = BUSY_Q === '2';
 const BUSY = BUSY_Q === '1' || BUSY_MONTH;
 /** ?private=1: privacy mode on (what the server sends then: "Busy" blocks, holidays and birthdays as they are). */
 const PRIVATE = new URLSearchParams(location.search).get('private') === '1';
-/** Pick the demo string for the current language: L('English', 'Español', 'Português'). */
-const L = (en: string, es: string, pt: string) => (DEMO_LANG === 'es' ? es : DEMO_LANG === 'pt' ? pt : en);
+/** Pick the demo string for the current language: L('English', 'Español', 'Português'); Dutch and Danish come from
+ * mock-text.ts, keyed by the English. */
+const L = (en: string, es: string, pt: string) =>
+  DEMO_LANG === 'es' ? es : DEMO_LANG === 'pt' ? pt : NL_DA !== null ? DEMO_NL_DA[en]?.[NL_DA] ?? en : en;
+/** The family demo is written in Spanish (every language but Dutch and Danish shows it as is). */
+const F = (es: string) => (NL_DA !== null ? DEMO_NL_DA[es]?.[NL_DA] ?? es : es);
 
 export const MOCK_SOURCES: PublicCalendarSource[] = [
   { id: 'c_fam', name: L('Family', 'Familia', 'Família'), color: '#4c8dff', emoji: '', kind: 'generic' },
@@ -131,7 +135,7 @@ export function mockConfig(): DisplayConfig {
  */
 // ---------------------------------------------------------------------------------------------
 // Familia demo (kids layouts): three kids and two parents, routines about half done (what is over is done, a bit of
-// what is on now), a week of meals and three rewards. Demo data, so in Spanish. ?members=6 adds a grandmother and
+// what is on now), a week of meals and three rewards. Demo data, written in Spanish (Dutch and Danish through F()). ?members=6 adds a grandmother and
 // gives the parents routines too (the compact two-row Rutinas layout).
 // ---------------------------------------------------------------------------------------------
 const MOCK_MEMBERS: [string, string, string, string, boolean, number, string | null][] = [
@@ -201,11 +205,12 @@ export function mockFamily(now = new Date(), cfg: DisplayConfig = DEFAULT_CONFIG
       const first = !firstOfSlot.has(key);
       firstOfSlot.add(key);
       const done = slot === 'any' ? false : idx < now ? !(memberId === 'm_mateo' && !first) : idx === now ? first && memberId !== 'm_sofia' : false;
-      return { id: `h_demo${i}`, memberId, title, emoji, slot, points: showPoints && kidOf.get(memberId) ? points : 0, done };
+      return { id: `h_demo${i}`, memberId, title: F(title), emoji, slot, points: showPoints && kidOf.get(memberId) ? points : 0, done };
     })
     .sort((a, b) => order.indexOf(a.slot) - order.indexOf(b.slot));
   chores.sort((a, b) => members.findIndex((m) => m[0] === a.memberId) - members.findIndex((m) => m[0] === b.memberId));
-  const views: FamilyMemberView[] = members.map(([id, name, avatar, color, kid, stars, calendarId]) => {
+  const views: FamilyMemberView[] = members.map(([id, name0, avatar, color, kid, stars, calendarId]) => {
+    const name = F(name0);
     const mine = chores.filter((c) => c.memberId === id);
     const initials = name.split(/\s+/).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
     return {
@@ -219,7 +224,7 @@ export function mockFamily(now = new Date(), cfg: DisplayConfig = DEFAULT_CONFIG
     if (m.points === null) continue;
     const pts = m.points;
     const w = MOCK_REWARDS.find((r) => r.cost > pts) ?? MOCK_REWARDS[MOCK_REWARDS.length - 1];
-    nextReward[m.id] = { ...w, missing: Math.max(0, w.cost - pts) };
+    nextReward[m.id] = { ...w, title: F(w.title), missing: Math.max(0, w.cost - pts) };
   }
   const start = startOfWeek(today, cfg.calendar.weekStart ?? 1);
   const slots: MealSlot[] = q.get('snack') === '1' ? ['breakfast', 'lunch', 'snack', 'dinner'] : ['breakfast', 'lunch', 'dinner'];
@@ -228,7 +233,7 @@ export function mockFamily(now = new Date(), cfg: DisplayConfig = DEFAULT_CONFIG
     const dow = keyToUTC(date).getUTCDay();
     const all = MOCK_MEALS[(dow + 6) % 7];
     // the weekend breakfast is left open: an empty cell
-    const meals = Object.fromEntries(slots.filter((s) => !(dow === 0 && s === 'breakfast')).map((s) => [s, all[s]]));
+    const meals = Object.fromEntries(slots.filter((s) => !(dow === 0 && s === 'breakfast')).map((s) => [s, F(all[s])]));
     return { date, dow, meals };
   });
   return {
@@ -568,7 +573,7 @@ export function mockNews(): NewsResponse {
     ['La fiesta de la vendimia cierra con 200.000 visitantes', 'Música, gastronomía y vino llenaron las calles del centro histórico durante cinco días.'],
     ['La biblioteca municipal abre también los domingos', 'El nuevo horario incluye talleres gratuitos para niños y un club de lectura en inglés.'],
     ['Previsión: llega la primera lluvia del otoño', 'Se esperan chubascos a partir del sábado, con un descenso notable de las temperaturas.'],
-  ] : DEMO_LANG === 'pt' ? [
+  ] : NL_DA !== null ? DEMO_NEWS[DEMO_LANG as 'nl' | 'da'].map(([a, b]) => [a, b]) : DEMO_LANG === 'pt' ? [
     ['Cidade alarga a rede de metro com quatro novas estações', 'As obras da linha circular avançam e os novos troços devem abrir no próximo ano.'],
     ['Golfinhos voltam a ser avistados no estuário', 'Os biólogos registam mais avistamentos este outono e os passeios de barco celebram uma temporada recorde.'],
     ['Renováveis batem recorde na produção de eletricidade', 'Em setembro, mais de 80 % da eletricidade consumida veio de fontes eólica, solar e hídrica.'],

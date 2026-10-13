@@ -73,13 +73,13 @@ test('kids styles only touch the kids layouts (and hide #kids elsewhere)', () =>
   assert.match(css, /\.lite\.style-modern #app\.is-kids \.k-bar i \{ transition: none; \}/);
 });
 
-test('display texts of the kids layouts exist in Spanish, English and Portuguese', () => {
+test('display texts of the kids layouts exist in Spanish, English, Portuguese, Dutch and Danish', () => {
   const i18n = read('web/shared/i18n.ts');
   const keys = ['kidsMorning', 'kidsAfternoon', 'kidsEvening', 'kidsAnytime', 'kidsAllDone', 'kidsScan', 'kidsNone', 'kidsNoMembers', 'kidsRoutines',
     'kidsMealsToday', 'kidsMealsWeek', 'kidsMealsOff', 'meal_breakfast', 'meal_lunch', 'meal_snack', 'meal_dinner', 'greetMorning', 'greetAfternoon',
     'greetEvening', 'kidsEventsLeft', 'kidsEventsLeft1', 'kidsNoEventsLeft', 'kidsRoutinesDone', 'kidsRewards', 'kidsStarsLeft', 'kidsTasks',
     'kidsNoMeal', 'kidsRewardReady', 'kidsNoMealsDay', 'kidsPrivate', 'kidsStarsLeft1', 'kidsLeft'];
-  for (const k of keys) assert.equal(i18n.split(new RegExp(`\\n  ${k}: ['"]`)).length - 1, 3, `display string ${k} not in es, en and pt`);
+  for (const k of keys) assert.equal(i18n.split(new RegExp(`\\n  ${k}: ['"]`)).length - 1, 5, `display string ${k} not in es, en, pt, nl and da`);
   // every key the widget asks for is one of them (or an older one)
   const kids = read('web/display/widgets/kids.ts');
   for (const m of kids.matchAll(/\bt\('(\w+)'/g)) assert.ok(i18n.includes(`  ${m[1]}: `), `kids.ts uses unknown key ${m[1]}`);

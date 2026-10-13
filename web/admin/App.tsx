@@ -15,6 +15,7 @@ import { FeedbackDialog } from './components/FeedbackDialog';
 import { feedbackMeta } from './feedbackForm';
 import { Button, setScopeScreenName } from './components/ui';
 import { getLang, initialLang, setLang, nScreens, t } from './i18n';
+import { LANG_NAMES, LANGS } from '../shared/i18n';
 import { setIntent } from './intent';
 import { Login } from './Login';
 import { SetupWizard, takeSetupToken } from './Setup';
@@ -919,8 +920,8 @@ export function App() {
         </nav>
         <div class="sidebar__foot">
           <div class="lang-switch" role="group" aria-label={t('Idioma del panel')}>
-            {(['es', 'en', 'pt'] as Lang[]).map((l) => (
-              <button type="button" class={getLang() === l ? 'is-active' : ''} onClick={() => changeLang(l)}>
+            {LANGS.map((l) => (
+              <button type="button" class={getLang() === l ? 'is-active' : ''} title={LANG_NAMES[l]} lang={l} onClick={() => changeLang(l)}>
                 {l.toUpperCase()}
               </button>
             ))}

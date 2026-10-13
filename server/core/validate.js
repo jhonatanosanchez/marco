@@ -164,7 +164,7 @@ function sanitizeSource(ctx, path, s, seen) {
 
 function sanitizeRule(ctx, path, r, seen) {
   if (!isObj(r)) { ctx.err(path, 'expected object'); return null; }
-  const match = arr(ctx, `${path}.match`, r.match, [], 50)
+  const match = arr(ctx, `${path}.match`, r.match, [], 100)
     .filter((m) => typeof m === 'string')
     .map((m) => m.trim().slice(0, 80))
     .filter(Boolean);

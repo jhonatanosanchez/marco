@@ -98,6 +98,9 @@ export const HOLIDAY_PRESETS: { cc: string; flag: string; name: string; url: str
   { cc: 'DE', flag: '🇩🇪', name: 'Festivos de Alemania', url: 'https://calendar.google.com/calendar/ical/en.german%23holiday%40group.v.calendar.google.com/public/basic.ics' },
   { cc: 'FR', flag: '🇫🇷', name: 'Festivos de Francia', url: 'https://calendar.google.com/calendar/ical/en.french%23holiday%40group.v.calendar.google.com/public/basic.ics' },
   { cc: 'BR', flag: '🇧🇷', name: 'Festivos de Brasil', url: 'https://calendar.google.com/calendar/ical/pt.brazilian%23holiday%40group.v.calendar.google.com/public/basic.ics' },
+  { cc: 'NL', flag: '🇳🇱', name: 'Festivos de Países Bajos', url: 'https://calendar.google.com/calendar/ical/en.dutch%23holiday%40group.v.calendar.google.com/public/basic.ics' },
+  { cc: 'BE', flag: '🇧🇪', name: 'Festivos de Bélgica', url: 'https://calendar.google.com/calendar/ical/en.be%23holiday%40group.v.calendar.google.com/public/basic.ics' },
+  { cc: 'DK', flag: '🇩🇰', name: 'Festivos de Dinamarca', url: 'https://calendar.google.com/calendar/ical/en.danish%23holiday%40group.v.calendar.google.com/public/basic.ics' },
 ];
 
 export const SWATCHES = [

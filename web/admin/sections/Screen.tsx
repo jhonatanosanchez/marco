@@ -3,7 +3,8 @@ import { api, ApiError } from '../api';
 import { toast } from '../components/feedback';
 import { GoogleG, Icon } from '../components/icons';
 import { PrivateLinkCard } from '../components/DisplayAccess';
-import { Button, Callout, Card, Chips, Field, PageHeader, Segmented, Slider, Textarea, TextInput, ToggleRow } from '../components/ui';
+import { Button, Callout, Card, Chips, Field, PageHeader, Segmented, Select, Slider, Textarea, TextInput, ToggleRow } from '../components/ui';
+import { LANG_NAMES, LANGS } from '../../shared/i18n';
 import { has, limit, offers } from '../caps';
 import { locale, t } from '../i18n';
 import { cssBytes, EMAIL_RE } from '../util';
@@ -26,14 +27,9 @@ export function ScreenSection({ cfg, set, errors, screenId, saved, go }: Section
             <TextInput value={s.name} error={!!errors['screen.name']} onValue={(v) => set((d) => void (d.screen.name = v))} />
           </Field>
           <Field label={t('Idioma de la pantalla')}>
-            <Segmented
-              full
+            <Select
               value={s.language}
-              options={[
-                { value: 'es', label: 'Español' },
-                { value: 'en', label: 'English' },
-                { value: 'pt', label: 'Português' },
-              ]}
+              options={LANGS.map((l) => ({ value: l, label: LANG_NAMES[l] }))}
               onChange={(v) => set((d) => void (d.screen.language = v))}
             />
           </Field>

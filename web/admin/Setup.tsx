@@ -12,6 +12,7 @@ import { api, ApiError } from './api';
 import { Icon, type IconName } from './components/icons';
 import { Button, Callout, Field, Segmented, TextInput } from './components/ui';
 import { getLang, setLang, t } from './i18n';
+import { LOCALES } from '../shared/i18n';
 import { PRESETS, Schematic } from './sections/Layout';
 import { HOLIDAY_PRESETS, isHttpUrl, SWATCHES } from './util';
 
@@ -71,6 +72,8 @@ const LANG_CARDS: { value: Lang; name: string; hello: string }[] = [
   { value: 'en', name: 'English', hello: 'Hello' },
   { value: 'es', name: 'Español', hello: 'Hola' },
   { value: 'pt', name: 'Português', hello: 'Olá' },
+  { value: 'nl', name: 'Nederlands', hello: 'Hallo' },
+  { value: 'da', name: 'Dansk', hello: 'Hej' },
 ];
 
 const browserTz = () => {
@@ -438,7 +441,7 @@ export function SetupWizard({ status: initial, onDone, onLang }: { status: Setup
   const now = new Date();
   const timePreview = (() => {
     try {
-      return new Intl.DateTimeFormat(lang === 'en' ? 'en-GB' : lang === 'pt' ? 'pt-PT' : 'es-ES', {
+      return new Intl.DateTimeFormat(LOCALES[lang], {
         hour: 'numeric', minute: '2-digit', hour12: !h24, timeZone: tzOk ? tz : undefined,
       }).format(now);
     } catch {

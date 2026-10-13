@@ -159,7 +159,7 @@ export const ROWS_PRICES: [string, string, string][] = [
   ['El precio de ahora con su nivel, el más bajo, la media y el más alto, y una fila por hora con su barra. Las que quepan.', 'The price now with its level, the lowest, the average and the highest, and a row per hour with its bar. As many as fit.', 'O preço de agora com o seu nível, o mais baixo, a média e o mais alto, e uma linha por hora com a sua barra. As que couberem.'],
   ['Mercado', 'Market', 'Mercado'],
   ['Recargo fijo', 'Fixed extra', 'Acréscimo fixo'],
-  ['Formato', 'Shape', 'Formato'],
+  ['Forma', 'Shape', 'Forma'],
   ['Una tarjeta ancha con una barra por hora y el precio encima.', 'A wide card with a bar per hour and its price on top.', 'Um cartão largo com uma barra por hora e o preço por cima.'],
   ['Las horas en dos columnas cuando la tarjeta es ancha.', 'The hours in two columns when the card is wide.', 'As horas em duas colunas quando o cartão é largo.'],
   ['Una tarjeta alta: el precio de ahora y una fila por hora con su barra y su precio.', 'A tall card: the price now and a row per hour with its bar and price.', 'Um cartão alto: o preço de agora e uma linha por hora com a sua barra e o seu preço.'],

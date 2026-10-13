@@ -11,7 +11,7 @@ import './styles-kids.css';
 import type {
   Announcement, CountdownsResponse, DisplayConfig, EventsResponse, FamilyDisplayState, Lang, NewsResponse, NightCommand, Photo, PhotosResponse, PlannerBar, StreamHello, WeatherResponse,
 } from '../shared/types';
-import { addDays, startOfWeek } from '../shared/i18n';
+import { addDays, LANGS, startOfWeek } from '../shared/i18n';
 import { api, ApiError } from './api';
 import { parseColor, toHex } from './color';
 import { ctx, setCtxConfig } from './ctx';
@@ -1588,7 +1588,7 @@ async function boot(): Promise<void> {
   if (setup) {
     const pl = params.get('lang');
     heartbeat.stop();
-    showWelcome(setup, pl === 'es' || pl === 'en' || pl === 'pt' ? pl : setup.suggestedLanguage);
+    showWelcome(setup, LANGS.includes(pl as Lang) ? (pl as Lang) : setup.suggestedLanguage);
     waitForSetup();
     return;
   }

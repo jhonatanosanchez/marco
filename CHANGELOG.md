@@ -5,6 +5,30 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-13
+
+### Added
+- Dutch and Danish for the screen, the admin, the family page and the icon rules: every admin and family page text,
+  the screen's words, dates and numbers, weather descriptions and wind directions, private mode titles, backup
+  summaries, the pairing and welcome screens, the setup wizard and the demo. Long dates read "Maandag 13 oktober"
+  and "Mandag den 13. oktober", short Danish dates "23. okt", and numbers use a decimal comma.
+- Icon rules: Dutch and Danish keywords (about 800 keywords in all). Existing installs get the new keywords once on
+  the next start; rules you changed keep your emoji and your own keywords, and nothing is removed. A rule can now
+  hold up to 100 keywords (was 50).
+- Holidays: quick-add calendars for the Netherlands, Belgium and Denmark, and holiday names from the Dutch, Belgian
+  and Danish Google feeds shown in every language.
+- Vacation rental and birthday titles in Dutch and Danish are recognised ("Verjaardag van Anna", "Annas
+  fødselsdag", "Niet beschikbaar", guest lines with "Gast" or "Gæst").
+- Admin: the screen language is now a list with each language's own name, and the sidebar switch has five buttons.
+
+### Fixed
+- Electricity price widget: the *Shape* field showed "Format" in English, because it shared its text with the date
+  format field.
+- Holiday names written with a curly apostrophe ("Father’s Day" in some Google feeds) were not translated.
+- The demo and the admin preview now pick event icons the same way as the server: short keywords match whole words
+  only, so "car" no longer gives "Carmen" a car.
+- A screen text missing in a language now falls back to English, then Spanish (it went straight to Spanish).
+
 ## [0.11.1] - 2026-10-13
 
 ### Added

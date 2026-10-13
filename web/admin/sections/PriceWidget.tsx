@@ -384,7 +384,7 @@ export function PriceWidgetFields({ w, errors, upd, part, tz }: {
       </Field>
       {(o.view === 'chart' || o.view === 'auto' || o.view === 'next') && (
         <div class="grid grid--2">
-          <Field label={t('Formato')} hint={t(SHAPE_HINT[o.chartShape ?? 'columns'][o.view === 'next' ? 'next' : 'chart'])}>
+          <Field label={t('Forma')} hint={t(SHAPE_HINT[o.chartShape ?? 'columns'][o.view === 'next' ? 'next' : 'chart'])}>
             <Segmented
               full
               value={o.chartShape ?? 'columns'}

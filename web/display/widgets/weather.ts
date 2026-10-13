@@ -1,6 +1,6 @@
 // Weather block: current conditions, meta row, hourly strip and daily forecast pills.
-import type { WeatherResponse } from '../../shared/types';
-import { diffDays, formatTime, weekdayName, zonedParts } from '../../shared/i18n';
+import type { Lang, WeatherResponse } from '../../shared/types';
+import { diffDays, formatTime, LOCALES, weekdayName, zonedParts } from '../../shared/i18n';
 import { ctx } from '../ctx';
 import { esc, setHTML } from '../dom';
 import { ICON, weatherIcon, windArrow } from '../icons';
@@ -20,7 +20,7 @@ export function sourceCredit(w: WeatherResponse | null): string {
 }
 
 const r1 = (n: number | null | undefined, lang: string) =>
-  n === null || n === undefined || Number.isNaN(n) ? '–' : (Math.round(n * 10) / 10).toLocaleString(lang === 'en' ? 'en-GB' : 'es-ES');
+  n === null || n === undefined || Number.isNaN(n) ? '–' : (Math.round(n * 10) / 10).toLocaleString(LOCALES[lang as Lang] ?? 'es-ES');
 
 export class Weather {
   constructor(private root: HTMLElement, private opts: { hourly?: boolean; days?: boolean; compact?: boolean } = {}) {
