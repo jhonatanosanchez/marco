@@ -167,6 +167,11 @@ export const ROWS_WIDGETS: [string, string, string][] = [
     '«{view}» não cabe neste tamanho: o ecrã mostra o preço de agora. Experimente um tamanho maior ou a coluna lateral.',
   ],
   [
+    '«{view}» necesita más sitio en esta pantalla: aquí se ve más grande. En un sitio más pequeño la pantalla muestra el precio de ahora.',
+    '“{view}” needs more room on this screen: here it is shown larger. In a smaller place the screen shows the price now.',
+    '«{view}» precisa de mais espaço neste ecrã: aqui aparece maior. Num lugar mais pequeno o ecrã mostra o preço de agora.',
+  ],
+  [
     'No cabe en este sitio: la pantalla no lo mostraría. Prueba otro tamaño o sitio.',
     'It does not fit here: the screen would not show it. Try another size or place.',
     'Não cabe aqui: o ecrã não o mostraria. Experimente outro tamanho ou lugar.',

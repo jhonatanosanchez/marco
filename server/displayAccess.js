@@ -239,8 +239,11 @@ export function bareScreenRequest(cfg, req, key = req.query?.screen) {
   return !isLoopbackClient(req);
 }
 
-/** Display API paths that do not depend on a screen (no ?screen= is ever sent): exempt from bareScreenRequest. */
-const UNSCOPED_PATHS = new Set(['/api/news', '/api/display/heartbeat']);
+/**
+ * Display API paths that do not depend on a screen (no ?screen= is ever sent): exempt from bareScreenRequest. The
+ * electricity prices are one zone's market prices, the same for every screen (the price widget asks by zone).
+ */
+const UNSCOPED_PATHS = new Set(['/api/news', '/api/display/heartbeat', '/api/display/prices']);
 
 /** Unknown ?screen=, or no screen at all where one is needed (see unknownScreenRequest, bareScreenRequest). */
 function noScreen(req, { bare = true } = {}) {

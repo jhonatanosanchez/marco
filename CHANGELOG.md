@@ -26,15 +26,18 @@ All notable changes to this project are documented here. The format is based on
 - Widgets: the Widgets page shows a preview of the widget you are editing, in its own card under the screen
   preview: only the widget, with your unsaved changes, drawn as on the TV on a plain backdrop of the screen's style
   and theme. Pick the size it has there (corner S, M or L, side column or full screen); it starts where that screen
-  has it. Every view of the price widget shows there, and a view that does not fit at that size says so. *Test*
-  loads it again. It is only a preview: a note links to *Layout → Widgets on this screen*, where you place it. The
-  *Used on* chips open that card too.
+  has it. Every view of the price widget shows there: one that needs more room than that place has is shown larger,
+  with a note. *Test* loads it again. It is only a preview: a note links to *Layout → Widgets on this screen*, where
+  you place it. The *Used on* chips open that card too.
 
 ### Changed
 - Planner: picking it now puts the time and the weather in the strip on top on a landscape screen. *At the side* is
   still one click away.
 
 ### Fixed
+- Electricity price widget: a screen opened from another device on the network with open display access now shows
+  the prices. Their request names no screen, and the server refused it like the bare address, so the card stayed
+  empty (and so did the widget preview when the admin is opened by its network address).
 - Electricity price widget: in a full side column (a larger text size, for example) the card no longer disappears.
   The room kept for it was a few pixels short of the card at its smallest, so it hid itself.
 - Carousel: when the next screen has other photo settings, its photo now comes in with the screen switch. Before,

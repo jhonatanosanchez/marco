@@ -88,3 +88,12 @@ test('price card in a crowded side column: the room kept for it is enough for th
   // and a card that the estimate would hide is tried at FLOOR first
   assert.match(prices, /card\.style\.setProperty\('--pk', String\(FLOOR\)\);\n\s*if \(k > FLOOR && card\.scrollHeight <= this\.maxH \+ 2\) return;/);
 });
+
+test('widget preview: a price view that does not fit where the preview starts is shown larger, with a note', () => {
+  const panel = read('web/admin/WidgetPreviewPanel.tsx');
+  // a large size first, then full screen; only while the owner has not picked a place, and after the display settled
+  assert.match(panel, /setPreviewSpot\(now\.size !== 'l' \? \{ \.\.\.now, size: 'l' \} : \{ \.\.\.now, place: 'full', size: 'l' \}\)/);
+  assert.match(panel, /\(pick\.spot && !grown\)/);
+  assert.match(panel, /}, 1200\);/);
+  assert.match(read('web/admin/i18n-dict-widgets.ts'), /necesita más sitio en esta pantalla/);
+});

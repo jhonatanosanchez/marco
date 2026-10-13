@@ -932,6 +932,11 @@ test('bare address from the LAN (open mode): 404 screen_not_found on every per-s
     // not about one screen: news, gallery files (their URLs come from /api/photos, which needs a screen)
     assert.equal((await ctx.call('GET', '/api/news', { headers: LAN })).status, 200);
     assert.equal((await ctx.call('GET', '/media/photos/family.jpg', { headers: LAN })).status, 200);
+    // nor the electricity prices of a zone: a TV or the admin's widget preview on the LAN asks with no screen (a
+    // known zone answers 200 or 502 from its source, never 404 screen_not_found)
+    const pr = await ctx.call('GET', '/api/display/prices?zone=no-such-zone', { headers: LAN });
+    assert.equal(pr.status, 400);
+    assert.equal(pr.json.error, 'invalid_zone');
     // the stream is refused before it opens: not registered
     const s = await ctx.stream('/api/stream?client=kiosk-bare-lan', { headers: LAN });
     assert.equal(s.status, 404);

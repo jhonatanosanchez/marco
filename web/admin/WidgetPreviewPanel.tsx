@@ -1,7 +1,7 @@
 // The widget preview of the Widgets page, a card under the screen preview: only the widget being edited, with its
 // unsaved changes, as the TV draws it at the chosen place (widgetPreview.ts). Clearly a preview: placing a widget on a
 // screen is done in Diseño.
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { DisplayConfig, StoredConfig, WidgetSize } from '../shared/types';
 import { Segmented } from './components/ui';
 import { t } from './i18n';
@@ -39,12 +39,39 @@ export function WidgetPreviewPanel({ draft, screenId, go, setScreenId, variant, 
   }, [source, screenId]);
   // what a price card draws there: a view that needs more room falls back to the price now, as on the TV
   const [info, setInfo] = useState<{ mode: string | null; cramped: boolean }>({ mode: null, cramped: false });
-  useEffect(() => setInfo({ mode: null, cramped: false }), [key]);
-  if (!w || !spot) return null;
-  const setPlace = (place: WidgetPreviewPlace) => setPreviewSpot({ ...spot, place, size: place === 'full' ? 'l' : spot.size });
-  const setSize = (size: WidgetSize) => setPreviewSpot({ ...spot, size });
-  const view = w.type === 'prices' ? w.options.prices?.view ?? 'auto' : 'auto';
+  useEffect(() => setInfo({ mode: null, cramped: false }), [key, w?.type === 'prices' ? w.options.prices?.view : '']);
+  const view = w?.type === 'prices' ? w.options.prices?.view ?? 'auto' : 'auto';
   const tooSmall = !!VIEW_NAME[view] && info.mode === 'now';
+  // a view that does not fit where the preview starts is shown larger (a large size, then full screen), so every view
+  // can be seen; once the owner picks a place, it stays there with a note instead
+  const [grown, setGrown] = useState(false);
+  const grownRef = useRef(grown);
+  grownRef.current = grown;
+  useEffect(() => {
+    // another view or widget: back to where the preview starts
+    if (grownRef.current) setPreviewSpot(null);
+    setGrown(false);
+  }, [w?.id, view]);
+  const spotRef = useRef(spot);
+  spotRef.current = spot;
+  useEffect(() => {
+    if (!tooSmall || !spot || (pick.spot && !grown) || spot.place === 'full') return;
+    // the display answers each change on its own time: only a view still too small after a moment counts
+    const id = window.setTimeout(() => {
+      const now = spotRef.current;
+      if (!now || now.place === 'full') return;
+      setGrown(true);
+      setPreviewSpot(now.size !== 'l' ? { ...now, size: 'l' } : { ...now, place: 'full', size: 'l' });
+    }, 1200);
+    return () => clearTimeout(id);
+  }, [tooSmall, key]);
+  if (!w || !spot) return null;
+  const choose = (next: typeof spot) => {
+    setGrown(false);
+    setPreviewSpot(next);
+  };
+  const setPlace = (place: WidgetPreviewPlace) => choose({ ...spot, place, size: place === 'full' ? 'l' : spot.size });
+  const setSize = (size: WidgetSize) => choose({ ...spot, size });
   return (
     <Preview
       {...frame}
@@ -89,6 +116,9 @@ export function WidgetPreviewPanel({ draft, screenId, go, setScreenId, variant, 
       }
       note={
         <div class="wpv-note">
+          {grown && !tooSmall && (
+            <p class="small wpv-warn">{t('«{view}» necesita más sitio en esta pantalla: aquí se ve más grande. En un sitio más pequeño la pantalla muestra el precio de ahora.', { view: t(VIEW_NAME[view]) })}</p>
+          )}
           {tooSmall && (
             <p class="small wpv-warn">{t('«{view}» no cabe en este tamaño: la pantalla muestra el precio de ahora. Prueba un tamaño mayor o la columna lateral.', { view: t(VIEW_NAME[view]) })}</p>
           )}
