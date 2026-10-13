@@ -5,7 +5,6 @@ name: Release
 # The demo video (marco-demo.mp4) is too big for the repository. The READMEs link to a fixed pre-release tagged
 # "media" (releases/download/media/marco-demo.mp4), created once by hand:
 #   gh release create media marco-demo.mp4 --prerelease --title "Media" --notes "Files linked from the README"
-# When that release has the video, it is copied into each version's release too.
 on:
   push:
     tags: ['v*']
@@ -52,11 +51,6 @@ jobs:
         run: |
           v="${GITHUB_REF_NAME#v}"
           files=("release/marco-$v.tar.gz" "release/marco-$v.tar.gz.sha256" release/install.sh release/install.sh.sha256)
-          if gh release download media --pattern marco-demo.mp4 --dir release 2>/dev/null; then
-            files+=(release/marco-demo.mp4)
-          else
-            echo "No marco-demo.mp4 in the 'media' release: the version's release goes out without the video."
-          fi
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
           else
