@@ -184,7 +184,7 @@ function blankEntry(clientId, now) {
   return {
     clientId, screenKey: '', screenId: '', ip: '', userAgent: '', firstSeen: now, lastSeen: now,
     viewport: null, screenRes: null, dpr: null, webgl: null, lite: null, version: null, build: null,
-    night: null, nightOverride: null, uptimeSec: null, lastError: null, lastConnectAt: null,
+    night: null, nightOverride: null, uptimeSec: null, lastError: null, echo: null, lastConnectAt: null,
     streams: 0, connectedAt: null, access: 'open', deviceId: null, showingScreenId: null,
   };
 }
@@ -442,6 +442,19 @@ const wh = (v) => {
 };
 const boolOrNull = (v) => (typeof v === 'boolean' ? v : null);
 
+/** Estado del modo Echo Show (fork fsrhome) que manda la pantalla; null si falta o no es un objeto. */
+export function sanitizeEcho(v) {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const fps = finite(v.fps, 0, 240);
+  return {
+    fps: fps === null ? null : Math.round(fps),
+    keepAlive: v.keepAlive === 'on' ? 'on' : 'off',
+    fullscreen: v.fullscreen === true,
+    open: v.open === true,
+    liteByGuard: v.liteByGuard === true,
+  };
+}
+
 /**
  * Validate/clamp a DisplayHeartbeat body (unknown keys ignored). Returns { ok, value } or { ok: false, error }.
  */
@@ -468,6 +481,7 @@ export function sanitizeHeartbeat(body) {
       uptimeSec: (() => { const n = finite(body.uptimeSec, 0, 1e9); return n === null ? null : Math.round(n); })(),
       lastError: body.lastError === null ? null : clampStr(body.lastError, 200),
       photoFrame: sanitizePhotoFrame(body.photoFrame),
+      echo: sanitizeEcho(body.echo),
     },
   };
 }
@@ -523,7 +537,7 @@ export function recordHeartbeat(body, req) {
     lastSeen: nowIso,
     viewport: hb.viewport, screenRes: hb.screenRes, dpr: hb.dpr, webgl: hb.webgl, lite: hb.lite,
     version: hb.version, build: hb.build, night: hb.night, nightOverride: hb.nightOverride,
-    uptimeSec: hb.uptimeSec, lastError: hb.lastError, photoFrame: hb.photoFrame,
+    uptimeSec: hb.uptimeSec, lastError: hb.lastError, photoFrame: hb.photoFrame, echo: hb.echo,
   });
   scheduleSave();
   return { ok: true, now: nowIso, revision: cfg.revision };
@@ -562,6 +576,7 @@ function toInfo(d, cfg) {
     uptimeSec: d.uptimeSec ?? null,
     lastError: d.lastError ?? null,
     photoFrame: d.photoFrame ?? null,
+    echo: d.echo ?? null,
     // How the display got in: private link ('key'), paired device ('device'), admin session or open (no key).
     access: d.access || 'open',
     deviceId: d.deviceId || null,

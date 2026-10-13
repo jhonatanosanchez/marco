@@ -84,6 +84,19 @@ function DisplayCard({ d, saved, serverVersion, onCmd, onForget, busy }: { d: Di
           <dt>WebGL</dt>
           <dd>{d.webgl == null ? '–' : d.webgl ? <span class="ok-text">{t('Activo')}</span> : <span class="muted">{d.lite ? t('Modo ligero') : t('Desactivado')}</span>}</dd>
         </div>
+        {d.echo && (
+          <div>
+            <dt>Echo</dt>
+            <dd>
+              {d.echo.fps != null ? `${d.echo.fps} fps` : '–'}
+              {' · '}
+              {d.echo.keepAlive === 'on' ? <span class="ok-text">{t('Audio activo')}</span> : <span class="muted">{t('Audio detenido')}</span>}
+              {d.echo.fullscreen && <> · {t('Pantalla completa')}</>}
+              {!d.echo.open && <> · <span class="muted">{t('Cerrado por horario')}</span></>}
+              {d.echo.liteByGuard && <> · {t('Modo ligero por fps')}</>}
+            </dd>
+          </div>
+        )}
         <div>
           <dt>{t('Versión')}</dt>
           <dd>

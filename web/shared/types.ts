@@ -1886,6 +1886,8 @@ export interface DisplayHeartbeat {
   lastError: string | null; // last uncaught error message (≤ 200 chars)
   /** photo panel geometry and the part not covered by text (focal-point editor preview) */
   photoFrame?: PhotoFrame | null;
+  /** Modo Echo Show (fork fsrhome); null = apagado o build sin él. */
+  echo?: EchoStatus | null;
 }
 
 export interface HeartbeatResponse {
@@ -1926,6 +1928,8 @@ export interface DisplayInfo {
   uptimeSec: number | null;
   lastError: string | null;
   photoFrame?: PhotoFrame | null;
+  /** Modo Echo Show (fork fsrhome); null = apagado o build sin él. */
+  echo?: EchoStatus | null;
   /** how the display got in: private link, paired device, admin session or open mode (no key) */
   access?: DisplayAccessVia;
   deviceId?: string | null;

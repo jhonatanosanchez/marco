@@ -44,6 +44,7 @@ export function buildHeartbeat(src: HeartbeatSource): DisplayHeartbeat {
     uptimeSec: Math.round((Date.now() - bootAt) / 1000),
     lastError,
     photoFrame: src.photoFrame?.() ?? null,
+    echo: src.echo?.() ?? null,
   };
 }
 

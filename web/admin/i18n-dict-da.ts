@@ -3,10 +3,12 @@
 // DA_FAMILY and DA_SINGULAR_FAMILY in i18n-dict-family.ts, so the family page does not load this file.
 
 import { DA_TWOFA } from './i18n-dict-2fa';
+import { DA_ECHO } from './i18n-dict-echo';
 
 /** Every admin row but the Familia ones. */
 export const DA: Record<string, string> = {
   ...DA_TWOFA,
+  ...DA_ECHO,
   '(ninguno)': '(ingen)',
   'Estás usando la contraseña inicial. Cámbiala: hasta entonces solo se acepta desde tu red local.': 'Du bruger den første adgangskode. Skift den: indtil da godtages den kun fra dit lokale netværk.',
   'Sesiones': 'Sessioner',
