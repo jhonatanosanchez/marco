@@ -108,6 +108,15 @@ export class CustomWidgets {
     });
     if (isPreview) {
       window.addEventListener('message', (ev) => {
+        // the admin tested a widget ("Probar"): it loads again now (prices: asked again)
+        if (ev.source === window.parent && ev.data?.type === 'marco:preview-reload' && typeof ev.data.id === 'string') {
+          for (const e of this.entries.values()) {
+            if (e.w.id !== ev.data.id) continue;
+            e.card?.stop();
+            this.load(e);
+          }
+          return;
+        }
         if (ev.source !== window.parent || ev.data?.type !== 'marco:preview-widget') return;
         const { id, v, blob } = ev.data as { id?: unknown; v?: unknown; blob?: unknown };
         if (typeof id !== 'string' || typeof v !== 'string' || !(blob instanceof Blob) || !blob.type.startsWith('image/')) return;

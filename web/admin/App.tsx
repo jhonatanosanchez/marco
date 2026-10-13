@@ -19,6 +19,7 @@ import { setIntent } from './intent';
 import { Login } from './Login';
 import { SetupWizard, takeSetupToken } from './Setup';
 import { Preview } from './Preview';
+import { WidgetPreviewPanel } from './WidgetPreviewPanel';
 import { SETTINGS_INDEX } from './searchIndex';
 import { caps as currentCaps, has, hasFeature, loadCaps, type Caps } from './caps';
 import { accountNav, filterActions, filterNav, filterSettings, NAV_ITEMS, type NavMeta } from './navFilter';
@@ -847,6 +848,8 @@ export function App() {
   for (const d of displays ?? []) if (d.connected) online[d.screenId] = (online[d.screenId] ?? 0) + 1;
   const onlineTotal = Object.values(online).reduce((a, b) => a + b, 0);
   const multi = draft.screens.length > 1;
+  // on the Widgets page the preview shows the widget being edited (WidgetPreviewPanel)
+  const widgetPv = route === 'widgets' && (draft.widgets ?? []).length > 0;
 
   const sectionProps: SectionProps = {
     cfg: view,
@@ -1086,7 +1089,11 @@ export function App() {
           </main>
           {previewSide && (
             <aside class="preview-col">
+              {widgetPv ? (
+                <WidgetPreviewPanel variant="side" draft={draft} screenId={screenId} go={go} setScreenId={setScreenId} saved={savedSlug != null} url={previewUrl} openUrl={viewUrl} screenName={multi ? curScreen.name : ''} reloadKey={previewKey} portrait={portrait} onClose={() => (setShowPreview(false), lsSet(LS_PREVIEW, '0'))} />
+              ) : (
               <Preview variant="side" saved={savedSlug != null} url={previewUrl} openUrl={viewUrl} screenName={multi ? curScreen.name : ''} live={live} hint={t('Muestra lo que cambias aunque no esté guardado. Los calendarios, las fotos y los eventos nuevos se ven al guardar.')} {...(pvTarget ? { ...pvTarget, live: undefined } : {})} reloadKey={previewKey} portrait={portrait} onClose={() => (setShowPreview(false), lsSet(LS_PREVIEW, '0'))} />
+              )}
             </aside>
           )}
         </div>
@@ -1116,7 +1123,11 @@ export function App() {
       {sheet && !previewSide && (
         <div class="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && setSheet(false)}>
           <div class="sheet">
+            {widgetPv ? (
+              <WidgetPreviewPanel variant="sheet" draft={draft} screenId={screenId} go={go} setScreenId={setScreenId} saved={savedSlug != null} url={previewUrl} openUrl={viewUrl} screenName={multi ? curScreen.name : ''} reloadKey={previewKey} portrait={portrait} onClose={() => setSheet(false)} />
+            ) : (
             <Preview variant="sheet" saved={savedSlug != null} url={previewUrl} openUrl={viewUrl} screenName={multi ? curScreen.name : ''} live={live} hint={t('Muestra lo que cambias aunque no esté guardado. Los calendarios, las fotos y los eventos nuevos se ven al guardar.')} {...(pvTarget ? { ...pvTarget, live: undefined } : {})} reloadKey={previewKey} portrait={portrait} onClose={() => setSheet(false)} />
+            )}
           </div>
         </div>
       )}

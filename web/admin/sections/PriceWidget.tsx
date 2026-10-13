@@ -14,6 +14,7 @@ import { Icon } from '../components/icons';
 import { Button, Field, NumberInput, Segmented, Select, TextInput } from '../components/ui';
 import { locale, t } from '../i18n';
 import { edition } from '../caps';
+import { previewTested } from '../widgetPreview';
 import { PriceTariffFields } from './PriceTariff';
 
 /** Options of a new price widget: the zone of the household's time zone. */
@@ -295,7 +296,10 @@ export function PriceWidgetFields({ w, errors, upd, part, tz }: {
   const run = async () => {
     setTest({ loading: true, zone: testKey });
     try {
-      setTest({ loading: false, zone: testKey, res: await api.testPrices(o.zone, grid) });
+      const r = await api.testPrices(o.zone, grid);
+      setTest({ loading: false, zone: testKey, res: r });
+      // the widget preview asks for the prices again (the server has just fetched them)
+      previewTested(w.id);
     } catch (e) {
       setTest({ loading: false, zone: testKey, res: { ok: false, error: (e as ApiError).message } });
     }

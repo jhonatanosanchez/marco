@@ -5689,3 +5689,30 @@ button.immich-album:hover {
   .view-seg { display: none; }
   .view-sel { display: block; }
 }
+
+/* Widgets page: the preview of the widget being edited (WidgetPreviewPanel.tsx) */
+.preview__tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  vertical-align: 1px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--warn) 35%, transparent);
+  white-space: nowrap;
+}
+.preview--widget .preview__bar { flex-wrap: wrap; }
+.preview--widget .preview__bar strong { min-width: 0; }
+.preview__extra { margin: 0 4px 10px; }
+.wpv-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.preview__frame.is-zoomed { border-radius: 6px; }
+.preview--widget .preview__frame, .preview--widget .preview__frame iframe { transition: width 0.25s var(--ease), height 0.25s var(--ease), transform 0.25s var(--ease); }
+.wpv-note { margin: 12px 4px 0; }
+.wpv-note p { margin: 0 0 6px; }
+.widget-card-wrap { display: contents; }
+.card.is-previewed { box-shadow: var(--shadow), 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent); }
+/* a narrow sheet: "Pantalla completa" goes on two lines instead of being cut */
+.wpv-opts .seg button { padding-inline: 8px; white-space: normal; text-align: center; line-height: 1.15; }

@@ -1832,10 +1832,41 @@ const heartbeat = new Heartbeat(
 if (isPreview) {
   window.addEventListener('message', (e) => {
     if (e.source !== window.parent || e.data?.type !== 'marco:preview-draft') return;
+    // the Widgets page previews one widget: where it is on screen goes back to the admin, which zooms in on it
+    previewFocus(typeof e.data.focus === 'string' ? e.data.focus : null);
     const draft = e.data.config as DisplayConfig | null;
     if (!draft || typeof draft !== 'object') return setConfigOverlay(null);
     setConfigOverlay((c) => (c.screenId !== draft.screenId ? c : { ...draft, revision: c.revision, privacy: c.privacy, target: c.target, carousel: c.carousel }));
   });
+}
+
+/**
+ * Admin preview of one widget (Widgets page): its box on this page, sent to the admin whenever it changes
+ * ({ type: 'marco:preview-focus', rect: { x, y, w, h } | null }; null while it shows nothing). Checked a few times a
+ * second: images load, cards grow and the layout settles on their own time.
+ */
+let focusId: string | null = null;
+let focusTimer: ReturnType<typeof setInterval> | null = null;
+let focusSent = '';
+function previewFocus(id: string | null): void {
+  if (id === focusId) return;
+  focusId = id;
+  focusSent = '';
+  if (focusTimer) clearInterval(focusTimer);
+  focusTimer = null;
+  if (!id) return;
+  const report = () => {
+    const el = [...document.querySelectorAll<HTMLElement>('[data-widget]')].find((x) => x.dataset.widget === focusId);
+    const r = el && !el.classList.contains('uw-wait') ? el.getBoundingClientRect() : null;
+    const rect = r && r.width > 4 && r.height > 4 ? { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) } : null;
+    const key = JSON.stringify(rect);
+    if (key === focusSent) return;
+    focusSent = key;
+    // only a box on this page goes out: nothing in it is private
+    window.parent.postMessage({ type: 'marco:preview-focus', id: focusId, rect }, '*');
+  };
+  report();
+  focusTimer = setInterval(report, 250);
 }
 
 // The admin's focal-point editor previews the photo with this display's real free band.

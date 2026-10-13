@@ -9,6 +9,7 @@ import { atLimit as reachesLimit, edition, has, limit } from '../caps';
 import { setWidgetPreview } from '../livePreview';
 import { moveItem, uid, WEB_WIDGET_REFRESH_SEC, WIDGET_REFRESH_SEC, widgetUrlProblem } from '../util';
 import type { SectionProps } from './common';
+import { previewTested, setPreviewWidget, useWidgetPreview } from '../widgetPreview';
 import { newPriceOptions, PriceWidgetFields } from './PriceWidget';
 
 /** Refresh choices as the admin shows them. */
@@ -50,6 +51,10 @@ const formatBytes = (n: number) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFi
 export function widgetUses(full: StoredConfig, id: string) {
   return full.screens.filter((s) => (s.widgets ?? []).some((p) => p.widgetId === id) || (s.layout.preset === 'widget' && s.layout.widgetId === id));
 }
+
+/** Diseño card where a screen has widget `id`: the full-screen widget, or the widgets on that screen. */
+export const widgetUseAnchor = (s: StoredConfig['screens'][number], id: string) =>
+  s.layout.preset === 'widget' && s.layout.widgetId === id ? 'layout/layout-options' : 'layout/layout-widgets';
 
 /** A widget leaves every screen: its placements and the full-screen layout that pointed at it. */
 export function pruneWidget(d: StoredConfig, id: string) {
@@ -133,8 +138,8 @@ function TestResult({ w, res }: { w: WidgetDef; res: TestWidgetResponse }) {
   );
 }
 
-function WidgetCard({ w, i, n, full, errors, upd, remove, move, go, setScreenId }: {
-  w: WidgetDef; i: number; n: number; full: StoredConfig; errors: Record<string, string>;
+function WidgetCard({ w, i, n, full, errors, upd, remove, move, go, setScreenId, previewed }: {
+  w: WidgetDef; i: number; n: number; full: StoredConfig; errors: Record<string, string>; previewed: boolean;
   upd: (fn: (x: WidgetDef) => void) => void; remove: () => void; move: (a: number, b: number) => void;
   go: (route: string) => void; setScreenId: (id: string) => void;
 }) {
@@ -165,12 +170,17 @@ function WidgetCard({ w, i, n, full, errors, upd, remove, move, go, setScreenId 
     } catch (e) {
       setTest({ loading: false, key, res: { ok: false, error: (e as ApiError).message } });
     }
+    // the widget preview shows this one and loads it again
+    previewTested(w.id);
   };
   // a result belongs to the address and type it was made for
   const res = test.key === `${w.type}|${w.options.url.trim()}` ? test.res : undefined;
   return (
+    // the preview shows the widget the owner is working on
+    <div class="widget-card-wrap" onFocusIn={() => setPreviewWidget(w.id)} onPointerDown={() => setPreviewWidget(w.id)}>
     <Card
       id={`widget-${w.id}`}
+      class={previewed ? 'is-previewed' : ''}
       icon={image ? 'image' : prices ? 'zap' : 'globe'}
       title={w.name.trim() || t('Widget sin nombre')}
       actions={
@@ -277,9 +287,10 @@ function WidgetCard({ w, i, n, full, errors, upd, remove, move, go, setScreenId 
                 <button
                   type="button"
                   class="chip chip--static chip--link"
+                  title={t('Ver dónde está en Diseño')}
                   onClick={() => {
                     setScreenId(s.id);
-                    go('layout/layout-widgets');
+                    go(widgetUseAnchor(s, w.id));
                   }}
                 >
                   {s.name}
@@ -318,6 +329,7 @@ function WidgetCard({ w, i, n, full, errors, upd, remove, move, go, setScreenId 
         </div>
       )}
     </Card>
+    </div>
   );
 }
 
@@ -325,11 +337,16 @@ export function WidgetsSection({ full, setFull, errors, go, setScreenId }: Secti
   const items = full.widgets ?? [];
   const max = limit('widgets');
   const atLimit = reachesLimit('widgets', items.length);
-  const add = () =>
+  const pv = useWidgetPreview();
+  const pvId = items.some((w) => w.id === pv.id) ? pv.id : items[0]?.id;
+  const add = () => {
+    const w = newWidget();
     setFull((d) => {
       d.widgets = d.widgets ?? [];
-      d.widgets.push(newWidget());
+      d.widgets.push(w);
     });
+    setPreviewWidget(w.id);
+  };
   const move = (a: number, b: number) => setFull((d) => void (d.widgets = moveItem(d.widgets ?? [], a, b)));
   const remove = async (w: WidgetDef) => {
     const n = widgetUses(full, w.id).length;
@@ -371,6 +388,7 @@ export function WidgetsSection({ full, setFull, errors, go, setScreenId }: Secti
             w={w}
             i={i}
             n={items.length}
+            previewed={items.length > 1 && w.id === pvId}
             full={full}
             errors={errors}
             move={move}

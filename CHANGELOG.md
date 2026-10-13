@@ -23,10 +23,15 @@ All notable changes to this project are documented here. The format is based on
   badge, the lowest, average and highest of the next 24 hours, and one row per hour with a bar, in one or two
   columns. Works full screen, in the side column and in a large corner (with too little room it shows the price now
   card). *Automatic* uses it on a portrait full screen.
+- Widgets: the Widgets page shows a preview of the widget you are editing, large and on the screen you are editing,
+  with your unsaved changes. Pick where it goes in the preview (corner S, M or L, side column or full screen); it
+  starts where that screen has it. *Test* loads it again. It is only a preview: a note links to *Layout → Widgets on
+  this screen*, where you place it. The *Used on* chips open that card too.
 
 ### Fixed
 - Carousel: when the next screen has other photo settings, its photo now comes in with the screen switch. Before,
   the switch played first and the photo crossfaded right after it, so every switch looked like two animations.
+- Birthday titles: a name starting with Do, Da or Del (like "CUMPLE DORU") keeps those letters.
 
 ## [0.10.0] - 2026-10-12
 
