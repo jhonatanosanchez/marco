@@ -25,6 +25,9 @@ const es: Dict = {
   yesterday: 'Ayer',
   now: 'Ahora',
   allDay: 'Todo el día',
+  // modo Echo Show (fork fsrhome)
+  echoTap: 'Toca la pantalla',
+  echoPaused: 'Tablero en pausa hasta las {time}',
   more: '+{n} más',
   dayXofY: 'Día {x} de {y}',
   checkIn: 'Entrada',
@@ -148,6 +151,9 @@ const en: Dict = {
   yesterday: 'Yesterday',
   now: 'Now',
   allDay: 'All day',
+  // modo Echo Show (fork fsrhome)
+  echoTap: 'Tap the screen',
+  echoPaused: 'Board paused until {time}',
   more: '+{n} more',
   dayXofY: 'Day {x} of {y}',
   checkIn: 'Check-in',
@@ -271,6 +277,9 @@ const pt: Dict = {
   yesterday: 'Ontem',
   now: 'Agora',
   allDay: 'Todo o dia',
+  // modo Echo Show (fork fsrhome)
+  echoTap: 'Toque no ecrã',
+  echoPaused: 'Painel em pausa até às {time}',
   more: '+{n} mais',
   dayXofY: 'Dia {x} de {y}',
   checkIn: 'Entrada',
@@ -394,6 +403,9 @@ const nl: Dict = {
   yesterday: 'Gisteren',
   now: 'Nu',
   allDay: 'Hele dag',
+  // modo Echo Show (fork fsrhome)
+  echoTap: 'Tik op het scherm',
+  echoPaused: 'Bord gepauzeerd tot {time}',
   more: '+{n} meer',
   dayXofY: 'Dag {x} van {y}',
   checkIn: 'Inchecken',
@@ -517,6 +529,9 @@ const da: Dict = {
   yesterday: 'I går',
   now: 'Nu',
   allDay: 'Hele dagen',
+  // modo Echo Show (fork fsrhome)
+  echoTap: 'Tryk på skærmen',
+  echoPaused: 'Tavlen er sat på pause til {time}',
   more: '+{n} mere',
   dayXofY: 'Dag {x} af {y}',
   checkIn: 'Indtjekning',

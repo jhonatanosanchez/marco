@@ -1,7 +1,7 @@
 // Display heartbeat (docs/ARCHITECTURE.md): POST /api/display/heartbeat on every SSE open, every 60 s (10 min in poll
 // mode) and right after handling a night / identify command. Lets the admin's "Pantallas conectadas" page show what each screen runs.
 import type { PhotoFrame } from '../shared/focus';
-import type { DisplayHeartbeat, NightCommand } from '../shared/types';
+import type { DisplayHeartbeat, EchoStatus, NightCommand } from '../shared/types';
 import { api } from './api';
 import { clientId, isPreview, screenKey } from './identity';
 
@@ -13,6 +13,8 @@ export interface HeartbeatSource {
   nightOverride(): NightCommand;
   demo(): boolean;
   photoFrame?(): PhotoFrame | null;
+  /** modo Echo Show (fork fsrhome); null = apagado */
+  echo?(): EchoStatus | null;
 }
 
 const bootAt = Date.now();

@@ -1,0 +1,18 @@
+/* Modo Echo Show (fork fsrhome): aviso de toque y pausa fuera de horario, con el vidrio de Marco. */
+.echo-tap {
+  position: fixed; left: 50%; bottom: 4vh; transform: translateX(-50%); z-index: 9000;
+  padding: .6em 1.2em; border-radius: 999px; font-size: 2.6vmin; color: #fff;
+  background: rgba(20, 20, 24, .45); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18); pointer-events: none;
+  animation: echo-pulse 2.4s ease-in-out infinite;
+}
+@keyframes echo-pulse { 50% { opacity: .55; } }
+.echo-pause {
+  position: fixed; inset: 0; z-index: 9001; display: grid; place-items: center;
+  background: rgba(0, 0, 0, .55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.echo-pause__card {
+  padding: 1em 1.8em; border-radius: 22px; font-size: 4vmin; color: #fff;
+  background: rgba(20, 20, 24, .5); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16);
+}
+html.lite .echo-tap, html.lite .echo-pause { backdrop-filter: none; -webkit-backdrop-filter: none; }

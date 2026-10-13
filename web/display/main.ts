@@ -62,12 +62,15 @@ import { healthOnce, loadEmojiWebFont } from './health';
 import { isKidsPreset, Kids, withToggle } from './widgets/kids';
 import { refreshMarquee } from './marquee';
 import { CustomWidgets } from './widgets/custom';
+import { EchoController } from './echo';
 
 const params = ctx.params;
 if (isWidgetOnly) document.documentElement.classList.add('widget-only');
 const forceDemo = params.get('demo') === '1';
 const lite = ctx.lite;
 if (lite) document.documentElement.classList.add('lite');
+// modo Echo Show (fork fsrhome); nunca en la vista previa del admin
+const echo = new EchoController(isPreview);
 
 // ?now=2026-10-09T10:43 → fixed clock offset (for screenshots / testing)
 const nowParam = params.get('now');
@@ -466,6 +469,7 @@ function applyConfig(raw: DisplayConfig): void {
   // after the layout and the side content: a side widget goes to its corner when there is no side column
   custom.render(cfg, preset);
   revealApp(cfg);
+  echo.update(cfg.screen.echo);
 }
 
 /**
@@ -1841,6 +1845,7 @@ const heartbeat = new Heartbeat(
     nightOverride: () => nightOverride,
     demo: () => state.demo,
     photoFrame: () => photos.frame,
+    echo: () => echo.status(),
   },
   (now) => setServerNow(now),
 );

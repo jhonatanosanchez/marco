@@ -35,6 +35,15 @@ export interface EchoSettings {
   fpsGuard: boolean;
 }
 
+/** Estado del modo Echo que la pantalla manda en su latido (null = modo apagado). */
+export interface EchoStatus {
+  fps: number | null; // promedio de las últimas muestras
+  keepAlive: 'on' | 'off'; // el mp3 está sonando
+  fullscreen: boolean;
+  open: boolean; // dentro del horario
+  liteByGuard: boolean; // la guardia la pasó a lite
+}
+
 export type DisplayStyle = 'classic' | 'modern';
 
 /** Glass material of the Modern style (like iOS Liquid Glass): ignored by Classic. */
