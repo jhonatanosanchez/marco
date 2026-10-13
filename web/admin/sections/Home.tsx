@@ -12,7 +12,7 @@ import { Button, Callout, Card, Empty, StatusDot } from '../components/ui';
 import { daysBetween, eventDay, eventTimeLabel, fmtDay, relDays, todayIn } from '../dates';
 import { has, runtime } from '../caps';
 import { screenHref, useDisplayLinks } from '../displayLinks';
-import { formatDuration, locale, nScreens, relTime, t } from '../i18n';
+import { formatDuration, kmh, locale, nScreens, relTime, t } from '../i18n';
 import { withPollNote } from '../liveNote';
 import { greetingName, sourceRowName } from '../util';
 import type { SectionProps } from './common';
@@ -340,7 +340,7 @@ export function HomeSection({ me, full, go, setScreenId, cfg, saved }: SectionPr
                   <span class="muted small">
                     ↓ {Math.round(d.weather.min)}° · ↑ {Math.round(d.weather.max)}°
                     {d.weather.humidity != null && <> · 💧 {d.weather.humidity}%</>}
-                    {d.weather.windKmh != null && <> · 💨 {Math.round(d.weather.windKmh)} km/h</>}
+                    {d.weather.windKmh != null && <> · 💨 {Math.round(d.weather.windKmh)} {kmh()}</>}
                   </span>
                   <span class="muted small">
                     {t('Actualizado {when}', { when: relTime(d.weather.updatedAt) })}

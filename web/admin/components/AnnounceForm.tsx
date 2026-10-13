@@ -164,7 +164,7 @@ export function AnnounceForm({ screens, compact, onSent }: { screens: ScreenProf
               <StylePicker value={style} onChange={setStyle} />
             </Field>
             <Field label={t('Duración')}>
-              <Select value={duration} options={DURATIONS} onChange={setDuration} />
+              <Select value={duration} options={DURATIONS.map((d) => (d.value >= 3600 ? { ...d, label: t('{n} h', { n: d.value / 3600 }) } : d))} onChange={setDuration} />
             </Field>
             <Field label={t('Sonido')}>
               <label class="mini-toggle">

@@ -11,7 +11,7 @@ import type { GeocodeResult, Lang, LayoutPreset, SetupRequest, SetupStatus, Test
 import { api, ApiError } from './api';
 import { Icon, type IconName } from './components/icons';
 import { Button, Callout, Field, Segmented, TextInput } from './components/ui';
-import { getLang, setLang, t } from './i18n';
+import { getLang, kmh, setLang, t } from './i18n';
 import { LOCALES } from '../shared/i18n';
 import { PRESETS, Schematic } from './sections/Layout';
 import { HOLIDAY_PRESETS, isHttpUrl, SWATCHES } from './util';
@@ -663,7 +663,7 @@ export function SetupWizard({ status: initial, onDone, onLang }: { status: Setup
               full
               value={units}
               options={[
-                { value: 'metric', label: '°C · km/h' },
+                { value: 'metric', label: `°C · ${kmh()}` },
                 { value: 'imperial', label: '°F · mph' },
               ]}
               onChange={setUnits}

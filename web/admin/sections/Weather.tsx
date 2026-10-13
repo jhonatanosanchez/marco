@@ -7,7 +7,7 @@ import type { AdminStatus, GeocodeResult, OpenMeteoModel, WeatherKeyStatus, Weat
 import { api, ApiError } from '../api';
 import { toast } from '../components/feedback';
 import { has } from '../caps';
-import { getLang, t } from '../i18n';
+import { getLang, kmh, t } from '../i18n';
 import type { SectionProps } from './common';
 
 export function WeatherSection({ cfg, set, errors }: SectionProps) {
@@ -94,7 +94,7 @@ export function WeatherSection({ cfg, set, errors }: SectionProps) {
                 full
                 value={w.units}
                 options={[
-                  { value: 'metric', label: '°C · km/h' },
+                  { value: 'metric', label: `°C · ${kmh()}` },
                   { value: 'imperial', label: '°F · mph' },
                 ]}
                 onChange={(v) => set((d) => void (d.weather.units = v))}

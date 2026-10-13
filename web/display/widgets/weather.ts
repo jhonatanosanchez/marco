@@ -35,7 +35,7 @@ export class Weather {
     if (!wc.enabled || !w || !w.current) return;
     const c = w.current;
     const f24 = cfg.datetime.format24;
-    const speedUnit = wc.units === 'imperial' ? 'mph' : 'km/h';
+    const speedUnit = wc.units === 'imperial' ? 'mph' : lang === 'da' ? 'km/t' : 'km/h'; // Danish: km/t (kilometer i timen)
     const windVal = has(c.windKmh) ? (wc.units === 'imperial' ? c.windKmh / 1.609 : c.windKmh) : null;
 
     const nowMs = Date.now();

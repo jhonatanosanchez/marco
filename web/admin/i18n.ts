@@ -97,10 +97,19 @@ export function formatDuration(sec: number): string {
   const d = Math.floor(sec / 86400);
   const h = Math.floor((sec % 86400) / 3600);
   const m = Math.floor((sec % 3600) / 60);
+  // Danish writes the units out ("2 t 5 min", t = timer)
+  if (current === 'da') {
+    if (d) return `${d} d ${h} t`;
+    if (h) return `${h} t ${m} min`;
+    return `${m} min ${Math.floor(sec % 60)} s`;
+  }
   if (d) return `${d}d ${h}h`;
   if (h) return `${h}h ${m}m`;
   return `${m}m ${Math.floor(sec % 60)}s`;
 }
+
+/** Wind speed unit of the metric system: Danish writes km/t ("kilometer i timen"). */
+export const kmh = () => (current === 'da' ? 'km/t' : 'km/h');
 
 /** "1 pantalla" / "3 pantallas" */
 export const nScreens = (n: number) => (n === 1 ? t('1 pantalla') : t('{n} pantallas', { n }));

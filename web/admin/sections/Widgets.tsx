@@ -274,7 +274,7 @@ function WidgetCard({ w, i, n, full, errors, upd, remove, move, go, setScreenId,
           <Field label={t('Recargar cada')} error={errors[`wdg.${w.id}.refreshSec`] ? t(errors[`wdg.${w.id}.refreshSec`]) : undefined}>
             <Select
               value={w.options.refreshSec}
-              options={[...(belowMin ? [w.options.refreshSec] : []), ...refreshList].map((s) => ({ value: s, label: t(REFRESH_LABEL[s] ?? `${s} s`) }))}
+              options={[...(belowMin ? [w.options.refreshSec] : []), ...refreshList].map((s) => ({ value: s, label: s >= 3600 && s % 3600 === 0 ? t('{n} h', { n: s / 3600 }) : t(REFRESH_LABEL[s] ?? `${s} s`) }))}
               onChange={(v) => upd((x) => void (x.options.refreshSec = v))}
             />
             {belowMin && <p class="muted small">{t('Aquí lo mínimo es {n} s.', { n: minRefresh })}</p>}
