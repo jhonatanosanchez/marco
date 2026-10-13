@@ -1,0 +1,14 @@
+/* Widget "Cámaras" y vista a pantalla completa (fork fsrhome), con el vidrio de Marco. */
+.camgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .5vmin; }
+.camgrid .cam { position: relative; overflow: hidden; border-radius: 1.4vmin; background: rgba(0, 0, 0, .55); cursor: pointer; }
+.camgrid .cam img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.camgrid .cam-name, .camgrid .cam-label {
+  position: absolute; left: .8vmin; padding: .2em .6em; border-radius: 999px; font-size: 1.7vmin; color: #fff;
+  background: rgba(20, 20, 24, .45); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.camgrid .cam-name { bottom: .8vmin; }
+.camgrid .cam-label { top: .8vmin; background: rgba(200, 60, 40, .7); }
+.camgrid .cam-off { position: absolute; inset: 0; display: none; place-items: center; font-size: 1.8vmin; color: rgba(255, 255, 255, .7); }
+.camgrid .cam.is-off img { visibility: hidden; }
+.camgrid .cam.is-off .cam-off { display: grid; }
+html.lite .camgrid .cam-name, html.lite .camgrid .cam-label { backdrop-filter: none; -webkit-backdrop-filter: none; }

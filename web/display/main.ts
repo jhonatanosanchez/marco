@@ -63,6 +63,7 @@ import { isKidsPreset, Kids, withToggle } from './widgets/kids';
 import { refreshMarquee } from './marquee';
 import { CustomWidgets } from './widgets/custom';
 import { EchoController } from './echo';
+import { setCameraActivity } from './widgets/cameras';
 
 const params = ctx.params;
 if (isWidgetOnly) document.documentElement.classList.add('widget-only');
@@ -1805,6 +1806,8 @@ const liveHandlers: StreamHandlers = {
     doorbell.show(d);
   },
   doorbellEnd: (d) => doorbell.end(d.id),
+  // Cámaras (fork fsrhome): etiquetas de actividad sobre cada recuadro
+  cameras: (d) => setCameraActivity(d.activity),
   // Link regenerated / device revoked → "no longer valid"; switched to private without a key → pairing.
   revoked: (d) => denyAccess(d.code === 'key_required' ? 401 : 403),
   open: () => setOnline(true),

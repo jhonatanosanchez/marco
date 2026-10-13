@@ -16,6 +16,7 @@ import type { DisplayConfig, DisplayWidget, FrameCorner } from '../../shared/typ
 import { ctx } from '../ctx';
 import { authHeaders, isPreview, withScreen } from '../identity';
 import { PriceCard, priceFloorHeight } from './prices';
+import { CameraCard } from './cameras';
 
 /** Corner boxes: max width (vw) and height (vh) per size. */
 const CORNER_BOX: Record<string, [number, number]> = { s: [18, 22], m: [26, 32], l: [36, 45] };
@@ -31,8 +32,8 @@ interface Entry {
   el: HTMLElement;
   /** what is on screen now (null until the first load) */
   media: HTMLImageElement | HTMLIFrameElement | HTMLElement | null;
-  /** 'prices' widgets: the card that draws them */
-  card: PriceCard | null;
+  /** 'prices' and 'cameras' widgets: the card that draws them */
+  card: PriceCard | CameraCard | null;
   /** natural size of the image on screen */
   nat: [number, number] | null;
   timer: ReturnType<typeof setTimeout> | null;
@@ -236,6 +237,7 @@ export class CustomWidgets {
 
   private usable(w: DisplayWidget): boolean {
     // only http(s): a javascript: or data: address in an iframe or the unsaved preview would run on this origin
+    if (w?.type === 'cameras') return typeof w.id === 'string' && Array.isArray(w.cameras) && w.cameras.length > 0;
     if (w?.type === 'prices') return typeof w.id === 'string' && typeof w.prices?.zone === 'string' && !!w.prices.zone;
     if (!w || typeof w.id !== 'string' || !webUrl(w.src)) return false;
     // web pages are framed directly only; a proxied server never sends them, but never frame its routes either
@@ -259,8 +261,8 @@ export class CustomWidgets {
     pill.className = 'uw-pill';
     el.appendChild(pill);
     const e: Entry = { key, w, el, media: null, card: null, nat: null, timer: null, gen: 0, blobUrl: null, abort: null, waiting: false, dead: false };
-    if (w.type === 'prices') {
-      const card = new PriceCard(w);
+    if (w.type === 'prices' || w.type === 'cameras') {
+      const card = w.type === 'prices' ? new PriceCard(w) : new CameraCard(w);
       e.card = card;
       card.onState = (st) => {
         if (e.dead) return;

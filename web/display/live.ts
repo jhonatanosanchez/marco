@@ -3,7 +3,7 @@
 // display then polls GET /api/display/poll, which returns the same events as commands. A server that answers 404
 // there gets the older config revision check every 90 s.
 // No runtime imports on purpose: the module is unit-tested directly by node --test (server/test/display-live.test.js).
-import type { Announcement, DoorbellRing, IdentifyPayload, NightCommand, PollResponse, StreamHello } from '../shared/types';
+import type { Announcement, CameraAlert, CamerasActivityEvent, DoorbellRing, IdentifyPayload, NightCommand, PollResponse, StreamHello } from '../shared/types';
 
 export type LiveMode = 'sse' | 'poll';
 
@@ -98,6 +98,9 @@ export interface StreamHandlers {
   doorbellEnd?: (d: { id: string | null }) => void;
   /** Familia changed (a routine ticked, stars, a new family link): refetch the family state */
   family?: (d: { rev?: number }) => void;
+  /** cámaras (fork fsrhome): actividad por cámara y alerta de persona */
+  cameras?: (d: CamerasActivityEvent) => void;
+  cameraAlert?: (d: CameraAlert) => void;
   /** link regenerated / device revoked / display access switched to private */
   revoked?: (d: { code: string }) => void;
   open?: () => void;
@@ -126,6 +129,15 @@ export function dispatch(name: string, d: any, h: StreamHandlers): boolean {
     case 'family': h.family?.({ ...(typeof d?.rev === 'number' ? { rev: d.rev } : {}) }); return true;
     case 'doorbell-end': h.doorbellEnd?.({ id: typeof d?.id === 'string' ? d.id : null }); return true;
     case 'revoked': h.revoked?.({ code: typeof d?.code === 'string' ? d.code : 'invalid_key' }); return true;
+    case 'cameras': if (d && typeof d.activity === 'object' && d.activity !== null) h.cameras?.({ activity: d.activity }); return true;
+    case 'cameraAlert':
+      if (d && typeof d.camera === 'string' && typeof d.startTime === 'number') {
+        h.cameraAlert?.({
+          camera: d.camera, name: typeof d.name === 'string' ? d.name : d.camera, label: typeof d.label === 'string' ? d.label : 'person',
+          startTime: d.startTime, eventId: typeof d.eventId === 'string' ? d.eventId : null, ...(d.test === true ? { test: true } : {}),
+        });
+      }
+      return true;
     default: return false;
   }
 }
