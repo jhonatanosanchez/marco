@@ -25,6 +25,16 @@ export interface NightMode {
   dim: number; // 0..1 (brightness multiplier applied at night)
 }
 
+export type EchoKeepAlive = 'mp3' | 'off';
+export interface EchoSettings {
+  enabled: boolean;
+  keepAlive: EchoKeepAlive;
+  openFrom: string; // "HH:MM"
+  openTo: string; // "HH:MM"; openTo < openFrom cruza la medianoche; iguales = siempre abierto
+  fullscreenOnTap: boolean;
+  fpsGuard: boolean;
+}
+
 export type DisplayStyle = 'classic' | 'modern';
 
 /** Glass material of the Modern style (like iOS Liquid Glass): ignored by Classic. */
@@ -54,6 +64,8 @@ export interface ScreenConfig {
   orientation: 'auto' | 'landscape' | 'portrait' | string;
   customCss: string;
   nightMode: NightMode;
+  /** Echo Show (fork fsrhome). Missing = disabled (ECHO_DEFAULTS in web/display/echoCore.ts). */
+  echo?: EchoSettings;
 }
 
 export interface LayoutConfig {

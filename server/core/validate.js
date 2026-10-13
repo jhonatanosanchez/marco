@@ -238,6 +238,8 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs, familyMemberIds 
 
   const sc = obj(ctx, `${p}.screen`, x.screen);
   const nm = obj(ctx, `${p}.screen.nightMode`, sc.nightMode);
+  const ec = obj(ctx, `${p}.screen.echo`, sc.echo);
+  const ED = D.screen.echo;
   const gl = obj(ctx, `${p}.screen.glass`, sc.glass);
   const GD = D.screen.glass;
   const screen = {
@@ -255,6 +257,15 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs, familyMemberIds 
       from: hhmm(ctx, `${p}.screen.nightMode.from`, nm.from, D.screen.nightMode.from),
       to: hhmm(ctx, `${p}.screen.nightMode.to`, nm.to, D.screen.nightMode.to),
       dim: num(ctx, `${p}.screen.nightMode.dim`, nm.dim, D.screen.nightMode.dim, 0, 1),
+    },
+    // Echo Show (fork fsrhome)
+    echo: {
+      enabled: bool(ctx, `${p}.screen.echo.enabled`, ec.enabled, ED.enabled),
+      keepAlive: oneOf(ctx, `${p}.screen.echo.keepAlive`, ec.keepAlive, ED.keepAlive, ['mp3', 'off']),
+      openFrom: hhmm(ctx, `${p}.screen.echo.openFrom`, ec.openFrom, ED.openFrom),
+      openTo: hhmm(ctx, `${p}.screen.echo.openTo`, ec.openTo, ED.openTo),
+      fullscreenOnTap: bool(ctx, `${p}.screen.echo.fullscreenOnTap`, ec.fullscreenOnTap, ED.fullscreenOnTap),
+      fpsGuard: bool(ctx, `${p}.screen.echo.fpsGuard`, ec.fpsGuard, ED.fpsGuard),
     },
     // glass material of the Modern style: appearance, transparency (0 = see-through, 1 = solid), blur, tint, light edge
     glass: {
