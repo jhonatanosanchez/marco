@@ -17,11 +17,11 @@ import { _resetActivityThrottle, logActivity, listActivity } from '../activity.j
 import { createToken } from '../tokens.js';
 import {
   syncDisplayKeys, onDisplayAccessConfig, listDisplayLinks, KEY_RE, DEVICE_TOKEN_RE, _resetDisplayAccess, revalidateStreams,
-  isLoopbackClient,
+  isLoopbackClient, listDevices,
 } from '../displayAccess.js';
 import {
   startPairing, pairingStatus, claimPairing, displayAddress, normalizeCode, _resetPairing, _pendingCount, CODE_ALPHABET, CODE_LENGTH,
-  PAIR_TTL_MS, WAITING_GRACE_MS, CLAIM_FAIL_LIMIT, CLAIM_FAIL_GLOBAL, START_LIMIT,
+  PAIR_TTL_MS, WAITING_GRACE_MS, CLAIM_FAIL_LIMIT, CLAIM_FAIL_GLOBAL, START_LIMIT, MAX_PENDING_PER_ADDRESS,
 } from '../pairing.js';
 import { redactSecrets } from '../core/activityCore.js';
 
@@ -141,7 +141,8 @@ const ENDPOINTS = [
   { name: 'poll', method: 'GET', url: '/api/display/poll?client=kiosk-test-3' },
   { name: 'stream', method: 'GET', url: '/api/stream?client=kiosk-test-2', sse: true, query: true },
   { name: 'photo file', method: 'GET', url: '/media/photos/family.jpg', query: true },
-  { name: 'thumbnail', method: 'GET', url: '/media/thumbs/family.jpg', query: true },
+  // thumbnails are for the admin's gallery grid: a display credential or open mode gets 404 (adminOnly)
+  { name: 'thumbnail', method: 'GET', url: '/media/thumbs/family.jpg', query: true, adminOnly: true },
 ];
 
 /** Status of one endpoint with a credential / cookie / extra headers. */
@@ -159,7 +160,7 @@ async function hit(ctx, ep, { cred = '', cookie = '', headers = {} } = {}) {
   }
   return (await ctx.call(ep.method, url, { body: ep.body, headers: h, cookie })).status;
 }
-const allowed = (ep, status) => (ep.upstream ? ![401, 403].includes(status) : status === 200);
+const allowed = (ep, status, { session = false } = {}) => (ep.adminOnly && !session ? status === 404 : ep.upstream ? ![401, 403].includes(status) : status === 200);
 
 test('private mode: access matrix (no key 401, valid key, revoked key 403, device token, admin session)', async () => {
   await withServer(async (ctx) => {
@@ -178,7 +179,7 @@ test('private mode: access matrix (no key 401, valid key, revoked key 403, devic
       assert.ok(allowed(ep, await hit(ctx, ep, { cred: kitchenKey })), `${ep.name}: valid key`);
       assert.ok(allowed(ep, await hit(ctx, ep, { cred: kitchenKey.toUpperCase() })), `${ep.name}: key is case-insensitive`);
       assert.ok(allowed(ep, await hit(ctx, ep, { cred: deviceToken })), `${ep.name}: device token`);
-      assert.ok(allowed(ep, await hit(ctx, ep, { cookie })), `${ep.name}: admin session`);
+      assert.ok(allowed(ep, await hit(ctx, ep, { cookie }), { session: true }), `${ep.name}: admin session`);
       assert.equal(await hit(ctx, ep, { cred: '00000000-0000-4000-8000-000000000000' }), 403, `${ep.name}: unknown key → 403`);
       assert.equal(await hit(ctx, ep, { cred: `md_${'A'.repeat(43)}` }), 403, `${ep.name}: unknown device token → 403`);
       assert.equal(await hit(ctx, ep, { cred: 'not-a-key' }), 403, `${ep.name}: garbage → 403`);
@@ -300,7 +301,7 @@ test('regenerate link: old key revoked at once, connected displays told via SSE,
   });
 });
 
-test('screens deleted → their links stop working; devices move to the default screen', async () => {
+test('screens deleted → their links stop working; their paired devices are revoked', async () => {
   await withServer(async (ctx) => {
     const cookie = await ctx.login();
     const kitchenKey = keyOf('kitchen');
@@ -312,7 +313,9 @@ test('screens deleted → their links stop working; devices move to the default 
     cfg.screens = cfg.screens.filter((s) => s.id !== 's_kitchen');
     assert.equal((await ctx.call('PUT', '/api/admin/config', { cookie, body: cfg })).status, 200);
     assert.equal((await ctx.call('GET', '/api/events', { headers: { 'x-marco-key': kitchenKey } })).status, 403);
-    assert.equal((await ctx.call('GET', '/api/display/config', { headers: { 'x-marco-key': token } })).json.screenId, 's_main');
+    // never moved to another screen: the device token stops working
+    assert.equal((await ctx.call('GET', '/api/display/config', { headers: { 'x-marco-key': token } })).status, 403);
+    assert.ok(!listDevices().some((d) => d.id === out.device.id));
   });
 });
 
@@ -465,7 +468,8 @@ test('pairing rules: TTL, only while the display waits, single use, rate limits 
     assert.equal(codes.size, START_LIMIT);
     assert.equal(startPairing(fakeDisplay('192.168.1.77'), t0).status, 429);
     assert.ok(startPairing(fakeDisplay('192.168.1.78'), t0).code);
-    assert.equal(_pendingCount(), START_LIMIT + 1);
+    // an address keeps at most MAX_PENDING_PER_ADDRESS codes waiting: a newer one replaces its oldest
+    assert.equal(_pendingCount(), MAX_PENDING_PER_ADDRESS + 1);
     _resetPairing();
   });
 });

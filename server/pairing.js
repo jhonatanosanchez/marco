@@ -27,6 +27,8 @@ export const POLL_MS = 2000;
 /** A claim only succeeds while the display polled within this window (it is really there, waiting). */
 export const WAITING_GRACE_MS = 15_000;
 export const MAX_PENDING = 100;
+/** Codes waiting at once per client address: a new one from the same address replaces its oldest. */
+export const MAX_PENDING_PER_ADDRESS = 5;
 export const START_LIMIT = 10; // pairing sessions started per client address per window
 export const CLAIM_FAIL_LIMIT = 10; // wrong codes per admin session + client address per window
 export const CLAIM_FAIL_GLOBAL = 50; // wrong codes across all admins per window
@@ -52,12 +54,36 @@ function prune(now = Date.now()) {
   globalFails = fresh(globalFails);
 }
 
+/**
+ * Room for one more waiting code, so a few addresses cannot fill the table and block every other display: an address
+ * at MAX_PENDING_PER_ADDRESS gives up its oldest code; when the table is full, codes whose display stopped polling
+ * go first (they can no longer be claimed), then the oldest code of the address holding the most. Codes already
+ * paired (token waiting for pickup) are never dropped.
+ */
+function makeRoom(bucket, now) {
+  const waiting = () => [...sessions.entries()].filter(([, s]) => s.state === 'waiting');
+  const mine = waiting().filter(([, s]) => s.bucket === bucket).sort((a, b) => a[1].createdAt - b[1].createdAt);
+  for (const [k] of mine.slice(0, Math.max(0, mine.length - MAX_PENDING_PER_ADDRESS + 1))) sessions.delete(k);
+  if (sessions.size < MAX_PENDING) return;
+  for (const [k, s] of waiting()) if (now - s.lastPollAt > WAITING_GRACE_MS) sessions.delete(k);
+  if (sessions.size < MAX_PENDING) return;
+  const byBucket = new Map();
+  for (const [k, s] of waiting()) {
+    const list = byBucket.get(s.bucket) || [];
+    list.push([k, s]);
+    byBucket.set(s.bucket, list);
+  }
+  const heaviest = [...byBucket.values()].sort((a, b) => b.length - a.length)[0];
+  if (heaviest?.length > 1) sessions.delete(heaviest.sort((a, b) => a[1].createdAt - b[1].createdAt)[0][0]);
+}
+
 /** Start a pairing session for a waiting display. Returns PairStartResponse or { error, status }. */
 export function startPairing(req, now = Date.now()) {
   prune(now);
   const bucket = ipBucket(req.ip);
   const hits = startHits.get(bucket) || [];
   if (hits.length >= START_LIMIT) return { error: 'too many pairing codes from this address, wait a few minutes', status: 429 };
+  makeRoom(bucket, now);
   if (sessions.size >= MAX_PENDING) return { error: 'too many screens are waiting to be paired, try again later', status: 503 };
   hits.push(now);
   startHits.set(bucket, hits);
@@ -67,7 +93,7 @@ export function startPairing(req, now = Date.now()) {
   const sessionId = crypto.randomBytes(32).toString('base64url');
   sessions.set(shaHex(sessionId), {
     code, codeHash: sha(code), createdAt: now, expiresAt: now + PAIR_TTL_MS, lastPollAt: now, state: 'waiting',
-    ip: String(req.ip || '').slice(0, 64), userAgent: String(req.get?.('user-agent') || '').slice(0, 300),
+    bucket, ip: String(req.ip || '').slice(0, 64), userAgent: String(req.get?.('user-agent') || '').slice(0, 300),
     token: null, device: null, pairedAt: 0,
   });
   return { sessionId, code, expiresAt: new Date(now + PAIR_TTL_MS).toISOString(), pollMs: POLL_MS };

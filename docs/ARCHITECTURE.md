@@ -456,9 +456,13 @@ the "Screen not found" page (`web/display/widgets/screenMissing.ts`), which asks
 starts normally once the screen exists. A credential's own screen always wins over `?screen=`.
 
 - A credential always decides the screen; `?screen=` is ignored with it. `/media/*` follows the same rules (in open
-  mode keyless media stays LAN-only). `/api/health`, `/api/setup/*`, `/api/pair/*` and the webhooks are outside it.
+  mode keyless media stays LAN-only). A gallery file is served to a display only when a screen its credential may
+  read (its screen, its carousel's screens, every screen in open mode) shows the gallery (`gallery` or `mixed`) and is
+  not private with *hide photos*, and only when the photo is not hidden; anything else answers the same `404` as a
+  missing file. Thumbnails (`/media/thumbs/*`) are for an admin session only. Hidden file names go only to displays
+  that show the gallery (the `photos` event of the others has no `hidden` list). `/api/health`, `/api/setup/*`, `/api/pair/*` and the webhooks are outside it.
 - A key or device bound to a carousel reads the carousel's screens and no other (see [Carousels](#carousels)); when
-  the carousel is deleted its key is dropped and its devices move to the default screen.
+  the carousel is deleted its key is dropped and its paired devices are revoked.
 - Keys: one per screen (and per carousel) in `secrets.displayKeys`, created with the screen, dropped when the screen is deleted,
   replaced by *Regenerate link* (SSE clients that used the old key get `revoked` and are closed).
 - Pairing (`server/pairing.js`, memory only): `POST /api/pair/start` → `{ sessionId, code }`; the display polls
@@ -466,7 +470,9 @@ starts normally once the screen exists. A credential's own screen always wins ov
   (`POST /api/admin/pair/claim`) for a screen in two steps (the first only answers which display is waiting, the
   owner confirms, the second pairs) → a device with a random 256-bit token is created (only its hash is
   stored) and handed to the polling display once. Codes live 10 minutes, are single use and claimable only while the
-  display polled in the last 15 s. Devices of a deleted screen move to the default screen.
+  display polled in the last 15 s. Devices of a deleted screen are revoked (never moved to another screen). An
+  address keeps at most 5 codes waiting (a newer one replaces its oldest), and a full table first drops codes whose
+  display stopped polling, then the oldest code of the address holding the most.
 - New installs start `private`; a stored config without `security` (saved by 0.2 or older) is migrated to `open` on
   load, and a save without `security` (old admin build, old backup or export) keeps the current mode. Restores and
   imports always keep the current mode (it is owned by the running install, not by a file).
@@ -489,7 +495,10 @@ starts normally once the screen exists. A credential's own screen always wins ov
 - Command palette (Ctrl/Cmd+K or `/`): pages, individual settings, screens and actions.
 - Photo pipeline in the browser (`web/admin/photoTools.ts`): EXIF rotation, resize to ≤ 2560 px JPEG, 480 px
   thumbnail, HEIC decoding through a lazily loaded chunk, automatic focal point (spectral saliency + skin tones,
-  `web/admin/saliency.ts`). The server never decodes images.
+  `web/admin/saliency.ts`). The server never decodes images, but it rewrites every gallery upload and thumbnail
+  without its metadata (location, camera, dates, comments; the EXIF orientation is kept: `cleanImage` in
+  `server/photos.js`) and refuses files that do not parse as JPEG, PNG or WebP. Photos stored by older versions are
+  cleaned once at startup (`cleanStoredPhotos`, keeping their date and focal point).
 - i18n: Spanish strings are the keys; English and Portuguese live in `web/admin/i18n-dict*.ts`, Dutch and Danish
   in `web/admin/i18n-dict-nl.ts` and `i18n-dict-da.ts` (one object per language keyed by the Spanish string; the
   Familia rows sit in `i18n-dict-family.ts` so the family page stays small). A missing Dutch or Danish value falls

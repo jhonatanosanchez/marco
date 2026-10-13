@@ -154,6 +154,7 @@ export function ScreensSection({ full, setFull, saved, screenId, setScreenId, go
       body: (
         <>
           <p>{t('Se borrarán su diseño y sus ajustes. Los calendarios y demás contenido común no se tocan.')}</p>
+          <p>{t('Las teles emparejadas con esta pantalla se desconectan y su enlace privado deja de funcionar.')}</p>
           {n > 0 && <p class="err-text">{t('{n} pantallas conectadas la usan: pasarán a mostrar la pantalla predeterminada.', { n })}</p>}
           {orphans.length > 0 && (
             <>

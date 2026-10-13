@@ -268,7 +268,7 @@ export const api = {
   backupFile: (id: string) => request<unknown>('GET', `/api/admin/backups/${encodeURIComponent(id)}`),
   restoreBackup: (id: string) => request<{ ok: true; config: StoredConfig; repaired?: string[] }>('POST', `/api/admin/backups/${encodeURIComponent(id)}/restore`, {}),
   deleteBackup: (id: string) => request<{ ok: true }>('DELETE', `/api/admin/backups/${encodeURIComponent(id)}`),
-  exportConfig: (includeSecrets: boolean) => request<ExportBundle>('POST', '/api/admin/export', { includeSecrets }),
+  exportConfig: (includeSecrets: boolean, password?: string) => request<ExportBundle>('POST', '/api/admin/export', { includeSecrets, ...(password ? { password } : {}) }),
   importPreview: (bundle: unknown) => request<ImportPreview>('POST', '/api/admin/import/preview', { bundle, lang: getLang() }),
   importApply: (body: ImportApplyRequest) => request<{ ok: true; config: StoredConfig; loggedOut?: boolean }>('POST', '/api/admin/import/apply', body),
 

@@ -59,6 +59,37 @@ function backupFileName(b: BackupInfo): string {
 
 const REASON: Record<string, string> = { save: 'Al guardar', manual: 'Manual', restore: 'Antes de restaurar', import: 'Antes de importar', migration: 'Migración v1' };
 
+/**
+ * Run a call that sends private data (an export or import with secrets). When the server asks for the password
+ * (no sign-in in the last 10 minutes: 403 password_required) or says it was wrong, ask for it and try again.
+ * Resolves null when the person cancels.
+ */
+async function withPassword<T>(run: (password?: string) => Promise<T>): Promise<T | null> {
+  let password: string | undefined;
+  for (let i = 0; i < 4; i++) {
+    try {
+      return await run(password);
+    } catch (e) {
+      const code = ((e as ApiError).body as { code?: string } | null)?.code;
+      if (code !== 'password_required' && code !== 'password_incorrect') throw e;
+      let typed = '';
+      const ok = await confirmDialog({
+        title: t('Contraseña actual'),
+        body: (
+          <>
+            <p>{t('Para incluir los datos privados, escribe la contraseña del panel.')}</p>
+            {code === 'password_incorrect' && <p class="err-text">{t('Contraseña incorrecta')}</p>}
+            <input class="input" type="password" autocomplete="current-password" aria-label={t('Contraseña actual')} onInput={(ev) => (typed = ev.currentTarget.value)} />
+          </>
+        ),
+      });
+      if (!ok || !typed) return null;
+      password = typed;
+    }
+  }
+  return null;
+}
+
 export function BackupsSection({ dirty, replaceConfig, full }: SectionProps) {
   const hasPhotos = !!full?.family?.members?.some((m) => !!m.photo);
   const [secrets, setSecrets] = useState(false);
@@ -98,7 +129,8 @@ export function BackupsSection({ dirty, replaceConfig, full }: SectionProps) {
     setExporting(true);
     try {
       const withSecrets = secretsOn && secrets;
-      const b = await api.exportConfig(withSecrets);
+      const b = withSecrets ? await withPassword((pw) => api.exportConfig(true, pw)) : await api.exportConfig(false);
+      if (!b) return;
       const day = new Date().toISOString().slice(0, 10);
       downloadJson(b, `marco-${day}${withSecrets ? '-secrets' : ''}.json`);
       toast(t('Copia descargada'));
@@ -167,7 +199,9 @@ export function BackupsSection({ dirty, replaceConfig, full }: SectionProps) {
     if (!ok) return;
     setBusy('apply');
     try {
-      const r = await api.importApply({ bundle, includeSecrets: secretsOn && impSecrets, sections: all ? undefined : sections });
+      const includeSecrets = secretsOn && impSecrets;
+      const r = await withPassword((password) => api.importApply({ bundle, includeSecrets, sections: all ? undefined : sections, ...(password ? { password } : {}) }));
+      if (!r) return;
       if (r.loggedOut) {
         toast(t('Importado. La contraseña ha cambiado: vuelve a entrar.'), 'info');
         setTimeout(() => location.reload(), 1500);

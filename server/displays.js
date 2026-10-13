@@ -4,14 +4,17 @@ import fs from 'node:fs';
 import { getConfig, paths, writeFileAtomic } from './store.js';
 import { resolveScreen } from './core/screens.js';
 import { listClients, send, matches } from './sse.js';
-import { publish, recordIdentify, readSince, trackPoller, isPolling, nextDelay, _resetPoll } from './pollHub.js';
+import { publish, recordIdentify, readSince, trackPoller, isPolling, nextDelay, _resetPoll, MAX_POLLERS_PER_IP } from './pollHub.js';
 import { logActivityThrottled } from './activity.js';
 import { activeFor } from './announce.js';
 import { ringPayloadFor } from './doorbell.js';
 import { bareScreenRequest, deviceName, isLoopbackClient, requestScreen } from './displayAccess.js';
 import { carouselMembers, findTarget, isCarouselId, isTargetId, targetInfo, targetMembers } from './core/carousels.js';
+import { ipBucket } from './lib/net.js';
 
 export const MAX_DISPLAYS = 100;
+/** Registry rows one credential (or, without one, one address) may hold: its own oldest offline rows make room. */
+export const MAX_DISPLAYS_PER_OWNER = MAX_POLLERS_PER_IP;
 const PRUNE_OFFLINE_MS = 30 * 24 * 3600_000;
 const RECONNECT_LOG_MS = 10 * 60_000;
 const SAVE_THROTTLE_MS = 30_000;
@@ -48,15 +51,45 @@ function load() {
  */
 const isLive = (d, now = Date.now()) => (d.streams || 0) > 0 || isPolling(d.clientId, now);
 
-function prune(now = Date.now()) {
+function prune(now = Date.now(), max = MAX_DISPLAYS) {
   for (const [id, d] of registry) {
     if (!isLive(d, now) && now - Date.parse(d.lastSeen || 0) > PRUNE_OFFLINE_MS) registry.delete(id);
   }
-  if (registry.size > MAX_DISPLAYS) {
+  if (registry.size > max) {
     // Drop the oldest offline entries first.
     const offline = [...registry.values()].filter((d) => !isLive(d, now)).sort((a, b) => (a.lastSeen < b.lastSeen ? -1 : 1));
-    while (registry.size > MAX_DISPLAYS && offline.length) registry.delete(offline.shift().clientId);
+    while (registry.size > max && offline.length) registry.delete(offline.shift().clientId);
   }
+}
+
+/**
+ * Who a registry row belongs to: the credential the display came in with (a hash of its key or device token), an
+ * admin session, or (open mode, no credential) its address. A display id is chosen by the display itself, so a row
+ * that is live under one owner is never taken over by another: that request is served but not listed, and commands
+ * aimed at the id keep reaching the display that holds it.
+ */
+const ownerOf = (access, ip) => (access?.credHash ? `c:${String(access.credHash).slice(0, 32)}`
+  : access?.via === 'session' ? 'session' : `ip:${ipBucket(String(ip || ''))}`);
+
+/**
+ * May a display of `owner` use registry row `clientId`? Not while the row is live under another owner, and not as a
+ * new row when that owner already holds MAX_DISPLAYS_PER_OWNER (its own oldest offline rows go first). Makes room
+ * in a full registry. Returns true when the row can be used.
+ */
+function mayUse(clientId, owner, now = Date.now()) {
+  const d = registry.get(clientId);
+  if (d) return !d.owner || d.owner === owner || !isLive(d, now);
+  const mine = [...registry.values()].filter((x) => x.owner === owner);
+  if (mine.length >= MAX_DISPLAYS_PER_OWNER) {
+    const offline = mine.filter((x) => !isLive(x, now)).sort((a, b) => (a.lastSeen < b.lastSeen ? -1 : 1));
+    while (mine.length >= MAX_DISPLAYS_PER_OWNER && offline.length) {
+      registry.delete(offline.shift().clientId);
+      mine.pop();
+    }
+    if (mine.length >= MAX_DISPLAYS_PER_OWNER) return false;
+  }
+  if (registry.size >= MAX_DISPLAYS) prune(now, MAX_DISPLAYS - 1);
+  return registry.size < MAX_DISPLAYS;
 }
 
 /** Persist (throttled). Anonymous entries (old builds) are not persisted. */
@@ -190,13 +223,17 @@ export function streamInit(req) {
   const screenKey = bound || (typeof req.query?.screen === 'string' ? req.query.screen.trim().slice(0, 64) : '');
   const raw = typeof req.query?.client === 'string' ? req.query.client.trim() : '';
   const anonymous = !CLIENT_ID_RE.test(raw) || raw.startsWith('anon-');
-  const clientId = anonymous ? `anon-${++anonSeq}` : raw;
   const sub = subscriptionFor(getConfig(), screenKey);
   // Admin preview iframes get live updates but are not listed as connected displays.
   const preview = req.query?.preview === '1';
+  const access = streamAccess(req);
+  load();
+  // an id live under another credential (or full registry): served, but not listed and not reachable by that id
+  const unlisted = !anonymous && !preview && !mayUse(raw, ownerOf(access, req.ip));
+  const clientId = anonymous ? `anon-${++anonSeq}` : unlisted ? `anon-unlisted-${++anonSeq}` : raw;
   return {
-    screenKey, ...sub, clientId: preview ? `anon-preview-${++anonSeq}` : clientId, anonymous: anonymous || preview, preview,
-    access: streamAccess(req),
+    screenKey, ...sub, clientId: preview ? `anon-preview-${++anonSeq}` : clientId, anonymous: anonymous || preview || unlisted, preview,
+    ...(unlisted ? { unlisted: true } : {}), access,
   };
 }
 
@@ -225,7 +262,7 @@ export function onStreamOpen(client) {
   load();
   // an unknown screen (only reachable without displayAuth, which answers 404 first) is never registered
   if (client.notFound) return;
-  if (client.preview) {
+  if (client.preview || client.unlisted) {
     for (const a of activeOn(getConfig(), membersOf(client))) send(client, 'announce', a);
     replayDoorbell(client);
     return;
@@ -242,6 +279,7 @@ export function onStreamOpen(client) {
     d = blankEntry(client.clientId, nowIso);
     registry.set(client.clientId, d);
   }
+  d.owner = ownerOf(client.access, client.ip);
   const wasLive = isLive(d, nowMs);
   const wasOfflineFor = wasLive ? 0 : nowMs - Date.parse(d.lastSeen || nowIso);
   d.streams = (d.streams || 0) + 1;
@@ -286,18 +324,19 @@ function notePoll(client, req, nowMs = Date.now()) {
   const ip = client.ip;
   let d = registry.get(client.clientId);
   const wasLive = Boolean(d) && isLive(d, nowMs);
-  // Not tracked (too many pollers, or too many client ids from this ip): served, but not listed.
+  // Not tracked (an id live under another credential, too many pollers or client ids from this ip): served, not listed.
+  const owner = ownerOf(client.access, ip);
+  if (!mayUse(client.clientId, owner, nowMs)) return;
   if (!trackPoller(client, nowMs)) return;
   const isNew = !d;
   if (!d) {
     for (const [id, x] of registry) {
       if (!isLive(x, nowMs) && x.ip === ip && x.screenId === client.screenId) registry.delete(id);
     }
-    if (registry.size >= MAX_DISPLAYS) prune(nowMs);
-    if (registry.size >= MAX_DISPLAYS) return;
     d = blankEntry(client.clientId, nowIso);
     registry.set(client.clientId, d);
   }
+  d.owner = owner;
   const wasOfflineFor = wasLive ? 0 : nowMs - Date.parse(d.lastSeen || nowIso);
   const access = client.access?.via || 'open';
   const changed = isNew || !wasLive || d.screenId !== client.screenId || d.screenKey !== client.screenKey || d.ip !== ip
@@ -338,7 +377,9 @@ export function pollDisplay(req, nowMs = Date.now()) {
   const { screen, carousel } = requestScreen(cfg, req);
   const raw = typeof q.client === 'string' ? q.client.trim() : '';
   const preview = q.preview === '1';
-  const anonymous = preview || !CLIENT_ID_RE.test(raw) || raw.startsWith('anon-');
+  let anonymous = preview || !CLIENT_ID_RE.test(raw) || raw.startsWith('anon-');
+  // an id live under another credential: served, but polls as an anonymous display (no commands aimed at that id)
+  if (!anonymous && !mayUse(raw, ownerOf(streamAccess(req), req?.ip), nowMs)) anonymous = true;
   const bound = boundScreen(cfg, req);
   // a display on a carousel is registered under the carousel and gets the live events of all its screens
   const sub = carousel ? { screenId: carousel.id, memberIds: carouselMembers(cfg, carousel) } : { screenId: screen.id, memberIds: null };
@@ -452,8 +493,13 @@ export function recordHeartbeat(body, req) {
   const hb = r.value;
   const cfg = getConfig();
   const nowIso = new Date().toISOString();
+  // The id must not be live under another credential (nor be a new row past the owner's or the registry's limit).
+  const access = accessOf(req);
+  const owner = ownerOf(streamAccess(req), req?.ip);
+  const existing = registry.get(hb.clientId);
+  if (!mayUse(hb.clientId, owner)) return { error: existing ? 'client id in use' : 'too many displays' };
   // Prefer the screen of the open stream; else resolve what the display says it asked for.
-  const stream = listClients().find((c) => c.clientId === hb.clientId);
+  const stream = listClients().find((c) => c.clientId === hb.clientId && ownerOf(c.access, c.ip) === owner);
   const bound = boundScreen(cfg, req);
   const sub = stream || bound ? null : subscriptionFor(cfg, hb.screen);
   // a display on an unknown screen is not listed (and never under the default screen); nor one that names no screen
@@ -461,14 +507,12 @@ export function recordHeartbeat(body, req) {
   if (sub?.notFound || (sub && req && bareScreenRequest(cfg, req, hb.screen))) return { error: 'screen_not_found' };
   let d = registry.get(hb.clientId);
   if (!d) {
-    if (registry.size >= MAX_DISPLAYS) prune();
-    if (registry.size >= MAX_DISPLAYS) return { error: 'too many displays' };
     d = blankEntry(hb.clientId, nowIso);
     registry.set(hb.clientId, d);
   }
   const screenId = stream?.screenId || bound || sub.screenId;
-  const access = accessOf(req);
   Object.assign(d, {
+    owner,
     screenKey: stream ? stream.screenKey : bound || hb.screen,
     screenId,
     // a display on a carousel reports the screen it shows (hb.screenId, one of the carousel's screens)

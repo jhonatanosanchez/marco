@@ -27,9 +27,14 @@ export const ROWS_CAROUSELS: [string, string, string][] = [
   ['(pantalla borrada)', '(deleted screen)', '(ecrã apagado)'],
   ['Eliminar el carrusel “{name}”', 'Delete the carousel “{name}”', 'Eliminar o carrossel “{name}”'],
   [
-    'Sus pantallas no se tocan. Las teles que lo muestran pasarán a la pantalla predeterminada y su enlace privado dejará de funcionar.',
-    'Its screens stay as they are. TVs that show it switch to the default screen and its private link stops working.',
-    'Os ecrãs ficam como estão. As TVs que o mostram passam para o ecrã predefinido e a ligação privada deixa de funcionar.',
+    'Sus pantallas no se tocan. Las teles emparejadas con él se desconectan y su enlace privado deja de funcionar.',
+    'Its screens stay as they are. TVs paired with it are disconnected and its private link stops working.',
+    'Os ecrãs ficam como estão. As TVs emparelhadas com ele são desligadas e a ligação privada deixa de funcionar.',
+  ],
+  [
+    'Las teles emparejadas con esta pantalla se desconectan y su enlace privado deja de funcionar.',
+    'TVs paired with this screen are disconnected and its private link stops working.',
+    'As TVs emparelhadas com este ecrã são desligadas e a ligação privada deixa de funcionar.',
   ],
   ['Máximo {n} carruseles', 'At most {n} carousels', 'Máximo {n} carrosséis'],
   ['Ningún carrusel todavía', 'No carousels yet', 'Ainda sem carrosséis'],

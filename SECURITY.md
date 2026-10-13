@@ -55,7 +55,11 @@ used on shared networks or behind an HTTPS reverse proxy on the Internet:
   (another host, or any proxy in front of the Docker container: `172.16.0.0/12`).
 - The admin panel (`/admin/`, `/api/admin/*`) requires a session (password and/or Google sign-in with an allow-list).
   Passwords are stored as scrypt hashes; the session cookie is `HttpOnly` + `SameSite=Lax` and mutating routes require
-  JSON (CSRF guard). There is no default password: a fresh install runs a first-run setup wizard that creates it
+  JSON (CSRF guard; `Origin: null` is refused, photo uploads need the admin's `X-Requested-With` header). Sessions are
+  kept on the server (only a hash of the random session id is stored): logging out ends the session for every copy
+  of the cookie, and a session ends after 14 days, or after 7 days without use. Exports and imports with private
+  data need a sign-in in the last 10 minutes or the password. Password checks (sign-in, current password) are
+  limited per address and, from outside the LAN, also in total across all addresses. There is no default password: a fresh install runs a first-run setup wizard that creates it
   (≥ 10 characters, common passwords refused). The setup endpoints work only until a password exists, only one
   request can complete them, and they accept requests from LAN clients only, unless the one-time token printed in
   the server log (or `SETUP_TOKEN`, which then is always required) is given. The token is always required with
@@ -153,7 +157,8 @@ how much of it.
   request pairs. Only type codes shown on your own screens; the new device appears in *Connected screens → Paired
   devices*, where it can be revoked.
 - *Malicious websites in a family member's browser* (CSRF, DNS rebinding): admin actions (claim, regenerate, revoke)
-  need the session cookie (`SameSite=Lax`), JSON bodies and a matching `Origin`; unknown host names get `421`. The
+  need the session cookie (`SameSite=Lax`), JSON bodies and a matching `Origin` (never `null`); unknown host names
+  get `421`. The
   pairing status endpoint needs the secret session id.
 
 **Residual risks**: the private link is a bearer secret: whoever has it sees that screen until it is regenerated.

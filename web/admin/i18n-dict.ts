@@ -108,6 +108,7 @@ const ROWS: [string, string, string][] = [
   ['Contraseña actual', 'Current password', 'Palavra-passe atual'],
   ['Contraseña actualizada', 'Password updated', 'Palavra-passe atualizada'],
   ['Contraseña incorrecta', 'Wrong password', 'Palavra-passe incorreta'],
+  ['Para incluir los datos privados, escribe la contraseña del panel.', 'To include the private data, enter the admin password.', 'Para incluir os dados privados, escreve a palavra-passe do painel.'],
   ['Créalo en Home Assistant → tu perfil → Seguridad → Tokens de acceso de larga duración. Se guarda solo en el servidor y nunca se vuelve a mostrar.', 'Create it in Home Assistant → your profile → Security → Long-lived access tokens. It is stored only on the server and never shown again.', 'Cria-o no Home Assistant → o teu perfil → Segurança → Tokens de acesso de longa duração. Fica guardado só no servidor e nunca mais é mostrado.'],
   ['Cuenta', 'Account', 'Conta'],
   ['Cuenta de Google vinculada', 'Google account linked', 'Conta Google ligada'],

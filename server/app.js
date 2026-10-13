@@ -23,6 +23,7 @@ import { hostGuard } from './lib/net.js';
 import { redactSecrets } from './core/activityCore.js';
 import { displayAuth, mediaAuth } from './displayAccess.js';
 import { immichMedia } from './immich.js';
+import { galleryMedia, thumbMedia } from './photos.js';
 
 const FRAME_DESTS = new Set(['iframe', 'frame', 'embed', 'object', 'fencedframe']);
 const PREVIEW_PAGE = /^\/(?:index\.html)?$|^\/d\/[^/]+$/;
@@ -127,13 +128,14 @@ export function createApp({ version, dist = path.join(ROOT, 'dist'), updater = n
   app.use('/media', mediaAuth);
   // Immich photos (server/immich.js): proxied with the server's API key, only assets of albums a screen plays.
   app.get('/media/immich/:id', (req, res, next) => immichMedia(req, res).catch(next));
-  // Gallery URLs carry ?v=<mtime> (replaced photos get a new URL), so they can be cached for long, privately.
-  app.use('/media/photos', express.static(paths.photos, {
+  // Gallery URLs carry ?v=<mtime> (replaced photos get a new URL), so they can be cached for long, privately. A
+  // display reads only photos in the rotation of a screen its credential may read (photos.js galleryMedia).
+  app.use('/media/photos', galleryMedia, express.static(paths.photos, {
     maxAge: '30d', dotfiles: 'deny', index: false, fallthrough: false,
     setHeaders: (res) => res.set('cache-control', 'private, max-age=2592000'),
   }));
-  // Browser-made thumbnails (always JPEG, whatever the photo's extension) for the admin gallery grid.
-  app.use('/media/thumbs', express.static(path.join(paths.photos, '.thumbs'), {
+  // Browser-made thumbnails (always JPEG, whatever the photo's extension) for the admin gallery grid (admin only).
+  app.use('/media/thumbs', thumbMedia, express.static(path.join(paths.photos, '.thumbs'), {
     maxAge: '365d', immutable: true, dotfiles: 'deny', index: false, fallthrough: false,
     setHeaders: (res) => { res.type('image/jpeg'); res.set('cache-control', 'private, max-age=31536000, immutable'); },
   }));

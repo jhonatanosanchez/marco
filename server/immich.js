@@ -9,8 +9,7 @@ import path from 'node:path';
 import { requestBuffer } from './lib/http.js';
 import { events, getConfig, getSecrets, paths, writeFileAtomic } from './store.js';
 import { publish } from './pollHub.js';
-import { screenPrivacy } from './privacy.js';
-import { carouselList, carouselMembers } from './core/carousels.js';
+import { mediaScreens } from './displayAccess.js';
 import {
   IMMICH_ID_RE, IMMICH_IMAGE_TYPES, MAX_IMMICH_ALBUMS, compactAsset, errorCodeFor, mapAlbum, mergeItems, missingScopes,
   normalizeImmichUrl, parseVersion, showableAsset, sniffImageType, usesSearch, versionText,
@@ -500,18 +499,10 @@ export async function immichMedia(req, res) {
     if (access.via !== 'session') return fail(404, 'not found');
     v = coverIds.has(id) ? 'c' : assetVersion(id);
   } else {
-    const cfg = getConfig();
-    let screens = null;
-    if (access.screenId) {
-      // a credential bound to a carousel reads the photos of the carousel's screens, and only those
-      const bound = cfg.screens.find((s) => s.id === access.screenId);
-      const c = bound ? null : carouselList(cfg).find((x) => x.id === access.screenId);
-      const ids = bound ? [bound.id] : c ? carouselMembers(cfg, c) : [];
-      // a screen that is private with "hide photos" serves none of its photos
-      screens = ids.map((sid) => cfg.screens.find((s) => s.id === sid))
-        .filter((sc) => sc && !(sc.privacy?.hidePhotos && screenPrivacy(cfg, sc).active));
-      if (!screens.length) return fail(404, 'not found');
-    }
+    // a credential reads the photos of its screen (or its carousel's screens); open mode, every screen; a screen
+    // that is private with "hide photos" serves none of its photos (displayAccess.js mediaScreens)
+    const screens = mediaScreens(getConfig(), access);
+    if (screens && !screens.length) return fail(404, 'not found');
     v = assetVersion(id, screens);
   }
   if (v === null || v === undefined) return fail(404, 'not found');

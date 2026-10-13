@@ -75,7 +75,7 @@ async function withApp(fn) {
   const raw = async (method, url, { json, form } = {}) => {
     const r = await fetch(base + url, {
       method,
-      headers: { ...(cookie ? { cookie } : {}), ...(json !== undefined ? { 'content-type': 'application/json' } : {}) },
+      headers: { ...(cookie ? { cookie } : {}), ...(json !== undefined ? { 'content-type': 'application/json' } : {}), ...(form ? { 'x-requested-with': 'fetch' } : {}) },
       body: json !== undefined ? JSON.stringify(json) : form,
     });
     const set = r.headers.getSetCookie?.() || [];

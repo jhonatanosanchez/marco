@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import * as store from '../store.js';
 import { defaultConfig } from '../core/defaults.js';
-import { microsoftConnectHandler, microsoftCallbackHandler, meHandler } from '../auth.js';
+import { microsoftConnectHandler, microsoftCallbackHandler, meHandler, startSession } from '../auth.js';
 import * as microsoft from '../microsoft.js';
 import { selfHostedFeatures } from '../capabilities.js';
 import { refreshSource, sourceStatus } from '../calendars.js';
@@ -84,7 +84,8 @@ describe('self-hosted Microsoft calendars', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  const session = () => ({ user: { method: 'password', email: 'admin', name: 'Admin' }, epoch: 'epoch-1' });
+  // a signed-in admin: the cookie fields plus the server-side session record (auth.js startSession)
+  const session = () => { const r = { session: {} }; startSession(r, { method: 'password', email: 'admin', name: 'Admin' }); return r.session; };
   const req = (over = {}) => ({ query: {}, session: session(), ip: '192.168.1.10', protocol: 'http', get: () => 'localhost:3000', headers: {}, socket: {}, ...over });
   const redirectOf = async (handler, r) => {
     let to = '';

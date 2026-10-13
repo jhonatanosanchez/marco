@@ -363,7 +363,7 @@ test('poll: a carousel display is bound to the carousel and gets announcements f
   });
 });
 
-test('devices and pairing take a carousel; deleting it moves its devices to the default screen and drops its link', async () => {
+test('devices and pairing take a carousel; deleting it revokes its devices and drops its link', async () => {
   await withServer(async ({ call, login }) => {
     const cookie = await login();
     const dev = createDevice({ name: 'Hall tablet', screenId: 'v_loop' });
@@ -377,9 +377,9 @@ test('devices and pairing take a carousel; deleting it moves its devices to the 
     cfg.carousels.items = [];
     assert.equal((await call('PUT', '/api/admin/config', { cookie, body: cfg })).status, 200);
     assert.equal((await call('GET', '/api/display/config', { headers: { 'x-marco-key': loopKey } })).status, 403);
+    // the device is revoked with it, never moved to the default screen
     const after = await call('GET', '/api/display/config', { headers: { 'x-marco-key': dev.token } });
-    assert.equal(after.json.screenId, 's_main');
-    assert.equal(after.json.carousel, null);
+    assert.equal(after.status, 403);
   });
 });
 

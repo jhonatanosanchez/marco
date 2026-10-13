@@ -2123,6 +2123,8 @@ export interface ImportNote {
 export interface ImportApplyRequest {
   bundle: unknown;
   includeSecrets: boolean;
+  /** the admin password, when the session did not sign in within the last 10 minutes (with includeSecrets) */
+  password?: string;
   /** top-level config keys to take from the bundle; omitted = all */
   sections?: string[];
 }

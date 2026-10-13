@@ -7,7 +7,8 @@ All endpoints speak JSON. TypeScript types for every request and response live i
   session, unless display access is set to *open* (legacy LAN mode). See [Display access](#display-access). They
   never return calendar URLs, Google accounts, tokens or Home Assistant credentials.
 - **Admin endpoints** need a session cookie (log in with `POST /api/auth/login`). Mutating requests must send
-  `Content-Type: application/json` (CSRF guard; photo uploads are the multipart exception).
+  `Content-Type: application/json` (CSRF guard; photo uploads are the multipart exception and need an
+  `X-Requested-With` header). A request with `Origin: null` is refused.
 - **Webhooks** need `Authorization: Bearer <token>` (create tokens in *Admin → API & webhooks*).
 
 Without a key or device token, every display endpoint accepts `?screen=<slug|id>` (case-insensitive; a carousel's
@@ -91,7 +92,7 @@ saved without `security` (old admin builds, backups or exports from before 0.3) 
 | `GET /api/stream?screen=&client=&k=` | Server-Sent Events, see below |
 | `GET /api/display/poll?screen=&client=&cursor=&rev=&hidden=&preview=` | `PollResponse`: the same events as commands, for displays without a stream. See below |
 | `GET /api/display/doorbell/frame?n=` | The doorbell camera picture for this display's screen (`image/jpeg`, `image/png`, `image/webp` or `image/gif`, `Cache-Control: private, no-store`), only while that screen rings. `n` is a counter the display adds so nothing caches it. `404 { code: "no_ring" }` when the screen is not ringing (also for open display access from outside the LAN), `404 { code: "no_camera" }` when the ring has no camera, `503 { code: "homeassistant_off" }`, `502 { code: "camera_unavailable" }` (Home Assistant failed, took more than 6 s, answered something that is not an image or more than 4 MB). See [Doorbell camera](#doorbell-camera) |
-| `GET /media/photos/<file>`, `GET /media/thumbs/<file>` | Gallery images and thumbnails |
+| `GET /media/photos/<file>`, `GET /media/thumbs/<file>` | Gallery images (a display: only photos in the rotation of a screen it may read that shows the gallery and is not private with *hide photos*) and thumbnails (admin session only) |
 | `GET /media/immich/<assetId>?v=` | Immich preview image, proxied with the server's API key and cached on disk (`Cache-Control: private, max-age=2592000`). `404` for an id that is not in an album some screen plays (a display key or device token: its own screen's albums only), and while that screen is private with *hide photos*; `503` when Immich is not set up; `502` when Immich fails or answers something that is not an image of up to 8 MB. `?s=thumb`: album cover thumbnail, admin session only |
 
 ### Capabilities in `/api/health`
@@ -374,9 +375,9 @@ Rules for the mutating setup endpoints:
 |---|---|
 | `GET /api/admin/backups` · `POST /api/admin/backups` | List / create a manual backup |
 | `GET /api/admin/backups/:id` · `POST /api/admin/backups/:id/restore` · `DELETE /api/admin/backups/:id` | Download / restore (current config backed up first) / delete |
-| `POST /api/admin/export` | `{ includeSecrets }` → `marco-YYYY-MM-DD.json` (secrets = password hash, HA token, Immich API key, Google accounts, API tokens, display keys, paired devices (token hashes); never the session secret) |
+| `POST /api/admin/export` | `{ includeSecrets, password? }` (with secrets: a sign-in in the last 10 minutes, or the admin `password`; else `403 { code: 'password_required' }`, a wrong one `403 { code: 'password_incorrect' }`) → `marco-YYYY-MM-DD.json` (secrets = password hash, HA token, Immich API key, Google accounts, API tokens, display keys, paired devices (token hashes); never the session secret) |
 | `POST /api/admin/import/preview` | `{ bundle, lang? }` (export bundle or a bare config) → per-section summary in `lang` (es/en/pt; default: `Accept-Language`, else English), `displayAccess` (the current mode, which the import keeps) and `secretsImpact: { linksChanged, devicesRemoved, devicesAdded } \| null` (what importing the bundle's secrets would change); nothing saved |
-| `POST /api/admin/import/apply` | `{ bundle, sections?, includeSecrets? }` → `{ ok, config, loggedOut? }`. `security.displayAccess` is never taken from the bundle (restores keep it too). Imported keys / devices close the streams of replaced keys and dropped devices |
+| `POST /api/admin/import/apply` | `{ bundle, sections?, includeSecrets?, password? }` (with secrets: same rule as the export) → `{ ok, config, loggedOut? }`. `security.displayAccess` is never taken from the bundle (restores keep it too). Imported keys / devices close the streams of replaced keys and dropped devices |
 | `GET /api/admin/activity?type=&level=&q=&actor=&before=&limit=` | Newest first, paged with `before=<id>` |
 | `DELETE /api/admin/activity` | Clear the log |
 
@@ -440,7 +441,7 @@ Everything that binds a display takes a carousel id where it takes a screen id:
   `showingScreenId` / `showingScreenName` from its last heartbeat (`DisplayHeartbeat.screenId` is the screen it shows).
 - `POST /api/admin/displays/command { screens: [<carousel id or slug>] }` reaches the displays of that carousel.
 
-Deleting a carousel drops its private link (its displays get `revoked`) and moves its devices to the default screen.
+Deleting a carousel drops its private link (its displays get `revoked`) and revokes its paired devices.
 A carousel left with no screens keeps its link, but the link then reads a blank screen (`screenId` = the carousel
 id, no calendar, stock photos, no countdowns), never the default screen. Carousel ids always start with `v_` and
 never match a screen id; a saved id that does not follow this gets a new one.

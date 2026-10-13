@@ -8,9 +8,11 @@ import { requestJson } from './lib/http.js';
 import { defaultScreen } from './core/screens.js';
 import { getConfig, paths, writeFileAtomic } from './store.js';
 import { immichItems, warm } from './immich.js';
+import { mediaScreens, showsGallery } from './displayAccess.js';
 import { IMMICH_ID_RE, placeOf } from './core/immichCore.js';
 import {
   ALLOWED_EXT, ALLOWED_MIME, imageInfo as imageInfoOf, imageHeaderNeed, isJpeg, isGalleryFile, uploadName as coreUploadName,
+  sniffImage as sniffImageOf, stripImageMetadata,
 } from './core/imageInfo.js';
 
 // Header parsing and the file name rules are pure (server/core/imageInfo.js); this file handles disk and multer.
@@ -87,11 +89,33 @@ export const thumbsDir = () => path.join(paths.photos, '.thumbs');
 const thumbPath = (file) => path.join(thumbsDir(), file);
 export const isThumbField = (f) => THUMB_FIELDS.has(f);
 
+/**
+ * The image without its metadata (where it was taken, the camera, dates, comments: core/imageInfo.js
+ * stripImageMetadata keeps the EXIF orientation only), or null when the bytes are not a JPEG, PNG or WebP that
+ * parses. Every gallery photo and thumbnail is stored this way, whoever uploaded it and however.
+ */
+export function cleanImage(buf) {
+  const mime = sniffImageOf(buf);
+  const out = mime ? stripImageMetadata(buf, mime) : null;
+  return out ? Buffer.from(out.buffer, out.byteOffset, out.byteLength) : null;
+}
+
+/** Rewrite a file on disk without its metadata. Returns false (file untouched) when it is not an image that parses. */
+export function cleanImageFile(file) {
+  const buf = fs.readFileSync(file);
+  const out = cleanImage(buf);
+  if (!out) return false;
+  if (!out.equals(buf)) fs.writeFileSync(file, out);
+  return true;
+}
+
 /** Store a (browser-made, small JPEG) thumbnail for a gallery file; `src` = temp file path or Buffer. */
 export function storeThumb(file, src) {
   fs.mkdirSync(thumbsDir(), { recursive: true });
-  if (Buffer.isBuffer(src)) writeFileAtomic(thumbPath(file), src);
-  else fs.renameSync(src, thumbPath(file));
+  const buf = Buffer.isBuffer(src) ? src : fs.readFileSync(src);
+  const clean = cleanImage(buf) || buf; // validThumb checked it is a JPEG; one that does not parse is kept as sent
+  writeFileAtomic(thumbPath(file), clean);
+  if (!Buffer.isBuffer(src)) fs.rmSync(src, { force: true });
 }
 export function removeThumb(file) {
   try { fs.rmSync(thumbPath(file), { force: true }); } catch { /* ignore */ }
@@ -234,6 +258,28 @@ export function listGallery() {
   } catch { /* no thumbs dir yet */ }
   if (dirty) { try { writeMeta(meta); } catch (err) { console.warn('[photos] meta write failed:', err.message); } }
   return out.sort((a, b) => b.mtime.localeCompare(a.mtime));
+}
+
+/**
+ * GET /media/photos/<file> after mediaAuth: an admin session reads every file; a display only a photo in the
+ * rotation (not hidden) and only when a screen its credential may read shows the gallery and is not private with
+ * "hide photos". Anything else gets the same 404 as a missing file, so names cannot be probed.
+ */
+export function galleryMedia(req, res, next) {
+  const notFound = () => res.status(404).set('cache-control', 'private, no-store').type('text/plain').send('not found');
+  let file;
+  try { file = decodeURIComponent(String(req.path || '').replace(/^\//, '')); } catch { return notFound(); }
+  if (!isGalleryFile(file)) return notFound();
+  const screens = mediaScreens(getConfig(), req.displayAccess);
+  if (screens === null) return next();
+  if (!showsGallery(screens) || readMeta()[file]?.hidden === true) return notFound();
+  next();
+}
+
+/** GET /media/thumbs/<file>: the admin's gallery grid only (an admin session). */
+export function thumbMedia(req, res, next) {
+  if (req.displayAccess?.via === 'session') return next();
+  res.status(404).set('cache-control', 'private, no-store').type('text/plain').send('not found');
 }
 
 export function getPhoto(file) {
@@ -445,6 +491,39 @@ export function finalizeUpload(tmpPath, requested, policy = 'rename', focus = nu
   meta[target] = m;
   const st = fs.statSync(photoPath(target));
   return { status, requested, ...entry(target, st, m) };
+}
+
+const CLEANED_MARKER = '.metadata-cleaned';
+
+/**
+ * Once per install: strip the metadata of gallery photos stored before uploads were cleaned on the server. The
+ * modification time is kept (the gallery order and the photo URLs stay the same) and so is the focal point.
+ * Returns how many files were rewritten.
+ */
+export function cleanStoredPhotos() {
+  const marker = photoPath(CLEANED_MARKER);
+  if (fs.existsSync(marker)) return 0;
+  let files = [];
+  try { files = fs.readdirSync(paths.photos).filter(isGalleryFile); } catch { return 0; }
+  let n = 0;
+  for (const file of files) {
+    try {
+      const p = photoPath(file);
+      const st = fs.statSync(p);
+      if (!st.isFile()) continue;
+      const buf = fs.readFileSync(p);
+      const out = cleanImage(buf);
+      if (!out || out.equals(buf)) continue;
+      writeFileAtomic(p, out);
+      fs.utimesSync(p, st.atime, st.mtime);
+      updateMeta((m) => { if (m[file]) m[file].bytes = out.length; });
+      n++;
+    } catch (err) {
+      console.warn('[photos] could not clean', file, err.message);
+    }
+  }
+  try { fs.writeFileSync(marker, new Date().toISOString()); } catch { /* tried again on the next start */ }
+  return n;
 }
 
 /** Remove abandoned temp uploads (aborted requests) older than an hour. */

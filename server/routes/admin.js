@@ -13,10 +13,11 @@ import { status as weatherStatus, weatherKey, checkWeatherKey } from '../weather
 import { WEATHER_KEY_RE, weatherKeyStatus } from '../core/weather.js';
 import {
   listGallery, uploadMiddleware, thumbMiddleware, deletePhoto, finalizeUpload, readMeta, writeMeta, setFocus, setHidden, getPhoto, checkNames,
-  cleanupTempUploads, isUnit, isGalleryFile, isThumbField, storeThumb, validThumb, CONFLICT_POLICIES,
+  cleanupTempUploads, isUnit, isGalleryFile, isThumbField, storeThumb, validThumb, CONFLICT_POLICIES, cleanImageFile,
 } from '../photos.js';
 import fs from 'node:fs';
 import { publish, connectedCount } from '../pollHub.js';
+import { mediaScreens, showsGallery } from '../displayAccess.js';
 import { isHttpUrl } from '../core/validate.js';
 import { logActivity } from '../activity.js';
 import { resolveScreenList } from '../displays.js';
@@ -27,6 +28,18 @@ import { gridCompany } from '../core/tariffsCore.js';
 import { testPrices, entsoeToken, entsoeTokenStatus, checkEntsoeToken, tokenChanged, ENTSOE_TOKEN_RE } from '../prices.js';
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
+/**
+ * Photos taken out of the rotation: displays that show the gallery get their names (the one on screen is replaced
+ * at once); every other display only hears that the gallery changed, so no file name reaches a screen that never
+ * shows gallery photos.
+ */
+function publishHidden(files) {
+  const cfg = getConfig();
+  const shows = (c) => Boolean(c.access) && showsGallery(mediaScreens(cfg, c.access, c.screenId));
+  publish('photos', { hidden: files }, null, shows);
+  publish('photos', {}, null, (c) => !shows(c));
+}
 
 export function adminRouter({ onConfigSaved } = {}) {
   const r = Router();
@@ -251,6 +264,13 @@ export function adminRouter({ onConfigSaved } = {}) {
       const t = thumbs.get(s.seq);
       if (t) fs.rmSync(t, { force: true });
     }
+    // Metadata goes before anything is stored (location, camera, dates); a file that is not a JPEG, PNG or WebP that
+    // parses refuses the whole upload, so nothing half-checked lands in the gallery.
+    const bad = photos.find((f) => !cleanImageFile(f.path));
+    if (bad) {
+      for (const f of all) fs.rmSync(f.path, { force: true });
+      return res.status(415).json({ error: `Unsupported or damaged image: ${bad.targetName || 'file'} (only JPG, PNG or WebP)` });
+    }
     for (const f of photos) {
       const r = finalizeUpload(f.path, f.targetName, policy, metaIn[f.seq] || null, meta, thumbs.get(f.seq) || null);
       if (r.status === 'skipped') skipped.push(r.file);
@@ -278,7 +298,8 @@ export function adminRouter({ onConfigSaved } = {}) {
       photo = getPhoto(req.params.file);
     }
     if (!photo) return res.status(404).json({ error: 'not found' });
-    publish('photos', hasHidden && hidden ? { hidden: [photo.file] } : {});
+    if (hasHidden && hidden) publishHidden([photo.file]);
+    else publish('photos', {});
     res.json(photo);
   });
   // Bulk show / hide: { files: string[], hidden: boolean }.
@@ -289,7 +310,10 @@ export function adminRouter({ onConfigSaved } = {}) {
     }
     if (typeof hidden !== 'boolean') return res.status(400).json({ error: 'hidden must be a boolean' });
     const { updated, missing } = setHidden(files, hidden);
-    if (updated.length) publish('photos', hidden ? { hidden: updated } : {});
+    if (updated.length) {
+      if (hidden) publishHidden(updated);
+      else publish('photos', {});
+    }
     const all = listGallery();
     res.json({ ok: true, updated, missing, total: all.length, inRotation: all.filter((p) => !p.hidden).length });
   });

@@ -194,7 +194,7 @@ export function CarouselsSection({ full, setFull, saved, errors, go, dirty, save
   const remove = async (c: Carousel) => {
     const ok = await confirmDialog({
       title: t('Eliminar el carrusel “{name}”', { name: c.name }),
-      body: <p>{t('Sus pantallas no se tocan. Las teles que lo muestran pasarán a la pantalla predeterminada y su enlace privado dejará de funcionar.')}</p>,
+      body: <p>{t('Sus pantallas no se tocan. Las teles emparejadas con él se desconectan y su enlace privado deja de funcionar.')}</p>,
       confirm: t('Eliminar'),
       danger: true,
     });

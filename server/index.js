@@ -18,6 +18,7 @@ import { invalidateIcsParsing } from './calendars.js';
 import { serverUpdater } from './routes/updates.js';
 import { onPrivacyConfig, syncPrivacy, stopPrivacy } from './privacy.js';
 import { startPhotoSweep } from './familyPhotos.js';
+import { cleanStoredPhotos } from './photos.js';
 
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 
@@ -41,6 +42,8 @@ await ensurePassword();
 
 // Every display screen gets its private-link key (secrets.json; displayAccess.js).
 syncDisplayKeys();
+// Gallery photos stored before uploads were cleaned lose their metadata once (photos.js cleanStoredPhotos).
+setTimeout(() => { try { const n = cleanStoredPhotos(); if (n) console.log(`[photos] removed metadata from ${n} gallery photo(s)`); } catch (err) { console.warn('[photos] metadata cleanup:', err.message); } }, 5000).unref();
 // Profile photos the config does not use go a week after they were last used (familyPhotos.js).
 startPhotoSweep();
 // Every heartbeat re-checks each open stream's credential (sessions expire, keys / devices change).

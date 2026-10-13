@@ -14,7 +14,7 @@ import { sseHandler, closeAll, MAX_STREAMS_PER_IP } from '../sse.js';
 import { streamInit, streamHello, onStreamOpen, onStreamClose, _resetDisplays, setServerVersion } from '../displays.js';
 import { createAnnouncement, clearAnnouncements, _resetAnnouncements } from '../announce.js';
 import { logActivity, listActivity, clearActivity, _resetActivityThrottle } from '../activity.js';
-import { googleCallbackHandler } from '../auth.js';
+import { googleCallbackHandler, startSession } from '../auth.js';
 import { screenSchedules } from '../core/screens.js';
 
 function baseConfig() {
@@ -187,7 +187,9 @@ test('Google sign-in off: existing Google sessions end, and the OAuth purpose co
     const { sessionValid } = await import('../auth.js');
     store.updateSecrets((s) => { s.passwordHash = 'scrypt$c2FsdA==$aGFzaA=='; s.sessionEpoch = 'e1'; });
     store.updateConfig((c) => { c.auth.allowedGoogleEmails = ['ana@example.com']; c.auth.passwordLoginEnabled = true; });
-    const req = { ip: '192.168.1.20', headers: {}, socket: { remoteAddress: '192.168.1.20' }, session: { epoch: 'e1', user: { email: 'ana@example.com', method: 'google' } } };
+    const signed = { session: {} };
+    startSession(signed, { email: 'ana@example.com', method: 'google' });
+    const req = { ip: '192.168.1.20', headers: {}, socket: { remoteAddress: '192.168.1.20' }, session: signed.session };
     assert.equal(sessionValid(req), false, 'Google sign-in is off on this server');
     process.env.MARCO_GOOGLE_LOGIN = '1';
     assert.equal(sessionValid(req), true);

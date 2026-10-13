@@ -515,7 +515,7 @@
       "callers": [
         "exportConfig"
       ],
-      "request": "{includeSecrets}",
+      "request": "{includeSecrets, (password ? { password }}",
       "response": "ExportBundle",
       "responseArray": false,
       "responseKeys": [

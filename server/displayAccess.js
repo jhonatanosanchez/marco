@@ -20,6 +20,7 @@ import { listPollers, dropPollers } from './pollHub.js';
 import { logActivity } from './activity.js';
 import { resolveScreen } from './core/screens.js';
 import { untrustedProxy } from './lib/net.js';
+import { screenPrivacy } from './privacy.js';
 import {
   carouselList, carouselMembers, emptyCarouselScreen, carouselScreenNow, findCarousel, findTarget, isTargetId, targetInfo,
 } from './core/carousels.js';
@@ -54,7 +55,8 @@ const targetIds = (cfg) => new Set([...cfg.screens.map((s) => s.id), ...carousel
 
 /**
  * Keep secrets in step with the screens and carousels: each one has a key, keys of deleted ones are dropped (their
- * links stop working), devices of deleted ones move to the default screen. Returns true when secrets changed.
+ * links stop working) and devices paired with deleted ones are revoked (never moved to another screen: a TV paired
+ * with a guest screen must not start showing the family's). Returns true when secrets changed.
  */
 export function syncDisplayKeys(cfg = getConfig()) {
   const ids = targetIds(cfg);
@@ -64,9 +66,17 @@ export function syncDisplayKeys(cfg = getConfig()) {
     if (!k[id] || typeof k[id].key !== 'string' || !KEY_RE.test(k[id].key)) { k[id] = newKey(); changed = true; }
   }
   for (const id of Object.keys(k)) if (!ids.has(id)) { delete k[id]; changed = true; }
-  const fallback = cfg.screens.find((s) => s.id === cfg.defaultScreen)?.id || cfg.screens[0]?.id;
-  for (const d of devices()) if (!ids.has(d.screenId)) { d.screenId = fallback; changed = true; }
+  const gone = devices().filter((d) => !ids.has(d.screenId));
+  if (gone.length) {
+    getSecrets().devices = devices().filter((d) => ids.has(d.screenId));
+    changed = true;
+    for (const d of gone) logActivity('display.device_revoked', { actor: 'system', level: 'warn', data: { id: d.id, name: d.name, reason: 'screen_deleted' } });
+  }
   if (changed) flushSecrets();
+  if (gone.length) {
+    const ids2 = new Set(gone.map((d) => d.id));
+    kickClients((c) => ids2.has(c.access?.deviceId), 'invalid_key');
+  }
   return changed;
 }
 
@@ -289,6 +299,26 @@ export function mediaAuth(req, res, next) {
   res.set('cache-control', 'private, no-store');
   res.status(a.status).type('text/plain').send(ERRORS[a.code]);
 }
+
+/**
+ * The screens whose photos a display credential may load (gallery files, Immich assets): the screen it is bound to,
+ * or the screens of its carousel; in open mode (no credential) the screen it asks for, else every screen. A screen
+ * that is private with "hide photos" right now is left out. null = no limit (an admin session).
+ */
+export function mediaScreens(cfg, access, screenId = '') {
+  if (!access || access.via === 'session') return null;
+  const id = access.screenId || screenId;
+  let list = cfg.screens;
+  if (id) {
+    const bound = cfg.screens.find((s) => s.id === id);
+    const c = bound ? null : carouselList(cfg).find((x) => x.id === id);
+    list = bound ? [bound] : c ? carouselMembers(cfg, c).map((sid) => cfg.screens.find((s) => s.id === sid)).filter(Boolean) : [];
+  }
+  return list.filter((sc) => !(sc.privacy?.hidePhotos && screenPrivacy(cfg, sc).active));
+}
+
+/** True when one of `screens` (mediaScreens) shows gallery photos (source gallery or mixed). */
+export const showsGallery = (screens) => screens === null || screens.some((s) => s.background?.source === 'gallery' || s.background?.source === 'mixed');
 
 // ---------------------------------------------------------------------------------------------------------------
 // Admin operations

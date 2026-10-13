@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import { Router } from 'express';
 import { requestLang } from '../core/lib/i18n.js';
-import { requireAuth, rotateSessionEpoch } from '../auth.js';
+import { requireAuth, rotateSessionEpoch, requireRecentAuth } from '../auth.js';
 import { getConfig, getSecrets, saveConfig, updateSecrets } from '../store.js';
 import {
   listBackups, writeBackup, backupPath, readBackup, deleteBackup, makeBundle, importPreview, parseImport,
@@ -112,8 +112,10 @@ export function systemRouter({ version = getServerVersion() } = {}) {
   });
 
   // ---------------- export / import (§6.2, §6.3) ----------------
-  r.post('/export', (req, res) => {
+  r.post('/export', async (req, res) => {
     const includeSecrets = req.body?.includeSecrets === true;
+    // Private data (password hash, tokens, display keys) only after a recent sign-in or the password.
+    if (includeSecrets && !(await requireRecentAuth(req, res, req.body?.password))) return;
     const bundle = makeBundle(getConfig(), { appVersion: version, secrets: includeSecrets ? getSecrets() : null, familyState: familyState(), familyPhotos: exportFamilyPhotos() });
     logActivity('config.exported', { req, level: includeSecrets ? 'warn' : 'info', data: { secrets: includeSecrets } });
     res.set('content-disposition', `attachment; filename="marco-${localDate(new Date(), getConfig().datetime.timezone)}.json"`);
@@ -125,12 +127,14 @@ export function systemRouter({ version = getServerVersion() } = {}) {
     res.json({ ...importPreview(req.body.bundle, getConfig(), requestLang(req), getSecrets()), displayAccess: getConfig().security.displayAccess });
   });
 
-  r.post('/import/apply', (req, res) => {
+  r.post('/import/apply', async (req, res) => {
     const b = req.body || {};
     if (!('bundle' in b)) return res.status(400).json({ error: 'bundle required' });
     const parsed = parseImport(b.bundle);
     if (!parsed.ok) return res.status(400).json({ error: 'invalid', details: parsed.errors });
     if (b.sections !== undefined && !Array.isArray(b.sections)) return res.status(400).json({ error: 'sections must be an array' });
+    // Importing private data can replace the password and every token: a recent sign-in or the password first.
+    if (b.includeSecrets === true && parsed.secrets && !(await requireRecentAuth(req, res, b.password))) return;
     const cur = getConfig();
     // Same as restore: an import never changes the display access mode (see keepSecurity).
     const absent = absentSections(b.bundle);
@@ -169,7 +173,7 @@ export function systemRouter({ version = getServerVersion() } = {}) {
     const photos = takesFamily ? importFamilyPhotos(bundleFamilyPhotos(b.bundle), result.config) : 0;
     if (famState) replaceFamilyState(famState);
     else if (applied.includes('family') || photos) notifyFamily();
-    // Keys of screens that are not in the imported config are dropped; devices of missing screens move to the default.
+    // Keys of screens that are not in the imported config are dropped, and so are devices paired with missing screens.
     if (applied.includes('displayKeys') || applied.includes('devices')) syncDisplayKeys();
     // Keys replaced / devices dropped by the import: close the streams still reading with the old credentials
     // (same as Regenerate link / Revoke). The password case closes admin-session streams via rotateSessionEpoch.
