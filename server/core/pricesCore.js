@@ -492,6 +492,10 @@ export function retryAfterMs(v, now = Date.now()) {
 export const PRICE_VIEWS = ['auto', 'chart', 'now', 'cheap', 'next'];
 export const PRICE_UNITS = ['main', 'sub'];
 export const PRICE_RESOLUTIONS = ['hour', 'quarter'];
+/** Hour labels under the chart: 00 06 12 18 ('simple'), every 3 hours or every hour (fewer when they would touch). */
+export const PRICE_AXES = ['simple', '3h', '1h'];
+/** Shape of the chart (and of the Next 24 h list): 'columns' is the wide card with bars, 'rows' the tall card with one row per hour. */
+export const PRICE_SHAPES = ['columns', 'rows'];
 export const MAX_VAT = 50;
 export const MIN_SURCHARGE = -10;
 export const MAX_SURCHARGE = 100;
@@ -588,6 +592,42 @@ export function trend(a, b) {
   const d = b - a;
   if (Math.abs(d) < Math.max(0.001, Math.max(Math.abs(a), Math.abs(b)) * 0.02)) return 'flat';
   return d > 0 ? 'up' : 'down';
+}
+
+/**
+ * Which coming hours carry their price over the bar when there is no room for all of them: every `step`-th hour from
+ * the first (the current one), and always the cheapest and the dearest. `prices`: one per hour, in order; `pitch`: px
+ * from one hour to the next; `labelW`: px of the widest label; `gap`: px kept between two labels. A label too close to
+ * the cheapest or the dearest one gives way to it. Returns the picked indexes in order, the step and the indexes of
+ * the cheapest and the dearest (-1 with no prices).
+ */
+export function priceLabelPicks(prices, pitch, labelW, gap = 0) {
+  const n = prices.length;
+  if (!n) return { picks: [], step: 0, min: -1, max: -1 };
+  let min = 0;
+  let max = 0;
+  for (let i = 1; i < n; i++) {
+    if (prices[i] < prices[min]) min = i;
+    if (prices[i] > prices[max]) max = i;
+  }
+  const need = labelW + gap;
+  const step = [1, 2, 3, 4, 6, 8, 12].find((s) => s * pitch >= need) ?? 0;
+  // the fewest hours between two labels that do not touch
+  const room = pitch > 0 ? Math.ceil(need / pitch - 1e-9) : Infinity;
+  const picks = new Set([min, max]);
+  if (step) for (let i = 0; i < n; i += step) if (Math.abs(i - min) >= room && Math.abs(i - max) >= room) picks.add(i);
+  return { picks: [...picks].sort((a, b) => a - b), step, min, max };
+}
+
+/**
+ * Hours between two labels under the chart: 'simple' every 6 (every 3 on a wide chart of today only), '3h' every 3,
+ * '1h' every hour; a step whose labels would touch (`labelW` + `gap` wider than step × `pitch`) goes to the next one
+ * (1, 3, 6, 12).
+ */
+export function axisStep(axis, pitch, labelW, { gap = 0, wide = false } = {}) {
+  const want = axis === '1h' ? 1 : axis === '3h' ? 3 : wide ? 3 : 6;
+  for (const s of [1, 3, 6, 12]) if (s >= want && s * pitch >= labelW + gap) return s;
+  return 12;
 }
 
 /** Unit label and factor: main unit (€/kWh, kr/kWh) or the hundredth (c/kWh, øre/kWh). */

@@ -10,8 +10,9 @@ import express from 'express';
 import {
   parseSource, normalizeSlots, hourly, pricedSlots, finalPrice, cheapestWindows, levelLimits, levelOf, trend, priceUnit, withLocal,
   zoneSources, sourceRequests, fetchWindow, nextRefreshAt, localMidnight, localHM, retryAfterMs, failureBackoff, PRICE_ZONES, priceZone,
-  zoneForTimeZone, DKK_PER_EUR, PriceParseError,
+  zoneForTimeZone, DKK_PER_EUR, PriceParseError, priceLabelPicks, axisStep, PRICE_AXES, PRICE_SHAPES,
 } from '../core/pricesCore.js';
+import { mergeImport } from '../core/backupsCore.js';
 import { getPrices, setPricesFetch, testPrices, PricesError } from '../prices.js';
 import { fakePricesFetch } from '../core/pricesFake.js';
 import { validateConfig } from '../core/validate.js';
@@ -407,7 +408,7 @@ test('validate: price widget options, defaults and limits; no address needed', (
   assert.equal(ok.ok, true, JSON.stringify(ok.errors));
   assert.deepEqual(ok.value.widgets[0].options, {
     url: '', refreshSec: 900, fit: 'contain', bust: false,
-    prices: { zone: 'DK2', view: 'auto', unit: 'main', currency: 'auto', surcharge: 1.23457, vat: 25, windowHours: 3, resolution: 'hour', tariff: 'none', grid: '' },
+    prices: { zone: 'DK2', view: 'auto', unit: 'main', currency: 'auto', surcharge: 1.23457, vat: 25, windowHours: 3, resolution: 'hour', axis: 'simple', chartShape: 'columns', tariff: 'none', grid: '' },
   });
   const bad = validateConfig(withWidget(priceWidget({ zone: 'XX', vat: 80, surcharge: 500, view: 'pie', windowHours: 9, unit: 'mwh' })));
   const paths = bad.errors.map((e) => e.path);
@@ -416,6 +417,97 @@ test('validate: price widget options, defaults and limits; no address needed', (
   assert.ok(none.errors.some((e) => e.path === 'widgets[0].options.prices.zone' && e.message === 'zone required'));
   // a server can refuse the type
   assert.ok(validateConfig(withWidget(priceWidget()), { widgetTypes: ['image'] }).errors.some((e) => e.message === 'not available on this server'));
+});
+
+test('validate: the chart hour labels and shape; older widgets get simple labels and the wide chart', () => {
+  assert.deepEqual([...PRICE_AXES], ['simple', '3h', '1h']);
+  assert.deepEqual([...PRICE_SHAPES], ['columns', 'rows']);
+  // a widget saved before these options
+  const old = validateConfig(withWidget(priceWidget({ view: 'chart' })));
+  assert.equal(old.ok, true, JSON.stringify(old.errors));
+  assert.equal(old.value.widgets[0].options.prices.axis, 'simple');
+  assert.equal(old.value.widgets[0].options.prices.chartShape, 'columns');
+  for (const axis of PRICE_AXES) {
+    for (const chartShape of PRICE_SHAPES) {
+      const r = validateConfig(withWidget(priceWidget({ view: 'chart', axis, chartShape })));
+      assert.equal(r.ok, true, JSON.stringify(r.errors));
+      assert.equal(r.value.widgets[0].options.prices.axis, axis);
+      assert.equal(r.value.widgets[0].options.prices.chartShape, chartShape);
+    }
+  }
+  const bad = validateConfig(withWidget(priceWidget({ axis: '2h', chartShape: 'auto' })));
+  const paths = bad.errors.map((e) => e.path);
+  assert.ok(paths.includes('widgets[0].options.prices.axis'));
+  assert.ok(paths.includes('widgets[0].options.prices.chartShape'));
+  assert.equal(validateConfig(withWidget(priceWidget({ axis: null }))).ok, false);
+});
+
+test('backup import: price widgets keep their chart options; older backups get the defaults', () => {
+  const backup = (prices) => {
+    const c = withWidget(priceWidget(prices));
+    c.screens[0].widgets = [{ widgetId: 'w_luz', place: 'corner', corner: 'br', size: 'l' }];
+    return c;
+  };
+  const merged = (prices) => validateConfig(mergeImport(defaultConfig(), backup(prices), ['screens']));
+  const old = merged({ view: 'chart', vat: 25 });
+  assert.equal(old.ok, true, JSON.stringify(old.errors));
+  assert.deepEqual([old.value.widgets[0].options.prices.axis, old.value.widgets[0].options.prices.chartShape], ['simple', 'columns']);
+  const recent = merged({ view: 'auto', axis: '1h', chartShape: 'rows' });
+  assert.equal(recent.ok, true, JSON.stringify(recent.errors));
+  assert.deepEqual([recent.value.widgets[0].options.prices.axis, recent.value.widgets[0].options.prices.chartShape], ['1h', 'rows']);
+  // a file with a value this version does not know is refused, not changed behind the owner's back
+  assert.equal(merged({ axis: 'every' }).ok, false);
+});
+
+test('chart labels: every n-th coming hour, always the cheapest and the dearest, never two touching', () => {
+  const day = [5, 4, 3, 2, 1, 2, 3, 6, 9, 8, 7, 5, 4, 3, 2, 3, 5, 8, 12, 11, 9, 7, 6, 5];
+  // room for all of them
+  assert.deepEqual(priceLabelPicks(day, 40, 30, 6), { picks: day.map((_, i) => i), step: 1, min: 4, max: 18 });
+  // no room for all: each label needs 36 px, an hour is 14 px wide, so one hour in three
+  const r = priceLabelPicks(day, 14, 30, 6);
+  assert.equal(r.step, 3);
+  assert.ok(r.picks.includes(r.min) && r.picks.includes(r.max));
+  assert.deepEqual([r.min, r.max], [4, 18]);
+  for (let i = 1; i < r.picks.length; i++) assert.ok((r.picks[i] - r.picks[i - 1]) * 14 >= 36 || [r.min, r.max].includes(r.picks[i]) && [r.min, r.max].includes(r.picks[i - 1]), `${r.picks}`);
+  // a regular label next to the cheapest or the dearest gives way to it
+  assert.ok(!r.picks.includes(3) && !r.picks.includes(5) && !r.picks.includes(17) && !r.picks.includes(19));
+  // the first coming hour (the current one) is labelled unless it is next to the cheapest or dearest
+  assert.ok(r.picks.includes(0));
+  // every 2nd hour
+  assert.equal(priceLabelPicks(day, 20, 30, 6).step, 2);
+  // a tiny chart: only the two that always show
+  const tiny = priceLabelPicks(day, 2, 30, 6);
+  assert.deepEqual([tiny.step, tiny.picks], [0, [4, 18]]);
+  // cheapest and dearest side by side are both kept
+  const two = priceLabelPicks([1, 9, 5, 5, 5], 10, 30, 6);
+  assert.ok(two.picks.includes(0) && two.picks.includes(1));
+  // a flat list, a single hour, none
+  assert.deepEqual(priceLabelPicks([3, 3, 3], 50, 30).picks, [0, 1, 2]);
+  assert.deepEqual(priceLabelPicks([7], 5, 30).picks, [0]);
+  assert.deepEqual(priceLabelPicks([], 5, 30), { picks: [], step: 0, min: -1, max: -1 });
+  // property: whatever the sizes, min and max are in and the picks are in order without repeats
+  for (let k = 0; k < 200; k++) {
+    const ps = Array.from({ length: 1 + (k % 40) }, (_, i) => Math.sin(i * 1.3 + k) * 10 + (k % 7));
+    const p = priceLabelPicks(ps, 1 + (k % 30), 10 + (k % 25), k % 5);
+    assert.ok(p.picks.includes(p.min) && p.picks.includes(p.max));
+    assert.equal(ps[p.min], Math.min(...ps));
+    assert.equal(ps[p.max], Math.max(...ps));
+    assert.deepEqual(p.picks, [...new Set(p.picks)].sort((a, b) => a - b));
+  }
+});
+
+test('chart hour labels: simple, every 3 hours, every hour, fewer when they would touch', () => {
+  assert.equal(axisStep('simple', 30, 20), 6);
+  assert.equal(axisStep('simple', 30, 20, { wide: true }), 3);
+  assert.equal(axisStep('3h', 30, 20), 3);
+  assert.equal(axisStep('1h', 30, 20, { gap: 6 }), 1);
+  // every hour does not fit: every 3 hours
+  assert.equal(axisStep('1h', 20, 20, { gap: 6 }), 3);
+  // nor every 3: every 6, then 12
+  assert.equal(axisStep('1h', 5, 20, { gap: 6 }), 6);
+  assert.equal(axisStep('3h', 2, 20, { gap: 6 }), 12);
+  // an unknown value reads as simple
+  assert.equal(axisStep(undefined, 30, 20), 6);
 });
 
 test('display projection: the options, no address, a version that changes with the zone only', () => {
@@ -542,4 +634,29 @@ test('core refresh round (shared with Marco Cloud): sources in order through the
   assert.equal(bad.error, 'no_source');
   assert.equal(bad.nextAt, now + 120_000);
   assert.throws(() => pricesResponse('NO1', bad, now), (err) => err instanceof CoreError && err.code === 'no_source');
+});
+
+test('display wiring: prices over the bars, the tall chart, the loading card', () => {
+  const read = (p) => fs.readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
+  const css = read('web/display/styles.css');
+  // the prices over the bars read from across the room: never under 1.3rem, tabular figures
+  assert.match(css, /\.pw-pv \{[^}]*font-size: max\([\d.]+em, 1\.3rem\)[^}]*font-variant-numeric: tabular-nums/);
+  // the loading bars breathe, but not on lite screens nor with reduced motion
+  assert.match(css, /\.lite \.pw-skel i \{ animation: none; \}/);
+  assert.match(css, /prefers-reduced-motion: reduce\) \{ \.pw-skel i \{ animation: none; \}/);
+  const prices = read('web/display/widgets/prices.ts');
+  // the Vertical shape turns every chart into rows; other views stay
+  assert.match(prices, /return rows && \(m === 'chart' \|\| m === 'nowchart' \|\| m === 'full'\) \? 'rows' : m;/);
+  assert.match(prices, /o\?\.chartShape === 'rows'/);
+  // labels: the pure picker, past hours never labelled (from the current hour on)
+  assert.match(prices, /priceLabelPicks\(coming\.map\(\(h\) => h\.p\), pitch, lab\.w, gap\)/);
+  assert.match(prices, /const coming = m\.hours\.filter\(\(h\) => h\.t >= from/);
+  // grid tariffs still on their way: a note, not "without grid tariff"
+  assert.match(prices, /m\.gridPending\) f\.appendChild\(el\('span', 'pw-incl pw-incl--wait', ctx\.t\('priceLoadingGrid'/);
+  const i18n = read('web/shared/i18n.ts');
+  for (const k of ['priceLoading', 'priceLoadingGrid']) assert.equal(i18n.split(`  ${k}: '`).length, 4, k);
+  const admin = read('web/admin/sections/PriceWidget.tsx');
+  assert.match(admin, /axis: 'simple', chartShape: 'columns'/);
+  assert.match(admin, /\{test\.loading \? t\('Cargando…'\) : t\('Probar'\)\}/);
+  for (const f of ['web/admin/sections/PriceTariff.tsx', 'web/admin/Preview.tsx']) assert.doesNotMatch(read(f), /—/, f);
 });

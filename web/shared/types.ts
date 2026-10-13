@@ -90,6 +90,8 @@ export interface WidgetOptions {
   prices?: PriceWidgetOptions;
 }
 export type PriceView = 'auto' | 'chart' | 'now' | 'cheap' | 'next';
+export type PriceAxis = 'simple' | '3h' | '1h';
+export type PriceShape = 'columns' | 'rows';
 /** Time bands a household pays on top of the market price (server/core/tariffsCore.js). */
 export interface PriceBands {
   /** '' (custom), 'es-20td' (Spain 2.0TD), 'es-20td-cm' (Ceuta and Melilla): only fills the hours */
@@ -121,6 +123,10 @@ export interface PriceWidgetOptions {
   windowHours: number;
   /** chart bars: hourly averages or quarter hours */
   resolution: 'hour' | 'quarter';
+  /** hour labels under the chart: 00 06 12 18 ('simple'), every 3 hours, every hour (fewer when they would touch); older widgets: none = simple */
+  axis?: PriceAxis;
+  /** 'columns': the wide card with bars (the default, also for older widgets); 'rows': the tall card, one row per hour */
+  chartShape?: PriceShape;
   /** what is added per hour before VAT: a Danish grid company's tariffs ('grid'), time bands, or nothing */
   tariff?: 'none' | 'grid' | 'bands';
   /** grid company id (server/tariffsCore.js DK_GRID_COMPANIES), of the widget's zone */

@@ -28,9 +28,9 @@ export const ROWS_PRICES: [string, string, string][] = [
     'O acréscimo foi convertido para {u} com a mudança de moeda.',
   ],
   [
-    'Barras de hoy desde las 00:00, de barato a caro, con la hora actual marcada. Mañana se añade cuando se publica, hacia las 13:00.',
-    'Bars for today from 00:00, cheap to expensive, with the current hour marked. Tomorrow is added once it is published, around 13:00.',
-    'Barras de hoje desde as 00:00, de barato a caro, com a hora atual marcada. Amanhã junta-se quando é publicado, por volta das 13:00.',
+    'Barras de hoy desde las 00:00, de barato a caro, con el precio encima de las horas que vienen. Mañana se añade cuando se publica, hacia las 13:00.',
+    'Bars for today from 00:00, cheap to expensive, with the price over the coming hours. Tomorrow is added once it is published, around 13:00.',
+    'Barras de hoje desde as 00:00, de barato a caro, com o preço por cima das próximas horas. Amanhã junta-se quando é publicado, por volta das 13:00.',
   ],
   [
     'El precio de ahora en grande, si es barato, normal o caro, y hacia dónde va la próxima hora.',
@@ -159,4 +159,20 @@ export const ROWS_PRICES: [string, string, string][] = [
   ['El precio de ahora con su nivel, el más bajo, la media y el más alto, y una fila por hora con su barra. Las que quepan.', 'The price now with its level, the lowest, the average and the highest, and a row per hour with its bar. As many as fit.', 'O preço de agora com o seu nível, o mais baixo, a média e o mais alto, e uma linha por hora com a sua barra. As que couberem.'],
   ['Mercado', 'Market', 'Mercado'],
   ['Recargo fijo', 'Fixed extra', 'Acréscimo fixo'],
+  ['Formato', 'Shape', 'Formato'],
+  ['Una tarjeta ancha con una barra por hora y el precio encima.', 'A wide card with a bar per hour and its price on top.', 'Um cartão largo com uma barra por hora e o preço por cima.'],
+  ['Las horas en dos columnas cuando la tarjeta es ancha.', 'The hours in two columns when the card is wide.', 'As horas em duas colunas quando o cartão é largo.'],
+  ['Una tarjeta alta: el precio de ahora y una fila por hora con su barra y su precio.', 'A tall card: the price now and a row per hour with its bar and price.', 'Um cartão alto: o preço de agora e uma linha por hora com a sua barra e o seu preço.'],
+  ['Las horas en una sola columna, una debajo de otra.', 'The hours in a single column, one under the other.', 'As horas numa só coluna, uma por baixo da outra.'],
+  ['Horas debajo', 'Hour labels', 'Horas por baixo'],
+  ['En la gráfica, bajo las barras.', 'On the chart, under the bars.', 'No gráfico, por baixo das barras.'],
+  ['Si no caben todas, cada 3 horas.', 'When they do not all fit, every 3 hours.', 'Se não couberem todas, de 3 em 3 horas.'],
+  ['Cada 6 h', 'Every 6 h', 'De 6 em 6 h'],
+  ['Cada 3 h', 'Every 3 h', 'De 3 em 3 h'],
+  ['Cada hora', 'Every hour', 'De hora a hora'],
+  [
+    'Cargando la tarifa de {c}. La primera vez puede tardar unos segundos.',
+    'Loading the {c} tariff. The first time can take a few seconds.',
+    'A carregar a tarifa de {c}. Da primeira vez pode demorar alguns segundos.',
+  ],
 ];

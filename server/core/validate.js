@@ -19,7 +19,7 @@ import {
 } from './tariffsCore.js';
 import { sanitizeFamily, sanitizeScreenFamily, KIDS_PRESETS } from './familyCore.js';
 import {
-  PRICE_ZONE_IDS, PRICE_VIEWS, PRICE_UNITS, PRICE_RESOLUTIONS, MAX_VAT, MIN_SURCHARGE, MAX_SURCHARGE,
+  PRICE_ZONE_IDS, PRICE_VIEWS, PRICE_UNITS, PRICE_RESOLUTIONS, PRICE_AXES, PRICE_SHAPES, MAX_VAT, MIN_SURCHARGE, MAX_SURCHARGE,
 } from './pricesCore.js';
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -479,6 +479,9 @@ function sanitizePriceOptions(ctx, p, v) {
     // length of the cheap stretches the widget looks for, in hours
     windowHours: num(ctx, `${p}.windowHours`, o.windowHours, 3, 1, 6, true),
     resolution: oneOf(ctx, `${p}.resolution`, o.resolution, 'hour', PRICE_RESOLUTIONS),
+    // the chart's hour labels and its shape (wide with bars, or tall with a row per hour); older widgets: simple, wide
+    axis: oneOf(ctx, `${p}.axis`, o.axis, 'simple', PRICE_AXES),
+    chartShape: oneOf(ctx, `${p}.chartShape`, o.chartShape, 'columns', PRICE_SHAPES),
     ...sanitizeTariff(ctx, p, o),
   };
 }

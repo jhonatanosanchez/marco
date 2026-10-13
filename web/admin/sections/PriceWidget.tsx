@@ -1,7 +1,7 @@
 // The electricity price widget's settings (Widgets section, type 'prices'): zone (grouped by country, the sources
 // it uses), view, unit and currency, what the household pays on top (surcharge before VAT, VAT), the test button and
 // the optional ENTSO-E token. The screens get the prices from this server (server/prices.js).
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { PriceWidgetOptions, TestPricesResponse, WeatherKeyStatus, WidgetDef } from '../../shared/types';
 import {
   DKK_PER_EUR, finalPrice, hourly, levelLimits, levelOf, localMidnight, MAX_SURCHARGE, MAX_VAT, MIN_SURCHARGE, PRICE_SOURCES, PRICE_ZONES, priceUnit,
@@ -19,7 +19,7 @@ import { PriceTariffFields } from './PriceTariff';
 
 /** Options of a new price widget: the zone of the household's time zone. */
 export const newPriceOptions = (tz: string): PriceWidgetOptions => ({
-  zone: zoneForTimeZone(tz), view: 'auto', unit: 'main', currency: 'auto', surcharge: 0, vat: 0, windowHours: 3, resolution: 'hour', tariff: 'none', grid: '',
+  zone: zoneForTimeZone(tz), view: 'auto', unit: 'main', currency: 'auto', surcharge: 0, vat: 0, windowHours: 3, resolution: 'hour', axis: 'simple', chartShape: 'columns', tariff: 'none', grid: '',
 });
 
 const ERROR_TEXT: Record<string, string> = {
@@ -38,7 +38,7 @@ const ERROR_TEXT: Record<string, string> = {
 
 const VIEW_HINT: Record<string, string> = {
   auto: 'En una esquina pequeña o mediana, el precio de ahora. En una grande o en la columna lateral, también la gráfica. A pantalla completa, todo; en una pantalla vertical, las próximas 24 horas.',
-  chart: 'Barras de hoy desde las 00:00, de barato a caro, con la hora actual marcada. Mañana se añade cuando se publica, hacia las 13:00.',
+  chart: 'Barras de hoy desde las 00:00, de barato a caro, con el precio encima de las horas que vienen. Mañana se añade cuando se publica, hacia las 13:00.',
   now: 'El precio de ahora en grande, si es barato, normal o caro, y hacia dónde va la próxima hora.',
   cheap: 'Las franjas más baratas que quedan por delante, por ejemplo de 02:00 a 05:00.',
   next: 'El precio de ahora con su nivel, el más bajo, la media y el más alto, y una fila por hora con su barra. Las que quepan.',
@@ -51,6 +51,21 @@ const viewOptions = () => [
   { value: 'cheap' as const, label: t('Franjas baratas') },
   { value: 'next' as const, label: t('Próximas 24 h') },
 ];
+
+/** What each shape draws, by view (the chart, or the Next 24 h list). */
+const SHAPE_HINT: Record<string, Record<string, string>> = {
+  columns: {
+    chart: 'Una tarjeta ancha con una barra por hora y el precio encima.',
+    next: 'Las horas en dos columnas cuando la tarjeta es ancha.',
+  },
+  rows: {
+    chart: 'Una tarjeta alta: el precio de ahora y una fila por hora con su barra y su precio.',
+    next: 'Las horas en una sola columna, una debajo de otra.',
+  },
+};
+
+/** Zone and grid company pairs whose tariffs this page has already asked for. */
+const warmed = new Set<string>();
 
 /** The fixed extra's hint: what is left to add once grid tariffs or time bands are in. */
 const SURCHARGE_HINT: Record<string, string> = {
@@ -305,6 +320,22 @@ export function PriceWidgetFields({ w, errors, upd, part, tz }: {
     }
   };
   const res = test.zone === testKey ? test.res : undefined;
+  // a grid company chosen: its tariffs are fetched now (the first time takes a few seconds), so the screens and the
+  // preview have them when they ask
+  const [gridLoading, setGridLoading] = useState('');
+  // not for the company a saved widget already has: only one picked now
+  const firstKey = useRef(testKey);
+  useEffect(() => {
+    if (!grid || testKey === firstKey.current || warmed.has(testKey)) return;
+    warmed.add(testKey);
+    let live = true;
+    setGridLoading(testKey);
+    api.testPrices(o.zone, grid)
+      .then(() => previewTested(w.id))
+      .catch(() => warmed.delete(testKey))
+      .finally(() => live && setGridLoading((k) => (k === testKey ? '' : k)));
+    return () => void (live = false);
+  }, [testKey]);
   const err = (k: string) => (errors[`wdg.${w.id}.${k}`] ? t(errors[`wdg.${w.id}.${k}`]) : undefined);
   if (part === 'more') {
     return (
@@ -337,7 +368,7 @@ export function PriceWidgetFields({ w, errors, upd, part, tz }: {
         <div class="search-row">
           <Select value={o.zone} options={zoneOptions()} onChange={(v) => setMoney((p) => void (p.zone = v))} error={!!err('zone')} />
           <Button size="sm" icon="play" disabled={!zone} loading={test.loading} onClick={run}>
-            {t('Probar')}
+            {test.loading ? t('Cargando…') : t('Probar')}
           </Button>
         </div>
       </Field>
@@ -351,7 +382,36 @@ export function PriceWidgetFields({ w, errors, upd, part, tz }: {
           <Select value={o.view} options={viewOptions()} onChange={(v) => set((p) => void (p.view = v))} />
         </div>
       </Field>
-      <PriceTariffFields o={o} set={set} err={err} />
+      {(o.view === 'chart' || o.view === 'auto' || o.view === 'next') && (
+        <div class="grid grid--2">
+          <Field label={t('Formato')} hint={t(SHAPE_HINT[o.chartShape ?? 'columns'][o.view === 'next' ? 'next' : 'chart'])}>
+            <Segmented
+              full
+              value={o.chartShape ?? 'columns'}
+              options={[
+                { value: 'columns' as const, label: t('Horizontal') },
+                { value: 'rows' as const, label: t('Vertical') },
+              ]}
+              onChange={(v) => set((p) => void (p.chartShape = v))}
+            />
+          </Field>
+          {o.view !== 'next' && (o.chartShape ?? 'columns') === 'columns' && (
+            <Field label={t('Horas debajo')} hint={t(o.axis === '1h' ? 'Si no caben todas, cada 3 horas.' : 'En la gráfica, bajo las barras.')}>
+              <Segmented
+                full
+                value={o.axis ?? 'simple'}
+                options={[
+                  { value: 'simple' as const, label: t('Cada 6 h') },
+                  { value: '3h' as const, label: t('Cada 3 h') },
+                  { value: '1h' as const, label: t('Cada hora') },
+                ]}
+                onChange={(v) => set((p) => void (p.axis = v))}
+              />
+            </Field>
+          )}
+        </div>
+      )}
+      <PriceTariffFields o={o} set={set} err={err} gridLoading={!!grid && gridLoading === testKey} />
       <div class="grid grid--2">
         <Field label={t('Recargo fijo por kWh')} error={err('surcharge')} hint={t(SURCHARGE_HINT[tariffMode(o)])}>
           <NumberInput value={o.surcharge} min={MIN_SURCHARGE} max={MAX_SURCHARGE} step={0.01} suffix={unitMain.label} error={!!err('surcharge')} onValue={(v) => set((p) => void (p.surcharge = v))} />

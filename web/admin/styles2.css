@@ -5716,6 +5716,9 @@ button.immich-album:hover {
 .preview--widget .preview__frame { margin: 0; border-radius: 12px; box-shadow: 0 0 0 1px var(--border); background: var(--surface-2); }
 .preview--widget .preview__frame, .preview--widget .preview__frame iframe { transition: width 0.25s var(--ease), height 0.25s var(--ease), transform 0.25s var(--ease); }
 .preview--widget .preview__loading { background: var(--surface-2); }
+/* the room the widget has at that place (its corner's box, the whole side column), dashed */
+.preview__room { position: absolute; z-index: 1; box-sizing: border-box; border: 1.5px dashed color-mix(in srgb, var(--accent) 70%, transparent); border-radius: 8px; background: color-mix(in srgb, var(--accent) 5%, transparent); pointer-events: none; transition: all 0.25s var(--ease); }
+.wpv-room { color: var(--text-2, inherit); }
 .wpv-note { margin: 12px 4px 0; }
 .wpv-note p { margin: 0 0 6px; }
 .wpv-warn { color: var(--warn); }

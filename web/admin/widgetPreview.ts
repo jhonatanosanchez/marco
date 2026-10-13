@@ -48,14 +48,15 @@ export function useWidgetPreview(): PickState {
 
 /**
  * Where `w` is shown first: as placed on screen `screenId`, else a medium corner. A price widget not placed there goes
- * in the side column, where every view has room (Next 24 h, a list, in a large one).
+ * in the side column, where every view has room (Next 24 h and the Vertical shape in a large one).
  */
 export function widgetPreviewSpot(cfg: StoredConfig, screenId: string, w: WidgetDef): WidgetPreviewSpot {
   const screen = cfg.screens.find((s) => s.id === screenId);
   if (screen?.layout.preset === 'widget' && screen.layout.widgetId === w.id) return { place: 'full', size: 'l', corner: 'br' };
   const p = (screen?.widgets ?? []).find((x) => x.widgetId === w.id);
   if (p) return { place: p.place, size: p.size, corner: p.corner };
-  if (w.type === 'prices') return { place: 'side', size: w.options.prices?.view === 'next' ? 'l' : 'm', corner: 'br' };
+  // the Vertical shape is a tall card: the large size, where it has the height
+  if (w.type === 'prices') return { place: 'side', size: w.options.prices?.view === 'next' || w.options.prices?.chartShape === 'rows' ? 'l' : 'm', corner: 'br' };
   return { place: 'corner', size: 'm', corner: 'br' };
 }
 

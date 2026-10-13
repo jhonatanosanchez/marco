@@ -27,7 +27,7 @@ const widgetBlob = (url: string) => {
  * the frame shows just that box; `reload` changes when a test asks the display to load it again. `title`, `tag`,
  * `extra` (a row under the bar) and `note` (above the hint) dress the panel for that use.
  */
-export function Preview({ reloadKey, portrait, onClose, variant, saved, url, openUrl, screenName, choices, chosen, onChoose, hint, live, focus = null, onFocus, reload = 0, title, tag, extra, note }: { reloadKey: number; portrait: boolean; onClose?: () => void; variant: 'side' | 'sheet'; saved: boolean; url: string | null; openUrl: string | null; screenName?: string; choices?: { value: string; label: string }[]; chosen?: string; onChoose?: (v: string) => void; hint?: string; live?: unknown; focus?: string | null; onFocus?: (info: { mode: string | null; cramped: boolean }) => void; reload?: number; title?: string; tag?: string; extra?: ComponentChildren; note?: ComponentChildren }) {
+export function Preview({ reloadKey, portrait, onClose, variant, saved, url, openUrl, screenName, choices, chosen, onChoose, hint, live, focus = null, onFocus, reload = 0, title, tag, extra, note }: { reloadKey: number; portrait: boolean; onClose?: () => void; variant: 'side' | 'sheet'; saved: boolean; url: string | null; openUrl: string | null; screenName?: string; choices?: { value: string; label: string }[]; chosen?: string; onChoose?: (v: string) => void; hint?: string; live?: unknown; focus?: string | null; onFocus?: (info: { mode: string | null; cramped: boolean; room: { w: number; h: number } | null }) => void; reload?: number; title?: string; tag?: string; extra?: ComponentChildren; note?: ComponentChildren }) {
   const box = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -63,14 +63,23 @@ export function Preview({ reloadKey, portrait, onClose, variant, saved, url, ope
   onFocusRef.current = onFocus;
   // where the focused widget is on the screen (null: nowhere yet, the whole screen is shown)
   const [rect, setRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-  useEffect(() => setRect(null), [focus, reloadKey, orient, url]);
+  // the room it has there (the side column, its corner's box): outlined, so a corner and the side column look apart
+  const [room, setRoom] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  useEffect(() => {
+    setRect(null);
+    setRoom(null);
+  }, [focus, reloadKey, orient, url]);
   useEffect(() => {
     if (!focus) return;
     const on = (e: MessageEvent) => {
       if (e.source !== frame.current?.contentWindow || e.data?.type !== 'marco:preview-focus' || e.data.id !== focus) return;
-      const r = e.data.rect;
-      setRect(r && [r.x, r.y, r.w, r.h].every((n) => typeof n === 'number' && Number.isFinite(n)) ? r : null);
-      onFocusRef.current?.({ mode: typeof e.data.mode === 'string' ? e.data.mode : null, cramped: e.data.cramped === true });
+      const ok = (r: unknown): r is { x: number; y: number; w: number; h: number } =>
+        !!r && typeof r === 'object' && ['x', 'y', 'w', 'h'].every((k) => typeof (r as Record<string, unknown>)[k] === 'number' && Number.isFinite((r as Record<string, number>)[k]));
+      const r = ok(e.data.rect) ? e.data.rect : null;
+      const rm = r && ok(e.data.room) ? e.data.room : null;
+      setRect(r ? { x: r.x, y: r.y, w: r.w, h: r.h } : null);
+      setRoom(rm ? { x: rm.x, y: rm.y, w: rm.w, h: rm.h } : null);
+      onFocusRef.current?.({ mode: typeof e.data.mode === 'string' ? e.data.mode : null, cramped: e.data.cramped === true, room: rm ? { w: rm.w, h: rm.h } : null });
     };
     window.addEventListener('message', on);
     return () => window.removeEventListener('message', on);
@@ -87,14 +96,18 @@ export function Preview({ reloadKey, portrait, onClose, variant, saved, url, ope
   const H = orient === 'land' ? 1080 : 1920;
   // In portrait, cap the height so it fits in the column.
   // the widget preview sits under the screen preview: less height
-  const maxH = window.innerHeight * (focus ? 0.42 : variant === 'sheet' ? 0.7 : 0.62);
+  const maxH = window.innerHeight * (focus ? (room && room.h > room.w ? 0.55 : 0.42) : variant === 'sheet' ? 0.7 : 0.62);
   // the part of the screen in view: all of it, or the focused widget with a margin of its backdrop
   const pad = 0.025 * Math.min(W, H);
-  const crop = focus && rect
+  // (with the room it has there)
+  const area = rect && room
+    ? { x: Math.min(rect.x, room.x), y: Math.min(rect.y, room.y), r: Math.max(rect.x + rect.w, room.x + room.w), b: Math.max(rect.y + rect.h, room.y + room.h) }
+    : rect ? { x: rect.x, y: rect.y, r: rect.x + rect.w, b: rect.y + rect.h } : null;
+  const crop = focus && area
     ? (() => {
-        const x0 = Math.max(0, rect.x - pad);
-        const y0 = Math.max(0, rect.y - pad);
-        return { x: x0, y: y0, w: Math.min(W, rect.x + rect.w + pad) - x0, h: Math.min(H, rect.y + rect.h + pad) - y0 };
+        const x0 = Math.max(0, area.x - pad);
+        const y0 = Math.max(0, area.y - pad);
+        return { x: x0, y: y0, w: Math.min(W, area.r + pad) - x0, h: Math.min(H, area.b + pad) - y0 };
       })()
     : { x: 0, y: 0, w: W, h: H };
   const zoomed = crop.w < W || crop.h < H;
@@ -163,6 +176,13 @@ export function Preview({ reloadKey, portrait, onClose, variant, saved, url, ope
               tabIndex={-1}
               style={{ width: `${W}px`, height: `${H}px`, transform: `translate(${-crop.x * scale}px, ${-crop.y * scale}px) scale(${scale})` }}
               onLoad={() => setLoaded(true)}
+            />
+          )}
+          {focus && room && loaded && (
+            <div
+              class="preview__room"
+              aria-hidden="true"
+              style={{ left: `${(room.x - crop.x) * scale}px`, top: `${(room.y - crop.y) * scale}px`, width: `${room.w * scale}px`, height: `${room.h * scale}px` }}
             />
           )}
           {saved && !loaded && <div class="preview__loading shimmer" />}

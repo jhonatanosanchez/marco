@@ -38,8 +38,8 @@ export function WidgetPreviewPanel({ draft, screenId, go, setScreenId, variant, 
     return () => clearTimeout(id);
   }, [source, screenId]);
   // what a price card draws there: a view that needs more room falls back to the price now, as on the TV
-  const [info, setInfo] = useState<{ mode: string | null; cramped: boolean }>({ mode: null, cramped: false });
-  useEffect(() => setInfo({ mode: null, cramped: false }), [key, w?.type === 'prices' ? w.options.prices?.view : '']);
+  const [info, setInfo] = useState<{ mode: string | null; cramped: boolean; room: { w: number; h: number } | null }>({ mode: null, cramped: false, room: null });
+  useEffect(() => setInfo({ mode: null, cramped: false, room: null }), [key, w?.type === 'prices' ? w.options.prices?.view : '']);
   const view = w?.type === 'prices' ? w.options.prices?.view ?? 'auto' : 'auto';
   const tooSmall = !!VIEW_NAME[view] && info.mode === 'now';
   // a view that does not fit where the preview starts is shown larger (a large size, then full screen), so every view
@@ -116,6 +116,13 @@ export function WidgetPreviewPanel({ draft, screenId, go, setScreenId, variant, 
       }
       note={
         <div class="wpv-note">
+          {info.room && spot.place !== 'full' && (
+            <p class="small wpv-room">
+              {spot.place === 'side'
+                ? t('Lateral: la columna mide {w} × {h} px; el widget comparte su altura con el resto de la columna.', { w: info.room.w, h: info.room.h })
+                : t('Esquina {s}: hasta {w} × {h} px, sobre la foto.', { s: spot.size.toUpperCase(), w: info.room.w, h: info.room.h })}
+            </p>
+          )}
           {grown && !tooSmall && (
             <p class="small wpv-warn">{t('«{view}» necesita más sitio en esta pantalla: aquí se ve más grande. En un sitio más pequeño la pantalla muestra el precio de ahora.', { view: t(VIEW_NAME[view]) })}</p>
           )}

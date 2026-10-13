@@ -93,7 +93,7 @@ export function mockConfig(): DisplayConfig {
     message: { enabled: q.get('msg') === '1', text: L('Have a great weekend, everyone!', '¡Buen fin de semana, familia!', 'Bom fim de semana, família!'), emoji: '💛' },
   });
   // ?pw=view:place:corner:size,... electricity price widgets (view auto|chart|now|cheap|next, place corner|side|full),
-  // &pwzone= (default DK2), &pwunit=sub, &pwvat=, &pwadd= (surcharge), &pwres=quarter, &pwgrid=, &pwbands=es. A 'full' one picks the Widget layout.
+  // &pwzone= (default DK2), &pwunit=sub, &pwvat=, &pwadd= (surcharge), &pwres=quarter, &pwaxis=, &pwshape=, &pwgrid=, &pwbands=es. A 'full' one picks the Widget layout.
   if (q.get('pw')) {
     cfg.widgets = q.get('pw')!.split(',').map((spec, i) => {
       const [view = 'auto', place = 'corner', corner = 'br', size = 'm'] = spec.split(':');
@@ -104,6 +104,9 @@ export function mockConfig(): DisplayConfig {
           zone: q.get('pwzone') || 'DK2', view: view as 'auto', unit: q.get('pwunit') === 'sub' ? 'sub' as const : 'main' as const, currency: 'auto' as const,
           surcharge: Number(q.get('pwadd')) || 0, vat: Number(q.get('pwvat')) || 0, windowHours: Number(q.get('pwh')) || 3,
           resolution: q.get('pwres') === 'quarter' ? 'quarter' as const : 'hour' as const,
+          // &pwaxis=3h|1h: the chart's hour labels; &pwshape=rows: the tall chart (one row per hour)
+          axis: (['3h', '1h'].includes(q.get('pwaxis') ?? '') ? q.get('pwaxis') : 'simple') as 'simple' | '3h' | '1h',
+          chartShape: q.get('pwshape') === 'rows' ? 'rows' as const : 'columns' as const,
           // &pwgrid=radius: a Danish grid company's tariffs; &pwbands=es: Spain 2.0TD bands with sample prices
           ...(q.get('pwgrid') ? { tariff: 'grid' as const, grid: q.get('pwgrid')! } : {}),
           ...(q.get('pwbands') === 'es' ? { tariff: 'bands' as const, bands: { ...presetBands('es-20td'), list: [{ name: 'Punta', price: 0.12 }, { name: 'Llano', price: 0.05 }, { name: 'Valle', price: 0.01 }] } } : {}),

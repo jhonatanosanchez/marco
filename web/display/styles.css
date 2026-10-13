@@ -1610,12 +1610,31 @@ html:not(.style-modern) #uw-side { margin: 0 -1rem; }
 .pw-div { stroke: var(--pw-sep); stroke-width: 1; }
 .pw-ax { fill: var(--pw-ink-2); font-family: var(--font-num); font-size: 1em; font-weight: 500; }
 .pw-ax--day { fill: var(--pw-ink-2); font-family: var(--font-ui); font-weight: 600; }
+/* the price over each coming hour's bar, in its level's colour; the cheapest and the dearest in bold. Never under
+   1.3rem: read from across the room */
+.pw-pv { fill: var(--pw-mid-ink); font-family: var(--font-num); font-size: max(0.86em, 1.3rem); font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.pw-pv--cheap { fill: var(--pw-cheap-ink); }
+.pw-pv--high { fill: var(--pw-high-ink); }
+.pw-pv--ext { font-weight: 700; }
 .pw-foot { display: flex; align-items: baseline; gap: 1em; color: var(--pw-ink-2); font-size: max(0.72em, 1.4rem); white-space: nowrap; }
 .pw-credit { margin-left: auto; overflow: hidden; text-overflow: ellipsis; color: var(--pw-ink-3); font-size: 0.85em; }
 .pw--full .pw-foot { font-size: max(0.56em, 1.4rem); }
 /* what the price includes on top of the market (grid tariff, time bands) */
 .pw-incl { flex: none; color: var(--pw-ink-2); }
 .pw-incl--miss { color: var(--pw-high-ink); }
+.pw-incl--wait { color: var(--pw-ink-2); }
+/* before the first prices: faint bars or rows that breathe slowly (still on lite screens), and a line of text */
+.pw-skel { flex: 1 1 auto; min-height: 3em; display: flex; gap: 0.35em; }
+.pw-skel--bars { align-items: flex-end; padding-bottom: 1.6em; }
+.pw-skel--bars i { flex: 1; border-radius: 0.25em; }
+.pw-skel--rows { flex-direction: column; gap: 0.9em; padding: 0.4em 0; min-height: 0; overflow: hidden; }
+.pw-skel--rows i { flex: none; height: 0.55em; border-radius: 99em; }
+.pw-skel--now { flex: none; min-height: 0; height: 3.2em; width: 60%; border-radius: 0.6em; background: var(--pw-ink); opacity: 0.08; }
+.pw-skel i { display: block; background: var(--pw-ink); opacity: 0.1; animation: pw-breathe 2.4s ease-in-out infinite alternate; }
+@keyframes pw-breathe { from { opacity: 0.06; } to { opacity: 0.17; } }
+.lite .pw-skel i { animation: none; }
+@media (prefers-reduced-motion: reduce) { .pw-skel i { animation: none; } }
+.pw-wait { color: var(--pw-ink-2); font-size: max(0.86em, 1.4rem); font-weight: 500; }
 
 /* Next 24 h ('next'): the price now coloured by its level and a badge, lowest / average / highest of the 24 hours,
    then one row per hour from the current one (time, a bar from the lowest to the highest price, the price), in one
@@ -1642,6 +1661,8 @@ html:not(.style-modern) #uw-side { margin: 0 -1rem; }
 /* a portrait screen: the figures under the price, as on the smaller cards */
 .pw--full .pw-nx { align-content: start; }
 .pw--full.pw--tall .pw-nx-top { display: flex; flex-direction: column; align-items: stretch; gap: 0.8em; }
+/* the tall chart (Vertical) on a wide full screen: an upright card, centred, the figures under the price */
+.pw--full.pw--rows .pw-nx-top { display: flex; flex-direction: column; align-items: stretch; gap: 0.8em; }
 .pw-nx-hero { display: flex; align-items: center; flex-wrap: wrap; gap: 0.35em 0.8em; min-width: 0; }
 .pw--next .pw-val { font-size: 3em; }
 .pw--next.pw--full .pw-val { font-size: 3.4em; }

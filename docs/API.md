@@ -476,9 +476,12 @@ day-ahead prices and draws the card itself. The zones, sources, parsers, price m
 `server/core/pricesCore.js` (shared with Marco Cloud); `server/prices.js` keeps one cache entry per zone in memory.
 
 - `options.prices`: `{ zone, view: 'auto' | 'chart' | 'now' | 'cheap' | 'next', unit: 'main' | 'sub', currency: 'auto' |
-  'EUR', surcharge, vat, windowHours, resolution: 'hour' | 'quarter', tariff: 'none' | 'grid' | 'bands', grid, bands }`. `zone` is one of `PRICE_ZONE_IDS` (43 bidding
+  'EUR', surcharge, vat, windowHours, resolution: 'hour' | 'quarter', axis: 'simple' | '3h' | '1h', chartShape: 'columns' |
+  'rows', tariff: 'none' | 'grid' | 'bands', grid, bands }`. `zone` is one of `PRICE_ZONE_IDS` (43 bidding
   zones, `ES-PVPC` for the Spanish regulated tariff). `surcharge` is per kWh in the main unit (EUR or DKK), -10 to
-  100, added before `vat` (0 to 50 %). `windowHours` 1 to 6. `options.url` is stored empty.
+  100, added before `vat` (0 to 50 %). `windowHours` 1 to 6. `axis` (hour labels under the chart) defaults to
+  `simple`, `chartShape` (wide bars or one row per hour) to `columns`, also for widgets saved before 0.11.1.
+  `options.url` is stored empty.
 - Tariffs (`server/core/tariffsCore.js`, shared with Marco Cloud): `tariff: 'grid'` with `grid` a Danish grid company
   id of the widget's zone (`DK_GRID_COMPANIES`, 35 companies in DK1 and DK2); `tariff: 'bands'` with `bands: { preset:
   '' | 'es-20td' | 'es-20td-cm', list: [{ name, price }] (1 to 4, price -10 to 10 per kWh before VAT), weekday:

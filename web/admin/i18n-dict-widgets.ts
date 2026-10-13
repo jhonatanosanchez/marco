@@ -185,4 +185,10 @@ export const ROWS_WIDGETS: [string, string, string][] = [
   ],
   ['Ir a Widgets en esta pantalla', 'Go to Widgets on this screen', 'Ir para Widgets neste ecrã'],
   ['Ver dónde está en Diseño', 'See where it is in Layout', 'Ver onde está em Disposição'],
+  [
+    'Lateral: la columna mide {w} × {h} px; el widget comparte su altura con el resto de la columna.',
+    'Side: the column is {w} × {h} px; the widget shares its height with the rest of the column.',
+    'Lateral: a coluna mede {w} × {h} px; o widget partilha a altura com o resto da coluna.',
+  ],
+  ['Esquina {s}: hasta {w} × {h} px, sobre la foto.', 'Corner {s}: up to {w} × {h} px, over the photo.', 'Canto {s}: até {w} × {h} px, sobre a foto.'],
 ];

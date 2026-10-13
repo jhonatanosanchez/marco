@@ -1864,11 +1864,31 @@ function previewFocus(id: string | null): void {
     const card = el?.querySelector<HTMLElement>('.pw');
     const mode = card?.dataset.mode ?? null;
     const cramped = !!card?.classList.contains('pw-cramped');
-    const key = JSON.stringify([rect, mode, cramped]);
+    // the room it has there: the whole side column, or the box of its corner (its size and the corner's margin)
+    let room: typeof rect = null;
+    const parent = el?.parentElement;
+    if (rect && parent) {
+      if (parent.id === 'uw-side') {
+        const c = (parent.closest('.side') ?? parent).getBoundingClientRect();
+        room = { x: Math.round(c.left), y: Math.round(c.top), w: Math.round(c.width), h: Math.round(c.height) };
+      } else if (parent.classList.contains('uw-c')) {
+        const [rw, rh] = (el!.dataset.room ?? '').split('x').map(Number);
+        if (rw > 0 && rh > 0) {
+          const p = parent.getBoundingClientRect();
+          const pad = parseFloat(getComputedStyle(parent).paddingLeft) || 0;
+          const right = parent.classList.contains('tr') || parent.classList.contains('br');
+          const bottom = parent.classList.contains('bl') || parent.classList.contains('br');
+          const w = Math.min(rw, innerWidth - 2 * pad);
+          const h = Math.min(rh, innerHeight - 2 * pad);
+          room = { x: Math.round(right ? p.right - pad - w : p.left + pad), y: Math.round(bottom ? p.bottom - pad - h : p.top + pad), w: Math.round(w), h: Math.round(h) };
+        }
+      }
+    }
+    const key = JSON.stringify([rect, mode, cramped, room]);
     if (key === focusSent) return;
     focusSent = key;
     // only a box on this page and a view name go out: nothing in them is private
-    window.parent.postMessage({ type: 'marco:preview-focus', id: focusId, rect, mode, cramped }, '*');
+    window.parent.postMessage({ type: 'marco:preview-focus', id: focusId, rect, mode, cramped, room, screen: { w: innerWidth, h: innerHeight } }, '*');
   };
   report();
   focusTimer = setInterval(report, 250);

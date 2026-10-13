@@ -80,12 +80,14 @@ async function readBody(res) {
 
 const fake = process.env.MARCO_PRICES_FAKE;
 if (fake) loadFakeFixtures();
-let outbound = fake ? fakePricesFetch(fake) : realFetch;
+// MARCO_PRICES_FAKE_DELAY / MARCO_PRICES_FAKE_GRID_DELAY (ms): slow made-up sources, to see the loading states
+const fakeSlow = { delay: Number(process.env.MARCO_PRICES_FAKE_DELAY) || 0, gridDelay: Number(process.env.MARCO_PRICES_FAKE_GRID_DELAY) || 0 };
+let outbound = fake ? fakePricesFetch(fake, undefined, fakeSlow) : realFetch;
 let clock = () => Date.now();
 
 /** Tests replace the network (a fetch-like function) and the clock; null restores them. Clears the cache. */
 export function setPricesFetch(f, now = null) {
-  outbound = f || (fake ? fakePricesFetch(fake) : realFetch);
+  outbound = f || (fake ? fakePricesFetch(fake, undefined, fakeSlow) : realFetch);
   clock = now || (() => Date.now());
   cache.clear();
   inflight.clear();

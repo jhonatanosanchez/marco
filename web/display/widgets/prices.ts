@@ -12,10 +12,10 @@
 // Every time is in the household's time zone (ctx.tz): on DST days the chart has 23 or 25 hours.
 import type { DisplayWidget, PricesResponse, PriceWidgetOptions } from '../../shared/types';
 import {
-  cheapestWindows, DKK_PER_EUR, hourly, levelLimits, levelOf, localMidnight, pricedSlots, priceUnit, priceZone, slotAt, trend, wallClock,
+  axisStep, cheapestWindows, DKK_PER_EUR, hourly, levelLimits, levelOf, localMidnight, priceLabelPicks, pricedSlots, priceUnit, priceZone, slotAt, trend, wallClock,
   widgetCurrency,
 } from '../../../server/core/pricesCore.js';
-import { tariffAdder, tariffMode } from '../../../server/core/tariffsCore.js';
+import { gridCompany, tariffAdder, tariffMode } from '../../../server/core/tariffsCore.js';
 import type { PricedSlot } from '../../../server/core/pricesCore.js';
 import { LOCALES, formatHM } from '../../shared/i18n';
 import { getJSON } from '../api';
@@ -102,12 +102,15 @@ function subscribe(key: string, cb: Feed['subs'] extends Set<infer F> ? F : neve
 // ------------------------------------------------------------------------------------------- drawing
 
 export type PricePlace = 'corner' | 'side' | 'full';
-type Mode = 'now' | 'nowchart' | 'chart' | 'cheap' | 'full' | 'next';
+type Mode = 'now' | 'nowchart' | 'chart' | 'cheap' | 'full' | 'next' | 'rows';
 
-/** What a widget shows where it is (`portrait`: the room is taller than wide). */
-export function priceMode(view: PriceWidgetOptions['view'], place: PricePlace, size: string, portrait = false): Mode {
-  if (view === 'auto') return place === 'full' ? (portrait ? 'next' : 'full') : place === 'side' || size === 'l' ? 'nowchart' : 'now';
-  return view;
+/**
+ * What a widget shows where it is (`portrait`: the room is taller than wide). `rows`: the chart is drawn tall, as
+ * one row per hour (the Vertical shape), wherever a chart would be.
+ */
+export function priceMode(view: PriceWidgetOptions['view'], place: PricePlace, size: string, portrait = false, rows = false): Mode {
+  const m: Mode = view === 'auto' ? (place === 'full' ? (portrait ? 'next' : 'full') : place === 'side' || size === 'l' ? 'nowchart' : 'now') : view;
+  return rows && (m === 'chart' || m === 'nowchart' || m === 'full') ? 'rows' : m;
 }
 
 /** Font scale per place and size (1 = the side column's cards). */
@@ -176,6 +179,8 @@ interface Model {
   tariff: 'grid' | 'bands' | 'none';
   /** some grid tariffs ahead are carried forward from the last published ones */
   estimated: boolean;
+  /** the grid company's tariffs are still being fetched: the prices are without them for now */
+  gridPending: boolean;
 }
 
 interface NextHours {
@@ -198,8 +203,13 @@ export class PriceCard {
   private sig = '';
   /** the room ('WxH size') where the next-24-hours list had fewer than MIN_ROWS rows: the price now is drawn there */
   private nextTooSmall = '';
+  /**
+   * The tall chart (rows) in this room: 2 with the price now and the lowest / average / highest, 1 without those
+   * three figures, 0 with the price now in the header only; -1: not even then MIN_ROWS rows, the wide chart instead.
+   */
+  private rowsFit: { room: string; level: number } = { room: '', level: 2 };
   /** called when the card first has prices, fails before having any, or turns stale / fresh */
-  onState: ((s: 'ok' | 'stale' | 'failed') => void) | null = null;
+  onState: ((s: 'loading' | 'ok' | 'stale' | 'failed') => void) | null = null;
 
   constructor(w: DisplayWidget) {
     this.w = w;
@@ -221,6 +231,11 @@ export class PriceCard {
       this.draw();
       this.onState?.(d ? (d.stale || failed ? 'stale' : 'ok') : 'failed');
     });
+    // nothing yet (a first fetch can take seconds): the card shows that the prices are on their way
+    if (!this.data && !this.failed) {
+      this.draw();
+      this.onState?.('loading');
+    }
     this.minuteTick();
   }
 
@@ -316,6 +331,7 @@ export class PriceCard {
       max: all.length ? Math.max(...all) : 0,
       tariff,
       estimated,
+      gridPending: mode === 'grid' && !add && d.grid?.error === 'pending',
     };
   }
 
@@ -333,28 +349,33 @@ export class PriceCard {
   draw(tick = false): void {
     const now = Date.now();
     const o = this.w.prices;
-    let mode = priceMode(o?.view ?? 'auto', this.place, this.w.size, this.maxH > this.maxW * 1.05);
+    const room = this.roomKey();
+    if (this.rowsFit.room !== room) this.rowsFit = { room, level: 2 };
+    const rowsWanted = o?.chartShape === 'rows' && this.rowsFit.level >= 0;
+    let mode = priceMode(o?.view ?? 'auto', this.place, this.w.size, this.maxH > this.maxW * 1.05, rowsWanted);
     // too little room for a chart or a list (a crowded side column, a short corner): the price now only
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 10;
     const k = this.place === 'full' ? 1.9 : SCALE[this.w.size] ?? 1;
     // the list: header, price, lowest / average / highest and at least MIN_ROWS hours
-    const need = mode === 'nowchart' ? 22 : mode === 'chart' ? 16 : mode === 'next' ? 30 : 0;
+    const need = mode === 'nowchart' ? 22 : mode === 'chart' ? 16 : mode === 'next' ? 30 : mode === 'rows' ? 12 : 0;
     if (this.place !== 'full' && need && this.maxH < need * rem * k) mode = 'now';
     if (mode === 'next' && this.place !== 'full' && this.nextTooSmall === this.roomKey()) mode = 'now';
-    const sig = JSON.stringify([this.data?.fetchedAt, this.data?.grid?.fetchedAt, this.data?.stale, this.failed, o, mode, this.maxW, this.maxH, this.w.name, this.w.size, ctx.lang, ctx.tz, Math.floor(now / (o?.resolution === 'quarter' ? 900_000 : 3600_000))]);
+    const sig = JSON.stringify([this.data?.fetchedAt, this.data?.grid?.fetchedAt, this.data?.stale, this.failed, o, mode, this.rowsFit.level, this.maxW, this.maxH, this.w.name, this.w.size, ctx.lang, ctx.tz, Math.floor(now / (o?.resolution === 'quarter' ? 900_000 : 3600_000))]);
     if (tick && sig === this.sig) return;
     this.sig = sig;
     const m = this.model(now);
     const card = this.el;
-    card.className = `uw-media pw pw--${mode} pw--${this.place} pw--${this.w.size}${this.maxH > this.maxW * 1.05 ? ' pw--tall' : ''}`;
+    card.className = `uw-media pw pw--${mode}${mode === 'rows' ? ` pw--next pw--rows${this.rowsFit.level}` : ''} pw--${this.place} pw--${this.w.size}${this.maxH > this.maxW * 1.05 ? ' pw--tall' : ''}`;
     // what it draws (the admin's widget preview says when a view does not fit)
     card.dataset.mode = mode;
     // full screen: the chart views fill it; a lone price or list is drawn larger, to read from across the room
-    const pk = this.place === 'full' ? (mode === 'now' || mode === 'cheap' ? 2.6 : mode === 'next' ? 1.7 : 1.9) : SCALE[this.w.size] ?? 1;
+    const pk = this.place === 'full' ? (mode === 'now' || mode === 'cheap' ? 2.6 : mode === 'next' || mode === 'rows' ? 1.7 : 1.9) : SCALE[this.w.size] ?? 1;
     card.style.setProperty('--pk', String(pk));
     card.replaceChildren();
+    if (!m && o && !this.failed && !this.data) return this.loading(mode);
     if (!m || !o) return;
-    const next = mode === 'next' ? this.nextHours(m, now) : null;
+    const rows = mode === 'next' || mode === 'rows';
+    const next = rows ? this.nextHours(m, now) : null;
     // the list's rows are hours: its badge takes the level of the current hour (with quarter-hour prices the big
     // price is the current quarter's, its colour and the highlighted row still agree)
     const lvlOf = next ? slotAt(m.hours, now) ?? m.now : m.now;
@@ -376,17 +397,29 @@ export class PriceCard {
       // the list takes the room it is given: as many hours as fit
       card.style.width = `${this.maxW}px`;
       card.style.height = `${this.maxH}px`;
+    } else if (mode === 'rows') {
+      // the tall card: the room's height, and a card's width, not wider than it needs (a wide room keeps it upright)
+      // (in the side column it takes the column's width, like its other cards)
+      const w = this.place === 'side' ? this.maxW : Math.min(this.maxW, Math.max(rem * pk * 30, Math.round(this.maxH * (this.place === 'full' ? 0.75 : 0.8))));
+      card.style.width = `${w}px`;
+      card.style.height = `${this.maxH}px`;
     } else if (this.place === 'side') card.style.width = `${this.maxW}px`;
 
-    card.appendChild(this.header(m, mode, next?.list.length ?? 0));
+    // the tall chart in a short room: fewer figures on top, so that more hours fit
+    const level = mode === 'rows' ? this.rowsFit.level : 2;
+    card.appendChild(this.header(m, mode, next?.list.length ?? 0, level));
     if (next) {
-      const top = el('div', 'pw-nx-top');
-      top.appendChild(this.nextHero(m, lvl));
-      top.appendChild(this.nextStats(m, next));
-      card.appendChild(top);
+      if (level > 0) {
+        const top = el('div', 'pw-nx-top');
+        top.appendChild(this.nextHero(m, lvl));
+        if (level > 1) top.appendChild(this.nextStats(m, next));
+        card.appendChild(top);
+      }
       const box = el('div', 'pw-nx');
       card.appendChild(box);
-      requestAnimationFrame(() => this.nextList(box, m, next, now));
+      // Vertical: one column of hours; Horizontal: two where the card is wide enough
+      const oneCol = mode === 'rows' || o.chartShape === 'rows';
+      requestAnimationFrame(() => this.nextList(box, m, next, now, oneCol, mode === 'rows'));
     }
     if (mode === 'now') card.appendChild(this.nowBlock(m, lvl, true));
     if (mode === 'nowchart') card.appendChild(this.nowBlock(m, lvl, false));
@@ -404,7 +437,42 @@ export class PriceCard {
     }
     if (mode === 'cheap') card.appendChild(this.cheapBlock(m, now, this.place === 'full' ? 4 : this.place === 'side' ? 3 : this.w.size === 's' ? 1 : this.w.size === 'm' ? 2 : 3));
     card.appendChild(this.footer(m, mode));
-    if (this.place !== 'full' && mode !== 'next') this.fit(pk);
+    if (this.place !== 'full' && !rows) this.fit(pk);
+  }
+
+  /**
+   * Before the first prices: the card at its size with its title, faint bars or rows in place of the prices and
+   * "Loading prices…" (the bars breathe slowly; still on lite screens).
+   */
+  private loading(mode: Mode): void {
+    const card = this.el;
+    card.classList.add('pw-loading');
+    card.dataset.level = 'mid';
+    const chart = mode === 'chart' || mode === 'nowchart' || mode === 'full';
+    if (chart) {
+      card.style.width = `${this.maxW}px`;
+      card.style.height = `${this.place === 'full' ? this.maxH : Math.min(this.maxH, Math.round(this.maxW * (mode === 'nowchart' ? 0.66 : 0.52)))}px`;
+    } else if (mode === 'next' || mode === 'rows') {
+      card.style.width = `${mode === 'rows' && this.place !== 'side' ? Math.min(this.maxW, Math.max(this.maxW * 0.5, Math.round(this.maxH * 0.8))) : this.maxW}px`;
+      card.style.height = `${this.maxH}px`;
+    } else if (this.place === 'side') card.style.width = `${this.maxW}px`;
+    const h = el('div', 'pw-h');
+    h.appendChild(el('span', 'pw-title', this.title()));
+    h.appendChild(el('span', 'pw-zone', this.zoneLabel()));
+    card.appendChild(h);
+    const sk = el('div', `pw-skel pw-skel--${chart ? 'bars' : mode === 'next' || mode === 'rows' ? 'rows' : 'now'}`);
+    const n = chart ? 24 : mode === 'next' || mode === 'rows' ? 14 : 0;
+    for (let i = 0; i < n; i++) {
+      const b = el('i', '');
+      // a calm day's shape: low at night, a morning and an evening peak
+      const f = 0.35 + 0.3 * Math.exp(-(((i - 8) / 2.2) ** 2)) + 0.45 * Math.exp(-(((i - 19) / 2.4) ** 2));
+      if (chart) b.style.height = `${Math.round(f * 100)}%`;
+      else b.style.width = `${Math.round(40 + 50 * Math.abs(Math.sin(i * 1.7)))}%`;
+      b.style.animationDelay = `${(i * 0.06).toFixed(2)}s`;
+      sk.appendChild(b);
+    }
+    card.appendChild(sk);
+    card.appendChild(el('div', 'pw-wait', ctx.t('priceLoading')));
   }
 
   /** The next 24 hours from the current one (hourly, whatever the bars), their limits, lowest, average and highest. */
@@ -453,15 +521,17 @@ export class PriceCard {
    * The hours as rows (time, a bar from the lowest to the highest price of the 24 hours, the price), in one or two
    * columns by the width, as many as fit the height; full screen: all of them, the text sized to fill it.
    */
-  private nextList(box: HTMLElement, m: Model, n: NextHours, now: number): void {
+  private nextList(box: HTMLElement, m: Model, n: NextHours, now: number, oneCol = false, tall = false): void {
     if (!box.isConnected) return;
     const W = box.clientWidth;
     const H = box.clientHeight;
-    if (W < 40 || H < 20 || !n.list.length) return;
+    if (W < 40 || !n.list.length) return;
     const LINE = 2.05;
+    // the figures on top took all the height: the tall chart drops them (below)
+    if (H < 20 && !(tall && this.place !== 'full')) return;
     let fs = parseFloat(getComputedStyle(box).fontSize) || 16;
     // two columns where there is width for them; a full portrait screen keeps one, with long bars
-    const cols = this.place === 'full' ? (W < H * 0.8 ? 1 : 2) : W >= fs * 25 ? 2 : 1;
+    const cols = oneCol ? 1 : this.place === 'full' ? (W < H * 0.8 ? 1 : 2) : W >= fs * 25 ? 2 : 1;
     let count: number;
     if (this.place === 'full') {
       count = n.list.length;
@@ -469,12 +539,20 @@ export class PriceCard {
       // never wider than a column holds (time, bar, price)
       const rows = Math.max(Math.ceil(count / cols), Math.ceil(24 / cols));
       fs = Math.max(12, Math.min(H / rows / LINE, W / cols / 13));
+      // the tall chart on a wide screen: fewer hours, read from across the room
+      if (tall) {
+        const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 10;
+        fs = Math.max(fs, Math.min(rem * 2.6, W / 13));
+        count = Math.min(count, Math.max(1, Math.floor(H / (fs * LINE))));
+      }
       box.style.fontSize = `${fs.toFixed(1)}px`;
     } else {
       count = Math.min(n.list.length, cols * Math.max(1, Math.floor(H / (fs * LINE))));
-      // fewer than MIN_ROWS hours is not a list: the price now card in this room instead
-      if (count < Math.min(MIN_ROWS, n.list.length)) {
-        this.nextTooSmall = this.roomKey();
+      // fewer than MIN_ROWS hours is not a list: the price now card in this room instead (the tall chart drops its
+      // figures on top first, then turns into the wide chart)
+      if (count < Math.min(tall && this.rowsFit.level > 0 ? MIN_ROWS + 2 : MIN_ROWS, n.list.length)) {
+        if (tall) this.rowsFit = { room: this.roomKey(), level: this.rowsFit.level - 1 };
+        else this.nextTooSmall = this.roomKey();
         this.sig = '';
         this.draw();
         return;
@@ -484,7 +562,7 @@ export class PriceCard {
     box.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
     // full screen: the rows share what is left over (less than one row), so the list ends at the footer; elsewhere
     // they keep their height from the top
-    box.style.gridTemplateRows = this.place === 'full' && count >= 24 ? `repeat(${rows}, minmax(0, 1fr))` : `repeat(${rows}, ${LINE}em)`;
+    box.style.gridTemplateRows = this.place === 'full' && (count >= 24 || tall) ? `repeat(${rows}, minmax(0, 1fr))` : `repeat(${rows}, ${LINE}em)`;
     box.classList.toggle('pw-nx--2', cols === 2);
     // a 12-hour clock has longer labels: the bars still start in one line
     box.classList.toggle('pw-nx--h12', ctx.cfg.datetime.format24 === false);
@@ -547,14 +625,15 @@ export class PriceCard {
     return z === 'ES-PVPC' ? 'PVPC' : z;
   }
 
-  private header(m: Model, mode: Mode, nextCount = 0): HTMLElement {
+  private header(m: Model, mode: Mode, nextCount = 0, level = 2): HTMLElement {
     const h = el('div', 'pw-h');
     const title = el('span', 'pw-title', this.title());
     h.appendChild(title);
-    h.appendChild(el('span', 'pw-zone', this.zoneLabel()));
-    if (mode === 'next' && nextCount) h.appendChild(el('span', 'pw-hsub', ctx.t('priceNextHours', { n: nextCount })));
+    // the tall chart's smallest form: the title and the price now share the line
+    if (!(mode === 'rows' && level <= 0)) h.appendChild(el('span', 'pw-zone', this.zoneLabel()));
+    if ((mode === 'next' || (mode === 'rows' && level > 0)) && nextCount) h.appendChild(el('span', 'pw-hsub', ctx.t('priceNextHours', { n: nextCount })));
     // the chart and the list carry the price now in their header
-    if ((mode === 'chart' || mode === 'cheap') && m.now) {
+    if ((mode === 'chart' || mode === 'cheap' || (mode === 'rows' && level <= 0)) && m.now) {
       const v = el('span', 'pw-hnow');
       v.appendChild(el('b', '', m.fmt.format(m.now.p)));
       v.appendChild(el('span', 'pw-u', ` ${m.unit.label}`));
@@ -605,13 +684,14 @@ export class PriceCard {
 
   private footer(m: Model, mode: Mode): HTMLElement {
     const f = el('div', 'pw-foot');
-    if (mode !== 'now' && mode !== 'cheap' && mode !== 'next' && m.bars.length) {
+    if (mode !== 'now' && mode !== 'cheap' && mode !== 'next' && mode !== 'rows' && m.bars.length) {
       f.appendChild(el('span', 'pw-range', ctx.t('priceMinMax', { a: m.fmtShort.format(m.min), b: m.fmtShort.format(m.max) })));
     }
     // what the prices include besides the market (and the fixed extra): the grid company's tariffs or the time bands
     const o = this.w.prices;
     if (m.tariff === 'grid') f.appendChild(el('span', 'pw-incl', ctx.t(m.estimated ? 'priceInclGridEst' : 'priceInclGrid')));
     else if (m.tariff === 'bands') f.appendChild(el('span', 'pw-incl', ctx.t('priceInclBands')));
+    else if (m.gridPending) f.appendChild(el('span', 'pw-incl pw-incl--wait', ctx.t('priceLoadingGrid', { c: this.data?.grid?.name || gridCompany(o?.grid ?? '')?.name || '' })));
     else if (o && tariffMode(o) === 'grid') f.appendChild(el('span', 'pw-incl pw-incl--miss', ctx.t('priceNoGrid')));
     // 'Energinet' and 'Energinet DataHub': one credit
     const spot = this.data?.credit ?? '';
@@ -621,27 +701,63 @@ export class PriceCard {
     return f;
   }
 
-  /** The bars, drawn at the box's size in pixels (crisp text, no scaling). */
+  /**
+   * The bars, drawn at the box's size in pixels (crisp text, no scaling). Over the bars of the coming hours, their
+   * price: all of them when they fit, else every 2nd, 3rd... hour, always with the cheapest and the dearest one.
+   */
   private chart(box: HTMLElement, m: Model, now: number): void {
     if (!box.isConnected) return;
     const W = Math.floor(box.clientWidth);
     const H = Math.floor(box.clientHeight);
     if (W < 40 || H < 30) return;
     const fs = parseFloat(getComputedStyle(box).fontSize) || 12;
-    const axisH = Math.round(fs * 1.7);
-    const top = Math.round(fs * 0.5);
-    const plotH = H - axisH - top;
     const bars = m.bars;
-    if (!bars.length || plotH < 10) return;
+    if (!bars.length) return;
+    const s = svg('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, class: 'pw-svg', 'aria-hidden': 'true' });
+    // in the document first: the labels are measured there, in their own font
+    box.replaceChildren(s);
+    const measure = (cls: string, texts: string[]): { w: number; fs: number } => {
+      const t = svg('text', { x: -9999, y: -9999, class: cls });
+      s.appendChild(t);
+      let w = 0;
+      for (const x of new Set(texts)) {
+        t.textContent = x;
+        w = Math.max(w, t.getComputedTextLength());
+      }
+      const size = parseFloat(getComputedStyle(t).fontSize) || fs;
+      t.remove();
+      return { w, fs: size };
+    };
     const start = m.todayStart;
     const end = bars[bars.length - 1].t + bars[bars.length - 1].m * 60_000;
     const span = Math.max(1, end - start);
     const x = (t: number) => ((t - start) / span) * W;
+    const pitch = (3600_000 / span) * W;
+    // the coming hours (hourly prices also over quarter-hour bars) and their labels
+    const from = slotAt(m.hours, now)?.t ?? Math.floor(now / 3600_000) * 3600_000;
+    const coming = m.hours.filter((h) => h.t >= from && h.t < end && h.t >= start);
+    const dec = m.unit.decimals === 3 ? 2 : m.unit.decimals;
+    const fmtL = new Intl.NumberFormat(LOCALES[ctx.lang] ?? 'es-ES', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+    const texts = coming.map((h) => fmtL.format(h.p));
+    const lab = coming.length ? measure('pw-pv pw-pv--ext', texts) : { w: 0, fs };
+    // larger where the labels have room for it (a large card, full screen): as large as the hours between two of
+    // them allow, up to 1.6 times
+    const base = coming.length ? priceLabelPicks(coming.map((h) => h.p), pitch, lab.w, lab.fs * 0.55).step : 1;
+    const grow = Math.min(this.place === 'full' ? 1.6 : 1.2, (base * pitch * 0.9) / Math.max(1, lab.w + lab.fs * 0.55));
+    if (grow > 1) {
+      lab.w *= grow;
+      lab.fs *= grow;
+    }
+    const axisH = Math.round(fs * 1.7);
+    // labels only with room for the bars under them
+    const withLabels = coming.length > 0 && H - axisH - lab.fs * 1.4 > lab.fs * 3;
+    const top = withLabels ? Math.round(lab.fs * 1.3) : Math.round(fs * 0.5);
+    const plotH = H - axisH - top;
+    if (plotH < 10) return;
     const lo = Math.min(0, m.min);
     const hi = Math.max(m.max, lo + 1e-9);
     const y = (p: number) => top + plotH - ((p - lo) / (hi - lo)) * plotH;
     const zeroY = y(0);
-    const s = svg('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, class: 'pw-svg', 'aria-hidden': 'true' });
     const slotW = (15 * 60_000 / span) * W;
     const gapFrac = slotW * (bars[0].m / 15) > 6 ? 0.22 : 0.08;
     // tomorrow: a light band behind and a divider
@@ -650,6 +766,7 @@ export class PriceCard {
       s.appendChild(svg('rect', { x: tx, y: 0, width: W - tx, height: top + plotH, class: 'pw-tmw' }));
       s.appendChild(svg('line', { x1: tx, x2: tx, y1: 0, y2: top + plotH, class: 'pw-div' }));
     }
+    const tops: { x0: number; x1: number; y: number }[] = [];
     for (const b of bars) {
       const x0 = x(b.t);
       const w = Math.max(1, x(b.t + b.m * 60_000) - x0);
@@ -660,43 +777,84 @@ export class PriceCard {
       const past = b.t + b.m * 60_000 <= now;
       const cur = b.t <= now && now < b.t + b.m * 60_000;
       const r = Math.min((w - g) / 2, fs * 0.25);
+      tops.push({ x0, x1: x0 + w, y: y0 });
       s.appendChild(svg('rect', {
         x: x0 + g / 2, y: y0, width: Math.max(1, w - g), height: h, rx: r, ry: r,
         class: `pw-bar pw-bar--${levelOf(b.p, b.t >= m.tomorrowStart ? m.limitsTomorrow : m.limits)}${past ? ' is-past' : ''}${cur ? ' is-now' : ''}`,
       }));
     }
-    // now: a thin line over the plot and a dot on top of the current bar
-    const nx = x(now);
-    if (nx >= 0 && nx <= W) {
-      s.appendChild(svg('line', { x1: nx, x2: nx, y1: top - fs * 0.2, y2: top + plotH, class: 'pw-nowline' }));
-      const cur = slotAt(bars, now);
-      if (cur) s.appendChild(svg('circle', { cx: nx, cy: Math.max(fs * 0.35, Math.min(y(cur.p), zeroY) - fs * 0.55), r: fs * 0.3, class: 'pw-nowdot' }));
-    }
     if (lo < 0) s.appendChild(svg('line', { x1: 0, x2: W, y1: zeroY, y2: zeroY, class: 'pw-zero' }));
-    // hour labels: every 6 hours (3 on wide charts with only today), tomorrow's name after the divider
-    const step = m.hasTomorrow || W < fs * 26 ? 6 : 3;
+    // the prices over the coming hours: each one just above the highest bar under it
+    const nx = x(now);
+    let nowTop = top - fs * 0.2;
+    if (withLabels) {
+      const gap = lab.fs * 0.55;
+      const pick = priceLabelPicks(coming.map((h) => h.p), pitch, lab.w, gap);
+      const placed = pick.picks.map((i) => {
+        const h = coming[i];
+        const cx = Math.max(lab.w / 2, Math.min(W - lab.w / 2, x(h.t) + pitch / 2));
+        const l = cx - lab.w / 2;
+        const r = cx + lab.w / 2;
+        const under = tops.filter((b) => b.x1 > l && b.x0 < r).reduce((n, b) => Math.min(n, b.y), zeroY);
+        return { i, h, cx, base: Math.max(lab.fs * 0.95, under - lab.fs * 0.32), anchor: 'middle' };
+      });
+      // the cheapest and the dearest hour side by side, when they are too close to stand apart
+      const a = placed.find((p) => p.i === Math.min(pick.min, pick.max));
+      const b = placed.find((p) => p.i === Math.max(pick.min, pick.max));
+      if (a && b && a !== b && b.cx - a.cx < lab.w + gap && Math.abs(a.base - b.base) < lab.fs * 1.1) {
+        const mid = (a.cx + b.cx) / 2;
+        a.base = b.base = Math.min(a.base, b.base);
+        a.cx = Math.max(lab.w + gap / 2, mid) - gap / 2;
+        a.anchor = 'end';
+        b.cx = Math.min(W - lab.w - gap / 2, mid) + gap / 2;
+        b.anchor = 'start';
+      }
+      for (const p of placed) {
+        const lvl = levelOf(p.h.p, p.h.t >= m.tomorrowStart ? m.limitsTomorrow : m.limits);
+        const ext = p.i === pick.min ? ' pw-pv--ext pw-pv--min' : p.i === pick.max ? ' pw-pv--ext pw-pv--max' : '';
+        const t = svg('text', { x: p.cx, y: p.base, 'text-anchor': p.anchor, class: `pw-pv pw-pv--${lvl}${ext}` });
+        if (grow > 1) t.style.fontSize = `${lab.fs.toFixed(1)}px`;
+        t.textContent = texts[p.i];
+        s.appendChild(t);
+        // the now line starts under the current hour's price
+        if (p.h.t === from && Math.abs(nx - p.cx) < lab.w / 2 + 2) nowTop = p.base + lab.fs * 0.3;
+      }
+    }
+    // now: a thin line over the plot, and a dot on top of the current bar when it has no price over it
+    if (nx >= 0 && nx <= W) {
+      s.appendChild(svg('line', { x1: nx, x2: nx, y1: nowTop, y2: top + plotH, class: 'pw-nowline' }));
+      const cur = slotAt(bars, now);
+      if (cur && !withLabels) s.appendChild(svg('circle', { cx: nx, cy: Math.max(fs * 0.35, Math.min(y(cur.p), zeroY) - fs * 0.55), r: fs * 0.3, class: 'pw-nowdot' }));
+    }
+    // hour labels under their bar: every 6 hours (3 on wide charts with only today), or as chosen (3 h, 1 h) when they
+    // do not touch; tomorrow's name after the divider
+    const h24 = ctx.cfg.datetime.format24 !== false;
+    const hourText = (h: number) => (h24 ? String(h).padStart(2, '0') : `${h % 12 || 12}${h < 12 ? 'a' : 'p'}`);
+    const ax = measure('pw-ax', Array.from({ length: 24 }, (_, h) => hourText(h)));
+    const step = axisStep(this.w.prices?.axis ?? 'simple', pitch, ax.w, { gap: fs * 0.5, wide: !m.hasTomorrow && W >= fs * 26 });
     const ay = H - fs * 0.35;
     const dayLabel = ctx.t('tomorrow');
-    const h24 = ctx.cfg.datetime.format24 !== false;
+    const tx0 = m.hasTomorrow ? x(m.tomorrowStart) : Infinity;
     // the day's name takes the place of the hours right after midnight
-    const dayEnd = m.hasTomorrow ? x(m.tomorrowStart) + fs * (0.4 + dayLabel.length * 0.62 + 0.8) : -1;
-    for (let t = start; t < end; t += 3600_000) {
-      const p = wallClock(t, ctx.tz);
-      if (p.mi !== 0 || p.h % step !== 0) continue;
-      if (m.hasTomorrow && t === m.tomorrowStart) continue;
-      const lx = x(t);
-      if (lx > W - fs * 1.4) continue;
-      if (lx >= x(m.tomorrowStart) && lx < dayEnd) continue;
-      const tx = svg('text', { x: lx, y: ay, class: 'pw-ax' });
+    const dayEnd = m.hasTomorrow ? tx0 + fs * 0.4 + measure('pw-ax pw-ax--day', [dayLabel]).w + fs * 0.5 : -1;
+    for (const hr of m.hours) {
+      if (hr.t < start || hr.t >= end) continue;
+      const p = wallClock(hr.t, ctx.tz);
+      if (p.h % step !== 0) continue;
+      if (m.hasTomorrow && hr.t === m.tomorrowStart) continue;
+      const lx = x(hr.t) + pitch / 2;
+      const l = Math.max(0, lx - ax.w / 2);
+      if (l + ax.w > W) continue;
+      if (l + ax.w > tx0 - fs * 0.15 && l < dayEnd) continue;
+      const t = svg('text', { x: l + ax.w / 2, y: ay, 'text-anchor': 'middle', class: 'pw-ax' });
       // the household's clock: 00 06 12 18, or 12a 6a 12p 6p
-      tx.textContent = h24 ? String(p.h).padStart(2, '0') : `${p.h % 12 || 12}${p.h < 12 ? 'a' : 'p'}`;
-      s.appendChild(tx);
+      t.textContent = hourText(p.h);
+      s.appendChild(t);
     }
     if (m.hasTomorrow) {
-      const tx = svg('text', { x: x(m.tomorrowStart) + fs * 0.4, y: ay, class: 'pw-ax pw-ax--day' });
-      tx.textContent = dayLabel;
-      s.appendChild(tx);
+      const t = svg('text', { x: tx0 + fs * 0.4, y: ay, class: 'pw-ax pw-ax--day' });
+      t.textContent = dayLabel;
+      s.appendChild(t);
     }
-    box.replaceChildren(s);
   }
 }

@@ -5,6 +5,25 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-10-13
+
+### Added
+- Electricity price widget: prices on the chart for the coming hours. Over each bar from the current hour on, its
+  price in your unit (0,19 or 3,2 or kr). When they do not all fit, every second or third hour is labelled, and the
+  cheapest and the dearest always are, in bold. Past hours stay grey without numbers.
+- Electricity price widget: hour labels option for the chart: every 6 hours (as before), every 3 hours or every
+  hour. When the labels would touch, fewer are shown.
+- Electricity price widget: rows for tall widgets. A new *Shape* setting (24 h chart, Automatic and Next 24 h):
+  *Landscape* is the wide card with bars, *Portrait* a tall card with the price now and its level, the lowest,
+  average and highest, and one row per hour with its bar and price. In a small room it drops the figures on top
+  first; with no room for a few rows it goes back to the wide chart. For *Next 24 h* it picks one column or two.
+- Electricity price widget: a loading state. Before the first prices the card shows its title, faint bars or rows
+  and *Loading prices…* (still on lite screens). While a grid company's tariffs are fetched for the first time it
+  shows the market price with *Loading Cerius tariff…* instead of a total without it. In the admin, *Test*
+  says *Loading…* and the grid company list shows a spinner on the company being fetched.
+- Widgets: the widget preview outlines the room the widget has: the corner's box or the whole side column, with
+  its size in pixels, so a corner and the side column no longer look the same.
+
 ## [0.11.0] - 2026-10-13
 
 ### Added

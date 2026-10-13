@@ -68,7 +68,8 @@ const offsetIso = (ms, tz) => {
 };
 
 /** A fetch-like function for the price sources: { status, headers: { get }, text() }. */
-export function fakePricesFetch(mode = '1', now = () => Date.now()) {
+/** `delay` / `gridDelay` (ms): a slow source and slow grid tariffs, to see the loading states. */
+export function fakePricesFetch(mode = '1', now = () => Date.now(), { delay = 0, gridDelay = 0 } = {}) {
   return async (raw) => {
     const url = new URL(raw);
     const reply = (status, text, type = 'application/json') => ({
@@ -76,6 +77,8 @@ export function fakePricesFetch(mode = '1', now = () => Date.now()) {
       text: async () => (typeof text === 'string' ? text : JSON.stringify(text)),
     });
     if (mode === 'fail') return reply(503, { error: 'down' });
+    const slow = url.pathname.includes('DatahubPricelist') ? gridDelay : delay;
+    if (slow > 0) await new Promise((r) => setTimeout(r, Math.min(slow, 120_000)));
     // tomorrow is published at 13:00 Brussels time, or never with MARCO_PRICES_FAKE=today
     const n = now();
     // MARCO_PRICES_FAKE=all: tomorrow is always out (screenshots at any hour)

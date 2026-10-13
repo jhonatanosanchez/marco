@@ -847,11 +847,17 @@ In *Widgets → Add widget → Electricity price* pick your zone (grouped by cou
 market price and keeps it: the screens never call any website, and screens showing the same zone share one copy.
 
 - **View:** *Automatic* (a small or medium corner shows the price now; a large corner or the side column adds the
-  chart; full screen shows everything), *24 h chart* (bars from cheap to expensive, the current hour marked, tomorrow
-  added once it is published, around 13:00 CET), *Price now*, *Cheap windows* (for example "02:00 to 05:00") and
+  chart; full screen shows everything), *24 h chart* (bars from cheap to expensive with the price over the coming
+  hours, tomorrow added once it is published, around 13:00 CET), *Price now*, *Cheap windows* (for example "02:00 to 05:00") and
   *Next 24 h* (the price now in large type with its level, the lowest, average and highest, and one row per hour with
   a bar from the current hour, in one or two columns, as many as fit). On a portrait screen in full screen,
   *Automatic* uses *Next 24 h*: a list fits the height better than a wide chart.
+- **Shape** (24 h chart, Automatic and Next 24 h): *Landscape* is the wide card with a bar per hour; *Portrait* is a
+  tall card with the price now, the lowest, average and highest, and one row per hour with its bar and price. For
+  *Next 24 h* it picks one column or two.
+- **Hour labels** (the wide chart): every 6 hours, every 3 hours or every hour. When they would touch, fewer are shown.
+  Over the bars, the price of each coming hour; with no room for all, every second or third one, always with the
+  cheapest and the dearest in bold.
 - **Grid tariff:** what is added to the market price by the hour.
   - *Grid company* (Denmark, DK1 and DK2): pick your netselskab (Radius, Cerius, N1, TREFOR, Konstant, Dinel and
     more, 35 companies) and Marco adds every hour its household (C) tariff, Energinet's transmission and system

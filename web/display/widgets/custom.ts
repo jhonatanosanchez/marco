@@ -264,7 +264,14 @@ export class CustomWidgets {
       e.card = card;
       card.onState = (st) => {
         if (e.dead) return;
-        if (st === 'failed') return this.failed(e);
+        if (st === 'failed') {
+          // the loading card goes: nothing to show
+          if (e.media && !card.hasData) {
+            e.media.remove();
+            e.media = null;
+          }
+          return this.failed(e);
+        }
         if (!e.media) this.swap(e, card.el, null);
         this.setStale(e, st === 'stale');
       };
@@ -526,6 +533,11 @@ export class CustomWidgets {
   }
 
   private size(e: Entry, media: HTMLImageElement | HTMLIFrameElement | HTMLElement | null = e.media): void {
+    // the room it may take, for the admin's widget preview (it outlines it)
+    if (isPreview && e.el.parentElement) {
+      const [rw, rh] = this.bounds(e);
+      e.el.dataset.room = `${Math.round(rw)}x${Math.round(rh)}`;
+    }
     if (e.card) {
       const box = e.el.parentElement;
       if (!box) return;

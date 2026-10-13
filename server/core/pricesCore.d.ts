@@ -27,6 +27,8 @@ export const PRICE_ZONE_IDS: string[];
 export const PRICE_VIEWS: readonly string[];
 export const PRICE_UNITS: readonly string[];
 export const PRICE_RESOLUTIONS: readonly string[];
+export const PRICE_AXES: readonly string[];
+export const PRICE_SHAPES: readonly string[];
 export const MAX_VAT: number;
 export const MIN_SURCHARGE: number;
 export const MAX_SURCHARGE: number;
@@ -49,6 +51,8 @@ export function levelLimits(prices: number[]): LevelLimits;
 export function levelOf(p: number, limits: LevelLimits): 'cheap' | 'mid' | 'high';
 export function cheapestWindows(hourSlots: PricedSlot[], now: number, hours?: number, count?: number): CheapWindow[];
 export function trend(a: number, b: number): 'up' | 'down' | 'flat';
+export function priceLabelPicks(prices: number[], pitch: number, labelW: number, gap?: number): { picks: number[]; step: number; min: number; max: number };
+export function axisStep(axis: string, pitch: number, labelW: number, opts?: { gap?: number; wide?: boolean }): number;
 export function priceUnit(currency: string, unit?: string): { label: string; factor: number; decimals: number };
 
 // Server side (self-hosted server/prices.js and Marco Cloud): one refresh round with the caller's own network.

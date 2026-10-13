@@ -29,7 +29,7 @@ export function bandMarks(names: string[]): string[] {
 const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[øØ]/g, 'o').replace(/[æÆ]/g, 'ae').toLowerCase();
 
 /** The grid company list: a search box and the companies of the zone first, the other Danish zone after. */
-function GridPicker({ o, onPick, error }: { o: PriceWidgetOptions; onPick: (id: string) => void; error?: string }) {
+function GridPicker({ o, onPick, error, loading }: { o: PriceWidgetOptions; onPick: (id: string) => void; error?: string; loading?: boolean }) {
   const [q, setQ] = useState('');
   const coll = new Intl.Collator(locale());
   const match = (n: string) => !q.trim() || fold(n).includes(fold(q.trim()));
@@ -57,6 +57,7 @@ function GridPicker({ o, onPick, error }: { o: PriceWidgetOptions; onPick: (id: 
                   <span class="grid-picker__dot" aria-hidden="true" />
                   <span class="grid-picker__name">{c.name}</span>
                   {g.zone !== o.zone && <span class="muted small">{c.zone}</span>}
+                  {loading && o.grid === c.id && <span class="spinner spinner--xs" role="status" aria-label={t('Cargando…')} />}
                 </button>
               ))}
             </div>
@@ -232,7 +233,11 @@ function BandsEditor({ o, set, err }: { o: PriceWidgetOptions; set: (fn: (p: Pri
 }
 
 /** The tariff part of the price widget's settings. */
-export function PriceTariffFields({ o, set, err }: { o: PriceWidgetOptions; set: (fn: (p: PriceWidgetOptions) => void) => void; err: (k: string) => string | undefined }) {
+export function PriceTariffFields({ o, set, err, gridLoading = false }: {
+  o: PriceWidgetOptions; set: (fn: (p: PriceWidgetOptions) => void) => void; err: (k: string) => string | undefined;
+  /** the chosen company's tariffs are being fetched for the first time */
+  gridLoading?: boolean;
+}) {
   const dk = GRID_ZONES.includes(o.zone);
   const noBands = BANDS_EXCLUDED_ZONES.includes(o.zone);
   const tariff = o.tariff ?? 'none';
@@ -283,8 +288,16 @@ export function PriceTariffFields({ o, set, err }: { o: PriceWidgetOptions; set:
         </div>
       </Field>
       {tariff === 'grid' && dk && (
-        <Field label={t('Compañía de red')} error={err('grid')} hint={company ? t('Elegida: {c}.', { c: company.name }) : t('Viene en tu factura de la luz.')}>
-          <GridPicker o={o} onPick={pick} error={err('grid')} />
+        <Field
+          label={t('Compañía de red')}
+          error={err('grid')}
+          hint={company
+            ? gridLoading
+              ? t('Cargando la tarifa de {c}. La primera vez puede tardar unos segundos.', { c: company.name })
+              : t('Elegida: {c}.', { c: company.name })
+            : t('Viene en tu factura de la luz.')}
+        >
+          <GridPicker o={o} onPick={pick} error={err('grid')} loading={gridLoading} />
         </Field>
       )}
       {tariff === 'bands' && !noBands && <BandsEditor o={o} set={set} err={err} />}
