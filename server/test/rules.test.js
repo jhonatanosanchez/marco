@@ -84,6 +84,11 @@ test('tidyTitle: un-shout and strip redundant birthday words', () => {
   assert.equal(tidyTitle('Cumpleaños de Juan Pérez', { emoji: '🎂' }), 'Juan Pérez');
   assert.equal(tidyTitle("María's birthday", { emoji: '🎂' }), 'María');
   assert.equal(tidyTitle('Cumple', { emoji: '🎂' }), 'Cumple');
+  // a name that starts like "do"/"da"/"del" keeps those letters
+  assert.equal(tidyTitle('CUMPLE DORU', { emoji: '🎂' }), 'Doru');
+  assert.equal(tidyTitle('Cumple Delia', { emoji: '🎂' }), 'Delia');
+  assert.equal(tidyTitle('Aniversário da Ana', { emoji: '🎂' }), 'Ana');
+  assert.equal(tidyTitle('Birthday Ofelia', { emoji: '🎂' }), 'Ofelia');
   assert.equal(tidyTitle('REUNIÓN DE EQUIPO', { emoji: '💼' }), 'Reunión de Equipo');
   assert.equal(tidyTitle('Cumple de Ana', { emoji: '💼' }), 'Cumple de Ana');
 });

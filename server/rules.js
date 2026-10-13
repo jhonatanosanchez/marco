@@ -32,7 +32,7 @@ export function decorate(rules, source, title, description) {
   };
 }
 
-const BIRTHDAY_PREFIX_RE = /^\s*(?:feliz\s+)?(?:cumplea[ñn]os|cumple|cumpleanos|birthday|b-?day|anivers[aá]rio|aniversario|aniversari)\b\s*(?:de[l]?|do|da|of)?\s*[:\-–·]?\s*/iu;
+const BIRTHDAY_PREFIX_RE = /^\s*(?:feliz\s+)?(?:cumplea[ñn]os|cumple|cumpleanos|birthday|b-?day|anivers[aá]rio|aniversario|aniversari)\b\s*(?:(?:del?|do|da|of)\s+)?[:\-–·]?\s*/iu;
 const BIRTHDAY_SUFFIX_RE = /^(.+?)(?:'s|’s)?\s+(?:birthday|b-?day|cumple(?:años)?|anivers[aá]rio)\s*$/iu;
 
 /** "MARÍA LÓPEZ" → "María López" (all-caps titles are much wider on screen). Short words stay lowercase. */
