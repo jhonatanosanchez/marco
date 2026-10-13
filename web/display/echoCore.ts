@@ -1,32 +1,13 @@
 // Modo Echo Show (fork fsrhome): lógica pura, sin DOM, para probarla en Node.
 // Horario de apertura, guardia de fps y las URLs de la recarga a lite / de la recarga matutina.
-import type { EchoSettings } from '../shared/types';
+import { HHMM } from '../shared/echo';
 
-export const ECHO_DEFAULTS: EchoSettings = {
-  enabled: false, keepAlive: 'mp3', openFrom: '05:00', openTo: '16:00', fullscreenOnTap: true, fpsGuard: true,
-};
+// Defaults y normalización viven en shared/echo.ts (los usa también el admin); se reexportan aquí.
+export { ECHO_DEFAULTS, normalizeEcho } from '../shared/echo';
+
 export const FPS_THRESHOLD = 30;
 export const FPS_SAMPLES = 10;
 export const FPS_WARMUP_MS = 10_000;
-
-const HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
-const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
-
-/** La config del servidor ya viene validada; esto cubre configs viejas o incompletas campo por campo. */
-export function normalizeEcho(raw: unknown): EchoSettings {
-  const r = isObj(raw) ? raw : {};
-  const D = ECHO_DEFAULTS;
-  const b = (v: unknown, d: boolean) => (typeof v === 'boolean' ? v : d);
-  const h = (v: unknown, d: string) => (typeof v === 'string' && HHMM.test(v) ? v : d);
-  return {
-    enabled: b(r.enabled, D.enabled),
-    keepAlive: r.keepAlive === 'off' || r.keepAlive === 'mp3' ? r.keepAlive : D.keepAlive,
-    openFrom: h(r.openFrom, D.openFrom),
-    openTo: h(r.openTo, D.openTo),
-    fullscreenOnTap: b(r.fullscreenOnTap, D.fullscreenOnTap),
-    fpsGuard: b(r.fpsGuard, D.fpsGuard),
-  };
-}
 
 export function hmToMin(s: string): number {
   if (typeof s !== 'string' || !HHMM.test(s)) return -1;

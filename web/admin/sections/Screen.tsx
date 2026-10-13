@@ -9,6 +9,7 @@ import { has, limit, offers } from '../caps';
 import { locale, t } from '../i18n';
 import { cssBytes, EMAIL_RE } from '../util';
 import { MIN_PASSWORD, passwordProblem } from '../../shared/password';
+import { ECHO_DEFAULTS } from '../../shared/echo';
 import type { SectionProps } from './common';
 import { PrivacyCard } from './Privacy';
 import { TwoFactorCard } from '../components/TwoFactor';
@@ -19,6 +20,9 @@ export function ScreenSection({ cfg, set, errors, screenId, saved, go }: Section
   const s = cfg.screen;
   const cssMax = limit('customCssBytes');
   const nm = s.nightMode;
+  const ec = s.echo ?? ECHO_DEFAULTS;
+  // configs viejas pueden no traer screen.echo: se completa con los defaults al editar
+  const setEcho = (patch: Partial<typeof ec>) => set((d) => void (d.screen.echo = { ...ec, ...d.screen.echo, ...patch }));
   return (
     <>
       <PageHeader scope="screen" title={t('Ajustes de la pantalla')} desc={t('Nombre, idioma, apariencia y modo noche de la pantalla.')} />
@@ -64,6 +68,32 @@ export function ScreenSection({ cfg, set, errors, screenId, saved, go }: Section
           <Field label={t('Brillo nocturno')}>
             <Slider value={nm.dim} min={0.05} max={1} step={0.05} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => set((d) => void (d.screen.nightMode.dim = v))} />
           </Field>
+        </div>
+      </Card>
+      <Card id="scr-echo" scope="screen" title={t('Echo Show')} icon="monitor" desc={t('Para pantallas Echo Show en Silk: mantiene la página abierta, pide pantalla completa al tocar y cierra fuera de horario.')}>
+        <ToggleRow label={t('Activar modo Echo Show')} checked={ec.enabled} onChange={(v) => setEcho({ enabled: v })} />
+        <div class={`grid grid--3 ${ec.enabled ? '' : 'is-disabled'}`}>
+          <Field label={t('Mantener viva')}>
+            <Segmented
+              full
+              value={ec.keepAlive}
+              options={[
+                { value: 'mp3', label: t('Audio mudo (mp3)') },
+                { value: 'off', label: t('Apagado') },
+              ]}
+              onChange={(v) => setEcho({ keepAlive: v === 'off' ? 'off' : 'mp3' })}
+            />
+          </Field>
+          <Field label={t('Abre a las')} error={errors['screen.echo.openFrom']}>
+            <input class={`input ${errors['screen.echo.openFrom'] ? 'is-invalid' : ''}`} type="time" value={ec.openFrom} onInput={(e) => setEcho({ openFrom: e.currentTarget.value })} />
+          </Field>
+          <Field label={t('Cierra a las')} error={errors['screen.echo.openTo']}>
+            <input class={`input ${errors['screen.echo.openTo'] ? 'is-invalid' : ''}`} type="time" value={ec.openTo} onInput={(e) => setEcho({ openTo: e.currentTarget.value })} />
+          </Field>
+        </div>
+        <div class={ec.enabled ? '' : 'is-disabled'}>
+          <ToggleRow label={t('Pantalla completa al tocar')} checked={ec.fullscreenOnTap} onChange={(v) => setEcho({ fullscreenOnTap: v })} />
+          <ToggleRow label={t('Pasar a modo ligero si va lenta')} checked={ec.fpsGuard} onChange={(v) => setEcho({ fpsGuard: v })} />
         </div>
       </Card>
       {has('privacy') && <PrivacyCard cfg={cfg} set={set} errors={errors} go={go} />}
