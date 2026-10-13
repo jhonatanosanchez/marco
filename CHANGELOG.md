@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.14.0] - 2026-10-13
 
 ### Added
 - Optional two-step sign-in for the admin with an authenticator app (*Security → Two-step verification*), with ten
