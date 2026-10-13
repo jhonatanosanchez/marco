@@ -29,21 +29,24 @@ test('new screens and screens saved before the option keep the photo on the side
   assert.equal(old.ok, true, JSON.stringify(old.errors));
   assert.equal(old.value.screens[0].background.scope, 'side');
   assert.equal(old.value.screens[0].background.calendarOpacity, 0.5);
+  assert.equal(old.value.screens[0].background.calendarBlur, 18);
 });
 
 test('the whole-screen photo and its calendar transparency are kept per screen and reach the display', () => {
   const c = defaultConfig();
   c.screens[0].background.scope = 'screen';
   c.screens[0].background.calendarOpacity = 0.2;
+  c.screens[0].background.calendarBlur = 0;
   const { ok, errors, value } = validateConfig(c);
   assert.equal(ok, true, JSON.stringify(errors));
   const d = displayConfig(value, value.screens[0]);
   assert.equal(d.background.scope, 'screen');
   assert.equal(d.background.calendarOpacity, 0.2);
+  assert.equal(d.background.calendarBlur, 0);
 });
 
 test('invalid values are rejected with a path and fall back to the default', () => {
-  for (const [k, bad, def] of [['scope', 'everywhere', 'side'], ['scope', true, 'side'], ['calendarOpacity', 1.2, 0.5], ['calendarOpacity', -0.1, 0.5], ['calendarOpacity', 'glass', 0.5]]) {
+  for (const [k, bad, def] of [['scope', 'everywhere', 'side'], ['scope', true, 'side'], ['calendarOpacity', 1.2, 0.5], ['calendarOpacity', -0.1, 0.5], ['calendarOpacity', 'glass', 0.5], ['calendarBlur', 41, 18], ['calendarBlur', -1, 18]]) {
     const c = defaultConfig();
     c.screens[0].background[k] = bad;
     const { ok, errors, value } = validateConfig(c);
@@ -112,6 +115,10 @@ test('styles: the photo spans the whole screen, the calendar is glass, lite mode
   assert.match(css, /\.lite #app\.bg-screen \.main \{ -webkit-backdrop-filter: none; backdrop-filter: none; \}/);
   const modern = read('web/display/styles-modern.css');
   assert.match(modern, /\.lite\.style-modern #app\.bg-screen \.main \{ -webkit-backdrop-filter: none; backdrop-filter: none; \}/);
+  // background.calendarBlur: the blur follows --sheet-blur, and 0 turns the frosted glass off
+  assert.match(css, /#app\.bg-screen \.main \{[^}]*blur\(calc\(var\(--sheet-blur, 18\)/);
+  assert.match(css, /\.sheet-noblur #app\.bg-screen \.main \{ -webkit-backdrop-filter: none; backdrop-filter: none; \}/);
+  assert.match(modern, /\.style-modern\.sheet-noblur #app\.bg-screen \.main \{ -webkit-backdrop-filter: none; backdrop-filter: none; \}/);
   const kids = read('web/display/styles-kids.css');
   assert.match(kids, /\.style-modern #app\.is-kids\.bg-screen \.photo-area \{ display: block; \}/);
   // the display sets the class and the variable from the config

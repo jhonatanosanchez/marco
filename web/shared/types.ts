@@ -252,6 +252,8 @@ export interface BackgroundConfig {
   scope?: BackgroundScope;
   /** with scope 'screen': how solid the calendar glass is, 0 = most see-through, 1 = almost opaque (default 0.5) */
   calendarOpacity?: number;
+  /** Blur of the photo behind that calendar glass, 0..40 (0 = none). */
+  calendarBlur?: number;
 }
 
 export interface CalendarSource {

@@ -1,5 +1,5 @@
 import { useRef } from 'preact/hooks';
-import { CALENDAR_OPACITY_DEFAULT, GLASS_DEFAULTS, glassVars, normalizeGlass, SCREEN_PHOTO_PRESETS, type PhotoStats } from '../../shared/glass';
+import { CALENDAR_BLUR_DEFAULT, CALENDAR_OPACITY_DEFAULT, GLASS_DEFAULTS, glassVars, normalizeGlass, SCREEN_PHOTO_PRESETS, type PhotoStats } from '../../shared/glass';
 import type { BackgroundScope, DisplayStyle, FrameCorner, GlassConfig, LayoutPreset, PlannerBar, WidgetPlacement } from '../../shared/types';
 import { Icon } from '../components/icons';
 import { EventStyleField, PLANNER_CALENDAR, undoPlannerPick, weeksCap, WeeksField } from '../components/PlannerFields';
@@ -595,16 +595,28 @@ export function PhotoScopeFields({ cfg, set, kids }: Pick<SectionProps, 'cfg' | 
         />
       </Field>
       {scope === 'screen' && b.enabled && applies && (
-        <Field label={t('Transparencia del calendario')} hint={t('En la Raspberry Pi (modo ligero) no hay desenfoque y el calendario es algo más sólido.')}>
-          <Slider
-            value={b.calendarOpacity ?? CALENDAR_OPACITY_DEFAULT}
-            min={0}
-            max={1}
-            step={0.05}
-            format={(v) => t(opacityWord(v))}
-            onChange={(v) => set((d) => void (d.background.calendarOpacity = v))}
-          />
-        </Field>
+        <div class="grid grid--2">
+          <Field label={t('Transparencia del calendario')}>
+            <Slider
+              value={b.calendarOpacity ?? CALENDAR_OPACITY_DEFAULT}
+              min={0}
+              max={1}
+              step={0.05}
+              format={(v) => t(opacityWord(v))}
+              onChange={(v) => set((d) => void (d.background.calendarOpacity = v))}
+            />
+          </Field>
+          <Field label={t('Desenfoque del calendario')}>
+            <Slider
+              value={b.calendarBlur ?? CALENDAR_BLUR_DEFAULT}
+              min={0}
+              max={40}
+              step={1}
+              format={(v) => (v ? `${v}` : t('Sin desenfoque'))}
+              onChange={(v) => set((d) => void (d.background.calendarBlur = v))}
+            />
+          </Field>
+        </div>
       )}
     </div>
   );

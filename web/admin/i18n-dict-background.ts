@@ -24,9 +24,5 @@ export const ROWS_BACKGROUND: [string, string, string][] = [
     'As disposições para crianças só mostram foto com “Ecrã inteiro”.',
   ],
   ['Las fotos de fondo están desactivadas en esta pantalla.', 'Background photos are off on this screen.', 'As fotos de fundo estão desativadas neste ecrã.'],
-  [
-    'En la Raspberry Pi (modo ligero) no hay desenfoque y el calendario es algo más sólido.',
-    'On the Raspberry Pi (lite mode) there is no blur and the calendar is a little more solid.',
-    'No Raspberry Pi (modo leve) não há desfoque e o calendário fica um pouco mais sólido.',
-  ],
+  ['Desenfoque del calendario', 'Calendar blur', 'Desfoque do calendário'],
 ];

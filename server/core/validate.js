@@ -307,6 +307,7 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs, familyMemberIds 
     // the photo in the side area or behind the whole screen (the calendar then drawn over it as glass)
     scope: oneOf(ctx, `${p}.background.scope`, bg.scope, D.background.scope, ['side', 'screen']),
     calendarOpacity: num(ctx, `${p}.background.calendarOpacity`, bg.calendarOpacity, D.background.calendarOpacity, 0, 1),
+    calendarBlur: num(ctx, `${p}.background.calendarBlur`, bg.calendarBlur, D.background.calendarBlur, 0, 40, true),
   };
 
   const ca = obj(ctx, `${p}.calendar`, x.calendar);

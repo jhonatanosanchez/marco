@@ -264,11 +264,13 @@ body {
 #app.bg-screen .main {
   --sheet-rgb: 10 10 14;
   background: rgb(var(--sheet-rgb) / var(--sheet-a, 0.6));
-  -webkit-backdrop-filter: blur(2.6rem) saturate(1.5);
-  backdrop-filter: blur(2.6rem) saturate(1.5);
+  -webkit-backdrop-filter: blur(calc(var(--sheet-blur, 18) * 0.144rem)) saturate(1.5);
+  backdrop-filter: blur(calc(var(--sheet-blur, 18) * 0.144rem)) saturate(1.5);
 }
 .theme-light #app.bg-screen .main { --sheet-rgb: 244 242 238; }
 .lite #app.bg-screen .main { -webkit-backdrop-filter: none; backdrop-filter: none; }
+/* background.calendarBlur 0: no frosted glass, the photo stays sharp behind the calendar */
+.sheet-noblur #app.bg-screen .main { -webkit-backdrop-filter: none; backdrop-filter: none; }
 /* thin dark glass: a soft shadow keeps the text readable over the bright parts of the photo */
 .sheet-thin #app.bg-screen .main { text-shadow: 0 0.1rem 0.7rem rgb(0 0 0 / 0.5); }
 /* the photo is darker where the clock and the weather sit on it, lighter behind the calendar */

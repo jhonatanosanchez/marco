@@ -129,6 +129,9 @@ export function glassVars(raw: GlassConfig | undefined, photo: PhotoStats | null
 /** Default of background.calendarOpacity. */
 export const CALENDAR_OPACITY_DEFAULT = 0.5;
 
+/** Default of background.calendarBlur (0..40, the same scale as the glass blur). */
+export const CALENDAR_BLUR_DEFAULT = 18;
+
 /**
  * Layouts where background.scope 'screen' changes something. The others already have the photo behind the whole
  * screen (left / right, big time, photo frame, board), or no photo at all (bedside, a full-screen widget).

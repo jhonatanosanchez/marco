@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.14.1] - 2026-10-13
+
+### Added
+- With the photo on the whole screen, a *Calendar blur* slider sits next to the transparency one. Set it to 0 to turn
+  the frosted glass off and keep the photo sharp behind the calendar.
+
 ## [0.14.0] - 2026-10-13
 
 ### Added

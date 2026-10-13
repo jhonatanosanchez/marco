@@ -386,6 +386,8 @@ function applyConfig(raw: DisplayConfig): void {
   if (pbs === 'side' || pbs === 'screen') cfg.background.scope = pbs;
   const pco = Number(params.get('calOpacity') ?? NaN);
   if (params.has('calOpacity') && Number.isFinite(pco)) cfg.background.calendarOpacity = Math.min(1, Math.max(0, pco));
+  const pcb = Number(params.get('calBlur') ?? NaN);
+  if (params.has('calBlur') && Number.isFinite(pcb)) cfg.background.calendarBlur = Math.min(40, Math.max(0, Math.round(pcb)));
   const pfx = params.get('wxfx');
   if (pfx === 'off' || pfx === 'simple' || pfx === 'rich') cfg.background.weatherFx = pfx;
   // the top-bottom preset has a shorter calendar: cap the number of week rows so chips stay readable
@@ -428,6 +430,9 @@ function applyConfig(raw: DisplayConfig): void {
   const sheetA = calendarSheetAlpha(cfg.background.calendarOpacity, { light, lite });
   root.style.setProperty('--sheet-a', String(sheetA));
   root.classList.toggle('sheet-thin', !light && sheetA < 0.5);
+  const sheetBlur = Math.min(40, Math.max(0, Number(cfg.background.calendarBlur ?? 18) || 0));
+  root.style.setProperty('--sheet-blur', String(sheetBlur));
+  root.classList.toggle('sheet-noblur', sheetBlur === 0);
 
   if (cfg.screen.customCss) {
     if (!customStyle) {
