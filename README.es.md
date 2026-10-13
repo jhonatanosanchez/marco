@@ -134,7 +134,8 @@ color de la foto, transparencia, desenfoque y borde de luz:
   lluvia/nieve animadas.
 - **Teletipo de noticias** desde cualquier fuente RSS/Atom, una lista de tareas y un mensaje del día.
 - **Precio de la luz:** un widget con el precio del mercado diario de tu zona (casi toda Europa): gráfica de hoy y
-  mañana, el precio de ahora o las horas más baratas que quedan, con tus peajes e IVA. Mira
+  mañana, el precio de ahora, las horas más baratas que quedan o las próximas 24 horas, con tus peajes e IVA (en
+  Dinamarca, la tarifa de tu compañía de red hora a hora; en cualquier país, tus tramos horarios). Mira
   [Precio de la luz](#precio-de-la-luz).
 - **Fondo de fotos:** fotos de stock, tu propia galería o álbumes de tu biblioteca de [Immich](https://immich.app/),
   transiciones WebGL, zoom lento, un suave efecto ambiental de "aurora" y **recorte inteligente** que mantiene al
@@ -898,13 +899,33 @@ los datos.
 
 - **Vista:** *Automática* (en una esquina pequeña o mediana, el precio de ahora; en una grande o en la columna
   lateral, también la gráfica; a pantalla completa, todo), *Gráfica 24 h* (barras de barato a caro, la hora actual
-  marcada y mañana en cuanto se publica, hacia las 13:00), *Precio ahora* y *Franjas baratas* (por ejemplo "02:00 a
-  05:00").
+  marcada y mañana en cuanto se publica, hacia las 13:00), *Precio ahora*, *Franjas baratas* (por ejemplo "02:00 a
+  05:00") y *Próximas 24 h* (el precio de ahora en grande con su nivel, el más bajo, la media y el más alto, y una
+  fila por hora con su barra desde la hora actual, en una o dos columnas, las que quepan). En una pantalla vertical a
+  pantalla completa, *Automática* usa *Próximas 24 h*: una lista cabe mejor que una gráfica ancha.
+- **Tarifa de acceso:** lo que se suma al mercado según la hora.
+  - *Compañía de red* (Dinamarca, DK1 y DK2): eliges tu netselskab (Radius, Cerius, N1, TREFOR, Konstant, Dinel y
+    otras, 35 compañías) y Marco suma cada hora su tarifa de hogar (C), las tarifas de Energinet (transmisión y
+    sistema) y el impuesto de la electricidad (elafgift), de Energinet DataHub (dataset DatahubPricelist, sin clave).
+    Cambian por temporada y algunas por días: se leen hora a hora, también mañana. Si una compañía aún no ha
+    publicado las siguientes, se usa la última conocida hasta 31 días y la pantalla pone *estimada*; si falta una
+    parte, la pantalla enseña el precio del mercado con una nota en vez de un total demasiado bajo. Al elegirla, el
+    IVA pasa a 25 %.
+  - *Tramos horarios* (cualquier país): hasta 4 tramos con su precio por kWh sin IVA y sus horas (se toca una hora
+    para pasarla al tramo siguiente), con otras horas para fines de semana y festivos si quieres. *España 2.0TD*
+    rellena punta (10-14 y 18-22), llano (8-10, 14-18 y 22-24) y valle (0-8, y todo el día en sábados, domingos y
+    festivos nacionales de fecha fija: 1 y 6 de enero, 1 de mayo, 15 de agosto, 12 de octubre, 1 de noviembre, 6, 8
+    y 25 de diciembre); hay otro para Ceuta y Melilla. Los precios los pones tú, como vienen en tu factura. Con el
+    PVPC no hay tramos: ya incluye los peajes.
+  - El orden: (mercado + tarifa o tramo + recargo fijo) x (1 + IVA). La pantalla pone "Con tarifa de red" o "Con
+    tramos horarios" al pie, y el crédito de Energinet DataHub.
 - **Recargo fijo por kWh** e **IVA**, para ver lo que pagas de verdad. El recargo (peajes, impuestos, margen de tu
-  compañía) se suma antes del IVA. Con 0 y 0 ves el precio del mercado.
+  compañía; con compañía de red, solo el margen de tu compañía) se suma antes del IVA. Con 0 y 0 ves el precio del
+  mercado.
 - Muchas zonas publican un precio cada 15 minutos; la gráfica muestra la media de cada hora (o los cuartos de hora,
   en *Más opciones*). Los días de cambio de hora tienen 23 o 25 horas.
-- **Probar** enseña el precio de ahora con tu recargo e IVA, y si los de mañana ya están publicados.
+- **Probar** enseña el precio de ahora desglosado (mercado, tarifa de la compañía, Energinet, elafgift o tramo,
+  recargo, IVA y total), y si los de mañana ya están publicados.
 
 | Zona | Fuente | Clave |
 | --- | --- | --- |

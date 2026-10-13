@@ -22,6 +22,8 @@ import { logActivity } from '../activity.js';
 import { resolveScreenList } from '../displays.js';
 import { handlePrivacy, privacyResponse } from '../privacy.js';
 import { testWidget } from '../widgets.js';
+import { getGridTariffs } from '../tariffs.js';
+import { gridCompany } from '../core/tariffsCore.js';
 import { testPrices, entsoeToken, entsoeTokenStatus, checkEntsoeToken, tokenChanged, ENTSOE_TOKEN_RE } from '../prices.js';
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -114,7 +116,9 @@ export function adminRouter({ onConfigSaved } = {}) {
   // electricity prices: the zone's prices now, through the shared cache (server/prices.js)
   r.post('/test/prices', wrap(async (req, res) => {
     const zone = typeof req.body?.zone === 'string' ? req.body.zone : '';
-    res.json(await testPrices(zone));
+    const grid = typeof req.body?.grid === 'string' ? req.body.grid : '';
+    if (grid && gridCompany(grid)?.zone !== zone) return res.json({ ok: false, error: 'invalid_grid' });
+    res.json(await testPrices(zone, grid ? () => getGridTariffs(grid, zone, { force: true }) : null));
   }));
   // ENTSO-E token for the price widget (zones without a free source): write-only, like the weather key
   r.get('/prices/token', (req, res) => res.json(entsoeTokenStatus()));

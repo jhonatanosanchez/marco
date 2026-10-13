@@ -489,7 +489,7 @@ export function retryAfterMs(v, now = Date.now()) {
 
 // ------------------------------------------------------------------------------------------- price math
 
-export const PRICE_VIEWS = ['auto', 'chart', 'now', 'cheap'];
+export const PRICE_VIEWS = ['auto', 'chart', 'now', 'cheap', 'next'];
 export const PRICE_UNITS = ['main', 'sub'];
 export const PRICE_RESOLUTIONS = ['hour', 'quarter'];
 export const MAX_VAT = 50;
@@ -507,9 +507,15 @@ export function finalPrice(perMwh, { surcharge = 0, vat = 0 } = {}) {
 /** Currency a widget shows: the zone's own when there is one and the widget does not ask for euros. */
 export const widgetCurrency = (zone, opt = 'auto') => (opt === 'EUR' ? 'EUR' : (typeof zone === 'string' ? priceZone(zone) : zone)?.currency || 'EUR');
 
-/** Slots with `p` = final price per kWh in `currency`. */
-export function pricedSlots(slots, { currency = 'EUR', surcharge = 0, vat = 0 } = {}) {
-  return slots.map((s) => ({ t: s.t, m: s.m, p: finalPrice(currency !== 'EUR' && s.loc != null ? s.loc : s.eur, { surcharge, vat }) }));
+/**
+ * Slots with `p` = final price per kWh in `currency`. `add(t)`: what a grid tariff or a time band adds per kWh before
+ * VAT at the slot's start, as { add } (tariffsCore.js tariffAdder), or null when there is nothing to add.
+ */
+export function pricedSlots(slots, { currency = 'EUR', surcharge = 0, vat = 0, add = null } = {}) {
+  return slots.map((s) => {
+    const extra = add ? add(s.t)?.add ?? 0 : 0;
+    return { t: s.t, m: s.m, p: finalPrice(currency !== 'EUR' && s.loc != null ? s.loc : s.eur, { surcharge: (Number(surcharge) || 0) + extra, vat }) };
+  });
 }
 
 /** Averages per hour (time-weighted; hourly sources pass through). On the autumn DST day an hour repeats: 25 hours. */

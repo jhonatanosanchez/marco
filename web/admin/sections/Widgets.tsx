@@ -222,7 +222,7 @@ function WidgetCard({ w, i, n, full, errors, upd, remove, move, go, setScreenId 
           />
         </Field>
       </div>
-      {prices && w.options.prices && <PriceWidgetFields w={w} errors={errors} upd={upd} part="main" />}
+      {prices && w.options.prices && <PriceWidgetFields w={w} errors={errors} upd={upd} part="main" tz={full.datetime.timezone} />}
       {!prices && (
         <>
           <Field
@@ -294,7 +294,7 @@ function WidgetCard({ w, i, n, full, errors, upd, remove, move, go, setScreenId 
       <button type="button" class="link-btn widget-more" aria-expanded={more} onClick={() => setMore(!more)}>
         <Icon name={more ? 'up' : 'chevron'} size={14} /> {t('Más opciones')}
       </button>
-      {more && prices && w.options.prices && <PriceWidgetFields w={w} errors={errors} upd={upd} part="more" />}
+      {more && prices && w.options.prices && <PriceWidgetFields w={w} errors={errors} upd={upd} part="more" tz={full.datetime.timezone} />}
       {more && !prices && (
         <div class="stack">
           <Field label={t('Ajuste')} hint={t('Solo cuenta cuando el widget ocupa toda la pantalla.')}>

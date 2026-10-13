@@ -7,16 +7,18 @@ import {
   DKK_PER_EUR, finalPrice, hourly, levelLimits, levelOf, localMidnight, MAX_SURCHARGE, MAX_VAT, MIN_SURCHARGE, PRICE_SOURCES, PRICE_ZONES, priceUnit,
   priceZone, slotAt, widgetCurrency, zoneForTimeZone, zoneSources,
 } from '../../../server/core/pricesCore.js';
+import { BANDS_EXCLUDED_ZONES, bandIndexAt, gridCompany, priceParts, tariffAdder, tariffMode } from '../../../server/core/tariffsCore.js';
 import { api, ApiError } from '../api';
 import { toast } from '../components/feedback';
 import { Icon } from '../components/icons';
 import { Button, Field, NumberInput, Segmented, Select, TextInput } from '../components/ui';
 import { locale, t } from '../i18n';
 import { edition } from '../caps';
+import { PriceTariffFields } from './PriceTariff';
 
 /** Options of a new price widget: the zone of the household's time zone. */
 export const newPriceOptions = (tz: string): PriceWidgetOptions => ({
-  zone: zoneForTimeZone(tz), view: 'auto', unit: 'main', currency: 'auto', surcharge: 0, vat: 0, windowHours: 3, resolution: 'hour',
+  zone: zoneForTimeZone(tz), view: 'auto', unit: 'main', currency: 'auto', surcharge: 0, vat: 0, windowHours: 3, resolution: 'hour', tariff: 'none', grid: '',
 });
 
 const ERROR_TEXT: Record<string, string> = {
@@ -30,13 +32,30 @@ const ERROR_TEXT: Record<string, string> = {
   http_error: 'La fuente respondió con un error.',
   bad_response: 'La fuente envió una respuesta que no se puede leer.',
   not_configured: 'Falta la clave de ENTSO-E.',
+  invalid_grid: 'Elige una compañía de red de la misma zona.',
 };
 
 const VIEW_HINT: Record<string, string> = {
-  auto: 'En una esquina pequeña o mediana, el precio de ahora. En una grande o en la columna lateral, también la gráfica. A pantalla completa, todo.',
+  auto: 'En una esquina pequeña o mediana, el precio de ahora. En una grande o en la columna lateral, también la gráfica. A pantalla completa, todo; en una pantalla vertical, las próximas 24 horas.',
   chart: 'Barras de hoy desde las 00:00, de barato a caro, con la hora actual marcada. Mañana se añade cuando se publica, hacia las 13:00.',
   now: 'El precio de ahora en grande, si es barato, normal o caro, y hacia dónde va la próxima hora.',
   cheap: 'Las franjas más baratas que quedan por delante, por ejemplo de 02:00 a 05:00.',
+  next: 'El precio de ahora con su nivel, el más bajo, la media y el más alto, y una fila por hora con su barra. Las que quepan.',
+};
+
+const viewOptions = () => [
+  { value: 'auto' as const, label: t('Automática') },
+  { value: 'chart' as const, label: t('Gráfica 24 h') },
+  { value: 'now' as const, label: t('Precio ahora') },
+  { value: 'cheap' as const, label: t('Franjas baratas') },
+  { value: 'next' as const, label: t('Próximas 24 h') },
+];
+
+/** The fixed extra's hint: what is left to add once grid tariffs or time bands are in. */
+const SURCHARGE_HINT: Record<string, string> = {
+  none: 'Peajes, impuestos y el margen de tu compañía, sin IVA. Déjalo en 0 para ver el precio del mercado.',
+  grid: 'Solo el margen de tu compañía, sin IVA. Las tarifas de red y el impuesto sobre la electricidad ya se suman.',
+  bands: 'Impuestos y el margen de tu compañía, sin IVA. Los peajes ya van en los tramos.',
 };
 
 /** A surcharge per kWh from one currency to another (the krone is pegged to the euro), within the allowed range. */
@@ -73,7 +92,7 @@ function zoneOptions() {
   return rows.sort((a, b) => coll.compare(a.group, b.group) || coll.compare(a.label, b.label));
 }
 
-function PriceTest({ o, res }: { o: PriceWidgetOptions; res: TestPricesResponse }) {
+function PriceTest({ o, res, tz: homeTz }: { o: PriceWidgetOptions; res: TestPricesResponse; tz: string }) {
   if (!res.ok) {
     return (
       <div class="test-result is-err">
@@ -90,7 +109,8 @@ function PriceTest({ o, res }: { o: PriceWidgetOptions; res: TestPricesResponse 
   const slots = res.slots.map(([ts, m, eur, loc]) => ({ t: ts * 1000, m, eur, loc }));
   const perMwh = (s: { eur: number; loc?: number }) => (currency !== 'EUR' && s.loc != null ? s.loc : s.eur);
   const cur = slotAt(slots, now);
-  const priced = slots.map((s) => ({ t: s.t, m: s.m, p: finalPrice(perMwh(s), o) * unit.factor }));
+  const add = tariffAdder(o, { gridList: res.grid?.hours ?? null, tz: homeTz, currency, dkkPerEur: DKK_PER_EUR });
+  const priced = slots.map((s) => ({ t: s.t, m: s.m, p: finalPrice(perMwh(s), { surcharge: o.surcharge + (add?.(s.t)?.add ?? 0), vat: o.vat }) * unit.factor }));
   const hours = hourly(priced);
   const tz = priceZone(res.zone)?.tz ?? 'Europe/Brussels';
   const hour = slotAt(hours, now);
@@ -98,6 +118,15 @@ function PriceTest({ o, res }: { o: PriceWidgetOptions; res: TestPricesResponse 
   const lvl = hour ? levelOf(hour.p, levelLimits(today)) : 'mid';
   const tomorrow = slots.some((s) => s.t >= localMidnight(now, tz, 1) + 12 * 3600_000);
   const market = cur ? (perMwh(cur) / 1000) * unit.factor : null;
+  // the hour's parts: the market (hourly average), what the tariff adds, the extra, VAT
+  const hourMarket = hour ? hourly(slots.map((s) => ({ t: s.t, m: s.m, p: perMwh(s) / 1000 }))).find((h) => h.t === hour.t)?.p ?? null : null;
+  const a = hour ? add?.(hour.t) ?? null : null;
+  const parts = hourMarket != null ? priceParts(hourMarket, { grid: a?.grid, net: a?.net, tax: a?.tax, band: a?.band, extra: o.surcharge, vat: o.vat }) : null;
+  const mode = tariffMode(o);
+  // the parts with one more decimal (Energinet's tariffs and the tax are fractions of an øre or a cent)
+  const fmtPart = new Intl.NumberFormat(locale(), { minimumFractionDigits: unit.decimals + 1, maximumFractionDigits: unit.decimals + 1 });
+  const f = (x: number) => fmtPart.format(x * unit.factor);
+  const bandName = mode === 'bands' && hour && o.bands ? o.bands.list[bandIndexAt(o.bands, hour.t, homeTz)]?.name || t('Tramo {n}', { n: bandIndexAt(o.bands, hour.t, homeTz) + 1 }) : '';
   const quarter = slots.length > 1 && slots[1].t - slots[0].t === 15 * 60_000;
   return (
     <div class="widget-test">
@@ -115,15 +144,48 @@ function PriceTest({ o, res }: { o: PriceWidgetOptions; res: TestPricesResponse 
           {t('Fuente')}: {PRICE_SOURCES[res.source ?? '']?.name ?? res.credit}
         </span>
       </div>
+      {parts && (
+        <dl class="price-parts">
+          <dt>{t('Mercado')}</dt>
+          <dd>{f(parts.market)}</dd>
+          {mode === 'grid' && a && (
+            <>
+              <dt>{t('Tarifa de {c}', { c: gridCompany(o.grid ?? '')?.name ?? '' })}</dt>
+              <dd>{f(parts.grid)}</dd>
+              <dt>{t('Tarifas de Energinet')}</dt>
+              <dd>{f(parts.net)}</dd>
+              <dt>{t('Impuesto (elafgift)')}</dt>
+              <dd>{f(parts.tax)}</dd>
+            </>
+          )}
+          {mode === 'bands' && (
+            <>
+              <dt>{t('Tramo: {b}', { b: bandName })}</dt>
+              <dd>{f(parts.band)}</dd>
+            </>
+          )}
+          {!!o.surcharge && (
+            <>
+              <dt>{t('Recargo fijo')}</dt>
+              <dd>{f(parts.extra)}</dd>
+            </>
+          )}
+          {!!o.vat && (
+            <>
+              <dt>{t('IVA {n} %', { n: o.vat })}</dt>
+              <dd>{f(parts.vat)}</dd>
+            </>
+          )}
+          <dt class="price-parts__total">{t('Total esta hora')}</dt>
+          <dd class="price-parts__total">
+            {fmt.format(parts.total * unit.factor)} {unit.label}
+          </dd>
+        </dl>
+      )}
       <p class="muted small">
-        {market !== null && (
-          <>
-            {t('Mercado {p}', { p: `${fmt.format(market)} ${unit.label}` })}
-            {o.surcharge ? ` + ${t('recargo {p}', { p: fmt.format(o.surcharge * unit.factor) })}` : ''}
-            {o.vat ? ` + ${t('IVA {n} %', { n: o.vat })}` : ''}
-            {'. '}
-          </>
-        )}
+        {market !== null && !parts && <>{t('Mercado {p}', { p: `${fmt.format(market)} ${unit.label}` })}. </>}
+        {mode === 'grid' && res.grid?.error && !res.grid.hours.length ? `${t('No se pudo leer la tarifa de red; la pantalla mostrará el precio sin ella.')} ` : ''}
+        {mode === 'grid' && res.grid?.hours.some((h) => h[4]) ? `${t('Parte de la tarifa de red está estimada: aún no se ha publicado y se usa la última conocida.')} ` : ''}
         {quarter ? t('Precios cada 15 minutos; la pantalla muestra la media de cada hora.') + ' ' : ''}
         {tomorrow ? t('Los de mañana ya están publicados.') : t('Los de mañana aún no están publicados.')}
         {res.converted ? ` ${t('Convertido de euros: esta fuente no da coronas.')}` : ''}
@@ -193,8 +255,8 @@ function EntsoeToken({ st, setSt }: { st: WeatherKeyStatus | null; setSt: (s: We
 }
 
 /** `part`: the main settings, or what "Más opciones" opens (chart bars, ENTSO-E token). */
-export function PriceWidgetFields({ w, errors, upd, part }: {
-  w: WidgetDef; errors: Record<string, string>; upd: (fn: (x: WidgetDef) => void) => void; part: 'main' | 'more';
+export function PriceWidgetFields({ w, errors, upd, part, tz }: {
+  w: WidgetDef; errors: Record<string, string>; upd: (fn: (x: WidgetDef) => void) => void; part: 'main' | 'more'; tz: string;
 }) {
   const o = w.options.prices!;
   const set = (fn: (p: PriceWidgetOptions) => void) => upd((x) => {
@@ -209,6 +271,10 @@ export function PriceWidgetFields({ w, errors, upd, part }: {
     set((p) => {
       fn(p);
       p.surcharge = convertSurcharge(p.surcharge, before, after);
+      for (const b of p.bands?.list ?? []) b.price = convertSurcharge(b.price, before, after);
+      // a grid company of another zone, or bands on PVPC: no tariff
+      if (p.tariff === 'grid' && gridCompany(p.grid ?? '')?.zone !== p.zone) p.tariff = 'none';
+      if (p.tariff === 'bands' && BANDS_EXCLUDED_ZONES.includes(p.zone)) p.tariff = 'none';
     });
     if (after !== before && o.surcharge) toast(t('El recargo se ha pasado a {u} con el cambio de moneda.', { u: priceUnit(after, 'main').label }));
   };
@@ -224,15 +290,17 @@ export function PriceWidgetFields({ w, errors, upd, part }: {
   const unitSub = priceUnit(currency, 'sub');
   // Marco Cloud serves many households: the zones published for private use only are not offered there
   const sources = zone ? zoneSources(zone, { privateUse: edition() !== 'cloud', token: tokenSet }) : [];
+  const grid = tariffMode(o) === 'grid' ? o.grid ?? '' : '';
+  const testKey = `${o.zone}|${grid}`;
   const run = async () => {
-    setTest({ loading: true, zone: o.zone });
+    setTest({ loading: true, zone: testKey });
     try {
-      setTest({ loading: false, zone: o.zone, res: await api.testPrices(o.zone) });
+      setTest({ loading: false, zone: testKey, res: await api.testPrices(o.zone, grid) });
     } catch (e) {
-      setTest({ loading: false, zone: o.zone, res: { ok: false, error: (e as ApiError).message } });
+      setTest({ loading: false, zone: testKey, res: { ok: false, error: (e as ApiError).message } });
     }
   };
-  const res = test.zone === o.zone ? test.res : undefined;
+  const res = test.zone === testKey ? test.res : undefined;
   const err = (k: string) => (errors[`wdg.${w.id}.${k}`] ? t(errors[`wdg.${w.id}.${k}`]) : undefined);
   if (part === 'more') {
     return (
@@ -269,22 +337,19 @@ export function PriceWidgetFields({ w, errors, upd, part }: {
           </Button>
         </div>
       </Field>
-      {res && <PriceTest o={o} res={res} />}
+      {res && <PriceTest o={o} res={res} tz={tz} />}
       <Field label={t('Vista')} hint={t(VIEW_HINT[o.view])}>
-        <Segmented
-          full
-          value={o.view}
-          options={[
-            { value: 'auto', label: t('Automática') },
-            { value: 'chart', label: t('Gráfica 24 h') },
-            { value: 'now', label: t('Precio ahora') },
-            { value: 'cheap', label: t('Franjas baratas') },
-          ]}
-          onChange={(v) => set((p) => void (p.view = v))}
-        />
+        {/* five views: buttons on a wide panel, a list on a phone (styles2.css) */}
+        <div class="view-seg">
+          <Segmented full value={o.view} options={viewOptions()} onChange={(v) => set((p) => void (p.view = v))} />
+        </div>
+        <div class="view-sel">
+          <Select value={o.view} options={viewOptions()} onChange={(v) => set((p) => void (p.view = v))} />
+        </div>
       </Field>
+      <PriceTariffFields o={o} set={set} err={err} />
       <div class="grid grid--2">
-        <Field label={t('Recargo fijo por kWh')} error={err('surcharge')} hint={t('Peajes, impuestos y el margen de tu compañía, sin IVA. Déjalo en 0 para ver el precio del mercado.')}>
+        <Field label={t('Recargo fijo por kWh')} error={err('surcharge')} hint={t(SURCHARGE_HINT[tariffMode(o)])}>
           <NumberInput value={o.surcharge} min={MIN_SURCHARGE} max={MAX_SURCHARGE} step={0.01} suffix={unitMain.label} error={!!err('surcharge')} onValue={(v) => set((p) => void (p.surcharge = v))} />
         </Field>
         <Field label={t('IVA')} error={err('vat')} hint={t('Se aplica al precio con el recargo.')}>

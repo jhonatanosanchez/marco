@@ -5,6 +5,25 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-13
+
+### Added
+- Electricity price widget: hourly grid tariffs for Denmark by grid company (#3). Under *Grid tariff → Grid company*,
+  pick your netselskab (35 companies in DK1 and DK2, searchable) and every hour adds its household tariff,
+  Energinet's transmission and system tariffs and the electricity tax, from Energinet DataHub. Tariffs are read hour
+  by hour, so season changes, tomorrow and the days when the clocks change are right. Past the last published tariff
+  the screen says *estimated*; with a part missing it shows the market price and a note instead of a total that is
+  too low. Checked against a tester's DK2 card for Radius C on 2026-10-13: 2.78, 2.92, 2.99 and 1.52 kr at 08, 17, 18
+  and 23 h with VAT.
+- Electricity price widget: time bands for any country, with a Spain 2.0TD preset. Up to 4 bands with a price per kWh
+  and their hours, optional other hours on weekends and holidays. *Spain 2.0TD* (and a Ceuta and Melilla version)
+  fills in punta, llano and valle and the national holidays, and leaves the prices to you. Not offered on PVPC,
+  which already includes the tolls. *Test* now shows the price now part by part.
+- Electricity price widget: a *Next 24 h* view. The price now in large type with a *Now: Cheap / Normal / Expensive*
+  badge, the lowest, average and highest of the next 24 hours, and one row per hour with a bar, in one or two
+  columns. Works full screen, in the side column and in a large corner (with too little room it shows the price now
+  card). *Automatic* uses it on a portrait full screen.
+
 ### Fixed
 - Carousel: when the next screen has other photo settings, its photo now comes in with the screen switch. Before,
   the switch played first and the photo crossfaded right after it, so every switch looked like two animations.

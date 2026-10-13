@@ -16,6 +16,7 @@ import {
   refreshZone, retryAfterMs,
 } from './core/pricesCore.js';
 import { fakePricesFetch } from './core/pricesFake.js';
+import { loadFakeFixtures } from './pricesFixtures.js';
 import { getSecrets } from './store.js';
 
 export { PricesError, ENTSOE_TOKEN_RE } from './core/pricesCore.js';
@@ -32,8 +33,9 @@ const USER_AGENT = `Marco/${VERSION} (+https://github.com/mr-reb00t/marco)`;
 export const PRIVATE_USE = true;
 const TIMEOUT = 15_000;
 const MAX_BODY = 2 * 1024 * 1024;
-/** Spacing between two calls to the same source. */
+/** Spacing between two calls to the same source; Energi Data Service answers 3 calls per 10 seconds or so. */
 const SOURCE_GAP_MS = 2_000;
+const SOURCE_GAP = { eds: 3_600 };
 const FORGET_AFTER_MS = 3 * 86400_000;
 
 /** GET `url`, following redirects only on the same host (https), at most 3. */
@@ -77,6 +79,7 @@ async function readBody(res) {
 }
 
 const fake = process.env.MARCO_PRICES_FAKE;
+if (fake) loadFakeFixtures();
 let outbound = fake ? fakePricesFetch(fake) : realFetch;
 let clock = () => Date.now();
 
@@ -87,6 +90,7 @@ export function setPricesFetch(f, now = null) {
   cache.clear();
   inflight.clear();
   gates.clear();
+  for (const fn of resets) fn();
 }
 
 /** The household's ENTSO-E token (secrets.json). */
@@ -130,9 +134,29 @@ function call(source, req) {
     }
   });
   // the next call waits for this one plus a short gap, whatever its outcome
-  g.chain = run.catch(() => {}).then(() => new Promise((r) => setTimeout(r, outbound === realFetch ? SOURCE_GAP_MS : 0)));
+  g.chain = run.catch(() => {}).then(() => new Promise((r) => setTimeout(r, outbound === realFetch ? SOURCE_GAP[source] ?? SOURCE_GAP_MS : 0)));
   return run;
 }
+
+/**
+ * One GET through a source's gate (grid tariffs, server/tariffs.js): { status, text }. A 429 that asks for a short
+ * wait (15 seconds at most, Energi Data Service's window) is waited out and asked once more.
+ */
+export async function sourceGet(source, url) {
+  try {
+    return await call(source, { url });
+  } catch (err) {
+    const wait = gate(source).until - clock();
+    if (!(err instanceof PricesError) || err.code !== 'rate_limited' || wait > 15_000) throw err;
+    await new Promise((r) => setTimeout(r, Math.max(0, wait) + 250));
+    return call(source, { url });
+  }
+}
+/** The clock the price cache runs on (tests replace it with setPricesFetch). */
+export const pricesNow = () => clock();
+const resets = new Set();
+/** `fn` runs whenever setPricesFetch swaps the network (the tariff cache clears itself). */
+export const onPricesReset = (fn) => void resets.add(fn);
 
 async function refresh(zoneId, prev) {
   const e = await refreshZone(zoneId, prev, {
@@ -178,11 +202,14 @@ export function pricesStatus() {
 
 /**
  * POST /api/admin/test/prices: the zone's prices now, through the cache (so a test never costs more than one round of
- * calls a minute). { ok, ...getPrices } or { ok: false, error }.
+ * calls a minute), with the grid tariffs `gridTariffs()` gives (server/tariffs.js) when the widget has a grid company.
+ * { ok, ...getPrices, grid? } or { ok: false, error }.
  */
-export async function testPrices(zoneId) {
+export async function testPrices(zoneId, gridTariffs = null) {
   try {
-    return { ok: true, ...(await getPrices(zoneId, { force: true })) };
+    const out = { ok: true, ...(await getPrices(zoneId, { force: true })) };
+    if (gridTariffs) out.grid = await gridTariffs();
+    return out;
   } catch (err) {
     return { ok: false, error: err instanceof PricesError ? err.code : 'fetch_failed' };
   }

@@ -933,6 +933,18 @@
 .style-modern .pw-unit { font-weight: 600; }
 .style-modern .pw-cheap-h { font-weight: 600; }
 
+.style-modern .pw { --pw-track: rgb(255 255 255 / 0.12); }
+.style-modern.theme-light .pw:not(.pw--side) { --pw-track: rgb(60 60 67 / 0.1); }
+/* Next 24 h: filled tiles and a filled badge instead of the classic outlines */
+.style-modern .pw-stat { border: 0; background: var(--pw-band); border-radius: 1.4rem; }
+.style-modern .pw-badge { border: 0; }
+.style-modern .pw-badge--cheap { background: var(--pw-cheap-bg); }
+.style-modern .pw-badge--mid { background: var(--pw-mid-bg); }
+.style-modern .pw-badge--high { background: var(--pw-high-bg); }
+.style-modern .pw-row.is-now { box-shadow: none; }
+.style-modern .pw-row.is-now.is-midnight { box-shadow: none; }
+.style-modern .pw-hsub { color: var(--pw-ink-2); }
+
 /* the kids layouts: a pastel card like theirs, no glass */
 .style-modern #app.is-kids .pw,
 .style-modern.theme-light #app.is-kids .pw:not(.pw--side) {
@@ -947,3 +959,7 @@
   box-shadow: var(--k-shadow);
 }
 .style-modern #app.is-kids .pw::before { display: none; }
+.style-modern #app.is-kids .pw { --pw-track: var(--k-track); }
+.style-modern #app.is-kids .pw-stat { border-radius: 1.8rem; background: var(--k-fill); }
+.style-modern #app.is-kids .pw-badge { border-radius: 1.4rem; }
+.style-modern #app.is-kids .pw-rbar { height: 0.62em; }

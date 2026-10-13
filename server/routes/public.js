@@ -7,6 +7,8 @@ import { getWeather } from '../weather.js';
 import { getNews } from '../news.js';
 import { getPrices, PricesError } from '../prices.js';
 import { priceZone } from '../core/pricesCore.js';
+import { getGridTariffs } from '../tariffs.js';
+import { gridCompany } from '../core/tariffsCore.js';
 import { getPhotos } from '../photos.js';
 import { sseHandler } from '../sse.js';
 import { streamInit, streamHello, onStreamOpen, onStreamClose, pollDisplay } from '../displays.js';
@@ -21,6 +23,8 @@ import { privatizeEvents } from '../core/privacy.js';
 import { hash } from '../lib/text.js';
 import { familyQrUrl } from '../family.js';
 
+/** How long the display's price request waits for a first fetch of grid tariffs (its own timeout is 15 s). */
+const GRID_WAIT_MS = 5_000;
 /** Privacy of a screen as displayConfig() takes it ({ status, next }). */
 const privacyOf = (cfg, screen) => ({ status: screenPrivacy(cfg, screen), next: screenPrivacyNext(cfg, screen) });
 
@@ -100,7 +104,14 @@ export function publicRouter({ version }) {
     try {
       const zone = typeof req.query.zone === 'string' ? req.query.zone : '';
       if (!priceZone(zone)) return res.status(400).json({ error: 'invalid_zone' });
-      res.json(await getPrices(zone));
+      // &grid=<company>: the Danish grid tariffs of the zone's hours too (server/tariffs.js), a company of that zone
+      const grid = typeof req.query.grid === 'string' ? req.query.grid : '';
+      if (grid && gridCompany(grid)?.zone !== zone) return res.status(400).json({ error: 'invalid_grid' });
+      const out = await getPrices(zone);
+      // a first fetch of the tariffs (one call per code, spaced out) never holds up the prices: after 5 s the screen
+      // gets them without tariffs and a note, and has them on its next ask
+      if (grid) out.grid = await getGridTariffs(grid, zone, { wait: GRID_WAIT_MS });
+      res.json(out);
     } catch (err) {
       if (err instanceof PricesError) return res.status(502).json({ error: err.code });
       next(err);

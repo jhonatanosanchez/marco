@@ -129,7 +129,8 @@ transparency, blur and a light edge:
   realistic effect with drops on the glass, layered snow and sun rays on clear days (the photo is never blurred).
 - **News ticker** from any RSS/Atom feed, a to-do list and a message of the day.
 - **Electricity price:** a widget with the day-ahead price of your bidding zone (most of Europe): a chart of today
-  and tomorrow, the price now or the cheapest hours ahead, with your own grid fees and VAT. See
+  and tomorrow, the price now, the cheapest hours ahead or the next 24 hours, with your own grid fees and VAT (in
+  Denmark, your grid company's tariff hour by hour; in any country, your own time bands). See
   [Electricity prices](#electricity-prices).
 - **Photo background:** stock photos, your own gallery or albums from your [Immich](https://immich.app/) library,
   WebGL transitions, slow zoom, a soft "aurora" ambient effect, and **smart cropping** that keeps the subject (faces,
@@ -847,12 +848,33 @@ market price and keeps it: the screens never call any website, and screens showi
 
 - **View:** *Automatic* (a small or medium corner shows the price now; a large corner or the side column adds the
   chart; full screen shows everything), *24 h chart* (bars from cheap to expensive, the current hour marked, tomorrow
-  added once it is published, around 13:00 CET), *Price now* and *Cheap windows* (for example "02:00 to 05:00").
+  added once it is published, around 13:00 CET), *Price now*, *Cheap windows* (for example "02:00 to 05:00") and
+  *Next 24 h* (the price now in large type with its level, the lowest, average and highest, and one row per hour with
+  a bar from the current hour, in one or two columns, as many as fit). On a portrait screen in full screen,
+  *Automatic* uses *Next 24 h*: a list fits the height better than a wide chart.
+- **Grid tariff:** what is added to the market price by the hour.
+  - *Grid company* (Denmark, DK1 and DK2): pick your netselskab (Radius, Cerius, N1, TREFOR, Konstant, Dinel and
+    more, 35 companies) and Marco adds every hour its household (C) tariff, Energinet's transmission and system
+    tariffs and the electricity tax (elafgift), from Energinet DataHub (dataset DatahubPricelist, no key). They
+    change by season and some by day, so they are read hour by hour, tomorrow too. If a company has not yet
+    published the next ones, the last known tariff is used for up to 31 days and the screen says *estimated*; if a
+    part is missing, the screen shows the market price with a note instead of a total that is too low. Picking a
+    company sets VAT to 25 %.
+  - *Time bands* (any country): up to 4 bands, each with a price per kWh without VAT and its hours (tap an hour to
+    move it to the next band), with other hours on weekends and holidays if you like. *Spain 2.0TD* fills in punta
+    (10-14 and 18-22), llano (8-10, 14-18 and 22-24) and valle (0-8, and all day on Saturdays, Sundays and the
+    fixed-date national holidays: 1 and 6 January, 1 May, 15 August, 12 October, 1 November, 6, 8 and 25 December);
+    there is one for Ceuta and Melilla too. You type the prices, as they appear on your bill. PVPC has no bands: it
+    already includes the tolls.
+  - The order: (market + tariff or band + fixed extra) x (1 + VAT). The screen says "Incl. grid tariff" or "Incl.
+    time bands" at the bottom, and credits Energinet DataHub.
 - **Fixed extra per kWh** and **VAT**, to see what you actually pay. The extra (grid fees, taxes, your supplier's
-  margin) is added before VAT. With 0 and 0 you see the market price.
+  margin; with a grid company only your supplier's margin) is added before VAT. With 0 and 0 you see the market
+  price.
 - Many zones publish a price every 15 minutes; the chart shows the average of each hour (or the quarter hours, in
   *More options*). Days when the clocks change have 23 or 25 hours.
-- **Test** shows the price now with your extra and VAT, and whether tomorrow's prices are out.
+- **Test** shows the price now part by part (market, company tariff, Energinet, elafgift or band, extra, VAT and
+  total), and whether tomorrow's prices are out.
 
 | Zone | Source | Key |
 | --- | --- | --- |

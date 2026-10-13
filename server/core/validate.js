@@ -14,6 +14,9 @@ import {
   CAROUSEL_PREFIX, MAX_CAROUSELS, MAX_CAROUSEL_STEPS, MIN_STEP_SEC, MAX_STEP_SEC, DEFAULT_STEP_SEC, CAROUSEL_TRANSITIONS, CAROUSEL_SPEEDS, DEFAULT_TRANSITION, DEFAULT_SPEED, pruneCarousels,
 } from './carousels.js';
 import { IMMICH_ID_RE, MAX_IMMICH_ALBUMS, PORTRAIT_FITS, normalizeImmichUrl } from './immichCore.js';
+import {
+  BAND_NAME_MAX, BAND_PRESET_IDS, GRID_IDS, gridCompany, HOLIDAY_SETS, MAX_BAND_PRICE, MAX_BANDS, MIN_BAND_PRICE, TARIFF_MODES,
+} from './tariffsCore.js';
 import { sanitizeFamily, sanitizeScreenFamily, KIDS_PRESETS } from './familyCore.js';
 import {
   PRICE_ZONE_IDS, PRICE_VIEWS, PRICE_UNITS, PRICE_RESOLUTIONS, MAX_VAT, MIN_SURCHARGE, MAX_SURCHARGE,
@@ -476,6 +479,59 @@ function sanitizePriceOptions(ctx, p, v) {
     // length of the cheap stretches the widget looks for, in hours
     windowHours: num(ctx, `${p}.windowHours`, o.windowHours, 3, 1, 6, true),
     resolution: oneOf(ctx, `${p}.resolution`, o.resolution, 'hour', PRICE_RESOLUTIONS),
+    ...sanitizeTariff(ctx, p, o),
+  };
+}
+
+/**
+ * The tariff a price widget adds (tariffsCore.js): none, a Danish grid company (of the widget's zone) or time bands.
+ * The company and the bands are kept whichever is chosen, so switching back and forth loses nothing.
+ */
+function sanitizeTariff(ctx, p, o) {
+  const zone = typeof o.zone === 'string' ? o.zone : 'DK2';
+  const tariff = oneOf(ctx, `${p}.tariff`, o.tariff, 'none', TARIFF_MODES);
+  const grid = o.grid === undefined || o.grid === '' ? '' : oneOf(ctx, `${p}.grid`, o.grid, '', GRID_IDS);
+  if (tariff === 'grid') {
+    if (!grid) ctx.err(`${p}.grid`, 'grid company required');
+    else if (gridCompany(grid).zone !== zone) ctx.err(`${p}.grid`, `grid company is not in ${zone}`);
+  }
+  const out = { tariff, grid };
+  if (o.bands !== undefined && o.bands !== null) out.bands = sanitizeBands(ctx, `${p}.bands`, o.bands);
+  else if (tariff === 'bands') ctx.err(`${p}.bands`, 'time bands required');
+  return out;
+}
+
+function sanitizeBands(ctx, p, v) {
+  const o = obj(ctx, p, v);
+  const listIn = Array.isArray(o.list) ? o.list : [];
+  if (!Array.isArray(o.list)) ctx.err(`${p}.list`, 'expected array');
+  if (listIn.length < 1 || listIn.length > MAX_BANDS) ctx.err(`${p}.list`, `between 1 and ${MAX_BANDS} bands`);
+  const list = listIn.slice(0, MAX_BANDS).map((b, i) => {
+    const q = `${p}.list[${i}]`;
+    const x = obj(ctx, q, b);
+    return {
+      name: str(ctx, `${q}.name`, x.name, '', BAND_NAME_MAX).trim(),
+      price: Math.round(num(ctx, `${q}.price`, x.price, 0, MIN_BAND_PRICE, MAX_BAND_PRICE) * 1e5) / 1e5,
+    };
+  });
+  if (!list.length) list.push({ name: '', price: 0 });
+  const hours = (k, v2, required) => {
+    if (v2 === null || v2 === undefined) {
+      if (required) ctx.err(`${p}.${k}`, 'required');
+      return required ? new Array(24).fill(0) : null;
+    }
+    if (!Array.isArray(v2) || v2.length !== 24 || !v2.every((i) => Number.isInteger(i) && i >= 0 && i < list.length)) {
+      ctx.err(`${p}.${k}`, `24 band numbers from 0 to ${list.length - 1}`);
+      return required ? new Array(24).fill(0) : null;
+    }
+    return [...v2];
+  };
+  return {
+    preset: oneOf(ctx, `${p}.preset`, o.preset, '', BAND_PRESET_IDS),
+    list,
+    weekday: hours('weekday', o.weekday, true),
+    weekend: hours('weekend', o.weekend, false),
+    holidays: oneOf(ctx, `${p}.holidays`, o.holidays, 'none', HOLIDAY_SETS),
   };
 }
 

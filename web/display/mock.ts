@@ -1,5 +1,6 @@
 // Built-in realistic demo dataset (used with ?demo=1 or when /api is unreachable in dev).
 // Everything is generated relative to "today" so screenshots always look populated.
+import { presetBands } from '../../server/core/tariffsCore.js';
 import type {
   AlertStyle, Announcement, CalEvent, CarouselTransition, ChoreSlot, CountdownItem, CountdownsResponse, DisplayConfig, EventsResponse,
   FamilyChoreView, FamilyDisplayState, FamilyMemberView, MealSlot, NewsResponse, PhotosResponse, PublicCalendarSource, SourceKind,
@@ -91,8 +92,8 @@ export function mockConfig(): DisplayConfig {
     },
     message: { enabled: q.get('msg') === '1', text: L('Have a great weekend, everyone!', '¡Buen fin de semana, familia!', 'Bom fim de semana, família!'), emoji: '💛' },
   });
-  // ?pw=view:place:corner:size,... electricity price widgets (view auto|chart|now|cheap, place corner|side|full),
-  // &pwzone= (default DK2), &pwunit=sub, &pwvat=, &pwadd= (surcharge), &pwres=quarter. A 'full' one picks the Widget layout.
+  // ?pw=view:place:corner:size,... electricity price widgets (view auto|chart|now|cheap|next, place corner|side|full),
+  // &pwzone= (default DK2), &pwunit=sub, &pwvat=, &pwadd= (surcharge), &pwres=quarter, &pwgrid=, &pwbands=es. A 'full' one picks the Widget layout.
   if (q.get('pw')) {
     cfg.widgets = q.get('pw')!.split(',').map((spec, i) => {
       const [view = 'auto', place = 'corner', corner = 'br', size = 'm'] = spec.split(':');
@@ -103,6 +104,9 @@ export function mockConfig(): DisplayConfig {
           zone: q.get('pwzone') || 'DK2', view: view as 'auto', unit: q.get('pwunit') === 'sub' ? 'sub' as const : 'main' as const, currency: 'auto' as const,
           surcharge: Number(q.get('pwadd')) || 0, vat: Number(q.get('pwvat')) || 0, windowHours: Number(q.get('pwh')) || 3,
           resolution: q.get('pwres') === 'quarter' ? 'quarter' as const : 'hour' as const,
+          // &pwgrid=radius: a Danish grid company's tariffs; &pwbands=es: Spain 2.0TD bands with sample prices
+          ...(q.get('pwgrid') ? { tariff: 'grid' as const, grid: q.get('pwgrid')! } : {}),
+          ...(q.get('pwbands') === 'es' ? { tariff: 'bands' as const, bands: { ...presetBands('es-20td'), list: [{ name: 'Punta', price: 0.12 }, { name: 'Llano', price: 0.05 }, { name: 'Valle', price: 0.01 }] } } : {}),
         },
       };
     });

@@ -475,22 +475,34 @@ A widget of type `prices` (needs `features.priceWidgets`) has no address: the di
 day-ahead prices and draws the card itself. The zones, sources, parsers, price math and one refresh round are in
 `server/core/pricesCore.js` (shared with Marco Cloud); `server/prices.js` keeps one cache entry per zone in memory.
 
-- `options.prices`: `{ zone, view: 'auto' | 'chart' | 'now' | 'cheap', unit: 'main' | 'sub', currency: 'auto' | 'EUR',
-  surcharge, vat, windowHours, resolution: 'hour' | 'quarter' }`. `zone` is one of `PRICE_ZONE_IDS` (43 bidding
+- `options.prices`: `{ zone, view: 'auto' | 'chart' | 'now' | 'cheap' | 'next', unit: 'main' | 'sub', currency: 'auto' |
+  'EUR', surcharge, vat, windowHours, resolution: 'hour' | 'quarter', tariff: 'none' | 'grid' | 'bands', grid, bands }`. `zone` is one of `PRICE_ZONE_IDS` (43 bidding
   zones, `ES-PVPC` for the Spanish regulated tariff). `surcharge` is per kWh in the main unit (EUR or DKK), -10 to
   100, added before `vat` (0 to 50 %). `windowHours` 1 to 6. `options.url` is stored empty.
+- Tariffs (`server/core/tariffsCore.js`, shared with Marco Cloud): `tariff: 'grid'` with `grid` a Danish grid company
+  id of the widget's zone (`DK_GRID_COMPANIES`, 35 companies in DK1 and DK2); `tariff: 'bands'` with `bands: { preset:
+  '' | 'es-20td' | 'es-20td-cm', list: [{ name, price }] (1 to 4, price -10 to 10 per kWh before VAT), weekday:
+  [24 band indexes], weekend: [24] | null, holidays: 'none' | 'ES' }`, never on `ES-PVPC`. A choice that does not
+  fit the zone counts as `none`. Per kWh: (market + tariff or band + surcharge) x (1 + vat / 100).
 - `GET /api/display/prices?zone=DK2` (display auth): `{ zone, currency, converted, source, credit, fetchedAt, stale,
   error, slots: [[start (s), minutes, EUR/MWh, local/MWh?]] }`. Slots run from the zone's local midnight to the end
   of tomorrow once published, at 15 or 60 minutes. `converted`: kroner computed from euros (the source gave none).
   `stale`: the last good prices kept after failed refreshes (no longer covering now, or over 3 hours old). `400
   { error: 'invalid_zone' }`; `502 { error: code }` when no prices were ever fetched (`no_source`, `no_data`,
   `timeout`, `fetch_failed`, `http_denied`, `http_error`, `bad_response`, `rate_limited`).
+- `&grid=radius` (a company of `zone`, else `400 { error: 'invalid_grid' }`) adds `grid: { id, name, credit,
+  fetchedAt, error, hours: [[start (s), company, Energinet, tax, estimated 0|1]] }`, DKK/kWh before VAT, from
+  Energinet DataHub (DatahubPricelist; one request per tariff code, refreshed every 12 hours, one cache entry per
+  company and one for Energinet). An hour with any charge unknown is left out; past the last published record a
+  tariff is carried forward for up to 31 days (`estimated`), an ended discount never. `hours` is empty with `error`
+  when the tariffs could not be had, or `error: 'pending'` when a first fetch takes more than 5 seconds (the screen
+  asks again 20 seconds later).
 - Refresh: after the day-ahead auction (12:50 Brussels time; PVPC 20:30 Madrid time) every 20 minutes until
   tomorrow's prices are in, then at the next auction, at least every 6 hours. A screen never waits for a refresh
   while prices are cached. Failures back off from 2 minutes to 1 hour; a source's `429` is respected with its
   `Retry-After` (at most 1 hour).
-- `POST /api/admin/test/prices { zone }`: `{ ok: true, ...prices }` or `{ ok: false, error }`, through the cache (a
-  new round at most once a minute per zone).
+- `POST /api/admin/test/prices { zone, grid? }`: `{ ok: true, ...prices }` (with `grid` as above when one is given) or
+  `{ ok: false, error }`, through the cache (a new round at most once a minute per zone and per grid company).
 - `GET /api/admin/prices/token`: `{ set, hint }` (last 4 characters only). `PUT /api/admin/prices/token { token }`:
   20 to 64 letters, digits or dashes (empty removes it), tried once against ENTSO-E; `400 { error: 'token_invalid' }`
   when refused. Stored in `data/secrets.json` (`prices.entsoeToken`), included in exports with secrets.

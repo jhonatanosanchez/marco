@@ -89,7 +89,20 @@ export interface WidgetOptions {
   /** type 'prices' only (its url is empty) */
   prices?: PriceWidgetOptions;
 }
-export type PriceView = 'auto' | 'chart' | 'now' | 'cheap';
+export type PriceView = 'auto' | 'chart' | 'now' | 'cheap' | 'next';
+/** Time bands a household pays on top of the market price (server/core/tariffsCore.js). */
+export interface PriceBands {
+  /** '' (custom), 'es-20td' (Spain 2.0TD), 'es-20td-cm' (Ceuta and Melilla): only fills the hours */
+  preset: string;
+  /** 1 .. 4 bands: a name and a price per kWh in the main unit, before VAT */
+  list: { name: string; price: number }[];
+  /** band index of each hour 0..23 on working days */
+  weekday: number[];
+  /** band index of each hour on Saturdays, Sundays and holidays; null = as on working days */
+  weekend: number[] | null;
+  /** holidays that take the weekend hours: 'none' | 'ES' (Spain's national fixed-date holidays) */
+  holidays: string;
+}
 /** Electricity price widget (server/core/pricesCore.js, server/core/validate.js sanitizePriceOptions). */
 export interface PriceWidgetOptions {
   /** bidding zone id (PRICE_ZONES), e.g. 'DK2', 'ES-PVPC', 'DE-LU' */
@@ -108,6 +121,11 @@ export interface PriceWidgetOptions {
   windowHours: number;
   /** chart bars: hourly averages or quarter hours */
   resolution: 'hour' | 'quarter';
+  /** what is added per hour before VAT: a Danish grid company's tariffs ('grid'), time bands, or nothing */
+  tariff?: 'none' | 'grid' | 'bands';
+  /** grid company id (server/tariffsCore.js DK_GRID_COMPANIES), of the widget's zone */
+  grid?: string;
+  bands?: PriceBands;
 }
 /** GET /api/display/prices?zone= (server/prices.js getPrices) */
 export interface PricesResponse {
@@ -125,6 +143,17 @@ export interface PricesResponse {
   error: string | null;
   /** [start (unix s), minutes, EUR/MWh, local/MWh?] in time order */
   slots: [number, number, number, number?][];
+  /** with &grid=: the grid company's tariffs per hour (server/tariffs.js) */
+  grid?: GridTariffs;
+}
+/** Danish grid tariffs per hour, DKK/kWh before VAT: [start (unix s), company tariff, Energinet tariffs, electricity tax, estimated 0|1] */
+export interface GridTariffs {
+  id: string;
+  name: string;
+  credit: string;
+  fetchedAt: string | null;
+  error: string | null;
+  hours: [number, number, number, number, number][];
 }
 /** POST /api/admin/test/prices { zone } */
 export type TestPricesResponse = ({ ok: true } & PricesResponse) | { ok: false; error: string };

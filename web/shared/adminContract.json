@@ -1340,7 +1340,7 @@
       "callers": [
         "testPrices"
       ],
-      "request": "{zone}",
+      "request": "{zone, grid?}",
       "response": "TestPricesResponse",
       "responseArray": false,
       "responseKeys": null

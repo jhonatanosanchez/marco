@@ -175,7 +175,7 @@ export const api = {
     request<TestIcsResponse>('POST', '/api/admin/test/ics', insecureTls ? { url, insecureTls: true } : { url }),
   testRss: (url: string) => request<TestRssResponse>('POST', '/api/admin/test/rss', { url }),
   testWidget: (type: WidgetType, url: string) => request<TestWidgetResponse>('POST', '/api/admin/test/widget', { type, url }),
-  testPrices: (zone: string) => request<TestPricesResponse>('POST', '/api/admin/test/prices', { zone }),
+  testPrices: (zone: string, grid = '') => request<TestPricesResponse>('POST', '/api/admin/test/prices', grid ? { zone, grid } : { zone }),
   pricesToken: () => request<WeatherKeyStatus>('GET', '/api/admin/prices/token'),
   setPricesToken: (token: string) => request<WeatherKeyStatus & { checked?: boolean }>('PUT', '/api/admin/prices/token', { token }),
   testHomeAssistant: (url: string, token?: string) =>

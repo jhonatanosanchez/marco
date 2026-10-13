@@ -1613,6 +1613,99 @@ html:not(.style-modern) #uw-side { margin: 0 -1rem; }
 .pw-foot { display: flex; align-items: baseline; gap: 1em; color: var(--pw-ink-2); font-size: max(0.72em, 1.4rem); white-space: nowrap; }
 .pw-credit { margin-left: auto; overflow: hidden; text-overflow: ellipsis; color: var(--pw-ink-3); font-size: 0.85em; }
 .pw--full .pw-foot { font-size: max(0.56em, 1.4rem); }
+/* what the price includes on top of the market (grid tariff, time bands) */
+.pw-incl { flex: none; color: var(--pw-ink-2); }
+.pw-incl--miss { color: var(--pw-high-ink); }
+
+/* Next 24 h ('next'): the price now coloured by its level and a badge, lowest / average / highest of the 24 hours,
+   then one row per hour from the current one (time, a bar from the lowest to the highest price, the price), in one
+   or two columns. Classic: outlined like its other cards; Modern and Kids fill them (styles-modern.css). */
+.pw {
+  --pw-track: rgb(255 255 255 / 0.1);
+  --pw-cheap-bg: rgb(64 200 224 / 0.16);
+  --pw-mid-bg: rgb(245 197 66 / 0.16);
+  --pw-high-bg: rgb(255 98 89 / 0.18);
+}
+.theme-light .pw:not(.pw--side) {
+  --pw-track: rgb(0 0 0 / 0.07);
+  --pw-cheap-bg: rgb(10 132 255 / 0.12);
+  --pw-mid-bg: rgb(212 160 0 / 0.16);
+  --pw-high-bg: rgb(240 71 61 / 0.13);
+}
+.pw--next { gap: calc(var(--pk) * 0.85rem); }
+.pw--next.pw--full { gap: calc(var(--pk) * 0.9rem); }
+.pw-hsub { margin-left: auto; flex: none; color: var(--pw-ink-3); font-size: 0.86em; font-weight: 600; white-space: nowrap; }
+.pw-nx-top { display: flex; flex-direction: column; gap: calc(var(--pk) * 0.85rem); min-width: 0; }
+/* full screen: the price and the three figures side by side, the rows get the height */
+.pw--full .pw-nx-top { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 1.6em; }
+.pw--full .pw-nx-stats { gap: 0.6em; }
+/* a portrait screen: the figures under the price, as on the smaller cards */
+.pw--full .pw-nx { align-content: start; }
+.pw--full.pw--tall .pw-nx-top { display: flex; flex-direction: column; align-items: stretch; gap: 0.8em; }
+.pw-nx-hero { display: flex; align-items: center; flex-wrap: wrap; gap: 0.35em 0.8em; min-width: 0; }
+.pw--next .pw-val { font-size: 3em; }
+.pw--next.pw--full .pw-val { font-size: 3.4em; }
+.pw[data-level='cheap'] .pw-val--lvl { color: var(--pw-cheap-ink); }
+.pw[data-level='mid'] .pw-val--lvl { color: var(--pw-mid-ink); }
+.pw[data-level='high'] .pw-val--lvl { color: var(--pw-high-ink); }
+.pw-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  padding: 0.28em 0.8em;
+  border: 1px solid currentColor;
+  border-radius: 99em;
+  font-size: 0.86em;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.pw-badge::before { content: ''; width: 0.6em; height: 0.6em; border-radius: 50%; background: currentColor; }
+.pw-badge--cheap { color: var(--pw-cheap-ink); }
+.pw-badge--mid { color: var(--pw-mid-ink); }
+.pw-badge--high { color: var(--pw-high-ink); }
+.pw-nx-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5em; }
+.pw-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08em;
+  min-width: 0;
+  padding: 0.45em 0.7em 0.4em;
+  border: 1px solid var(--pw-sep);
+  border-radius: 1.2rem;
+  white-space: nowrap;
+}
+.pw-stat-l { overflow: hidden; text-overflow: ellipsis; color: var(--pw-ink-2); font-size: max(0.72em, 1.3rem); font-weight: 600; }
+.pw-stat-v { font-family: var(--font-num); font-size: 1.12em; font-weight: 600; }
+.pw-stat-t { color: var(--pw-ink-2); font-family: var(--font-num); font-size: max(0.72em, 1.3rem); font-weight: 500; }
+.pw-stat--cheap .pw-stat-v { color: var(--pw-cheap-ink); }
+.pw-stat--high .pw-stat-v { color: var(--pw-high-ink); }
+/* the rows read from across the room on every card (the weather's hourly labels: 1.6rem) */
+.pw-nx { flex: 1 1 auto; min-height: 0; display: grid; grid-auto-flow: column; column-gap: 1.4em; align-content: start; font-size: max(0.9em, 1.6rem); }
+.pw-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75em;
+  min-height: 0;
+  padding: 0 0.45em;
+  border-radius: 0.55em;
+  white-space: nowrap;
+}
+.pw-rt { min-width: 2.9em; color: var(--pw-ink); font-family: var(--font-num); font-weight: 500; }
+.pw-row.is-tmw .pw-rt { color: var(--pw-ink-2); }
+.pw-nx--h12 .pw-rt { min-width: 5.2em; }
+.pw-row.is-midnight { box-shadow: inset 0 1px 0 var(--pw-sep); border-radius: 0; }
+.pw-rbar { height: 0.5em; border-radius: 99em; background: var(--pw-track); overflow: hidden; }
+.pw-rbar i { display: block; height: 100%; border-radius: inherit; background: var(--pw-mid); }
+.pw-row--cheap .pw-rbar i { background: var(--pw-cheap); }
+.pw-row--high .pw-rbar i { background: var(--pw-high); }
+.pw-rv { min-width: 2.6em; font-family: var(--font-num); font-weight: 600; text-align: right; }
+.pw-row.is-now { box-shadow: inset 0 0 0 1.5px var(--pw-ink-3); }
+.pw-row.is-now .pw-rt { font-weight: 700; }
+.pw-row--cheap.is-now { background: var(--pw-cheap-bg); }
+.pw-row--mid.is-now { background: var(--pw-mid-bg); }
+.pw-row--high.is-now { background: var(--pw-high-bg); }
+
 /* a stale card: the "not updated" pill sits in its footer corner */
 .uw-prices .uw-pill { right: auto; left: 50%; bottom: auto; top: 0.8rem; transform: translateX(-50%); }
 

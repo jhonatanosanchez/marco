@@ -42,7 +42,7 @@ export function localDay(ms: number, tz: string): string;
 export function localHM(ms: number, tz: string): string;
 export function finalPrice(perMwh: number, opts?: { surcharge?: number; vat?: number }): number;
 export function widgetCurrency(zone: string | PriceZone, opt?: string): string;
-export function pricedSlots(slots: Slot[], opts?: { currency?: string; surcharge?: number; vat?: number }): PricedSlot[];
+export function pricedSlots(slots: Slot[], opts?: { currency?: string; surcharge?: number; vat?: number; add?: ((t: number) => { add: number } | null) | null }): PricedSlot[];
 export function hourly(slots: PricedSlot[]): PricedSlot[];
 export function slotAt<T extends { t: number; m: number }>(slots: T[], now: number): T | null;
 export function levelLimits(prices: number[]): LevelLimits;

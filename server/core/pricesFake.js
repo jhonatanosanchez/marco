@@ -1,7 +1,31 @@
 // Made-up electricity prices in each source's own format, for test servers and screenshots (MARCO_PRICES_FAKE=1).
 // It answers the very requests pricesCore.js builds, so the real parsers run end to end. Never used unless the
-// variable is set. MARCO_PRICES_FAKE=today: tomorrow is not published yet; =fail: every source is down.
+// variable is set. MARCO_PRICES_FAKE=today: tomorrow is not published yet; =all: it always is; =fail: every source is down.
 import { localMidnight, tzOffset, wallClock, priceZone, PRICE_ZONES, DKK_PER_EUR } from './pricesCore.js';
+
+// Real answers saved for the tests (trimmed), given by the caller (no files here: this runs on Workers too): DataHub
+// tariffs of every Danish grid company (October 2026 to April 2027) and the DK2 day-ahead prices of 2026-10-13,
+// served for those dates so a test server shows real numbers. server/pricesFixtures.js reads them for Node.
+let fixtureData = { datahub: [], dk2: new Map() };
+/** Sets the saved answers: { datahub: DatahubPricelist records, dk2: DayAheadPrices records }. */
+export function setFakeFixtures({ datahub = [], dk2 = [] } = {}) {
+  fixtureData = { datahub, dk2: new Map(dk2.map((r) => [Date.parse(`${r.TimeUTC}Z`), r])) };
+}
+const fixtures = () => fixtureData;
+
+/** DatahubPricelist: the saved records that match the filter, ValidFrom before `end`, newest first. */
+function fakeDatahub(url) {
+  const q = url.searchParams;
+  const f = JSON.parse(q.get('filter') || '{}');
+  const end = q.get('end') || '9999';
+  const glns = f.GLN_Number ?? [];
+  const codes = f.ChargeTypeCode ?? [];
+  const records = fixtures().datahub
+    .filter((r) => glns.includes(r.GLN_Number) && codes.includes(String(r.ChargeTypeCode).trim()) && r.ValidFrom < end)
+    .sort((a, b) => (a.ValidFrom < b.ValidFrom ? 1 : -1))
+    .slice(0, Number(q.get('limit')) || 100);
+  return { total: records.length, dataset: 'DatahubPricelist', records };
+}
 
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -54,17 +78,21 @@ export function fakePricesFetch(mode = '1', now = () => Date.now()) {
     if (mode === 'fail') return reply(503, { error: 'down' });
     // tomorrow is published at 13:00 Brussels time, or never with MARCO_PRICES_FAKE=today
     const n = now();
-    const pub = mode === 'today' || n < localMidnight(n, 'Europe/Brussels') + 13 * 3600_000
+    // MARCO_PRICES_FAKE=all: tomorrow is always out (screenshots at any hour)
+    const pub = mode === 'all' ? localMidnight(n, 'Europe/Brussels', 2) : mode === 'today' || n < localMidnight(n, 'Europe/Brussels') + 13 * 3600_000
       ? localMidnight(n, 'Europe/Brussels', 1)
       : localMidnight(n, 'Europe/Brussels', 2);
     const [from, to] = window(url);
     const host = url.hostname;
+    if (host.includes('energidataservice') && url.pathname.includes('DatahubPricelist')) return reply(200, fakeDatahub(url));
     if (host.includes('energidataservice')) {
       const area = JSON.parse(url.searchParams.get('filter')).PriceArea[0];
       const z = PRICE_ZONES.find((x) => x.eds === area);
       return reply(200, {
         total: 0, dataset: 'DayAheadPrices',
         records: steps(from, to, 15, pub).map((t) => {
+          const real = area === 'DK2' ? fixtures().dk2.get(t) : null;
+          if (real) return { TimeUTC: real.TimeUTC, TimeDK: '', PriceArea: area, DayAheadPriceEUR: real.DayAheadPriceEUR, DayAheadPriceDKK: real.DayAheadPriceDKK };
           const eur = fakePrice(t, z.tz);
           return { TimeUTC: new Date(t).toISOString().slice(0, 19), TimeDK: '', PriceArea: area, DayAheadPriceEUR: eur, DayAheadPriceDKK: Math.round(eur * DKK_PER_EUR * 1000) / 1000 };
         }),

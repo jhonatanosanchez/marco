@@ -407,7 +407,7 @@ test('validate: price widget options, defaults and limits; no address needed', (
   assert.equal(ok.ok, true, JSON.stringify(ok.errors));
   assert.deepEqual(ok.value.widgets[0].options, {
     url: '', refreshSec: 900, fit: 'contain', bust: false,
-    prices: { zone: 'DK2', view: 'auto', unit: 'main', currency: 'auto', surcharge: 1.23457, vat: 25, windowHours: 3, resolution: 'hour' },
+    prices: { zone: 'DK2', view: 'auto', unit: 'main', currency: 'auto', surcharge: 1.23457, vat: 25, windowHours: 3, resolution: 'hour', tariff: 'none', grid: '' },
   });
   const bad = validateConfig(withWidget(priceWidget({ zone: 'XX', vat: 80, surcharge: 500, view: 'pie', windowHours: 9, unit: 'mwh' })));
   const paths = bad.errors.map((e) => e.path);

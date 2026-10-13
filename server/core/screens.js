@@ -101,7 +101,7 @@ function shortHash(s) {
 }
 
 /** What changes when a saved widget changes in a way the display must load again (its `v`). */
-export const widgetVersion = (w) => shortHash(JSON.stringify(w.type === 'prices' ? [w.type, w.options.prices?.zone] : [w.type, w.options.url, w.options.refreshSec, w.options.bust]));
+export const widgetVersion = (w) => shortHash(JSON.stringify(w.type === 'prices' ? [w.type, w.options.prices?.zone, ...(w.options.prices?.tariff === 'grid' ? [w.options.prices.grid] : [])] : [w.type, w.options.url, w.options.refreshSec, w.options.bust]));
 
 /**
  * Widgets a screen shows, in display form. `widgetSrc(w)` = what the display loads: the URL itself on a server whose

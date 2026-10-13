@@ -3,6 +3,7 @@ import { locale, t } from './i18n';
 import type { AppConfig, CalendarSource, IconRule, SourceKind, StoredConfig } from '../shared/types';
 import { findKeyword } from '../../server/lib/keywords.js';
 import { MAX_SURCHARGE, MAX_VAT, MIN_SURCHARGE, priceZone } from '../../server/core/pricesCore.js';
+import { gridCompany, MAX_BAND_PRICE, MIN_BAND_PRICE } from '../../server/core/tariffsCore.js';
 import { caps as currentCaps, hasFeature, limitOf, type Caps, type LimitName } from './caps';
 
 export const uid = (prefix: string) =>
@@ -337,6 +338,14 @@ export function validateGlobal(c: StoredConfig): Errors {
       if (!o || !priceZone(o.zone)) e[`${p}.zone`] = 'Elige una zona';
       if (o && !(Number.isFinite(o.surcharge) && o.surcharge >= MIN_SURCHARGE && o.surcharge <= MAX_SURCHARGE)) e[`${p}.surcharge`] = `Entre ${MIN_SURCHARGE} y ${MAX_SURCHARGE}`;
       if (o && !(Number.isFinite(o.vat) && o.vat >= 0 && o.vat <= MAX_VAT)) e[`${p}.vat`] = `Entre 0 y ${MAX_VAT}`;
+      // the tariff: a grid company of the zone, band prices in range
+      if (o?.tariff === 'grid' && gridCompany(o.grid ?? '')?.zone !== o.zone) e[`${p}.grid`] = 'Elige tu compañía de red';
+      if (o?.tariff === 'bands' && o.bands) {
+        o.bands.list.forEach((b, i) => {
+          if (!(Number.isFinite(b.price) && b.price >= MIN_BAND_PRICE && b.price <= MAX_BAND_PRICE)) e[`${p}.bands.${i}.price`] = `Entre ${MIN_BAND_PRICE} y ${MAX_BAND_PRICE}`;
+        });
+        if (o.bands.list.every((b) => !b.price)) e[`${p}.bands`] = 'Pon el precio de al menos un tramo';
+      }
       continue;
     }
     const bad = widgetUrlProblem(w.options.url, wcaps.edition === 'cloud');
