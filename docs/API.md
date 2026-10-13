@@ -105,10 +105,10 @@ The admin and the display read these fields to decide which sections, actions an
   `announcements`, `displayCommands`, `openDisplayAccess`, `insecureTls`, `googleCalendar`, `googleLogin`,
   `passwordLogin`, `apiTokens`, `webhooks`, `backups`, `importExport`, `includeSecrets`, `activity`, `setupWizard`,
   `status`, `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`,
-  `carousels`, `immich`, `family`, `widgets`, `webWidgets`, `priceWidgets`, `familyPhotos`, `twoFactor`. A self-hosted server turns all of them on, except
+  `carousels`, `immich`, `family`, `widgets`, `webWidgets`, `priceWidgets`, `familyPhotos`, `twoFactor`, `accountSettings`. A self-hosted server turns all of them on, except
   `googleCalendar` and `googleLogin` (on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set),
   `microsoftCalendar` (Outlook and Microsoft 365 calendars, on when `MICROSOFT_CLIENT_ID` and
-  `MICROSOFT_CLIENT_SECRET` are set), `accountMenu` and `feedback` (always off). `updates` is the update banner,
+  `MICROSOFT_CLIENT_SECRET` are set), `accountMenu`, `accountSettings` and `feedback` (always off). `updates` is the update banner,
   *Status → Updates* and `/api/admin/update*`; Marco Cloud answers `false` and shows the CHANGELOG section of a new
   version once instead. `feedback` is Marco Cloud's *Help and feedback* form (account menu, sidebar and command
   palette), which sends `POST /api/admin/feedback` with `{ kind: 'problem'|'idea'|'other', message, meta }` to the
@@ -128,7 +128,8 @@ The admin and the display read these fields to decide which sections, actions an
   (`POST /api/admin/family/photos` and `GET /media/avatars/<id>`, see [Familia](#familia)); without it the admin
   offers emoji only. `twoFactor` is two-step sign-in with an authenticator app (`/api/admin/2fa*` and
   `POST /api/auth/2fa`, see [Two-step sign-in](#two-step-sign-in)); Marco Cloud answers `false` and has its own on the
-  account page.
+  account page. `accountSettings` puts a Marco Cloud account's settings on the admin's Account page (see
+  [Account mode](#account-mode)).
 - `limits` (optional): plan limits such as `screens`, `sources` or `devices`. Absent means no limit beyond the
   config validator's own caps (12 screens, 50 calendars, 20 news feeds, 1000 local events, 500 birthdays,
   100 countdowns, 6 carousels, 20 widgets). `widgetMinRefreshSec` is the shortest widget refresh the server takes
@@ -146,9 +147,9 @@ The admin and the display read these fields to decide which sections, actions an
 
 Clients treat a response with no `features` field (servers older than 0.5.0) as having every feature on, except
 `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`, `carousels`,
-`immich`, `family`, `widgets`, `webWidgets`, `priceWidgets`, `familyPhotos` and `twoFactor`. A key missing from `features` counts as off only when `edition` is not `'self-hosted'`, and a missing
+`immich`, `family`, `widgets`, `webWidgets`, `priceWidgets`, `familyPhotos`, `twoFactor` and `accountSettings`. A key missing from `features` counts as off only when `edition` is not `'self-hosted'`, and a missing
 `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`, `carousels`,
-`immich`, `family`, `widgets`, `webWidgets`, `priceWidgets`, `familyPhotos` or `twoFactor` is always off.
+`immich`, `family`, `widgets`, `webWidgets`, `priceWidgets`, `familyPhotos`, `twoFactor` or `accountSettings` is always off.
 
 ### Account mode
 
@@ -163,6 +164,22 @@ screen. `GET /api/auth/me` then returns `user.method: 'account'` and an `account
   when the language changes;
 - replaces the Security page with an Account page (same `#/security` route) that renames the household with
   `PATCH /api/admin/household {name}` (60 characters at most).
+
+With `features.accountSettings` the Account page holds the whole account, and the header menu only links to it:
+
+- language: `POST /api/account/lang {lang}` (also sent when the admin's language changes);
+- password: `POST /api/account/password {current, password}`, or `{password}` alone for an account that has none
+  yet (allowed from a session signed in within the last 10 minutes; older ones get `401 {code: 'reauth'}`);
+- two-step verification: `GET /api/account/two-factor` (`{ enabled, enabledAt, recoveryLeft, hasPassword }`) and
+  `POST /api/account/two-factor/setup|enable|disable|recovery-codes`, with the same bodies as `/api/admin/2fa*`;
+- Sign in with Google: `GET /api/account/google` (`{ enabled, hasPassword, linked }`) and
+  `POST /api/account/google/disconnect`;
+- sessions: `GET /api/auth/sessions`, `DELETE /api/auth/sessions/:id`, `POST /api/auth/logout-all`;
+- `GET /api/account/export` (a JSON download), and deleting the account with `POST /api/account/delete {password}` or
+  a confirmation link by email (`POST /api/account/delete/start`).
+
+A `401` with `code: 'reauth'` from these calls asks for a recent sign-in for that one change: the admin shows the
+message and stays signed in.
 
 Links in the `account` block must be paths on the same site or `http(s)` URLs; the admin ignores anything else.
 

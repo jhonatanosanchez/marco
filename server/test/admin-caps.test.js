@@ -52,7 +52,7 @@ test('caps: old servers and self-hosted keep every feature on', () => {
   assert.equal(old.edition, 'self-hosted');
   assert.equal(old.features, null);
   // accountMenu, microsoftCalendar, updates, feedback, privacy and the doorbell only exist on servers that say so
-  for (const k of FEATURE_KEYS) assert.equal(hasFeature(old, k), !['accountMenu', 'microsoftCalendar', 'updates', 'feedback', 'privacy', 'doorbell', 'doorbellLive', 'carousels', 'immich', 'family', 'widgets', 'webWidgets', 'priceWidgets', 'familyPhotos', 'twoFactor'].includes(k), k);
+  for (const k of FEATURE_KEYS) assert.equal(hasFeature(old, k), !['accountMenu', 'microsoftCalendar', 'updates', 'feedback', 'privacy', 'doorbell', 'doorbellLive', 'carousels', 'immich', 'family', 'widgets', 'webWidgets', 'priceWidgets', 'familyPhotos', 'twoFactor', 'accountSettings'].includes(k), k);
   // carousels: on for this server, off for servers that do not say so (they would drop config.carousels)
   assert.equal(hasFeature(selfHosted(), 'carousels'), true);
   assert.equal(hasFeature(capsFrom({ ok: true, uptime: 1, version: '0.5.0', edition: 'self-hosted', features: { news: true } }), 'carousels'), false);
@@ -137,8 +137,8 @@ test('navFilter: self-hosted defaults and old servers show everything', () => {
   // every entry except the account ones (features.accountMenu, multi-tenant servers only), Microsoft calendars
   // (features.microsoftCalendar), updates (features.updates) and the doorbell (features.doorbell): an old server lists
   // none of them
-  const accountEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'accountMenu' || e.feature === 'microsoftCalendar').length;
-  assert.equal(accountEntries, 3);
+  const accountEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'accountMenu' || e.feature === 'accountSettings' || e.feature === 'microsoftCalendar').length;
+  assert.equal(accountEntries, 7);
   // updates, privacy mode and the doorbell are opt-in too (features.updates, features.privacy, features.doorbell)
   const updateEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'updates' || e.feature === 'privacy').length;
   assert.equal(updateEntries, 2);
@@ -153,7 +153,7 @@ test('navFilter: self-hosted defaults and old servers show everything', () => {
   const widgetEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'widgets').length;
   assert.equal(widgetEntries, 1);
   // two-step sign-in: older servers have no /api/admin/2fa
-  const twoFactorEntries = search.SETTINGS_INDEX.filter((e) => e.feature === 'twoFactor').length;
+  const twoFactorEntries = search.SETTINGS_INDEX.filter((e) => [e.feature].flat().includes('twoFactor')).length;
   assert.equal(twoFactorEntries, 1);
   assert.equal(nav.filterSettings(search.SETTINGS_INDEX, oldServer(), routes).length, search.SETTINGS_INDEX.length - accountEntries - updateEntries - doorbellEntries - carouselEntries - immichEntries - familyEntries - widgetEntries - twoFactorEntries);
   // without Google credentials a self-hosted admin still lists the Google entries (with the setup hint); the doorbell
@@ -215,11 +215,16 @@ test('navFilter: palette and settings search follow the features', () => {
   const c = cloud();
   const visible = nav.filterNav(nav.NAV_ITEMS, c).map((n) => n.id);
   const labels = nav.filterSettings(search.SETTINGS_INDEX, c, visible).map((s) => s.label);
-  for (const gone of ['Cambiar contraseña', 'Emails de Google permitidos', 'Sensores de Home Assistant para el tiempo', 'Fuentes de noticias (RSS)', 'Tokens de API', 'Galería de fotos', 'Acceso a las pantallas', 'Cuentas de Google Calendar', 'Cerrar sesión en todos los dispositivos']) {
+  for (const gone of ['Emails de Google permitidos', 'Sensores de Home Assistant para el tiempo', 'Fuentes de noticias (RSS)', 'Tokens de API', 'Galería de fotos', 'Acceso a las pantallas', 'Cuentas de Google Calendar', 'Cerrar sesión en todos los dispositivos']) {
     assert.ok(!labels.includes(gone), gone);
   }
   assert.ok(labels.includes('CSS personalizado'));
   assert.ok(labels.includes('Exportar configuración'));
+  // the account settings (features.accountSettings) bring their own password, two-step and session entries
+  for (const kept of ['Cambiar contraseña', 'Verificación en dos pasos', 'Sesiones abiertas', 'Eliminar cuenta']) assert.ok(labels.includes(kept), kept);
+  const noSettings = capsFrom({ ...cloudHealth(), features: { ...cloudHealth().features, accountSettings: false } });
+  const older = nav.filterSettings(search.SETTINGS_INDEX, noSettings, visible).map((s) => s.label);
+  for (const gone of ['Cambiar contraseña', 'Verificación en dos pasos', 'Sesiones abiertas', 'Eliminar cuenta']) assert.ok(!older.includes(gone), gone);
   for (const s of search.SETTINGS_INDEX) assert.ok(nav.NAV_ITEMS.some((n) => n.id === s.route), `unknown route ${s.route}`);
 
   const noCmds = capsFrom({ ...cloudHealth(), features: { ...cloudHealth().features, displayCommands: false } });
@@ -407,7 +412,8 @@ test('accountNav: multi-tenant servers turn Security into Account', () => {
   // the account entries in the settings search follow accountMenu
   const visible = cl.map((n) => n.id);
   const labels = (caps) => nav.filterSettings(search.SETTINGS_INDEX, caps, visible).filter((s) => s.route === 'security').map((s) => s.label);
-  assert.deepEqual(labels(cloud()), ['Nombre del hogar', 'Sesiones abiertas']);
+  assert.deepEqual(labels(cloud()), ['Cambiar contraseña', 'Verificación en dos pasos', 'Nombre del hogar', 'Sesiones abiertas', 'Idioma de la cuenta', 'Entrar con Google', 'Descargar mis datos', 'Eliminar cuenta']);
+  assert.deepEqual(labels(capsFrom({ ...cloudHealth(), features: { ...cloudHealth().features, accountSettings: false } })), ['Nombre del hogar']);
   assert.ok(!labels(selfHosted()).includes('Nombre del hogar'));
 });
 

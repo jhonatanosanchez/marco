@@ -23,6 +23,8 @@ import type {
   TwoFactorSetup,
   RecoveryCodesResponse,
   TwoFactorLoginResponse,
+  AccountSessionsResponse,
+  AccountGoogleStatus,
   BackupInfo,
   BirthdayCsvResult,
   DashboardResponse,
@@ -87,7 +89,9 @@ export class ApiError extends Error {
 /** Fired on any 401 so the app can drop back to the login screen. */
 export const UNAUTHORIZED_EVENT = 'admin:unauthorized';
 
-async function request<T>(method: string, url: string, body?: unknown, opts: { silent401?: boolean; headers?: Record<string, string> } = {}): Promise<T> {
+/** `stepUp401`: a 401 with code 'reauth' asks for a recent sign-in for this one change (Marco Cloud's account
+ *  settings); the session itself is fine, so the admin stays where it is and the caller shows the message. */
+async function request<T>(method: string, url: string, body?: unknown, opts: { silent401?: boolean; stepUp401?: boolean; headers?: Record<string, string> } = {}): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json', 'X-Requested-With': 'fetch', ...(opts.headers ?? {}) };
   let payload: string | undefined;
   if (method !== 'GET') {
@@ -111,7 +115,8 @@ async function request<T>(method: string, url: string, body?: unknown, opts: { s
     }
   }
   if (!res.ok) {
-    if (res.status === 401 && !opts.silent401) window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
+    const stepUp = opts.stepUp401 && (data as { code?: unknown } | null)?.code === 'reauth';
+    if (res.status === 401 && !opts.silent401 && !stepUp) window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
     throw new ApiError(res.status, apiErrorMessage(res.status, data), data);
   }
   return data as T;
@@ -142,6 +147,25 @@ export const api = {
   twoFactorDisable: (proof: { password?: string; code?: string }) => request<{ ok: true }>('POST', '/api/admin/2fa/disable', proof),
   twoFactorRecoveryCodes: (proof: { password?: string; code?: string }) =>
     request<RecoveryCodesResponse>('POST', '/api/admin/2fa/recovery-codes', proof),
+
+  // Marco Cloud account settings (features.accountSettings), shown on the account page. Changes that need a recent
+  // sign-in answer 401 { code: 'reauth' } without signing the admin out (stepUp401).
+  accountPassword: (password: string, current?: string) =>
+    request<{ ok: true }>('POST', '/api/account/password', current ? { current, password } : { password }, { stepUp401: true }),
+  accountSessions: () => request<AccountSessionsResponse>('GET', '/api/auth/sessions'),
+  accountRevokeSession: (id: string) => request<{ ok: true; current: boolean }>('DELETE', `/api/auth/sessions/${encodeURIComponent(id)}`),
+  accountGoogle: () => request<AccountGoogleStatus>('GET', '/api/account/google'),
+  accountGoogleDisconnect: () => request<{ ok: true; removed: boolean }>('POST', '/api/account/google/disconnect', {}),
+  accountDelete: (password: string) => request<{ ok: true; next?: string }>('POST', '/api/account/delete', { password }),
+  accountDeleteByEmail: () => request<{ ok: true }>('POST', '/api/account/delete/start', {}),
+  accountTwoFactorStatus: () => request<TwoFactorStatus>('GET', '/api/account/two-factor'),
+  accountTwoFactorSetup: (password?: string) =>
+    request<TwoFactorSetup>('POST', '/api/account/two-factor/setup', password ? { password } : {}, { stepUp401: true }),
+  accountTwoFactorEnable: (code: string) => request<RecoveryCodesResponse>('POST', '/api/account/two-factor/enable', { code }),
+  accountTwoFactorDisable: (proof: { password?: string; code?: string }) =>
+    request<{ ok: true }>('POST', '/api/account/two-factor/disable', proof, { stepUp401: true }),
+  accountTwoFactorRecoveryCodes: (proof: { password?: string; code?: string }) =>
+    request<RecoveryCodesResponse>('POST', '/api/account/two-factor/recovery-codes', proof, { stepUp401: true }),
 
   // Marco Cloud account (features.accountMenu): the language follows the account, the household can be renamed.
   accountLang: (lang: string) => request<{ ok: true }>('POST', '/api/account/lang', { lang }),

@@ -3,10 +3,12 @@
 // NL_FAMILY and NL_SINGULAR_FAMILY in i18n-dict-family.ts, so the family page does not load this file.
 
 import { NL_TWOFA } from './i18n-dict-2fa';
+import { NL_ACCOUNT } from './i18n-dict-account';
 
 /** Every admin row but the Familia ones. */
 export const NL: Record<string, string> = {
   ...NL_TWOFA,
+  ...NL_ACCOUNT,
   '(ninguno)': '(geen)',
   'Estás usando la contraseña inicial. Cámbiala: hasta entonces solo se acepta desde tu red local.': 'Je gebruikt het startwachtwoord. Wijzig het: tot dan wordt het alleen vanuit je lokale netwerk geaccepteerd.',
   'Sesiones': 'Sessies',

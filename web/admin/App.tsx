@@ -840,7 +840,8 @@ export function App() {
   if (showErrors || dirty) for (const k of errorKeys) errCountBySection[sectionForError(k)] = (errCountBySection[sectionForError(k)] ?? 0) + 1;
   const user = me.user;
   const household = me.account?.household ?? null;
-  const links = has('accountMenu') ? accountLinks(me) : null;
+  // With the account settings in the admin (features.accountSettings) the menu only opens the Account page.
+  const links = has('accountMenu') && !has('accountSettings') ? accountLinks(me) : null;
   const feedback = hasFeature(caps, 'feedback');
   const accountPage = caps.tenancy === 'multi';
   const portrait = view.screen.orientation === 'portrait';
@@ -869,6 +870,7 @@ export function App() {
     go,
     reloadPreview: () => setPreviewKey((k) => k + 1),
     updateMe: setMe,
+    setLang: changeLang,
   };
 
   return (

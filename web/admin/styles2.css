@@ -4657,10 +4657,56 @@ h1 .scope {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* account settings (features.accountSettings) */
+.account-who {
+  flex-wrap: wrap;
+}
+.account-who__text {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.account-who__text strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.account-who__out {
+  flex: none;
+}
+.account-lang {
+  max-width: 280px;
+}
+.account-pw {
+  border-top: 0;
+  padding-top: 0;
+}
+.account-badge {
+  margin-left: 8px;
+  vertical-align: 1px;
+}
+.account-delete {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.account-delete .field {
+  max-width: 360px;
+  margin: 0;
+}
+.card--danger .card__icon {
+  background: color-mix(in srgb, var(--err) 14%, transparent);
+  color: var(--err);
+}
 @media (max-width: 640px) {
   .account-rename > .btn {
     margin-top: 0;
     width: 100%;
+  }
+  .account-who__out {
+    width: 100%;
+    justify-content: center;
+  }
+  .account-lang {
+    max-width: none;
   }
   .account-links .btn {
     width: 100%;

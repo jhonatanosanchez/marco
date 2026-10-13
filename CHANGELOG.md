@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- Marco Cloud: everything about your account now lives on the admin's *Account* page, with the same look as the rest
+  of the admin: language, password, two-step verification, Sign in with Google, open sessions, your data and deleting
+  the account. The old account page sends you there.
+
 ## [0.14.1] - 2026-10-13
 
 ### Added

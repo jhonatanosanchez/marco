@@ -38,6 +38,7 @@ const FEATURE_RULES = [
   [/^\/api\/admin\/status$/, 'status'],
   [/^\/api\/admin\/(announce|announcements)/, 'announcements'],
   [/^\/api\/admin\/(displays\/command|refresh-displays)$/, 'displayCommands'],
+  [/^\/api\/(account\/(password|two-factor|google|delete)(\/|$)|auth\/sessions(\/|$))/, 'accountSettings'],
   [/^\/api\/(account\/|admin\/household$)/, 'accountMenu'],
   [/^\/api\/admin\/update(\/|$)/, 'updates'],
   [/^\/api\/admin\/feedback$/, 'feedback'],

@@ -1,7 +1,8 @@
 // Two-step sign-in (server/twofactor.js): the Security card that turns it on and off, and the code step of the
 // sign-in page. The QR code is drawn here (web/shared/qr.ts), the secret never leaves this browser and the server.
+// The card also serves Marco Cloud's account page, on that server's account endpoints (`client`).
 import { useEffect, useState } from 'preact/hooks';
-import type { AuthMeResponse, TwoFactorSetup, TwoFactorStatus } from '../../shared/types';
+import type { AuthMeResponse, RecoveryCodesResponse, TwoFactorSetup, TwoFactorStatus } from '../../shared/types';
 import { api, ApiError } from '../api';
 import { toast } from './feedback';
 import { Icon } from './icons';
@@ -10,17 +11,39 @@ import { Button, Callout, Card, Field, Modal } from './ui';
 import { relTime, t } from '../i18n';
 import '../twofactor.css';
 
-const errCode = (e: unknown) => ((e as ApiError)?.body as { code?: string } | null)?.code ?? '';
+/** The error code of a failed call: `code`, else `error` (Marco Cloud names its codes there). */
+const errCode = (e: unknown) => {
+  const b = (e as ApiError)?.body as { code?: unknown; error?: unknown } | null;
+  const v = b?.code ?? b?.error;
+  return typeof v === 'string' ? v : '';
+};
+
+/** The calls behind the card: self-hosted's /api/admin/2fa*, or another server's account endpoints. */
+export interface TwoFactorClient {
+  status: () => Promise<TwoFactorStatus>;
+  setup: (password?: string) => Promise<TwoFactorSetup>;
+  enable: (code: string) => Promise<RecoveryCodesResponse>;
+  disable: (proof: { password?: string; code?: string }) => Promise<unknown>;
+  recoveryCodes: (proof: { password?: string; code?: string }) => Promise<RecoveryCodesResponse>;
+}
+
+const ADMIN_2FA: TwoFactorClient = {
+  status: () => api.twoFactorStatus(),
+  setup: (password) => api.twoFactorSetup(password),
+  enable: (code) => api.twoFactorEnable(code),
+  disable: (proof) => api.twoFactorDisable(proof),
+  recoveryCodes: (proof) => api.twoFactorRecoveryCodes(proof),
+};
 
 /** Text for an error answer of the settings endpoints. */
 function proofError(e: unknown): string {
   const ae = e as ApiError;
   const code = errCode(e);
   if (ae.status === 429) return t('Demasiados intentos. Espera un momento.');
-  if (code === 'password_incorrect') return t('Contraseña incorrecta');
+  if (code === 'password_incorrect' || code === 'wrong_password') return t('Contraseña incorrecta');
   if (code === 'code_incorrect' || code === 'code_invalid') return t('El código no es correcto. Comprueba que la hora del móvil está bien y prueba con el siguiente.');
-  if (code === 'reauth_required' || code === 'password_required') return t('Por seguridad, cierra la sesión y vuelve a entrar antes de cambiar esto.');
-  if (code === 'expired' || code === 'no_setup') return t('La configuración ha caducado. Empieza otra vez.');
+  if (code === 'reauth_required' || code === 'password_required' || code === 'reauth') return t('Por seguridad, cierra la sesión y vuelve a entrar antes de cambiar esto.');
+  if (code === 'expired' || code === 'no_setup' || code === 'setup_expired') return t('La configuración ha caducado. Empieza otra vez.');
   return ae.message === 'network' ? t('No se puede conectar con el servidor') : ae.message;
 }
 
@@ -113,7 +136,7 @@ function ProofModal({ title, confirm, danger, canPassword, onProof, onClose }: {
   );
 }
 
-function SetupModal({ setup, onDone, onClose }: { setup: TwoFactorSetup; onDone: () => void; onClose: () => void }) {
+function SetupModal({ setup, client, onDone, onClose }: { setup: TwoFactorSetup; client: TwoFactorClient; onDone: () => void; onClose: () => void }) {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -123,7 +146,7 @@ function SetupModal({ setup, onDone, onClose }: { setup: TwoFactorSetup; onDone:
     setBusy(true);
     setErr('');
     try {
-      const r = await api.twoFactorEnable(code.trim());
+      const r = await client.enable(code.trim());
       setCodes(r.recoveryCodes);
       onDone();
     } catch (e2) {
@@ -181,19 +204,20 @@ function SetupModal({ setup, onDone, onClose }: { setup: TwoFactorSetup; onDone:
   );
 }
 
-/** Security → Two-step sign-in. */
-export function TwoFactorCard({ me }: { me: AuthMeResponse }) {
+/** Security → Two-step sign-in. `client` and `desc`: another server's endpoints and its own description. */
+export function TwoFactorCard({ me, client = ADMIN_2FA, desc }: { me: AuthMeResponse; client?: TwoFactorClient; desc?: string }) {
   const [status, setStatus] = useState<TwoFactorStatus | null>(null);
   const [loadErr, setLoadErr] = useState('');
   const [setup, setSetup] = useState<TwoFactorSetup | null>(null);
   const [starting, setStarting] = useState(false);
   const [ask, setAsk] = useState<'disable' | 'codes' | 'password' | null>(null);
   const [newCodes, setNewCodes] = useState<string[] | null>(null);
-  const passwordSession = me.user?.method === 'password';
+  // A server that says whether the account has a password (Marco Cloud) takes it from any session.
+  const passwordSession = status?.hasPassword ?? me.user?.method === 'password';
 
   const load = async () => {
     try {
-      setStatus(await api.twoFactorStatus());
+      setStatus(await client.status());
       setLoadErr('');
     } catch (e) {
       setLoadErr(proofError(e));
@@ -202,14 +226,16 @@ export function TwoFactorCard({ me }: { me: AuthMeResponse }) {
   useEffect(() => void load(), []);
 
   const start = async (password?: string) => {
+    // the account has a password: it confirms the setup (Marco Cloud asks for it)
+    if (status?.hasPassword && !password) return setAsk('password');
     setStarting(true);
     try {
-      setSetup(await api.twoFactorSetup(password));
+      setSetup(await client.setup(password));
       setAsk(null);
     } catch (e) {
       const code = errCode(e);
       // no sign-in in the last 10 minutes: the password first (a Google session signs in again)
-      if ((code === 'password_required' || code === 'password_incorrect') && passwordSession && !password) setAsk('password');
+      if ((code === 'password_required' || code === 'password_incorrect' || code === 'confirm_required') && passwordSession && !password) setAsk('password');
       else if (password) throw e;
       else toast(proofError(e), 'error');
     } finally {
@@ -218,7 +244,7 @@ export function TwoFactorCard({ me }: { me: AuthMeResponse }) {
   };
 
   return (
-    <Card id="sec-2fa" title={t('Verificación en dos pasos')} icon="shield" desc={t('Además de la contraseña, al entrar se pide un código de una app de autenticación del móvil.')}>
+    <Card id="sec-2fa" title={t('Verificación en dos pasos')} icon="shield" desc={desc ?? t('Además de la contraseña, al entrar se pide un código de una app de autenticación del móvil.')}>
       {loadErr && <Callout kind="error">{loadErr}</Callout>}
       {!status && !loadErr && <div class="skeleton tfa-skeleton" />}
       {status && !status.enabled && (
@@ -268,7 +294,7 @@ export function TwoFactorCard({ me }: { me: AuthMeResponse }) {
           danger
           canPassword={passwordSession}
           onProof={async (p) => {
-            await api.twoFactorDisable(p);
+            await client.disable(p);
             setAsk(null);
             toast(t('Verificación en dos pasos desactivada'));
             load();
@@ -282,7 +308,7 @@ export function TwoFactorCard({ me }: { me: AuthMeResponse }) {
           confirm={t('Crear códigos nuevos')}
           canPassword={passwordSession}
           onProof={async (p) => {
-            const r = await api.twoFactorRecoveryCodes(p);
+            const r = await client.recoveryCodes(p);
             setAsk(null);
             setNewCodes(r.recoveryCodes);
             load();
@@ -296,7 +322,7 @@ export function TwoFactorCard({ me }: { me: AuthMeResponse }) {
           <RecoveryCodes codes={newCodes} />
         </Modal>
       )}
-      {setup && <SetupModal setup={setup} onDone={load} onClose={() => setSetup(null)} />}
+      {setup && <SetupModal setup={setup} client={client} onDone={load} onClose={() => setSetup(null)} />}
     </Card>
   );
 }

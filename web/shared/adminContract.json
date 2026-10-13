@@ -4,6 +4,70 @@
   "endpoints": [
     {
       "method": "POST",
+      "path": "/api/account/delete",
+      "query": [],
+      "feature": "accountSettings",
+      "callers": [
+        "accountDelete"
+      ],
+      "request": "{password}",
+      "response": "inline",
+      "responseArray": false,
+      "responseKeys": [
+        "ok",
+        "next?"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/account/delete/start",
+      "query": [],
+      "feature": "accountSettings",
+      "callers": [
+        "accountDeleteByEmail"
+      ],
+      "request": "{}",
+      "response": "inline",
+      "responseArray": false,
+      "responseKeys": [
+        "ok"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/account/google",
+      "query": [],
+      "feature": "accountSettings",
+      "callers": [
+        "accountGoogle"
+      ],
+      "request": null,
+      "response": "AccountGoogleStatus",
+      "responseArray": false,
+      "responseKeys": [
+        "enabled",
+        "hasPassword",
+        "linked"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/account/google/disconnect",
+      "query": [],
+      "feature": "accountSettings",
+      "callers": [
+        "accountGoogleDisconnect"
+      ],
+      "request": "{}",
+      "response": "inline",
+      "responseArray": false,
+      "responseKeys": [
+        "ok",
+        "removed"
+      ]
+    },
+    {
+      "method": "POST",
       "path": "/api/account/lang",
       "query": [],
       "feature": "accountMenu",
@@ -15,6 +79,102 @@
       "responseArray": false,
       "responseKeys": [
         "ok"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/account/password",
+      "query": [],
+      "feature": "accountSettings",
+      "callers": [
+        "accountPassword"
+      ],
+      "request": "{current?, password}",
+      "response": "inline",
+      "responseArray": false,
+      "responseKeys": [
+        "ok"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/account/two-factor",
+      "query": [],
+      "feature": "accountSettings",
+      "callers": [
+        "accountTwoFactorStatus"
+      ],
+      "request": null,
+      "response": "TwoFactorStatus",
+      "responseArray": false,
+      "responseKeys": [
+        "enabled",
+        "enabledAt",
+        "recoveryLeft",
+        "hasPassword?"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/account/two-factor/disable",
+      "query": [],
+      "feature": "accountSettings",
+      "callers": [
+        "accountTwoFactorDisable"
+      ],
+      "request": "{ password?: string; code?: string }",
+      "response": "inline",
+      "responseArray": false,
+      "responseKeys": [
+        "ok"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/account/two-factor/enable",
+      "query": [],
+      "feature": "accountSettings",
+      "callers": [
+        "accountTwoFactorEnable"
+      ],
+      "request": "{code}",
+      "response": "RecoveryCodesResponse",
+      "responseArray": false,
+      "responseKeys": [
+        "ok",
+        "recoveryCodes"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/account/two-factor/recovery-codes",
+      "query": [],
+      "feature": "accountSettings",
+      "callers": [
+        "accountTwoFactorRecoveryCodes"
+      ],
+      "request": "{ password?: string; code?: string }",
+      "response": "RecoveryCodesResponse",
+      "responseArray": false,
+      "responseKeys": [
+        "ok",
+        "recoveryCodes"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/account/two-factor/setup",
+      "query": [],
+      "feature": "accountSettings",
+      "callers": [
+        "accountTwoFactorSetup"
+      ],
+      "request": "{password?}",
+      "response": "TwoFactorSetup",
+      "responseArray": false,
+      "responseKeys": [
+        "secret",
+        "uri"
       ]
     },
     {
@@ -31,7 +191,8 @@
       "responseKeys": [
         "enabled",
         "enabledAt",
-        "recoveryLeft"
+        "recoveryLeft",
+        "hasPassword?"
       ]
     },
     {
@@ -1739,6 +1900,37 @@
         "account?",
         "microsoftConfigured?",
         "twoFactorPending?"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/sessions",
+      "query": [],
+      "feature": "accountSettings",
+      "callers": [
+        "accountSessions"
+      ],
+      "request": null,
+      "response": "AccountSessionsResponse",
+      "responseArray": false,
+      "responseKeys": [
+        "sessions"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/auth/sessions/:id",
+      "query": [],
+      "feature": "accountSettings",
+      "callers": [
+        "accountRevokeSession"
+      ],
+      "request": null,
+      "response": "inline",
+      "responseArray": false,
+      "responseKeys": [
+        "ok",
+        "current"
       ]
     },
     {

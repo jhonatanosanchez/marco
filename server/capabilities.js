@@ -12,7 +12,7 @@ export const FEATURE_KEYS = Object.freeze([
   'openDisplayAccess', 'insecureTls', 'googleCalendar', 'googleLogin', 'passwordLogin', 'apiTokens',
   'webhooks', 'backups', 'importExport', 'includeSecrets', 'activity', 'setupWizard', 'status', 'accountMenu',
   'microsoftCalendar', 'updates', 'feedback', 'privacy', 'doorbell', 'doorbellLive', 'carousels', 'immich',
-  'family', 'widgets', 'webWidgets', 'priceWidgets', 'familyPhotos', 'twoFactor',
+  'family', 'widgets', 'webWidgets', 'priceWidgets', 'familyPhotos', 'twoFactor', 'accountSettings',
 ]);
 
 /** Feature flags of a self-hosted server: all on (`updates` too: the update banner and settings), Google and
@@ -25,7 +25,8 @@ export const FEATURE_KEYS = Object.freeze([
  *  `widgets` are images on screens (config.widgets); `webWidgets` adds web pages in a sandboxed frame;
  *  `priceWidgets` the electricity price card (server/prices.js). `familyPhotos`: profile photos of the family members
  *  (POST /api/admin/family/photos, GET /media/avatars/<id>; server/familyPhotos.js). `twoFactor`: two-step sign-in
- *  with an authenticator app for the admin (server/twofactor.js; Marco Cloud has its own on the account page). */
+ *  with an authenticator app for the admin (server/twofactor.js; Marco Cloud has its own on the account page).
+ *  `accountSettings` (always off here): the account settings of a Marco Cloud account on the admin's account page. */
 export function selfHostedFeatures() {
   const google = googleConfigured();
   const out = {};
@@ -33,6 +34,7 @@ export function selfHostedFeatures() {
   out.googleCalendar = google;
   out.googleLogin = googleLoginEnabled(getConfig());
   out.accountMenu = false;
+  out.accountSettings = false;
   out.feedback = false;
   out.microsoftCalendar = microsoftConfigured();
   return out;

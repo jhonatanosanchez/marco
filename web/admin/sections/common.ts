@@ -1,4 +1,4 @@
-import type { AppConfig, AuthMeResponse, StoredConfig } from '../../shared/types';
+import type { AppConfig, AuthMeResponse, Lang, StoredConfig } from '../../shared/types';
 import type { Errors } from '../util';
 
 export interface SectionProps {
@@ -28,4 +28,6 @@ export interface SectionProps {
   reloadPreview: () => void;
   /** Replace the signed-in user's /api/auth/me data (account page after renaming the household). */
   updateMe?: (m: AuthMeResponse) => void;
+  /** Change the admin's language (and the account's, on servers with an account menu). */
+  setLang?: (l: Lang) => void;
 }

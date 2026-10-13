@@ -1178,6 +1178,10 @@ export interface Features {
   familyPhotos: boolean;
   /** Two-step sign-in with an authenticator app for the admin (/api/admin/2fa*, POST /api/auth/2fa); absent = off. */
   twoFactor: boolean;
+  /** Account settings inside the admin's account page (Marco Cloud): language, password, two-step verification,
+   *  Google sign-in, sessions, data export and deleting the account (/api/account/*, /api/auth/sessions*). Absent = off:
+   *  the account page links out to the server's own account pages instead. */
+  accountSettings: boolean;
 }
 
 export type FeatureName = keyof Features;
@@ -1344,6 +1348,10 @@ export interface AuthUser {
   name: string;
   picture?: string;
   method: 'password' | 'google' | 'account';
+  /** Marco Cloud accounts: the account's language (emails), whether it has a password, and when it was made (epoch ms) */
+  lang?: Lang;
+  hasPassword?: boolean;
+  createdAt?: number;
 }
 
 /** Marco Cloud: where the account pages live and which household the admin edits. */
@@ -1383,10 +1391,38 @@ export interface AuthMeResponse {
 /** GET /api/admin/2fa */
 export interface TwoFactorStatus {
   enabled: boolean;
-  /** ISO time it was turned on, or null */
-  enabledAt: string | null;
+  /** when it was turned on (ISO time; Marco Cloud: epoch ms), or null */
+  enabledAt: string | number | null;
   /** unused recovery codes */
   recoveryLeft: number;
+  /** Marco Cloud (GET /api/account/two-factor): the account has a password, so changes can be confirmed with it */
+  hasPassword?: boolean;
+}
+
+/** GET /api/auth/sessions (features.accountSettings): where the account is signed in. Times are epoch ms. */
+export interface AccountSession {
+  id: string;
+  createdAt: number;
+  lastSeenAt: number;
+  expiresAt: number;
+  /** browser and system, e.g. "Firefox on Linux"; null when unknown */
+  label: string | null;
+  /** two-letter country code, or null */
+  country: string | null;
+  current: boolean;
+}
+
+export interface AccountSessionsResponse {
+  sessions: AccountSession[];
+}
+
+/** GET /api/account/google (features.accountSettings): Sign in with Google for this account. */
+export interface AccountGoogleStatus {
+  /** the server offers Sign in with Google */
+  enabled: boolean;
+  hasPassword: boolean;
+  /** the Google account that signs in to this one, or null */
+  linked: { email: string; linkedAt: number; lastUsedAt: number | null } | null;
 }
 
 /** POST /api/admin/2fa/setup: the new secret (base32) and its otpauth:// URI for the QR code. */
