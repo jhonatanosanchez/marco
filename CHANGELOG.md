@@ -5,6 +5,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-10-13
+
+### Security
+- Several security fixes. Please update. After updating you will need to sign in to the admin again.
+- If Marco runs behind a reverse proxy, make sure the proxy sends `X-Forwarded-For` (the examples in the README do).
+- Thanks to @scootmandoo for reporting issues responsibly.
+
 ## [0.13.0] - 2026-10-13
 
 ### Added
