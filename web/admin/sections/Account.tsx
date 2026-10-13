@@ -358,7 +358,8 @@ function SessionsCard() {
     api
       .accountSessions()
       .then((r) => {
-        setList(r.sessions);
+        // this device first, then the most recently active
+        setList([...r.sessions].sort((a, b) => Number(b.current) - Number(a.current) || b.lastSeenAt - a.lastSeenAt));
         setFailed(false);
       })
       .catch(() => setFailed(true));
