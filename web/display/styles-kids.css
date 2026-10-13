@@ -410,3 +410,18 @@
 }
 .lite.style-modern #app.is-kids .k-bar i { transition: none; }
 .lite.style-modern #app.is-kids .k-touch .k-chore:active { transform: none; }
+
+/* ------------------------------------------------------------------------------------------- photo on the whole screen */
+/* background.scope 'screen': the photo fills the screen and the pastel page floats over it as glass (--sheet-a, how
+   solid it is, from background.calendarOpacity); the cards on it stay solid so the children read them easily */
+.style-modern #app.is-kids.bg-screen { background: transparent; }
+.style-modern #app.is-kids.bg-screen .photo-area { display: block; }
+.style-modern #app.is-kids.bg-screen .main,
+.style-modern #app.is-kids.bg-screen.side-right .main {
+  --sheet-rgb: 20 20 24;
+  margin: 2.4rem;
+  border-radius: 3.2rem;
+  background: rgb(var(--sheet-rgb) / var(--sheet-a, 0.6));
+}
+.style-modern.theme-light #app.is-kids.bg-screen .main { --sheet-rgb: 246 243 238; }
+.style-modern #app.is-kids.bg-screen .scrim { background: rgb(0 0 0 / 0.12); }

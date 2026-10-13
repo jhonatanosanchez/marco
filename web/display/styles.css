@@ -255,6 +255,38 @@ body {
 .preset-leftRight .wx-hourly { display: none; }
 .preset-leftRight.portrait .photo-area { grid-row: 1 / -1; }
 
+/* --- background.scope 'screen' (#app.bg-screen): one photo behind the whole screen, the calendar over it as glass.
+   --sheet-a (main.ts, web/shared/glass.ts calendarSheetAlpha) is how solid the glass is. Classic: the panel stays
+   flush with the edges, as in left / right; Modern floats it as a rounded sheet (styles-modern.css). Lite mode
+   (a Raspberry Pi): no blur, a denser sheet instead. */
+#app.bg-screen .photo-area { grid-column: 1 / -1 !important; grid-row: 1 / -1 !important; }
+#app.bg-screen .side { background: none; }
+#app.bg-screen .main {
+  --sheet-rgb: 10 10 14;
+  background: rgb(var(--sheet-rgb) / var(--sheet-a, 0.6));
+  -webkit-backdrop-filter: blur(2.6rem) saturate(1.5);
+  backdrop-filter: blur(2.6rem) saturate(1.5);
+}
+.theme-light #app.bg-screen .main { --sheet-rgb: 244 242 238; }
+.lite #app.bg-screen .main { -webkit-backdrop-filter: none; backdrop-filter: none; }
+/* thin dark glass: a soft shadow keeps the text readable over the bright parts of the photo */
+.sheet-thin #app.bg-screen .main { text-shadow: 0 0.1rem 0.7rem rgb(0 0 0 / 0.5); }
+/* the photo is darker where the clock and the weather sit on it, lighter behind the calendar */
+#app.bg-screen .scrim {
+  background:
+    linear-gradient(to right, rgb(0 0 0 / 0.42), rgb(0 0 0 / 0.16) var(--side-w), rgb(0 0 0 / 0.1)),
+    linear-gradient(to bottom, transparent 45%, rgb(0 0 0 / 0.42));
+}
+#app.bg-screen.side-right .scrim {
+  background:
+    linear-gradient(to left, rgb(0 0 0 / 0.42), rgb(0 0 0 / 0.16) var(--side-w), rgb(0 0 0 / 0.1)),
+    linear-gradient(to bottom, transparent 45%, rgb(0 0 0 / 0.42));
+}
+#app.bg-screen.portrait .scrim,
+#app.bg-screen.preset-topBottom .scrim { background: linear-gradient(to bottom, rgb(0 0 0 / 0.46), rgb(0 0 0 / 0.14) 40%, rgb(0 0 0 / 0.1)); }
+#app.bg-screen.pbar-bottom .scrim { background: linear-gradient(to top, rgb(0 0 0 / 0.46), rgb(0 0 0 / 0.14) 40%, rgb(0 0 0 / 0.1)); }
+#app.bg-screen.preset-topBottom.pbar .scrim { background: linear-gradient(to right, rgb(0 0 0 / 0.46), rgb(0 0 0 / 0.18) 45%, rgb(0 0 0 / 0.18) 60%, rgb(0 0 0 / 0.36)); }
+
 /* --- bigTime: giant centred clock over a full-screen photo --- */
 #app.preset-bigTime { grid-template-columns: 100%; grid-template-rows: minmax(0, 1fr) auto; }
 .preset-bigTime .photo-area { grid-column: 1 !important; grid-row: 1 / -1; }

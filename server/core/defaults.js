@@ -75,6 +75,9 @@ export function defaultScreenProfile({ id = 's_main', slug = 'living-room', name
       // immich: the albums played when source is 'immich' (server/immich.js)
       portraitFit: 'auto',
       immich: { albumIds: [], favoritesOnly: false },
+      // scope: the photo in the side area of the layout ('side') or behind the whole screen ('screen'), with the
+      // calendar over it as glass; calendarOpacity: how solid that glass is (0 = most see-through, 1 = almost opaque)
+      scope: 'side', calendarOpacity: 0.5,
     },
     calendar: {
       enabled: true, view: 'month', weeks: 5, weekStart: 1, showLocation: false, showEndTime: false,

@@ -1,6 +1,6 @@
 import { useRef } from 'preact/hooks';
-import { GLASS_DEFAULTS, glassVars, normalizeGlass, type PhotoStats } from '../../shared/glass';
-import type { DisplayStyle, FrameCorner, GlassConfig, LayoutPreset, PlannerBar, WidgetPlacement } from '../../shared/types';
+import { CALENDAR_OPACITY_DEFAULT, GLASS_DEFAULTS, glassVars, normalizeGlass, SCREEN_PHOTO_PRESETS, type PhotoStats } from '../../shared/glass';
+import type { BackgroundScope, DisplayStyle, FrameCorner, GlassConfig, LayoutPreset, PlannerBar, WidgetPlacement } from '../../shared/types';
 import { Icon } from '../components/icons';
 import { EventStyleField, PLANNER_CALENDAR, undoPlannerPick, weeksCap, WeeksField } from '../components/PlannerFields';
 import { Button, Callout, Card, ColorPicker, Field, PageHeader, ReorderButtons, Segmented, Select, Slider, ToggleRow } from '../components/ui';
@@ -563,6 +563,53 @@ export function GlassCard({ cfg, set }: Pick<SectionProps, 'cfg' | 'set'>) {
   );
 }
 
+/**
+ * Where the background photo goes (background.scope): the side area of the layout, or the whole screen with the
+ * calendar over it as glass, and then how solid that glass is (background.calendarOpacity).
+ */
+export function PhotoScopeFields({ cfg, set, kids }: Pick<SectionProps, 'cfg' | 'set'> & { kids: boolean }) {
+  const b = cfg.background;
+  const scope: BackgroundScope = b.scope === 'screen' ? 'screen' : 'side';
+  const applies = SCREEN_PHOTO_PRESETS.includes(cfg.layout.preset);
+  const hint = !b.enabled
+    ? t('Las fotos de fondo están desactivadas en esta pantalla.')
+    : !applies
+      ? t('Este diseño ya pone la foto en toda la pantalla, o no lleva foto.')
+      : scope === 'screen'
+        ? t('La foto llena toda la pantalla y el calendario se ve encima, como un cristal.')
+        : kids
+          ? t('Los diseños para niños solo llevan foto con “Toda la pantalla”.')
+          : t('La foto solo se ve en la zona lateral del diseño.');
+  return (
+    <div id="layout-photo" class="stack">
+      <Field label={t('Foto de fondo')} hint={hint}>
+        <Segmented
+          full
+          value={scope}
+          disabled={!b.enabled}
+          options={[
+            { value: 'side' as BackgroundScope, label: t('Solo el lateral') },
+            { value: 'screen' as BackgroundScope, label: t('Toda la pantalla') },
+          ]}
+          onChange={(v) => set((d) => void (d.background.scope = v))}
+        />
+      </Field>
+      {scope === 'screen' && b.enabled && applies && (
+        <Field label={t('Transparencia del calendario')} hint={t('En la Raspberry Pi (modo ligero) no hay desenfoque y el calendario es algo más sólido.')}>
+          <Slider
+            value={b.calendarOpacity ?? CALENDAR_OPACITY_DEFAULT}
+            min={0}
+            max={1}
+            step={0.05}
+            format={(v) => t(opacityWord(v))}
+            onChange={(v) => set((d) => void (d.background.calendarOpacity = v))}
+          />
+        </Field>
+      )}
+    </div>
+  );
+}
+
 /** Weather panel of the Classic style: blur and darkness behind it (background.panelBlur / panelShade). */
 export function WeatherPanelCard({ cfg, set }: Pick<SectionProps, 'cfg' | 'set'>) {
   const b = cfg.background;
@@ -934,6 +981,7 @@ export function LayoutSection(props: SectionProps) {
             <ColorPicker value={cfg.screen.accent} error={!!props.errors['screen.accent']} onChange={(v) => v && set((d) => void (d.screen.accent = v))} />
           </Field>
         </div>
+        <PhotoScopeFields cfg={cfg} set={set} kids={kids} />
       </Card>
       {!kids && (style === 'modern' ? <GlassCard cfg={cfg} set={set} /> : <WeatherPanelCard cfg={cfg} set={set} />)}
       {kids && !cfg.family.enabled && (

@@ -225,6 +225,10 @@ export interface ImmichBackground {
  *  'auto' = blurred fill for Immich photos, crop for the gallery and stock (the look screens had before). */
 export type PortraitFit = 'auto' | 'blur' | 'crop';
 
+/** Where the background photo goes: the side area of the layout (the original look) or the whole screen, with the
+ *  calendar and the other panels drawn over it as glass (web/shared/glass.ts). */
+export type BackgroundScope = 'side' | 'screen';
+
 export interface BackgroundConfig {
   enabled: boolean;
   source: 'stock' | 'gallery' | 'mixed' | 'immich';
@@ -244,6 +248,10 @@ export interface BackgroundConfig {
   weatherFx?: 'off' | 'simple' | 'rich';
   portraitFit?: PortraitFit;
   immich?: ImmichBackground;
+  /** 'side' (default) or 'screen': one photo behind the whole screen */
+  scope?: BackgroundScope;
+  /** with scope 'screen': how solid the calendar glass is, 0 = most see-through, 1 = almost opaque (default 0.5) */
+  calendarOpacity?: number;
 }
 
 export interface CalendarSource {

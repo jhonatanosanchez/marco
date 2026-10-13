@@ -123,3 +123,32 @@ export function glassVars(raw: GlassConfig | undefined, photo: PhotoStats | null
     },
   };
 }
+
+// ---- Photo on the whole screen (background.scope = 'screen') ----
+
+/** Default of background.calendarOpacity. */
+export const CALENDAR_OPACITY_DEFAULT = 0.5;
+
+/**
+ * Layouts where background.scope 'screen' changes something. The others already have the photo behind the whole
+ * screen (left / right, big time, photo frame, board), or no photo at all (bedside, a full-screen widget).
+ */
+export const SCREEN_PHOTO_PRESETS = ['bigCalendar', 'twoWeeks', 'today', 'agenda', 'topBottom', 'people', 'planner', 'kidsRoutines', 'kidsFamily', 'kidsMeals'];
+
+/** The background photo goes behind the whole screen on this layout. */
+export function photoOnWholeScreen(bg: { enabled?: boolean; scope?: string } | undefined, preset: string): boolean {
+  return !!bg?.enabled && bg.scope === 'screen' && SCREEN_PHOTO_PRESETS.includes(preset);
+}
+
+/**
+ * Alpha of the calendar glass over a full-screen photo, from background.calendarOpacity (0..1).
+ * Never fully see-through: the lowest setting still keeps the text readable over a bright photo. A light sheet needs
+ * more body than a dark one before dark text on it reads well, and with no blur (lite mode, a Raspberry Pi) the
+ * photo behind is sharp, so the sheet is denser there too.
+ */
+export function calendarSheetAlpha(raw: unknown, opts: { light: boolean; lite: boolean }): number {
+  const x = Number(raw);
+  const v = raw === null || raw === undefined || raw === '' || !Number.isFinite(x) ? CALENDAR_OPACITY_DEFAULT : clamp(x);
+  const [lo, hi] = opts.light ? (opts.lite ? [0.66, 0.96] : [0.56, 0.95]) : opts.lite ? [0.5, 0.94] : [0.24, 0.9];
+  return Math.round((lo + (hi - lo) * v) * 1000) / 1000;
+}

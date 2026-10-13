@@ -2,7 +2,7 @@
 // config from the server never breaks the screen.
 import type { AgendaDays, DisplayConfig } from '../shared/types';
 import { DEFAULT_ICON_RULES } from '../shared/emoji';
-import { GLASS_DEFAULTS, normalizeGlass } from '../shared/glass';
+import { CALENDAR_OPACITY_DEFAULT, GLASS_DEFAULTS, normalizeGlass } from '../shared/glass';
 
 export const DEFAULT_CONFIG: DisplayConfig = {
   revision: 0,
@@ -14,7 +14,7 @@ export const DEFAULT_CONFIG: DisplayConfig = {
   layout: { preset: 'bigCalendar', sidePanel: 'left', sideWidth: 0.36, people: null, corner: 'br', plannerBar: 'side' },
   background: {
     enabled: true, source: 'stock', stockTopic: 'nature', order: 'random', intervalSec: 120, brightness: 0.85, showMeta: false,
-    cover: true, transition: 'webgl', ambient: 'aurora', weatherFx: 'simple', portraitFit: 'auto',
+    cover: true, transition: 'webgl', ambient: 'aurora', weatherFx: 'simple', portraitFit: 'auto', scope: 'side', calendarOpacity: CALENDAR_OPACITY_DEFAULT,
   },
   calendar: {
     enabled: true, view: 'month', weeks: 5, weekStart: 1, showLocation: false, showEndTime: false, showDayXofY: true,
@@ -81,6 +81,8 @@ export function normalizeConfig(raw: unknown): DisplayConfig {
   c.screen.fontScale = Math.min(2, Math.max(0.5, Number(c.screen.fontScale) || 1));
   c.background.intervalSec = Math.max(10, Number(c.background.intervalSec) || 120);
   c.background.brightness = Math.min(1.2, Math.max(0.1, Number(c.background.brightness) || 0.85));
+  if (c.background.scope !== 'screen') c.background.scope = 'side';
+  c.background.calendarOpacity = Math.min(1, Math.max(0, Number.isFinite(Number(c.background.calendarOpacity)) ? Number(c.background.calendarOpacity) : CALENDAR_OPACITY_DEFAULT));
   c.news.rotateSec = Math.max(5, Number(c.news.rotateSec) || 15);
   c.weather.forecastDays = clampInt(c.weather.forecastDays, 1, 7, 5);
   if (c.screen.style !== 'modern') c.screen.style = 'classic';

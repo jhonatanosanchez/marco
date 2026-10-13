@@ -304,6 +304,9 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs, familyMemberIds 
       albumIds: [...new Set(albumIds.filter((a) => typeof a === 'string' && IMMICH_ID_RE.test(a)).map((a) => a.toLowerCase()))],
       favoritesOnly: bool(ctx, `${p}.background.immich.favoritesOnly`, im.favoritesOnly, D.background.immich.favoritesOnly),
     },
+    // the photo in the side area or behind the whole screen (the calendar then drawn over it as glass)
+    scope: oneOf(ctx, `${p}.background.scope`, bg.scope, D.background.scope, ['side', 'screen']),
+    calendarOpacity: num(ctx, `${p}.background.calendarOpacity`, bg.calendarOpacity, D.background.calendarOpacity, 0, 1),
   };
 
   const ca = obj(ctx, `${p}.calendar`, x.calendar);

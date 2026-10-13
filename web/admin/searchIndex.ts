@@ -16,6 +16,7 @@ export interface SettingEntry {
 export const SETTINGS_INDEX: SettingEntry[] = [
   // Pantalla
   { label: 'Widgets en esta pantalla', route: 'layout', anchor: 'layout-widgets', keywords: 'widget widgets imagen image imagem iframe web esquina corner canto lateral side tarjeta card cartão pantalla completa full screen ecrã inteiro', feature: 'widgets' },
+  { label: 'Foto en toda la pantalla', route: 'layout', anchor: 'layout-photo', keywords: 'background photo fondo foto fundo full screen pantalla completa ecrã inteiro whole wallpaper glass cristal vidro transparencia transparency transparência calendar calendario calendário' },
   { label: 'Cristal (estilo moderno)', route: 'layout', anchor: 'layout-glass', keywords: 'glass cristal vidro liquid transparente transparency transparência opacidad opacity blur desenfoque desfoque tint tono tom edge borde contorno iphone ios apple modern moderno' },
   { label: 'Panel del tiempo (estilo clásico)', route: 'layout', anchor: 'layout-weather-panel', keywords: 'weather panel panel del tiempo painel do tempo desenfoque blur desfoque oscuridad darkness escuridão sombra shade classic clásico clássico' },
   { label: 'Estilo clásico / moderno', route: 'layout', anchor: 'layout-style', keywords: 'style estilo look aspecto moderno modern classic clásico clássico apple glass cristal vidro minimal' },

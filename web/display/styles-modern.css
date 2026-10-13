@@ -659,6 +659,27 @@
 .lite.style-modern.theme-light .preset-leftRight .main { background: rgb(242 242 247 / 0.94); }
 .style-modern .preset-leftRight #news { margin-bottom: 1.6rem; }
 
+/* the photo behind the whole screen (background.scope 'screen'): the calendar floats as one glass sheet, as in left /
+   right, with the solidity of background.calendarOpacity (--sheet-a) and the tint of the glass settings */
+.style-modern #app.bg-screen .main {
+  --sheet-rgb: var(--g-sheet-rgb, 18 18 22);
+  margin: 2.4rem 2.4rem 2.4rem 0;
+  padding: 2.4rem 2.4rem 0 2.6rem;
+  border-radius: 3.2rem;
+  overflow: hidden;
+  -webkit-backdrop-filter: blur(4rem) saturate(1.6);
+  backdrop-filter: blur(4rem) saturate(1.6);
+  box-shadow: 0 2rem 6rem rgb(0 0 0 / 0.3), inset 0 0 0 1px rgb(255 255 255 / 0.1), inset 0 1px 0 rgb(255 255 255 / 0.12);
+}
+.style-modern #app.bg-screen.side-right .main { margin: 2.4rem 0 2.4rem 2.4rem; }
+.style-modern #app.bg-screen.portrait .main,
+.style-modern #app.bg-screen.preset-topBottom .main { margin: 0 2.4rem 2.4rem; }
+.style-modern #app.bg-screen.pbar-bottom .main { margin: 2.4rem 2.4rem 0; }
+.style-modern.theme-light #app.bg-screen .main { --sheet-rgb: 242 242 247; box-shadow: 0 2rem 6rem rgb(0 0 0 / 0.25), inset 0 0 0 1px rgb(255 255 255 / 0.5); }
+.style-modern.glass-no-edge #app.bg-screen .main { box-shadow: 0 2rem 6rem rgb(0 0 0 / 0.3); }
+.lite.style-modern #app.bg-screen .main { -webkit-backdrop-filter: none; backdrop-filter: none; }
+.style-modern #app.bg-screen #news { margin-bottom: 1.6rem; }
+
 /* big time: the news line becomes a floating glass bar */
 .style-modern .preset-bigTime .main {
   margin: 0 4rem 3.2rem;

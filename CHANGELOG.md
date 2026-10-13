@@ -5,6 +5,10 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- The background photo can now cover the whole screen (*Layout → Appearance → Background photo → Whole screen*), with
+  the calendar drawn over it as frosted glass and a slider for how see-through it is. Thanks to @aswormboy for the idea.
+
 ## [0.13.1] - 2026-10-13
 
 ### Security

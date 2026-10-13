@@ -46,8 +46,8 @@ test('the three kids layouts are known everywhere and saved by the server', asyn
 test('Classic falls back to the big calendar; the display listens to family and asks for it', () => {
   const main = read('web/display/main.ts');
   assert.match(main, /if \(isKidsPreset\(p\) && cfg\.screen\.style !== 'modern'\) return 'bigCalendar';/);
-  // same pastel page everywhere: no photo, no animated background
-  assert.match(main, /effectivePreset\(cfg\) === 'bedside' \|\| isKidsPreset\(effectivePreset\(cfg\)\)/);
+  // same pastel page everywhere: no photo, no animated background, unless the photo goes behind the whole screen
+  assert.match(main, /effectivePreset\(cfg\) === 'bedside' \|\| \(isKidsPreset\(effectivePreset\(cfg\)\) && !photoOnWholeScreen\(cfg\.background, effectivePreset\(cfg\)\)\)/);
   assert.match(main, /family: \(\) => void fetchFamily\(\)/);
   assert.match(read('web/display/stream.ts'), /STREAM_EVENTS = \[[^\]]*'family'/);
   assert.match(read('web/display/live.ts'), /case 'family': h\.family\?\./);

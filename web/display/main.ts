@@ -52,7 +52,7 @@ import { renderMessage, renderTodo } from './widgets/extras';
 import { Highlights } from './widgets/highlights';
 import { News } from './widgets/news';
 import { Photos, photoStats, type SlideshowPosition } from './widgets/photos';
-import { glassVars, normalizeGlass } from '../shared/glass';
+import { calendarSheetAlpha, glassVars, normalizeGlass, photoOnWholeScreen } from '../shared/glass';
 import { Weather } from './widgets/weather';
 import { VIEW_PRESETS, Views } from './widgets/views';
 import { checkSetup, showWelcome, waitForSetup } from './widgets/welcome';
@@ -284,6 +284,8 @@ function applyLayout(): void {
     app.classList.contains('booting') ? 'booting' : '',
     `preset-${preset}`, `side-${side === 'right' ? 'right' : 'left'}`, portrait ? 'portrait' : 'landscape',
     cfg.background.enabled ? 'has-photo' : 'no-photo',
+    // background.scope 'screen': the photo behind the whole screen, the calendar over it as glass
+    photoOnWholeScreen(cfg.background, preset) ? 'bg-screen' : '',
     presetBase(preset, portrait, bar) ? `preset-${presetBase(preset, portrait, bar)}` : '',
     // planner on a landscape screen with the clock and the weather in a strip (styles-planner.css)
     bar !== 'side' ? `pbar pbar-${bar}` : '',
@@ -379,6 +381,11 @@ function applyConfig(raw: DisplayConfig): void {
   if (pa === 'aurora' || pa === 'particles' || pa === 'none') cfg.background.ambient = pa;
   const ptr = params.get('transition');
   if (ptr === 'webgl' || ptr === 'fade' || ptr === 'none') cfg.background.transition = ptr;
+  // ?bgScope=side|screen (the photo behind the whole screen) and ?calOpacity=0..1 (how solid the calendar glass is)
+  const pbs = params.get('bgScope');
+  if (pbs === 'side' || pbs === 'screen') cfg.background.scope = pbs;
+  const pco = Number(params.get('calOpacity') ?? NaN);
+  if (params.has('calOpacity') && Number.isFinite(pco)) cfg.background.calendarOpacity = Math.min(1, Math.max(0, pco));
   const pfx = params.get('wxfx');
   if (pfx === 'off' || pfx === 'simple' || pfx === 'rich') cfg.background.weatherFx = pfx;
   // the top-bottom preset has a shorter calendar: cap the number of week rows so chips stay readable
@@ -391,8 +398,9 @@ function applyConfig(raw: DisplayConfig): void {
     cfg.calendar.weeks = 2;
     cfg.calendar.maxEventsPerDay = Math.max(cfg.calendar.maxEventsPerDay, 8);
   }
-  // Bedside: a dark room, no photo and no animated background. The kids layouts: the same pastel page everywhere.
-  if (effectivePreset(cfg) === 'bedside' || isKidsPreset(effectivePreset(cfg))) {
+  // Bedside: a dark room, no photo and no animated background. The kids layouts: the same pastel page everywhere,
+  // unless the photo goes behind the whole screen (background.scope 'screen'), with the page over it as glass.
+  if (effectivePreset(cfg) === 'bedside' || (isKidsPreset(effectivePreset(cfg)) && !photoOnWholeScreen(cfg.background, effectivePreset(cfg)))) {
     cfg.background.enabled = false;
     cfg.background.ambient = 'none';
   }
@@ -416,6 +424,10 @@ function applyConfig(raw: DisplayConfig): void {
   root.style.setProperty('--panel-blur', String(cfg.background.panelBlur ?? 18));
   root.style.setProperty('--panel-shade', String((cfg.background.panelShade ?? 0.5) * 2));
   root.style.setProperty('--side-w', `${(cfg.layout.sideWidth * 100).toFixed(2)}%`);
+  // the calendar glass over a full-screen photo (styles.css, .bg-screen); a thin one gives its text a soft shadow
+  const sheetA = calendarSheetAlpha(cfg.background.calendarOpacity, { light, lite });
+  root.style.setProperty('--sheet-a', String(sheetA));
+  root.classList.toggle('sheet-thin', !light && sheetA < 0.5);
 
   if (cfg.screen.customCss) {
     if (!customStyle) {
@@ -430,7 +442,8 @@ function applyConfig(raw: DisplayConfig): void {
 
   // WebGL needs
   const preset = effectivePreset(cfg);
-  const wantAmbient = !lite && cfg.background.ambient !== 'none' && ['bigCalendar', 'agenda', 'topBottom', 'today', 'twoWeeks', 'people', 'planner', 'widget'].includes(preset);
+  // a photo behind the whole screen leaves no room for the animated backdrop
+  const wantAmbient = !lite && !photoOnWholeScreen(cfg.background, preset) && cfg.background.ambient !== 'none' && ['bigCalendar', 'agenda', 'topBottom', 'today', 'twoWeeks', 'people', 'planner', 'widget'].includes(preset);
   const wantGLPhoto = !lite && cfg.background.enabled && cfg.background.transition === 'webgl';
   if ((wantAmbient || wantGLPhoto) && !engine && !glFailed) {
     void initGL().then(() => {
