@@ -11,6 +11,8 @@ const params = new URLSearchParams(location.search);
  * where a real display runs (same browser) cannot replace that display's key, token or id.
  */
 export const isPreview = params.get('preview') === '1';
+/** Admin preview of one widget (Widgets page): only the widget, on a plain backdrop (styles.css html.widget-only). */
+export const isWidgetOnly = isPreview && params.get('widgetOnly') === '1';
 
 /** Private-link key from the path (/d/<key>); '' when the page was opened at / or /pair. */
 export const linkKey = (() => {

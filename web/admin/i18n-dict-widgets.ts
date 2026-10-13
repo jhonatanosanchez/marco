@@ -160,14 +160,19 @@ export const ROWS_WIDGETS: [string, string, string][] = [
   // the preview on the Widgets page (WidgetPreviewPanel.tsx)
   ['Vista previa del widget', 'Widget preview', 'Pré-visualização do widget'],
   ['Solo vista previa', 'Preview only', 'Só pré-visualização'],
-  ['Muestra los cambios sin guardar. «Probar» lo carga de nuevo.', 'Shows unsaved changes. “Test” loads it again.', 'Mostra as alterações por guardar. «Testar» carrega-o de novo.'],
+  ['Solo el widget, con los cambios sin guardar. «Probar» lo carga de nuevo.', 'Just the widget, with unsaved changes. “Test” loads it again.', 'Só o widget, com as alterações por guardar. «Testar» carrega-o de novo.'],
+  [
+    '«{view}» no cabe en este tamaño: la pantalla muestra el precio de ahora. Prueba un tamaño mayor o la columna lateral.',
+    '“{view}” does not fit at this size: the screen shows the price now. Try a larger size or the side column.',
+    '«{view}» não cabe neste tamanho: o ecrã mostra o preço de agora. Experimente um tamanho maior ou a coluna lateral.',
+  ],
+  [
+    'No cabe en este sitio: la pantalla no lo mostraría. Prueba otro tamaño o sitio.',
+    'It does not fit here: the screen would not show it. Try another size or place.',
+    'Não cabe aqui: o ecrã não o mostraria. Experimente outro tamanho ou lugar.',
+  ],
   ['Dónde se ve en la vista previa', 'Where the preview shows it', 'Onde aparece na pré-visualização'],
   ['Pantalla completa', 'Full screen', 'Ecrã inteiro'],
-  [
-    'Esta pantalla no tiene columna lateral: aquí se ve con el diseño Calendario grande. En la pantalla iría en su esquina.',
-    'This screen has no side column: here it is shown with the Big calendar layout. On the screen it would go in its corner.',
-    'Este ecrã não tem coluna lateral: aqui aparece com a disposição Calendário grande. No ecrã iria para o seu canto.',
-  ],
   [
     'Para ponerlo en una pantalla, ve a Diseño → Widgets en esta pantalla; allí eliges dónde va y su tamaño.',
     'To put it on a screen, go to Layout → Widgets on this screen; there you choose where it goes and its size.',

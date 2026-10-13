@@ -1717,3 +1717,37 @@ html:not(.style-modern) #uw-side { margin: 0 -1rem; }
 #app.preset-widget.no-photo .main { background: var(--panel); }
 .preset-widget .main > :not(#uw-full) { display: none !important; }
 .preset-widget #uw-full { display: flex; flex: 1; min-height: 0; align-items: center; justify-content: center; padding: 2vmin; }
+
+/* ---- admin preview of one widget (Widgets page, ?preview=1&widgetOnly=1): only the widget, on a plain backdrop of
+   the screen's style and theme. The layout stays (the widget gets the room it has on the TV); everything else hides. */
+html.widget-only, html.widget-only body { background: #16181d; }
+html.widget-only.theme-light, html.widget-only.theme-light body { background: #e9ebef; }
+html.widget-only.style-modern body { background: radial-gradient(120% 120% at 25% 0%, #2b3242 0%, #151820 65%); }
+html.widget-only.style-modern.theme-light body { background: radial-gradient(120% 120% at 25% 0%, #fbfcfe 0%, #dde2ea 65%); }
+html.widget-only #gl,
+html.widget-only .photo-area,
+html.widget-only .side-top,
+html.widget-only .side-bottom,
+html.widget-only .photo-meta,
+html.widget-only .side-mid > :not(#uw-side),
+html.widget-only .main > :not(#uw-full),
+html.widget-only #night,
+html.widget-only #alerts,
+html.widget-only #identify,
+html.widget-only #doorbell,
+html.widget-only #status,
+html.widget-only #privacy-lock { display: none !important; }
+html.widget-only #app::before,
+html.widget-only #app::after,
+html.widget-only .side::before,
+html.widget-only .side::after { display: none !important; }
+html.widget-only .side,
+html.widget-only .main {
+  background: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+/* the side column's cards are dark glass over the photo on a light screen too: no photo here, so a darker glass */
+html.widget-only.theme-light .pw--side { --pw-bg: rgb(20 24 32 / 0.9) !important; }

@@ -109,7 +109,10 @@ test('the planner layout: accepted everywhere, and picking it sets automatic wee
   // the admin applies the same values when the layout is picked
   const fields = read('web/admin/components/PlannerFields.tsx');
   assert.match(fields, /PLANNER_CALENDAR[^=]*= \{ weeks: 'auto', eventStyle: 'cards' \}/);
-  assert.match(read('web/admin/sections/Layout.tsx'), /p\.id === 'planner' && d\.layout\.preset !== 'planner'\) Object\.assign\(d\.calendar, PLANNER_CALENDAR\)/);
+  const layout = read('web/admin/sections/Layout.tsx');
+  assert.match(layout, /p\.id === 'planner' && d\.layout\.preset !== 'planner'\) \{\s*Object\.assign\(d\.calendar, PLANNER_CALENDAR\);/);
+  // and the time and the weather start in the strip on top
+  assert.match(layout, /Object\.assign\(d\.calendar, PLANNER_CALENDAR\);[^}]*d\.layout\.plannerBar = 'top';/);
   // the setup wizard too, and only for this layout
   const { value } = parseSetupBody({ layout: 'planner' });
   assert.equal(value.layout, 'planner');

@@ -114,16 +114,20 @@ export function priceMode(view: PriceWidgetOptions['view'], place: PricePlace, s
 const SCALE: Record<string, number> = { s: 0.82, m: 1, l: 1.18 };
 /** Smallest scale a crowded card is shrunk to (side column, a shared corner); under it, the card is not shown. */
 const FLOOR = 0.6;
-/** The price-now card, in rem: its padding (fixed) and its content at scale 1 (measured: 3.2 + 13.3). */
+/**
+ * The price-now card, in rem: its padding (fixed) and its content at scale 1 (measured: 3.2 + 13.3; with the level
+ * badge and the next hour line, and a larger font scale rounding each line up, up to 14.2). The room kept for it errs
+ * on the large side: kept too short, the card would not fit at FLOOR and would not be shown at all.
+ */
 const NOW_CARD_PAD_REM = 3.2;
-const NOW_CARD_REM = 13.8;
+const NOW_CARD_REM = 14.6;
 /** Fewest hours the next-24-hours list shows outside full screen; with less room the card shows the price now. */
 const MIN_ROWS = 4;
 
 /** Height (px) of the smallest price-now card: the room the side column keeps for one (custom.ts). */
 export function priceFloorHeight(): number {
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 10;
-  return (NOW_CARD_PAD_REM + NOW_CARD_REM * FLOOR) * rem + 2;
+  return (NOW_CARD_PAD_REM + NOW_CARD_REM * FLOOR) * rem + 6;
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: string): HTMLElementTagNameMap[K] {
@@ -343,6 +347,8 @@ export class PriceCard {
     const m = this.model(now);
     const card = this.el;
     card.className = `uw-media pw pw--${mode} pw--${this.place} pw--${this.w.size}${this.maxH > this.maxW * 1.05 ? ' pw--tall' : ''}`;
+    // what it draws (the admin's widget preview says when a view does not fit)
+    card.dataset.mode = mode;
     // full screen: the chart views fill it; a lone price or list is drawn larger, to read from across the room
     const pk = this.place === 'full' ? (mode === 'now' || mode === 'cheap' ? 2.6 : mode === 'next' ? 1.7 : 1.9) : SCALE[this.w.size] ?? 1;
     card.style.setProperty('--pk', String(pk));
@@ -520,6 +526,9 @@ export class PriceCard {
     for (let i = 0; i < 4 && card.scrollHeight > this.maxH + 2; i++) {
       const next = (k * Math.max(0, this.maxH - pad)) / Math.max(1, card.scrollHeight - pad) - 0.005;
       if (next < FLOOR) {
+        // the estimate overshoots a little: the card at FLOOR may still fit
+        card.style.setProperty('--pk', String(FLOOR));
+        if (k > FLOOR && card.scrollHeight <= this.maxH + 2) return;
         card.classList.add('pw-cramped');
         return;
       }

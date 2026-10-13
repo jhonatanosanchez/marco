@@ -5690,7 +5690,11 @@ button.immich-album:hover {
   .view-sel { display: block; }
 }
 
-/* Widgets page: the preview of the widget being edited (WidgetPreviewPanel.tsx) */
+/* Widgets page: the widget preview, a card under the screen preview (WidgetPreviewPanel.tsx) */
+.preview-col { display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - var(--topbar-h) - 40px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.preview-col > .preview { flex: none; }
+.sheet { max-height: 92vh; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 10px; }
+.sheet > .preview { flex: none; }
 .preview__tag {
   display: inline-block;
   margin-left: 8px;
@@ -5708,10 +5712,13 @@ button.immich-album:hover {
 .preview--widget .preview__bar strong { min-width: 0; }
 .preview__extra { margin: 0 4px 10px; }
 .wpv-opts { display: flex; flex-wrap: wrap; gap: 8px; }
-.preview__frame.is-zoomed { border-radius: 6px; }
+/* only the widget: no TV bezel around it, the display's own plain backdrop shows */
+.preview--widget .preview__frame { margin: 0; border-radius: 12px; box-shadow: 0 0 0 1px var(--border); background: var(--surface-2); }
 .preview--widget .preview__frame, .preview--widget .preview__frame iframe { transition: width 0.25s var(--ease), height 0.25s var(--ease), transform 0.25s var(--ease); }
+.preview--widget .preview__loading { background: var(--surface-2); }
 .wpv-note { margin: 12px 4px 0; }
 .wpv-note p { margin: 0 0 6px; }
+.wpv-warn { color: var(--warn); }
 .widget-card-wrap { display: contents; }
 .card.is-previewed { box-shadow: var(--shadow), 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent); }
 /* a narrow sheet: "Pantalla completa" goes on two lines instead of being cut */

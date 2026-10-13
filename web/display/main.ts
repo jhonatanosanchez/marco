@@ -18,7 +18,7 @@ import { ctx, setCtxConfig } from './ctx';
 import { normalizeAgendaDays, normalizeConfig } from './defaults';
 import { Heartbeat, noteError } from './heartbeat';
 import {
-  authHeaders, clearDeviceToken, clientId, credential, credentialKind, getActiveScreen, isPreview, screenKey, setActiveScreen, storedDeviceToken, withScreen,
+  authHeaders, clearDeviceToken, clientId, credential, credentialKind, getActiveScreen, isPreview, isWidgetOnly, screenKey, setActiveScreen, storedDeviceToken, withScreen,
 } from './identity';
 import { CarouselController, type Bundle, type BundlePart } from './carousel';
 import { ScreenSwitcher, type SwitchGL } from './screenSwitch';
@@ -64,6 +64,7 @@ import { refreshMarquee } from './marquee';
 import { CustomWidgets } from './widgets/custom';
 
 const params = ctx.params;
+if (isWidgetOnly) document.documentElement.classList.add('widget-only');
 const forceDemo = params.get('demo') === '1';
 const lite = ctx.lite;
 if (lite) document.documentElement.classList.add('lite');
@@ -1859,11 +1860,15 @@ function previewFocus(id: string | null): void {
     const el = [...document.querySelectorAll<HTMLElement>('[data-widget]')].find((x) => x.dataset.widget === focusId);
     const r = el && !el.classList.contains('uw-wait') ? el.getBoundingClientRect() : null;
     const rect = r && r.width > 4 && r.height > 4 ? { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) } : null;
-    const key = JSON.stringify(rect);
+    // a price card: the view it draws there (a list or a chart falls back to the price now in too little room)
+    const card = el?.querySelector<HTMLElement>('.pw');
+    const mode = card?.dataset.mode ?? null;
+    const cramped = !!card?.classList.contains('pw-cramped');
+    const key = JSON.stringify([rect, mode, cramped]);
     if (key === focusSent) return;
     focusSent = key;
-    // only a box on this page goes out: nothing in it is private
-    window.parent.postMessage({ type: 'marco:preview-focus', id: focusId, rect }, '*');
+    // only a box on this page and a view name go out: nothing in them is private
+    window.parent.postMessage({ type: 'marco:preview-focus', id: focusId, rect, mode, cramped }, '*');
   };
   report();
   focusTimer = setInterval(report, 250);
