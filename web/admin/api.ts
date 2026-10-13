@@ -19,6 +19,10 @@ import type {
   ApiTokenCreated,
   ApiTokenInfo,
   AuthMeResponse,
+  TwoFactorStatus,
+  TwoFactorSetup,
+  RecoveryCodesResponse,
+  TwoFactorLoginResponse,
   BackupInfo,
   BirthdayCsvResult,
   DashboardResponse,
@@ -130,6 +134,14 @@ export const api = {
   login: (password: string) => request<unknown>('POST', '/api/auth/login', { password }, { silent401: true }),
   logout: () => request<unknown>('POST', '/api/auth/logout', {}, { silent401: true }),
   logoutAll: () => request<unknown>('POST', '/api/auth/logout-all', {}, { silent401: true }),
+  // Two-step sign-in (features.twoFactor). The sign-in step answers 401 for a wrong code, not for an expired session.
+  login2fa: (code: string) => request<TwoFactorLoginResponse>('POST', '/api/auth/2fa', { code }, { silent401: true }),
+  twoFactorStatus: () => request<TwoFactorStatus>('GET', '/api/admin/2fa'),
+  twoFactorSetup: (password?: string) => request<TwoFactorSetup>('POST', '/api/admin/2fa/setup', password ? { password } : {}),
+  twoFactorEnable: (code: string) => request<RecoveryCodesResponse>('POST', '/api/admin/2fa/enable', { code }),
+  twoFactorDisable: (proof: { password?: string; code?: string }) => request<{ ok: true }>('POST', '/api/admin/2fa/disable', proof),
+  twoFactorRecoveryCodes: (proof: { password?: string; code?: string }) =>
+    request<RecoveryCodesResponse>('POST', '/api/admin/2fa/recovery-codes', proof),
 
   // Marco Cloud account (features.accountMenu): the language follows the account, the household can be renamed.
   accountLang: (lang: string) => request<{ ok: true }>('POST', '/api/account/lang', { lang }),

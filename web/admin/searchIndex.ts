@@ -98,6 +98,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { label: 'Descargar fotos (.zip)', route: 'backups', anchor: 'bk-photos', keywords: 'photos gallery zip download export fotos galería descargar transferir', feature: ['importExport', 'gallery'] },
   { label: 'Registro de actividad', route: 'activity', keywords: 'activity log logins registro' },
   { label: 'Cambiar contraseña', route: 'security', anchor: 'sec-password', keywords: 'password contraseña palavra-passe', feature: 'passwordLogin' },
+  { label: 'Verificación en dos pasos', route: 'security', anchor: 'sec-2fa', keywords: '2fa two-factor two-step totp authenticator autenticación código code mfa otp tofaktor', feature: 'twoFactor' },
   { label: 'Emails de Google permitidos', route: 'security', anchor: 'sec-google', keywords: 'google login email permitir', feature: 'googleLogin' },
   { label: 'Cerrar sesión en todos los dispositivos', route: 'security', anchor: 'sec-sessions', keywords: 'logout sessions', feature: ['passwordLogin', 'googleLogin'] },
   { label: 'Nombre del hogar', route: 'security', anchor: 'acc-household', keywords: 'household hogar casa nombre name rename renombrar', feature: 'accountMenu' },

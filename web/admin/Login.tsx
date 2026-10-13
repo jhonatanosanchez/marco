@@ -1,8 +1,9 @@
 import { useState } from 'preact/hooks';
-import type { AuthMeResponse } from '../shared/types';
+import type { AuthMeResponse, LoginResponse } from '../shared/types';
 import { api, ApiError } from './api';
 import { BrandMark } from './components/BrandMark';
 import { GoogleG, Icon } from './components/icons';
+import { TwoFactorStep } from './components/TwoFactor';
 import { t } from './i18n';
 
 export function Login({ me, onDone, initialError }: { me: AuthMeResponse; onDone: () => void; initialError?: string }) {
@@ -13,6 +14,8 @@ export function Login({ me, onDone, initialError }: { me: AuthMeResponse; onDone
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(initialError ?? '');
   const [shake, setShake] = useState(0);
+  // two-step sign-in: the code comes after the password, or right away after Google (me.twoFactorPending)
+  const [step, setStep] = useState<'password' | 'code'>(me.twoFactorPending ? 'code' : 'password');
 
   const submit = async (e: Event) => {
     e.preventDefault();
@@ -20,7 +23,12 @@ export function Login({ me, onDone, initialError }: { me: AuthMeResponse; onDone
     setBusy(true);
     setErr('');
     try {
-      await api.login(pw);
+      const r = (await api.login(pw)) as LoginResponse | null;
+      if (r?.twoFactor) {
+        setPw('');
+        setStep('code');
+        return;
+      }
       onDone();
     } catch (e2) {
       const ae = e2 as ApiError;
@@ -44,45 +52,58 @@ export function Login({ me, onDone, initialError }: { me: AuthMeResponse; onDone
           <BrandMark size={72} />
         </div>
         <h1>{t('Panel de la pantalla')}</h1>
-        <p class="muted">{t('Gestiona calendarios, fotos, tiempo y todo lo que se ve en casa.')}</p>
-        {me.passwordLoginEnabled && (
-          <form onSubmit={submit} class="login__form">
-            <input type="text" name="username" autocomplete="username" value="admin" hidden readOnly />
-            <div class="input-group input-group--lg">
-              <span class="input-group__addon">
-                <Icon name="key" size={16} />
-              </span>
-              <input
-                class="input"
-                type={(show ? 'text' : 'password') as 'password'}
-                autocomplete="current-password"
-                placeholder={t('Contraseña')}
-                value={pw}
-                autoFocus
-                onInput={(e) => setPw(e.currentTarget.value)}
-              />
-              <button type="button" class="input-group__btn" onClick={() => setShow(!show)} aria-label={t('Mostrar')}>
-                <Icon name={show ? 'eyeOff' : 'eye'} size={16} />
-              </button>
-            </div>
-            <button type="submit" class={`btn btn--primary btn--block btn--lg ${busy ? 'is-loading' : ''}`} disabled={busy || !pw}>
-              {busy ? <span class="spinner" /> : null}
-              <span>{t('Entrar')}</span>
-            </button>
-          </form>
+        <p class="muted">{step === 'code' ? t('Verificación en dos pasos') : t('Gestiona calendarios, fotos, tiempo y todo lo que se ve en casa.')}</p>
+        {step === 'code' ? (
+          <TwoFactorStep
+            onDone={onDone}
+            onError={setErr}
+            onExpired={(msg) => {
+              setStep('password');
+              setErr(msg);
+            }}
+          />
+        ) : (
+          <>
+            {me.passwordLoginEnabled && (
+              <form onSubmit={submit} class="login__form">
+                <input type="text" name="username" autocomplete="username" value="admin" hidden readOnly />
+                <div class="input-group input-group--lg">
+                  <span class="input-group__addon">
+                    <Icon name="key" size={16} />
+                  </span>
+                  <input
+                    class="input"
+                    type={(show ? 'text' : 'password') as 'password'}
+                    autocomplete="current-password"
+                    placeholder={t('Contraseña')}
+                    value={pw}
+                    autoFocus
+                    onInput={(e) => setPw(e.currentTarget.value)}
+                  />
+                  <button type="button" class="input-group__btn" onClick={() => setShow(!show)} aria-label={t('Mostrar')}>
+                    <Icon name={show ? 'eyeOff' : 'eye'} size={16} />
+                  </button>
+                </div>
+                <button type="submit" class={`btn btn--primary btn--block btn--lg ${busy ? 'is-loading' : ''}`} disabled={busy || !pw}>
+                  {busy ? <span class="spinner" /> : null}
+                  <span>{t('Entrar')}</span>
+                </button>
+              </form>
+            )}
+            {me.passwordLoginEnabled && googleLogin && (
+              <div class="divider">
+                <span>{t('o')}</span>
+              </div>
+            )}
+            {googleLogin && (
+              <a class="btn btn--google btn--block btn--lg" href="/auth/google/login">
+                <GoogleG size={18} />
+                <span>{t('Entrar con Google')}</span>
+              </a>
+            )}
+            {!me.passwordLoginEnabled && !googleLogin && <div class="callout callout--warn">{t('No hay ningún método de acceso habilitado. Revisa la configuración del servidor.')}</div>}
+          </>
         )}
-        {me.passwordLoginEnabled && googleLogin && (
-          <div class="divider">
-            <span>{t('o')}</span>
-          </div>
-        )}
-        {googleLogin && (
-          <a class="btn btn--google btn--block btn--lg" href="/auth/google/login">
-            <GoogleG size={18} />
-            <span>{t('Entrar con Google')}</span>
-          </a>
-        )}
-        {!me.passwordLoginEnabled && !googleLogin && <div class="callout callout--warn">{t('No hay ningún método de acceso habilitado. Revisa la configuración del servidor.')}</div>}
         {err && (
           <div class="login__err" role="alert">
             <Icon name="alert" size={14} /> {err}

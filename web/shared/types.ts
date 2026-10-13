@@ -1174,6 +1174,8 @@ export interface Features {
   priceWidgets: boolean;
   /** Profile photos of the family members (POST /api/admin/family/photos and where the photos are served); absent = off. */
   familyPhotos: boolean;
+  /** Two-step sign-in with an authenticator app for the admin (/api/admin/2fa*, POST /api/auth/2fa); absent = off. */
+  twoFactor: boolean;
 }
 
 export type FeatureName = keyof Features;
@@ -1372,6 +1374,42 @@ export interface AuthMeResponse {
   account?: AccountInfo;
   /** Marco Cloud: the admin shows the Microsoft accounts card when it is true (Microsoft calendars on for this account). */
   microsoftConfigured?: boolean;
+  /** Two-step sign-in: the password (or Google) was right and this browser still has to send the code (POST /api/auth/2fa). */
+  twoFactorPending?: boolean;
+}
+
+/** GET /api/admin/2fa */
+export interface TwoFactorStatus {
+  enabled: boolean;
+  /** ISO time it was turned on, or null */
+  enabledAt: string | null;
+  /** unused recovery codes */
+  recoveryLeft: number;
+}
+
+/** POST /api/admin/2fa/setup: the new secret (base32) and its otpauth:// URI for the QR code. */
+export interface TwoFactorSetup {
+  secret: string;
+  uri: string;
+}
+
+/** POST /api/admin/2fa/enable and /api/admin/2fa/recovery-codes: the codes, shown once. */
+export interface RecoveryCodesResponse {
+  ok: true;
+  recoveryCodes: string[];
+}
+
+/** POST /api/auth/login: { user } when signed in, { twoFactor: true } when the code comes next. */
+export interface LoginResponse {
+  user?: AuthUser;
+  twoFactor?: boolean;
+}
+
+/** POST /api/auth/2fa */
+export interface TwoFactorLoginResponse {
+  user: AuthUser;
+  /** only when a recovery code was used: how many are left */
+  recoveryLeft?: number;
 }
 
 /** GET /api/setup/status */
@@ -2145,6 +2183,10 @@ export type ActivityType =
   | 'auth.password_changed'
   | 'auth.setup_completed'
   | 'auth.setup_rejected'
+  | 'auth.2fa_enabled'
+  | 'auth.2fa_disabled'
+  | 'auth.2fa_failed'
+  | 'auth.2fa_codes_renewed'
   | 'google.connected'
   | 'google.removed'
   | 'microsoft.connected'

@@ -39,8 +39,10 @@ export function sectionLabel(key: string): string {
 export function describeActivity(e: ActivityEntry): { icon: IconName; text: string } {
   const d = (e.data ?? {}) as Record<string, any>;
   switch (e.type) {
-    case 'auth.login':
-      return { icon: 'user', text: d.method === 'google' ? t('Inicio de sesión con Google') : t('Inicio de sesión con contraseña') };
+    case 'auth.login': {
+      const base = d.method === 'google' ? t('Inicio de sesión con Google') : t('Inicio de sesión con contraseña');
+      return { icon: 'user', text: d.twoFactor === 'recovery' ? `${base} · ${t('con un código de recuperación')}` : d.twoFactor ? `${base} · ${t('con verificación en dos pasos')}` : base };
+    }
     case 'auth.login_failed':
       return { icon: 'alert', text: d.reason ? t('Intento de acceso fallido ({reason})', { reason: str(d.reason) }) : t('Intento de acceso fallido') };
     case 'auth.logout':
@@ -53,6 +55,14 @@ export function describeActivity(e: ActivityEntry): { icon: IconName; text: stri
       return { icon: 'alert', text: t('Asistente de configuración rechazado ({reason})', { reason: str(d.reason) }) };
     case 'auth.password_changed':
       return { icon: 'key', text: t('Contraseña cambiada') };
+    case 'auth.2fa_enabled':
+      return { icon: 'shield', text: t('Verificación en dos pasos activada') };
+    case 'auth.2fa_disabled':
+      return { icon: 'shield', text: t('Verificación en dos pasos desactivada') };
+    case 'auth.2fa_failed':
+      return { icon: 'alert', text: t('Código de verificación incorrecto') };
+    case 'auth.2fa_codes_renewed':
+      return { icon: 'shield', text: t('Nuevos códigos de recuperación') };
     case 'google.connected':
       return { icon: 'google', text: t('Cuenta de Google vinculada: {email}', { email: str(d.email ?? d.account) }) };
     case 'google.removed':

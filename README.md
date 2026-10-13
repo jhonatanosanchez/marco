@@ -1103,6 +1103,11 @@ Marco was designed for a home network; since 0.3 the displays are **private by d
   0.2 installs until you switch) the display API has no login, so **do not expose it to the Internet**.
 - **Protected**: the admin (`/admin/`, `/api/admin/*`) needs a session (password and/or allowed Google accounts);
   webhooks need a bearer token.
+- **Two-step sign-in** (optional, off by default): *Security → Two-step verification* adds a 6-digit code from an
+  authenticator app (Google Authenticator, Microsoft Authenticator, 1Password, Aegis…) after the password, and after
+  Google when Google sign-in is on. Turning it on keeps the sessions already open; you get 10 one-time recovery codes.
+  Lost the phone and the codes? Stop Marco and run `npm run disable-2fa` in its folder (Docker:
+  `docker compose run --rm marco npm run disable-2fa`), then start it again.
 - A fresh install has **no default password**; the [setup wizard](#first-steps-the-setup-wizard) creates it. Set
   `SETUP_TOKEN` if the server is reachable from outside your LAN before you finish setup.
 - Unknown host names are refused (DNS-rebinding protection); add your domain with `PUBLIC_URL` / `ALLOWED_HOSTS`.

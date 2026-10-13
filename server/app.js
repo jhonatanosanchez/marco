@@ -5,7 +5,8 @@ import path from 'node:path';
 import express from 'express';
 import { paths, ROOT } from './store.js';
 import { sessionMiddleware, csrfGuard, loginHandler, logoutHandler, logoutAllHandler, meHandler,
-  googleLoginHandler, googleConnectHandler, googleCallbackHandler, microsoftConnectHandler, microsoftCallbackHandler } from './auth.js';
+  googleLoginHandler, googleConnectHandler, googleCallbackHandler, microsoftConnectHandler, microsoftCallbackHandler, twoFactorLoginHandler } from './auth.js';
+import { twoFactorRouter } from './routes/twofactor.js';
 import { publicRouter } from './routes/public.js';
 import { adminRouter } from './routes/admin.js';
 import { screensAdminRouter, displayPublicRouter } from './routes/screens.js';
@@ -90,6 +91,8 @@ export function createApp({ version, dist = path.join(ROOT, 'dist'), updater = n
   // --- auth ---
   app.get('/api/auth/me', meHandler);
   app.post('/api/auth/login', (req, res, next) => loginHandler(req, res).catch(next));
+  // The code step of a sign-in when two-step sign-in is on (server/twofactor.js).
+  app.post('/api/auth/2fa', twoFactorLoginHandler);
   app.post('/api/auth/logout', logoutHandler);
   app.post('/api/auth/logout-all', logoutAllHandler);
   app.get('/auth/google/login', googleLoginHandler);
@@ -107,6 +110,8 @@ export function createApp({ version, dist = path.join(ROOT, 'dist'), updater = n
   app.use('/api/admin', geocodeRouter());
   // Admin routers: each one applies requireAuth; unmatched paths fall through to the next one.
   app.use('/api/admin', adminRouter());
+  // Two-step sign-in settings (routes/twofactor.js).
+  app.use('/api/admin', twoFactorRouter());
   app.use('/api/admin', updatesRouter({ version, updater }));
   app.use('/api/admin', screensAdminRouter(), announceRouter(), systemRouter({ version }), eventsAdminRouter(), accessAdminRouter(), doorbellAdminRouter(), familyAdminRouter());
   // Display access (private links / paired devices / admin session; open mode = legacy LAN). displayAccess.js

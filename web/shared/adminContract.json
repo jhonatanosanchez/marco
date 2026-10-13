@@ -18,6 +18,86 @@
       ]
     },
     {
+      "method": "GET",
+      "path": "/api/admin/2fa",
+      "query": [],
+      "feature": "twoFactor",
+      "callers": [
+        "twoFactorStatus"
+      ],
+      "request": null,
+      "response": "TwoFactorStatus",
+      "responseArray": false,
+      "responseKeys": [
+        "enabled",
+        "enabledAt",
+        "recoveryLeft"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/2fa/disable",
+      "query": [],
+      "feature": "twoFactor",
+      "callers": [
+        "twoFactorDisable"
+      ],
+      "request": "{ password?: string; code?: string }",
+      "response": "inline",
+      "responseArray": false,
+      "responseKeys": [
+        "ok"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/2fa/enable",
+      "query": [],
+      "feature": "twoFactor",
+      "callers": [
+        "twoFactorEnable"
+      ],
+      "request": "{code}",
+      "response": "RecoveryCodesResponse",
+      "responseArray": false,
+      "responseKeys": [
+        "ok",
+        "recoveryCodes"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/2fa/recovery-codes",
+      "query": [],
+      "feature": "twoFactor",
+      "callers": [
+        "twoFactorRecoveryCodes"
+      ],
+      "request": "{ password?: string; code?: string }",
+      "response": "RecoveryCodesResponse",
+      "responseArray": false,
+      "responseKeys": [
+        "ok",
+        "recoveryCodes"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/2fa/setup",
+      "query": [],
+      "feature": "twoFactor",
+      "callers": [
+        "twoFactorSetup"
+      ],
+      "request": "{password?}",
+      "response": "TwoFactorSetup",
+      "responseArray": false,
+      "responseKeys": [
+        "secret",
+        "uri"
+      ]
+    },
+    {
       "method": "DELETE",
       "path": "/api/admin/activity",
       "query": [],
@@ -1584,6 +1664,22 @@
     },
     {
       "method": "POST",
+      "path": "/api/auth/2fa",
+      "query": [],
+      "feature": "twoFactor",
+      "callers": [
+        "login2fa"
+      ],
+      "request": "{code}",
+      "response": "TwoFactorLoginResponse",
+      "responseArray": false,
+      "responseKeys": [
+        "user",
+        "recoveryLeft?"
+      ]
+    },
+    {
+      "method": "POST",
       "path": "/api/auth/login",
       "query": [],
       "feature": "passwordLogin",
@@ -1641,7 +1737,8 @@
         "needsSetup?",
         "passwordFromEnv?",
         "account?",
-        "microsoftConfigured?"
+        "microsoftConfigured?",
+        "twoFactorPending?"
       ]
     },
     {

@@ -105,7 +105,7 @@ The admin and the display read these fields to decide which sections, actions an
   `announcements`, `displayCommands`, `openDisplayAccess`, `insecureTls`, `googleCalendar`, `googleLogin`,
   `passwordLogin`, `apiTokens`, `webhooks`, `backups`, `importExport`, `includeSecrets`, `activity`, `setupWizard`,
   `status`, `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`,
-  `carousels`, `immich`, `family`, `widgets`, `webWidgets`, `priceWidgets`, `familyPhotos`. A self-hosted server turns all of them on, except
+  `carousels`, `immich`, `family`, `widgets`, `webWidgets`, `priceWidgets`, `familyPhotos`, `twoFactor`. A self-hosted server turns all of them on, except
   `googleCalendar` and `googleLogin` (on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set),
   `microsoftCalendar` (Outlook and Microsoft 365 calendars, on when `MICROSOFT_CLIENT_ID` and
   `MICROSOFT_CLIENT_SECRET` are set), `accountMenu` and `feedback` (always off). `updates` is the update banner,
@@ -126,7 +126,9 @@ The admin and the display read these fields to decide which sections, actions an
   the `prices` type, `GET /api/display/prices` and `/api/admin/test/prices`, `/api/admin/prices/token` (see
   [Electricity prices](#electricity-prices)). `familyPhotos` allows profile photos of the family members
   (`POST /api/admin/family/photos` and `GET /media/avatars/<id>`, see [Familia](#familia)); without it the admin
-  offers emoji only.
+  offers emoji only. `twoFactor` is two-step sign-in with an authenticator app (`/api/admin/2fa*` and
+  `POST /api/auth/2fa`, see [Two-step sign-in](#two-step-sign-in)); Marco Cloud answers `false` and has its own on the
+  account page.
 - `limits` (optional): plan limits such as `screens`, `sources` or `devices`. Absent means no limit beyond the
   config validator's own caps (12 screens, 50 calendars, 20 news feeds, 1000 local events, 500 birthdays,
   100 countdowns, 6 carousels, 20 widgets). `widgetMinRefreshSec` is the shortest widget refresh the server takes
@@ -144,9 +146,9 @@ The admin and the display read these fields to decide which sections, actions an
 
 Clients treat a response with no `features` field (servers older than 0.5.0) as having every feature on, except
 `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`, `carousels`,
-`immich`, `family`, `widgets`, `webWidgets`, `priceWidgets` and `familyPhotos`. A key missing from `features` counts as off only when `edition` is not `'self-hosted'`, and a missing
+`immich`, `family`, `widgets`, `webWidgets`, `priceWidgets`, `familyPhotos` and `twoFactor`. A key missing from `features` counts as off only when `edition` is not `'self-hosted'`, and a missing
 `accountMenu`, `microsoftCalendar`, `updates`, `feedback`, `privacy`, `doorbell`, `doorbellLive`, `carousels`,
-`immich`, `family`, `widgets`, `webWidgets`, `priceWidgets` or `familyPhotos` is always off.
+`immich`, `family`, `widgets`, `webWidgets`, `priceWidgets`, `familyPhotos` or `twoFactor` is always off.
 
 ### Account mode
 
@@ -245,13 +247,37 @@ a switch to private access takes its pollers off the list at once; their next po
 | Method & path | Notes |
 |---|---|
 | `GET /api/auth/me` | `{ user: { email, name, picture, method } \| null, needsSetup, googleConfigured, passwordLoginEnabled, mustChangePassword, passwordFromEnv }`. `method` is `'password'` or `'google'` here; Marco Cloud answers `'account'` and adds `account: { loginUrl, accountUrl, sessionsUrl, deleteUrl, household: { name, role } }` and `microsoftConfigured` (Microsoft calendars on for this account; a self-hosted server sends it too, true when `MICROSOFT_CLIENT_ID` and `MICROSOFT_CLIENT_SECRET` are set) |
-| `POST /api/auth/login` | `{ password }`; `409 { needsSetup: true }` while the install has no password yet |
+| `POST /api/auth/login` | `{ password }`; `409 { needsSetup: true }` while the install has no password yet. With two-step sign-in on, a right password answers `{ twoFactor: true }` and no session yet |
+| `POST /api/auth/2fa` | `{ code }`: the 6-digit code or a recovery code after `{ twoFactor: true }` (or after Google) → `{ user, recoveryLeft? }`. `401 { code: 'code_invalid', attemptsLeft }`, `401 { code: 'challenge_expired' }` (type the password again), `429` |
 | `POST /api/auth/logout`, `POST /api/auth/logout-all` | log out this session / every session |
 | `GET /auth/google/login` | "Sign in with Google" (email must be in `auth.allowedGoogleEmails`; if the list is empty, the first Google login made while already logged in with the password adds itself) |
 | `GET /auth/google/connect` | Link a Google account for calendars (scope `calendar.readonly`, offline access); requires a session |
 | `GET /auth/google/callback` | OAuth redirect URI: `${PUBLIC_URL}/auth/google/callback` |
 | `GET /auth/microsoft/connect` | Link a Microsoft account for calendars (`openid email profile offline_access Calendars.Read Calendars.Read.Shared`, PKCE); requires a session and `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` |
 | `GET /auth/microsoft/callback` | OAuth redirect URI: `${PUBLIC_URL}/auth/microsoft/callback`. Back to `/admin/?microsoft=<email>` or `/admin/?error=microsoft_<code>` |
+
+### Two-step sign-in
+
+Optional (`features.twoFactor`), off until the admin turns it on in *Security*. It is a property of the admin, not of
+a sign-in method: after a right password, and after Google when Google sign-in is on, the server keeps a challenge
+(5 minutes, 5 wrong codes) and the browser only holds its random id in the session cookie. No session exists until
+`POST /api/auth/2fa` accepts a code, so `/api/auth/me` answers `user: null, twoFactorPending: true` meanwhile and every
+admin route answers `401`. Codes are RFC 6238 TOTP (SHA-1, 6 digits, 30 seconds, one step of drift either way); a
+code, or an older one, is never accepted twice. Wrong codes count toward the same per-address limit and shared budget
+as passwords and are logged as `auth.2fa_failed`. The secret and the hashes of the recovery codes live in
+`data/secrets.json` and are never exported, so an import or a restore leaves two-step sign-in as it is. Turning it on
+or off ends no session.
+
+| Method & path | Notes |
+|---|---|
+| `GET /api/admin/2fa` | `{ enabled, enabledAt, recoveryLeft }` |
+| `POST /api/admin/2fa/setup` | `{ password? }`: needs a sign-in in the last 10 minutes or the password (`403 password_required`) → `{ secret, uri }` (base32 and `otpauth://`, the admin draws the QR code itself) |
+| `POST /api/admin/2fa/enable` | `{ code }`: the first code from the app, within 15 minutes of the setup → `{ ok, recoveryCodes }` (10, shown once; only their hashes are kept). `auth.2fa_enabled` |
+| `POST /api/admin/2fa/disable` | `{ password }` (password sessions) or `{ code }` (a code or a recovery code, from a session that signed in within 10 minutes; else `403 reauth_required`). `auth.2fa_disabled` |
+| `POST /api/admin/2fa/recovery-codes` | same proof as disabling → `{ ok, recoveryCodes }`; the old codes stop working. `auth.2fa_codes_renewed` |
+
+Locked out (no phone, no recovery codes): stop the server and run `npm run disable-2fa` (`node server/disable-2fa.js
+[--data-dir <dir>]`). It removes the two-step settings from `secrets.json` and logs `auth.2fa_disabled`.
 
 ## Setup (first run)
 

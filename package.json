@@ -29,7 +29,8 @@
     "test": "node --test server/test/",
     "demo": "node scripts/demo.js",
     "check:release": "node scripts/check-release.js",
-    "contract": "node scripts/gen-contract.mjs"
+    "contract": "node scripts/gen-contract.mjs",
+    "disable-2fa": "node server/disable-2fa.js"
   },
   "dependencies": {
     "cookie-session": "^2.1.1",

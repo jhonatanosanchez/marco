@@ -11,6 +11,7 @@ import { cssBytes, EMAIL_RE } from '../util';
 import { MIN_PASSWORD, passwordProblem } from '../../shared/password';
 import type { SectionProps } from './common';
 import { PrivacyCard } from './Privacy';
+import { TwoFactorCard } from '../components/TwoFactor';
 
 const kb = (n: number) => (Math.round((n / 1024) * 10) / 10).toLocaleString(locale());
 
@@ -180,6 +181,7 @@ export function SecuritySection({ cfg, set, errors, me, saved, go }: SectionProp
           </form>
         </Card>
       )}
+      {has('twoFactor') && me.user && <TwoFactorCard me={me} />}
       {(pwOn || googleOn) && (
         <Card id="sec-sessions" title={t('Sesiones')} icon="shield">
           <p class="muted small">{t('Cierra la sesión en todos los navegadores y dispositivos (también en este). Cambiar la contraseña cierra las demás sesiones automáticamente.')}</p>

@@ -2,8 +2,11 @@
 // (server/test/i18n-complete.test.js checks that every key has a value). The Familia rows (admin and family page) are
 // NL_FAMILY and NL_SINGULAR_FAMILY in i18n-dict-family.ts, so the family page does not load this file.
 
+import { NL_TWOFA } from './i18n-dict-2fa';
+
 /** Every admin row but the Familia ones. */
 export const NL: Record<string, string> = {
+  ...NL_TWOFA,
   '(ninguno)': '(geen)',
   'Estás usando la contraseña inicial. Cámbiala: hasta entonces solo se acepta desde tu red local.': 'Je gebruikt het startwachtwoord. Wijzig het: tot dan wordt het alleen vanuit je lokale netwerk geaccepteerd.',
   'Sesiones': 'Sessies',

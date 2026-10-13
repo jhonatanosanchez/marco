@@ -22,6 +22,7 @@ const TYPES_PATH = resolve(root, 'web/shared/types.ts');
 const FEATURE_RULES = [
   [/^\/api\/setup\//, 'setupWizard'],
   [/^\/api\/auth\/login$/, 'passwordLogin'],
+  [/^\/api\/(admin\/2fa(\/|$)|auth\/2fa$)/, 'twoFactor'],
   [/^\/api\/admin\/password$/, 'passwordLogin'],
   [/^\/api\/admin\/(homeassistant\/|test\/homeassistant$)/, 'homeassistant'],
   [/^\/api\/admin\/(prices\/|test\/prices$)/, 'priceWidgets'],

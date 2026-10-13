@@ -10,6 +10,7 @@ import { logActivity, logActivityThrottled } from './activity.js';
 import { passwordProblem, PASSWORD_MESSAGES } from './lib/password.js';
 import { isPrivateIp, isLanClient, clientBucket, hostAllowed, hostnameOf } from './lib/net.js';
 import { LANGS } from './core/lib/i18n.js';
+import { twoFactorEnabled, startChallenge, challengeOf, dropChallenge, dropAllChallenges, checkSecondFactor, CHALLENGE_ATTEMPTS } from './twofactor.js';
 
 export { isPrivateIp, isLanClient };
 
@@ -210,12 +211,19 @@ export function endSession(req) {
   return typeof sid === 'string' ? sid : null;
 }
 
+/** Forget a sign-in the server no longer accepts, keeping a two-step challenge this browser is in the middle of. */
+function dropStaleSession(req) {
+  const tfa = req.session?.tfa;
+  req.session = null;
+  if (challengeOf(tfa)) req.session = { tfa };
+}
+
 export function requireAuth(req, res, next) {
   if (sessionValid(req)) {
     touchSession(req);
     return next();
   }
-  if (req.session?.user) req.session = null;
+  if (req.session?.user) dropStaleSession(req);
   res.status(401).json({ error: 'unauthorized' });
 }
 
@@ -223,6 +231,8 @@ export function requireAuth(req, res, next) {
 export function rotateSessionEpoch() {
   const epoch = crypto.randomBytes(16).toString('hex');
   updateSecrets((s) => { s.sessionEpoch = epoch; s.sessions = {}; });
+  // A password typed before this (a changed password, "log out everywhere") no longer leads to the code step.
+  dropAllChallenges();
   authEvents.emit('revoked');
   return epoch;
 }
@@ -351,9 +361,110 @@ export async function loginHandler(req, res) {
     return res.status(403).json({ error: 'default password only allowed from the local network; change it first' });
   }
   attempts.delete(r.key);
-  startSession(req, { email: 'admin', name: 'Admin', picture: '', method: 'password' });
+  const user = { email: 'admin', name: 'Admin', picture: '', method: 'password' };
+  // Two-step sign-in on: no session yet, the code comes next (POST /api/auth/2fa).
+  if (twoFactorEnabled()) {
+    beginTwoFactor(req, user);
+    return res.json({ twoFactor: true });
+  }
+  startSession(req, user);
   logActivity('auth.login', { req, data: { method: 'password' } });
   res.json({ user: sessionUser(req.session.user) });
+}
+
+// ---------- two-step sign-in (server/twofactor.js) ----------
+
+/**
+ * The password (or Google) was right and two-step sign-in is on: this browser gets a challenge id in its session
+ * cookie, and nothing else. A sign-in the server no longer accepts is dropped from the cookie first, so its leftovers
+ * cannot be mistaken for the new one.
+ */
+function beginTwoFactor(req, user) {
+  if (req.session?.user && !sessionValid(req)) {
+    delete req.session.user;
+    delete req.session.sid;
+    delete req.session.epoch;
+  }
+  dropChallenge(req.session?.tfa);
+  req.session.tfa = startChallenge(user);
+}
+
+/**
+ * Check a code from the authenticator app or a recovery code, rate limited like a password (per address and the
+ * shared budget for addresses outside the LAN; `scope` keeps the sign-in and the confirmations apart). Wrong codes
+ * are logged (auth.2fa_failed). Returns { ok: true, kind, recoveryLeft } or { ok: false, status, error?, reason? }.
+ */
+export function checkSecondFactorLimited(req, code, { scope = '2fa', actor, method } = {}) {
+  const r = reservePasswordCheck(req, scope);
+  if (r.error) return { ok: false, status: 429, error: r.error };
+  const out = checkSecondFactor(code);
+  if (!out.ok) {
+    if (out.reason !== 'off') countGlobalFailure(req, Date.now());
+    logActivity('auth.2fa_failed', { req, ...(actor ? { actor } : {}), level: 'warn', data: { method, reason: out.reason, attempt: r.reserved.n } });
+    return { ok: false, status: 401, reason: out.reason };
+  }
+  attempts.delete(r.key);
+  return out;
+}
+
+/** POST /api/auth/2fa { code }: the second step of a sign-in. The session starts only here. */
+export function twoFactorLoginHandler(req, res) {
+  const id = req.session?.tfa;
+  const ch = challengeOf(id);
+  if (!ch) {
+    if (req.session?.tfa) delete req.session.tfa;
+    return res.status(401).json({ error: 'sign in again', code: 'challenge_expired' });
+  }
+  const code = typeof req.body?.code === 'string' ? req.body.code.slice(0, 40) : '';
+  ch.attempts += 1;
+  const r = checkSecondFactorLimited(req, code, { actor: ch.user.email, method: ch.user.method });
+  if (!r.ok) {
+    if (r.status === 429) return res.status(429).json({ error: r.error });
+    const left = r.reason === 'off' ? 0 : Math.max(0, CHALLENGE_ATTEMPTS - ch.attempts);
+    if (!left) {
+      dropChallenge(id);
+      delete req.session.tfa;
+      return res.status(401).json({ error: 'sign in again', code: 'challenge_expired' });
+    }
+    return res.status(401).json({ error: 'invalid code', code: 'code_invalid', attemptsLeft: left });
+  }
+  dropChallenge(id);
+  delete req.session.tfa;
+  startSession(req, ch.user);
+  logActivity('auth.login', {
+    req,
+    level: r.kind === 'recovery' ? 'warn' : 'info',
+    data: { method: ch.user.method, twoFactor: r.kind, ...(r.kind === 'recovery' ? { recoveryLeft: r.recoveryLeft } : {}) },
+  });
+  res.json({ user: sessionUser(req.session.user), ...(r.kind === 'recovery' ? { recoveryLeft: r.recoveryLeft } : {}) });
+}
+
+/**
+ * Turning two-step sign-in off, or new recovery codes: the admin password (sessions signed in with it), or a code
+ * from the app or a recovery code from a session that signed in within RECENT_AUTH_MS. Answers 403
+ * (password_required / password_incorrect / code_incorrect / reauth_required) or 429 and returns false otherwise.
+ */
+export async function requirePasswordOrCode(req, res, { password, code } = {}) {
+  if (typeof password === 'string' && password && req.session?.user?.method === 'password') {
+    const r = await confirmPassword(req, password);
+    if (r.ok) return true;
+    if (r.status === 429) res.status(429).json({ error: r.error });
+    else res.status(403).json({ error: 'password incorrect', code: 'password_incorrect' });
+    return false;
+  }
+  if (typeof code === 'string' && code) {
+    if (!recentlyAuthenticated(req)) {
+      res.status(403).json({ error: 'sign in again first', code: 'reauth_required' });
+      return false;
+    }
+    const r = checkSecondFactorLimited(req, code.slice(0, 40), { scope: 'confirm', method: req.session.user.method });
+    if (r.ok) return true;
+    if (r.status === 429) res.status(429).json({ error: r.error });
+    else res.status(403).json({ error: 'code incorrect', code: 'code_incorrect' });
+    return false;
+  }
+  res.status(403).json({ error: 'confirm your password first', code: 'password_required' });
+  return false;
 }
 
 export function logoutHandler(req, res) {
@@ -374,7 +485,7 @@ export function logoutAllHandler(req, res) {
 
 export function meHandler(req, res) {
   const valid = sessionValid(req);
-  if (!valid && req.session?.user) req.session = null;
+  if (!valid && req.session?.user) dropStaleSession(req);
   const sec = getSecrets();
   res.json({
     user: valid ? sessionUser(req.session.user) : null,
@@ -388,6 +499,8 @@ export function meHandler(req, res) {
     // Microsoft calendars with the server's own Entra app (MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET).
     microsoftConfigured: microsoft.microsoftConfigured(),
     passwordLoginEnabled: getConfig().auth.passwordLoginEnabled,
+    // The password (or Google) was right and this browser still has to type the code (POST /api/auth/2fa).
+    twoFactorPending: !valid && Boolean(challengeOf(req.session?.tfa)),
   });
 }
 
@@ -514,7 +627,13 @@ export async function googleCallbackHandler(req, res) {
       return fail('email_not_allowed', profile.email);
     }
   }
-  startSession(req, { email: profile.email, name: profile.name, picture: profile.picture, method: 'google' });
+  const user = { email: profile.email, name: profile.name, picture: profile.picture, method: 'google' };
+  // Two-step sign-in applies to Google too: the admin opens on the code step (GET /api/auth/me twoFactorPending).
+  if (twoFactorEnabled()) {
+    beginTwoFactor(req, user);
+    return res.redirect('/admin/');
+  }
+  startSession(req, user);
   logActivity('auth.login', { req, data: { method: 'google' } });
   res.redirect('/admin/');
 }

@@ -1,0 +1,107 @@
+/* Two-step sign-in: Security card, setup dialog, recovery codes and the code step of the sign-in page
+   (components/TwoFactor.tsx). */
+.tfa-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+.tfa-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.tfa-state.is-on {
+  color: var(--ok);
+}
+.tfa-skeleton {
+  height: 38px;
+  border-radius: var(--r);
+}
+.tfa-steps {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.tfa-steps > li {
+  padding-left: 4px;
+  line-height: 1.5;
+}
+.tfa-qr {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 12px;
+}
+.tfa-qr .qr {
+  width: 176px;
+  height: 176px;
+  flex: none;
+}
+.tfa-qr__key {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 200px;
+}
+.tfa-qr__key .copy-field code {
+  white-space: normal;
+  word-break: break-all;
+  letter-spacing: 0.04em;
+}
+.tfa-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+.tfa-code-input {
+  font-family: var(--mono);
+  font-size: 18px;
+  letter-spacing: 0.18em;
+}
+.tfa-form .tfa-code-input {
+  max-width: 220px;
+}
+.tfa-codes {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 12px;
+}
+.tfa-codes__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 18px;
+  margin: 0;
+  padding: 14px 16px 14px 36px;
+  border-radius: var(--r);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+}
+.tfa-codes__list code {
+  font-family: var(--mono);
+  font-size: 15px;
+  letter-spacing: 0.05em;
+}
+.tfa-hint {
+  margin: 0 0 2px;
+  font-size: 13.5px;
+}
+.tfa-alt {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+@media (max-width: 520px) {
+  .tfa-codes__list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

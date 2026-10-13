@@ -6,6 +6,9 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- Optional two-step sign-in for the admin with an authenticator app (*Security → Two-step verification*), with ten
+  one-time recovery codes. It is off until you turn it on, and turning it on keeps the sessions already open. Locked
+  out? Stop Marco and run `npm run disable-2fa`.
 - The background photo can now cover the whole screen (*Layout → Appearance → Background photo → Whole screen*), with
   the calendar drawn over it as frosted glass and a slider for how see-through it is. Thanks to @aswormboy for the idea.
 
