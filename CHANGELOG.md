@@ -5,6 +5,10 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- The calendar can start on today (*Calendars → Calendar starts on → Today*): no past days, the first cell is today
+  and the weekday headers follow it. It moves on by one day at midnight.
+
 ### Changed
 - Marco Cloud: everything about your account now lives on the admin's *Account* page, with the same look as the rest
   of the admin: language, password, two-step verification, Sign in with Google, open sessions, your data and deleting

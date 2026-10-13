@@ -130,10 +130,11 @@ The stored config has **global** sections shared by every screen and a list of *
                   // source: stock | gallery | mixed | immich · order: random | newest | name · transition: webgl | fade | none · ambient: aurora | particles | none · weatherFx: off | simple | rich
                   // portraitFit: auto | blur | crop, for photos whose orientation differs from the screen (auto = blurred fill for Immich photos only)
                   // immich: albums played with source immich (UUIDs, at most 20, merged without duplicates; [] = stock photos)
-  "calendar":   { "enabled": true, "view": "month", "weeks": 5, "weekStart": 1, "showLocation": false, "showEndTime": false,
-                  "showDayXofY": true, "showLegend": true, "hidePast": false, "maxEventsPerDay": 4,
+  "calendar":   { "enabled": true, "view": "month", "weeks": 5, "weekStart": 1, "startOn": "week",
+                  "showLocation": false, "showEndTime": false, "showDayXofY": true, "showLegend": true, "hidePast": false, "maxEventsPerDay": 4,
                   "marquee": true, "rotateBusyDays": true, "compactBusyDays": true, "eventStyle": "lines",
                   "agendaDays": "auto", "sourceIds": null },               // null = every enabled source (incl. new ones); array = only these
+                  // startOn: week (the grid starts on the first day of this week, weekStart) | today (no past days: the first cell is today)
                   // marquee: titles cut short (calendar chips, agenda-like lists, side panel pills, countdowns, news) slide to show the rest
                   // rotateBusyDays: a month-grid day with more events than fit pages through them every 8 s
                   // compactBusyDays: a month / week grid day whose events do not fit at normal size lists them as small

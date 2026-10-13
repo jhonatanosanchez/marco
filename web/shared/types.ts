@@ -431,6 +431,8 @@ export interface IconRule {
 
 export type CalendarWeeks = number | 'auto';
 export type EventStyle = 'lines' | 'cards';
+/** calendar.startOn: the grid starts on the first day of this week (weekStart) or on today. */
+export type CalendarStartOn = 'week' | 'today';
 /** Days the agenda view looks ahead, or 'auto': Today and Tomorrow, then the next days with events until it is full. */
 export type AgendaDays = 'auto' | 7 | 14 | 30;
 
@@ -440,6 +442,11 @@ export interface CalendarConfig<S = CalendarSource> {
   /** Week rows of the month view, or 'auto': 2 to 6 rows, as many as fit maxEventsPerDay events per day. */
   weeks: CalendarWeeks;
   weekStart: number; // 0 = Sunday, 1 = Monday
+  /**
+   * Month / week grid: 'week' (default) starts on the first day of this week (weekStart); 'today' shows no past days,
+   * the first cell is today and the rows run on 7 days at a time (the column headers follow).
+   */
+  startOn: CalendarStartOn;
   showLocation: boolean;
   showEndTime: boolean;
   showDayXofY: boolean;
@@ -1643,7 +1650,7 @@ export interface ScreenProfile {
   screen: Omit<ScreenConfig, 'name'>;
   layout: LayoutConfig;
   background: BackgroundConfig;
-  calendar: Pick<CalendarConfig, 'enabled' | 'view' | 'weeks' | 'weekStart' | 'showLocation' | 'showEndTime' | 'showDayXofY' | 'showLegend' | 'hidePast' | 'maxEventsPerDay' | 'marquee' | 'rotateBusyDays' | 'compactBusyDays' | 'eventStyle' | 'agendaDays'> & { sourceIds: string[] | null };
+  calendar: Pick<CalendarConfig, 'enabled' | 'view' | 'weeks' | 'weekStart' | 'startOn' | 'showLocation' | 'showEndTime' | 'showDayXofY' | 'showLegend' | 'hidePast' | 'maxEventsPerDay' | 'marquee' | 'rotateBusyDays' | 'compactBusyDays' | 'eventStyle' | 'agendaDays'> & { sourceIds: string[] | null };
   datetime: Omit<DateTimeConfig, 'timezone'>;
   weather: Pick<WeatherConfig, 'enabled' | 'forecastDays' | 'showHourly' | 'showPrecipChance'>;
   news: { enabled: boolean; rotateSec: number };

@@ -700,15 +700,28 @@ export function CalendarsSection(props: SectionProps) {
                 onChange={(v) => set((d) => void (d.calendar.view = v))}
               />
             </Field>
-            <Field label={t('La semana empieza en')}>
-              <Segmented
+            <Field
+              label={t('El calendario empieza en')}
+              hint={c.startOn === 'today' ? t('Sin días pasados: el calendario empieza siempre por hoy y avanza un día cada medianoche.') : undefined}
+            >
+              <Segmented<number | 'today'>
                 full
-                value={c.weekStart}
+                value={c.startOn === 'today' ? 'today' : c.weekStart}
                 options={[
                   { value: 1, label: t('Lunes') },
                   { value: 0, label: t('Domingo') },
+                  { value: 'today', label: t('Hoy') },
                 ]}
-                onChange={(v) => set((d) => void (d.calendar.weekStart = v))}
+                onChange={(v) =>
+                  set((d) => {
+                    // weekStart stays as it was with 'today' (the menus of the week still start on it)
+                    if (v === 'today') d.calendar.startOn = 'today';
+                    else {
+                      d.calendar.startOn = 'week';
+                      d.calendar.weekStart = v;
+                    }
+                  })
+                }
               />
             </Field>
             <WeeksField cfg={props.cfg} set={set} error={errors['calendar.weeks']} />

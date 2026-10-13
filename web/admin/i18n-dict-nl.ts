@@ -194,6 +194,8 @@ export const NL: Record<string, string> = {
   'La contraseña actual no es correcta': 'Het huidige wachtwoord klopt niet',
   'La galería está vacía': 'De galerij is leeg',
   'La semana empieza en': 'Week begint op',
+  'El calendario empieza en': 'Kalender begint op',
+  'Sin días pasados: el calendario empieza siempre por hoy y avanza un día cada medianoche.': 'Geen dagen uit het verleden: de kalender begint altijd bij vandaag en schuift om middernacht een dag op.',
   'La sesión de Google caducó. Inténtalo de nuevo.': 'De Google-sessie is verlopen. Probeer het opnieuw.',
   'La sesión ha caducado. Vuelve a entrar.': 'Je sessie is verlopen. Log opnieuw in.',
   'Las contraseñas no coinciden': 'Wachtwoorden komen niet overeen',

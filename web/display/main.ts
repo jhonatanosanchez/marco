@@ -11,7 +11,7 @@ import './styles-kids.css';
 import type {
   Announcement, CountdownsResponse, DisplayConfig, EventsResponse, FamilyDisplayState, Lang, NewsResponse, NightCommand, Photo, PhotosResponse, PlannerBar, StreamHello, WeatherResponse,
 } from '../shared/types';
-import { addDays, LANGS, startOfWeek } from '../shared/i18n';
+import { addDays, gridStartOf, LANGS } from '../shared/i18n';
 import { api, ApiError } from './api';
 import { parseColor, toHex } from './color';
 import { ctx, setCtxConfig } from './ctx';
@@ -369,6 +369,9 @@ function applyConfig(raw: DisplayConfig): void {
     const pad = params.get('agendaDays');
     cfg.calendar.agendaDays = normalizeAgendaDays(pad === 'auto' ? 'auto' : Number(pad));
   }
+  // ?startOn=week|today (the grid starts on the first day of this week, or on today with no past days)
+  const pso = params.get('startOn');
+  if (pso === 'week' || pso === 'today') cfg.calendar.startOn = pso;
   const pcd = params.get('cards');
   if (pcd === '0' || pcd === '1') cfg.calendar.eventStyle = pcd === '1' ? 'cards' : 'lines';
   // automatic weeks: at most 6 rows, fewer where a layout caps the rows below
@@ -893,7 +896,7 @@ async function checkTarget(): Promise<void> {
 // ---------------------------------------------------------------------------------------------
 function eventsRange(cfg: DisplayConfig = ctx.cfg): [string, string] {
   const today = current().dayKey;
-  const from = startOfWeek(today, cfg.calendar.weekStart ?? 1);
+  const from = gridStartOf(today, cfg.calendar.weekStart ?? 1, cfg.calendar.startOn);
   let to = addDays(from, Math.max(rangeWeeks(cfg.calendar.weeks ?? 5) * 7, 21) + 1);
   // the agenda view looks further ahead than the grid (calendar.agendaDays; 'auto' up to AGENDA_AUTO_MAX_DAYS)
   const view = params.get('view') || cfg.calendar.view;
@@ -904,6 +907,9 @@ function eventsRange(cfg: DisplayConfig = ctx.cfg): [string, string] {
   return [from, to];
 }
 
+/** The range the last events request asked for (the admin preview asks again when a draft changes it). */
+let fetchedRange = '';
+
 async function fetchEvents(): Promise<void> {
   if (state.demo) {
     const m = mockEvents(current().now);
@@ -912,6 +918,7 @@ async function fetchEvents(): Promise<void> {
   }
   try {
     const [from, to] = eventsRange();
+    fetchedRange = `${from}/${to}`;
     const sid = getActiveScreen();
     const r = await api.events(from, to);
     setOnline(true);
@@ -1136,6 +1143,8 @@ on('config', (s) => {
   photoSig = sig;
   syncCarousel(s.config);
   syncFamily(s.config);
+  // an unsaved draft in the admin preview may show other days (weeks, weekStart, startOn): fetch the events they need
+  if (isPreview && fetchedRange && eventsRange().join('/') !== fetchedRange) void fetchEvents();
 });
 
 // ---------------------------------------------------------------------------------------------

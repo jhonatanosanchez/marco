@@ -1,5 +1,5 @@
 // Month / week grid: huge thin day numbers, lane-allocated event chips and continuous multi-day bars.
-import { addDays, diffDays, monthName, startOfWeek, weekdayNames, weekdayOfKey } from '../../shared/i18n';
+import { addDays, diffDays, gridStartOf, monthName, weekdayNames, weekdayOfKey } from '../../shared/i18n';
 import { chipColors } from '../color';
 import { ctx } from '../ctx';
 import { esc, reconcile, setHTML, type Spec } from '../dom';
@@ -120,7 +120,10 @@ export class MonthCalendar {
     const L = Math.max(1, Math.min(wantL, m ? this.lanesFor(m.h / nWeeks - 1, m) : 99));
     const today = tick.dayKey;
     const nowMs = tick.now.getTime();
-    const gridStart = startOfWeek(today, c.weekStart);
+    // the first day of this week, or today (calendar.startOn 'today': no past days, rolling rows of 7 days)
+    const rolling = c.startOn === 'today';
+    const gridStart = gridStartOf(today, c.weekStart, c.startOn);
+    const firstWd = weekdayOfKey(gridStart);
     this.root.style.setProperty('--weeks', String(nWeeks));
     this.root.style.setProperty('--lanes', String(L));
 
@@ -138,14 +141,14 @@ export class MonthCalendar {
       : '';
     setHTML(this.head.querySelector('.legend') as HTMLElement, legend);
 
-    // ---- weekday header
-    const names = weekdayNames(lang, c.weekStart, 'short');
-    const todayCol = (weekdayOfKey(today) - c.weekStart + 7) % 7;
+    // ---- weekday header: the columns follow the grid's first day (today's weekday first when it starts today)
+    const names = weekdayNames(lang, firstWd, 'short');
+    const todayCol = diffDays(gridStart, today) % 7;
     setHTML(
       this.dow,
       names
         .map((n, i) => {
-          const wd = (c.weekStart + i) % 7;
+          const wd = (firstWd + i) % 7;
           return `<div class="${i === todayCol ? 'is-today' : ''}${wd === 0 || wd === 6 ? ' we' : ''}">${esc(n)}</div>`;
         })
         .join(''),
@@ -159,7 +162,8 @@ export class MonthCalendar {
     for (let w = 0; w < nWeeks; w++) {
       const ws = addDays(gridStart, w * 7);
       weekRows.push({ key: ws, start: ws });
-      weekSpecs.push({ key: `w${ws}`, className: cards ? 'wk cards' : 'wk', html: '' });
+      // rolling rows move on by one day every midnight: keep each row (its days slide along) instead of replacing them all
+      weekSpecs.push({ key: rolling ? `r${w}` : `w${ws}`, className: cards ? 'wk cards' : 'wk', html: '' });
     }
     reconcile(this.weeks, weekSpecs, { flip: true, animate: !this.still });
     const rowEls = Array.from(this.weeks.children).filter((x) => !(x as any).__leaving) as HTMLElement[];

@@ -36,6 +36,8 @@ export const LAYOUT_PRESETS = [
 ];
 /** calendar.eventStyle: 'lines' (one-line chips, the original look) or 'cards' (time on top, title below). */
 export const EVENT_STYLES = ['lines', 'cards'];
+/** calendar.startOn: the month / week grid starts on the first day of this week (weekStart) or on today. */
+export const CALENDAR_START_ON = ['week', 'today'];
 /** layout.plannerBar: where the 'planner' layout puts the clock and the weather on a landscape screen. */
 export const PLANNER_BARS = ['side', 'top', 'bottom'];
 /** calendar.agendaDays: days the agenda view looks ahead, or 'auto' (fills the agenda with the next days that have events). */
@@ -317,6 +319,9 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs, familyMemberIds 
     // a number of week rows, or 'auto': the display picks 2 to 6 rows so each day fits maxEventsPerDay events
     weeks: ca.weeks === 'auto' ? 'auto' : num(ctx, `${p}.calendar.weeks`, ca.weeks, D.calendar.weeks, 1, 8, true),
     weekStart: num(ctx, `${p}.calendar.weekStart`, ca.weekStart, D.calendar.weekStart, 0, 6, true),
+    // 'today': the grid has no past days, its first cell is today and the rows run on 7 days at a time (screens saved
+    // before the option keep 'week')
+    startOn: oneOf(ctx, `${p}.calendar.startOn`, ca.startOn, D.calendar.startOn, CALENDAR_START_ON),
     showLocation: bool(ctx, `${p}.calendar.showLocation`, ca.showLocation, D.calendar.showLocation),
     showEndTime: bool(ctx, `${p}.calendar.showEndTime`, ca.showEndTime, D.calendar.showEndTime),
     showDayXofY: bool(ctx, `${p}.calendar.showDayXofY`, ca.showDayXofY, D.calendar.showDayXofY),

@@ -729,6 +729,14 @@ export function startOfWeek(key: string, weekStart = 1): string {
   return addDays(key, -delta);
 }
 
+/**
+ * First day of the month / week grid that shows `today`: the start of its week (weekStart, 0 = Sunday) or, with
+ * startOn 'today', today itself (no past days; the rows run on 7 days at a time from there).
+ */
+export function gridStartOf(today: string, weekStart = 1, startOn: 'week' | 'today' = 'week'): string {
+  return startOn === 'today' ? today : startOfWeek(today, weekStart);
+}
+
 function capitalize(s: string): string {
   return s ? s.charAt(0).toLocaleUpperCase() + s.slice(1) : s;
 }

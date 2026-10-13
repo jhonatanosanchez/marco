@@ -24,7 +24,7 @@ export const RESERVED_SOURCE_IDS = [LOCAL_SOURCE_ID, BIRTHDAYS_SOURCE_ID];
 
 /** Per-screen part of the keys that are split between global and per-screen ("merged sections"). */
 export const SCREEN_SPLIT_KEYS = {
-  calendar: ['enabled', 'view', 'weeks', 'weekStart', 'showLocation', 'showEndTime', 'showDayXofY', 'showLegend', 'hidePast', 'maxEventsPerDay', 'marquee', 'rotateBusyDays', 'compactBusyDays', 'eventStyle', 'agendaDays', 'sourceIds'],
+  calendar: ['enabled', 'view', 'weeks', 'weekStart', 'startOn', 'showLocation', 'showEndTime', 'showDayXofY', 'showLegend', 'hidePast', 'maxEventsPerDay', 'marquee', 'rotateBusyDays', 'compactBusyDays', 'eventStyle', 'agendaDays', 'sourceIds'],
   datetime: ['enabled', 'clock', 'format24', 'showSeconds', 'showAmPm', 'dateFormat', 'dateCustom'],
   weather: ['enabled', 'forecastDays', 'showHourly', 'showPrecipChance'],
   news: ['enabled', 'rotateSec'],
@@ -82,6 +82,9 @@ export function defaultScreenProfile({ id = 's_main', slug = 'living-room', name
     },
     calendar: {
       enabled: true, view: 'month', weeks: 5, weekStart: 1, showLocation: false, showEndTime: false,
+      // startOn: 'week' (the grid starts on the first day of this week, weekStart) or 'today' (no past days: the first
+      // cell is today and the rows run on from there)
+      startOn: 'week',
       showDayXofY: true, showLegend: true, hidePast: false, maxEventsPerDay: 4,
       // marquee: titles cut short slide to show the rest; rotateBusyDays: a day with more events than fit pages through them
       marquee: true, rotateBusyDays: true,

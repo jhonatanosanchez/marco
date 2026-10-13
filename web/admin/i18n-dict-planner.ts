@@ -73,4 +73,11 @@ export const ROWS_PLANNER: [string, string, string][] = [
     'The agenda shows the next {n} days. Days without events take no room.',
     'A agenda mostra os próximos {n} dias. Os dias sem eventos não ocupam espaço.',
   ],
+  // calendar.startOn: the grid starts on Monday, Sunday or today
+  ['El calendario empieza en', 'Calendar starts on', 'O calendário começa em'],
+  [
+    'Sin días pasados: el calendario empieza siempre por hoy y avanza un día cada medianoche.',
+    'No past days: the calendar always starts with today and moves on by one day at midnight.',
+    'Sem dias passados: o calendário começa sempre no dia de hoje e avança um dia à meia-noite.',
+  ],
 ];

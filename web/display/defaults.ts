@@ -17,7 +17,7 @@ export const DEFAULT_CONFIG: DisplayConfig = {
     cover: true, transition: 'webgl', ambient: 'aurora', weatherFx: 'simple', portraitFit: 'auto', scope: 'side', calendarOpacity: CALENDAR_OPACITY_DEFAULT, calendarBlur: CALENDAR_BLUR_DEFAULT,
   },
   calendar: {
-    enabled: true, view: 'month', weeks: 5, weekStart: 1, showLocation: false, showEndTime: false, showDayXofY: true,
+    enabled: true, view: 'month', weeks: 5, weekStart: 1, startOn: 'week', showLocation: false, showEndTime: false, showDayXofY: true,
     showLegend: true, hidePast: false, maxEventsPerDay: 4, marquee: true, rotateBusyDays: true, compactBusyDays: false, eventStyle: 'lines', agendaDays: 'auto', sources: [], iconRules: DEFAULT_ICON_RULES,
   },
   datetime: {
@@ -74,6 +74,7 @@ export function normalizeConfig(raw: unknown): DisplayConfig {
   c.calendar.agendaDays = normalizeAgendaDays(rawCal?.agendaDays);
   c.calendar.maxEventsPerDay = clampInt(c.calendar.maxEventsPerDay, 1, 12, 4);
   c.calendar.weekStart = clampInt(c.calendar.weekStart, 0, 6, 1);
+  c.calendar.startOn = c.calendar.startOn === 'today' ? 'today' : 'week';
   c.layout.sideWidth = Math.min(0.6, Math.max(0.2, Number(c.layout.sideWidth) || 0.36));
   if (!['tl', 'tr', 'bl', 'br'].includes(c.layout.corner as string)) c.layout.corner = 'br';
   if (!['side', 'top', 'bottom'].includes(c.layout.plannerBar as string)) c.layout.plannerBar = 'side';

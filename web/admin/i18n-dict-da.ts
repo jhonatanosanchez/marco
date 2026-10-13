@@ -194,6 +194,8 @@ export const DA: Record<string, string> = {
   'La contraseña actual no es correcta': 'Den nuværende adgangskode er forkert',
   'La galería está vacía': 'Galleriet er tomt',
   'La semana empieza en': 'Ugen starter',
+  'El calendario empieza en': 'Kalenderen starter',
+  'Sin días pasados: el calendario empieza siempre por hoy y avanza un día cada medianoche.': 'Ingen tidligere dage: kalenderen starter altid med i dag og rykker en dag frem ved midnat.',
   'La sesión de Google caducó. Inténtalo de nuevo.': 'Google-sessionen er udløbet. Prøv igen.',
   'La sesión ha caducado. Vuelve a entrar.': 'Din session er udløbet. Log ind igen.',
   'Las contraseñas no coinciden': 'Adgangskoderne er ikke ens',
