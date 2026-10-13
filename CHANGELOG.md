@@ -5,6 +5,10 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- Carousel: when the next screen has other photo settings, its photo now comes in with the screen switch. Before,
+  the switch played first and the photo crossfaded right after it, so every switch looked like two animations.
+
 ## [0.10.0] - 2026-10-12
 
 ### Added

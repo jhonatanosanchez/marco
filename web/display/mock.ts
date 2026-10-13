@@ -119,7 +119,7 @@ export function mockConfig(): DisplayConfig {
 
 /**
  * ?demo=1&carousel=1: a carousel of four demo screens with different layouts (&stepSec= seconds each, default 8, &tr=<name>
- * and &trSpeed=fast|normal|slow to film one animation),
+ * and &trSpeed=fast|normal|slow to film one animation, &photoMix=1 for other photos on every step),
  * for filming the rotation. Every config carries the same carousel block, as the server sends it.
  */
 // ---------------------------------------------------------------------------------------------
@@ -255,11 +255,14 @@ export function mockCarouselConfigs(): DisplayConfig[] {
     steps: screens.map(([screenId, slug, name]) => ({ screenId, slug, name, seconds: sec })),
   };
   const base = mockConfig();
-  return screens.map(([screenId, slug, name, preset]) => ({
+  // &photoMix=1: every step has its own photo topic (another slideshow at each switch, see mockPhotos)
+  const mix = q.get('photoMix') === '1';
+  return screens.map(([screenId, slug, name, preset], i) => ({
     ...base,
     screenId,
     slug,
     screen: { ...base.screen, name },
+    ...(mix ? { background: { ...base.background, stockTopic: `topic${i}`, intervalSec: [60, 30][i % 2] } } : {}),
     layout: { ...base.layout, preset: preset as DisplayConfig['layout']['preset'] },
     target: { id: carousel.id, kind: 'carousel' as const, slug: carousel.slug, name: carousel.name },
     carousel,
@@ -598,9 +601,11 @@ const PICSUM: [number, string][] = [
   [15, 'Paul Jarvis'], [29, 'Go Wild'], [28, 'Jerry Adney'], [10, 'Paul Jarvis'], [16, 'Paul Jarvis'], [17, 'Paul Jarvis'],
 ];
 
-export function mockPhotos(): PhotosResponse {
+/** `topic`: the demo carousel's &photoMix=1 topics ('topic2'...) start the list at another photo. */
+export function mockPhotos(topic = ''): PhotosResponse {
   const list = PICSUM.map(([id, author]) => ({ url: `https://picsum.photos/id/${id}/1920/1080`, author, source: 'stock' as const }));
-  return { photos: list };
+  const k = /^topic(\d+)$/.exec(topic) ? (Number(topic.slice(5)) * 3) % list.length : 0;
+  return { photos: [...list.slice(k), ...list.slice(0, k)] };
 }
 
 /** Countdown chips for the demo (mirrors GET /api/countdowns). */

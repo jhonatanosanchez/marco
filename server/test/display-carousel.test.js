@@ -43,7 +43,7 @@ const BLOCK = {
 };
 
 /** Controller on a fake clock at the start of a loop (epoch multiple of the 80 s cycle). */
-function setup({ block = BLOCK, failFor = new Set(), alert = () => false, night = () => false, pin = null, frozen = false } = {}) {
+function setup({ block = BLOCK, failFor = new Set(), alert = () => false, night = () => false, pin = null, frozen = false, upcoming } = {}) {
   const t0 = 80_000 * 25_000_000; // a slot boundary: step "a" starts
   const clock = fakeClock(t0);
   const shown = [];
@@ -58,6 +58,7 @@ function setup({ block = BLOCK, failFor = new Set(), alert = () => false, night 
       return { config: parts.includes('config') ? cfgOf(id) : undefined, events: { events: [], hash: id }, countdowns: { items: [] }, photos: { photos: [] } };
     },
     show: (id) => shown.push([id, clock.now() - t0]),
+    upcoming,
     pin,
     frozen,
     setTimer: clock.setTimer,
@@ -90,6 +91,19 @@ test('switches exactly at the slot boundary, after refreshing the next screen ah
   assert.ok(!after.at(-1)[1].includes('config'), 'config is not refetched without a new revision');
   c.stop();
   assert.equal(clock.pending(), 0, 'stop() clears its timers');
+});
+
+test('upcoming: the next screen is announced with its data before the switch (its first photo loads then)', async () => {
+  const ahead = [];
+  const { c, clock, shown, t0 } = setup({ upcoming: (id, b) => ahead.push([id, clock.now() - t0, !!b.config]) });
+  c.start();
+  await clock.advance(60_000 - PREFETCH_LEAD + 10);
+  assert.deepEqual(ahead, [['b', 60_000 - PREFETCH_LEAD, true]]);
+  assert.deepEqual(shown, []);
+  await clock.advance(PREFETCH_LEAD + 100);
+  assert.equal(shown[0]?.[0], 'b');
+  assert.equal(ahead.length, 1, 'once per switch');
+  c.stop();
 });
 
 test('a new config revision makes the other screens refresh their config before they show', async () => {

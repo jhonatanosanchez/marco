@@ -42,6 +42,8 @@ export interface CarouselDeps {
   fetch: (screenId: string, parts: BundlePart[], cfg: DisplayConfig | null) => Promise<Partial<Pick<Bundle, BundlePart>>>;
   /** put `screenId` on screen with its bundle; `sw` says how to animate it (web/display/switchPlan.ts) */
   show: (screenId: string, b: Bundle, sw: SwitchInfo) => void;
+  /** the next screen's data is ready a few seconds before it comes on (main.ts loads its first photo then) */
+  upcoming?: (screenId: string, b: Bundle) => void;
   /** the screen's data was refreshed while it is on screen */
   refreshed?: (screenId: string, b: Bundle, parts: BundlePart[]) => void;
   /** debug: ?step=<slug> pins one screen, ?carousel=0 freezes on the first step */
@@ -251,7 +253,9 @@ export class CarouselController {
       this.prefetchTimer = this.setTimer(() => {
         this.prefetchTimer = null;
         if (typeof document !== 'undefined' && document.hidden) return;
-        void this.ensure(next.screenId);
+        void this.ensure(next.screenId).then((b) => {
+          if (b && !this.stopped && this.active !== next.screenId) this.d.upcoming?.(next.screenId, b);
+        });
       }, Math.max(0, endsAt - lead - now));
     }
   }

@@ -9,7 +9,7 @@ import './styles-modern.css';
 import './styles-planner.css';
 import './styles-kids.css';
 import type {
-  Announcement, CountdownsResponse, DisplayConfig, EventsResponse, FamilyDisplayState, Lang, NewsResponse, NightCommand, PhotosResponse, PlannerBar, StreamHello, WeatherResponse,
+  Announcement, CountdownsResponse, DisplayConfig, EventsResponse, FamilyDisplayState, Lang, NewsResponse, NightCommand, Photo, PhotosResponse, PlannerBar, StreamHello, WeatherResponse,
 } from '../shared/types';
 import { addDays, startOfWeek } from '../shared/i18n';
 import { api, ApiError } from './api';
@@ -22,7 +22,7 @@ import {
 } from './identity';
 import { CarouselController, type Bundle, type BundlePart } from './carousel';
 import { ScreenSwitcher, type SwitchGL } from './screenSwitch';
-import { isArmDesktop, isLowPower, isLowPowerGPU, planSwitch, type SwitchInfo } from './switchPlan';
+import { isArmDesktop, isLowPower, isLowPowerGPU, planSwitch, type SwitchInfo, type SwitchPlan } from './switchPlan';
 import { $ } from './dom';
 import { type NEvent, normalizeEvents } from './eventModel';
 import type { AmbientLayer } from './gl/ambientLayer';
@@ -941,7 +941,7 @@ async function fetchNews(): Promise<void> {
 }
 
 async function fetchPhotos(): Promise<void> {
-  if (state.demo) return set('photos', mockPhotos());
+  if (state.demo) return set('photos', mockPhotos(ctx.cfg.background.stockTopic));
   try {
     const sid = getActiveScreen();
     const r = await api.photos(20, photos.lastKey);
@@ -1156,6 +1156,11 @@ function syncCarousel(c: DisplayConfig): void {
     alertOn: () => doorbell.active || announcements.expandedCount > 0,
     fetch: fetchBundle,
     show: showScreen,
+    // the next screen starts other photos: load its first one now, so the switch shows it at once
+    upcoming: (_id, b) => {
+      const s = photoStart(b);
+      if (s && b.config) void photos.prepare(s.list, s.idx, b.config.background);
+    },
     refreshed: (id, b, parts) => {
       if (id !== getActiveScreen()) return;
       if (parts.includes('config') && b.config && b.config !== state.config) set('config', b.config);
@@ -1204,7 +1209,7 @@ async function fetchBundle(id: string, parts: BundlePart[], known: DisplayConfig
   if (state.demo) {
     const cfg = mockCarouselConfigs().find((x) => x.screenId === id) ?? null;
     const t = current().now;
-    return { config: cfg, events: mockEvents(t), countdowns: mockCountdowns(t), photos: mockPhotos() };
+    return { config: cfg, events: mockEvents(t), countdowns: mockCountdowns(t), photos: mockPhotos(cfg?.background.stockTopic) };
   }
   const out: Partial<Pick<Bundle, BundlePart>> = {};
   const one = async <T,>(fn: () => Promise<T>): Promise<T | null> => {
@@ -1305,10 +1310,37 @@ function checkGPU(): void {
 /** Carousel screens with other photos: where each slideshow was when its screen left (by photo settings). */
 const photoSpots = new Map<string, { photos: PhotosResponse; at: SlideshowPosition }>();
 
-/** Put one carousel screen on display from its bundle: no request, animated as the carousel says (switchPlan.ts). */
+/** Longest wait for the next screen's first photo before a switch goes on without it (ms). */
+const PHOTO_WAIT_MS = 1500;
+
+/**
+ * The photo a carousel screen starts with when it comes on, when it has other photo settings than the screen on
+ * display: the one after where its slideshow was left, or the first of its list. Null when the slideshow just goes
+ * on (same settings), or at the end of a batch (the slideshow fetches the next one first).
+ */
+function photoStart(b: Bundle): { list: Photo[]; idx: number } | null {
+  const bg = b.config?.background;
+  if (!bg?.enabled || !photoSig) return null;
+  const sig = photoSigOf(bg);
+  if (sig === photoSig) return null;
+  const spot = photoSpots.get(sig);
+  const list = spot ? spot.at.list : b.photos?.photos ?? [];
+  const idx = spot ? spot.at.idx + 1 : 0;
+  return idx >= 0 && idx < list.length ? { list, idx } : null;
+}
+
+/**
+ * Put one carousel screen on display from its bundle: no request, animated as the carousel says (switchPlan.ts).
+ * When the new screen has other photos, its first photo is loaded before the switch (a few seconds ahead through
+ * the carousel's `upcoming`, or here for PHOTO_WAIT_MS at most) and goes in with the screen, so the switch is the
+ * only animation; when it is not ready in time the slideshow changes the photo after the switch as before.
+ */
 function showScreen(id: string, b: Bundle, sw: SwitchInfo): void {
   // from now on, answers for the screen that leaves are kept for it and never shown
   setActiveScreen(id);
+  const booting = app.classList.contains('booting');
+  const start = booting ? null : photoStart(b);
+  let plan: SwitchPlan | null = null;
   const apply = () => {
     if (!b.config || accessDenied || getActiveScreen() !== id) return;
     state.events = b.events;
@@ -1332,25 +1364,36 @@ function showScreen(id: string, b: Bundle, sw: SwitchInfo): void {
     }
     saveShown(b);
     const spot = newPhotos ? photoSpots.get(sig) : undefined;
+    // the light switch fades #app only, not the GL canvas: there the photo changes with a short GL transition
+    const glSec = plan?.light ? plan.ms / 2000 : 0;
+    const takeover = () => !!start && photos.takeover(start.list, start.idx, glSec);
+    // a photo of the screen that left, still loading, is not shown on this one
+    if (newPhotos) photos.restart();
     if (spot) {
       set('photos', spot.photos);
-      photos.resume(spot.at);
+      if (!takeover()) photos.resume(spot.at);
     } else if (newPhotos) {
       if (b.photos) {
         set('photos', b.photos as PhotosResponse);
-        void photos.next();
+        if (!takeover()) void photos.next();
       } else void fetchPhotos();
     }
     if (!weatherByLang.has(ctx.lang)) void fetchWeather();
   };
-  if (app.classList.contains('booting')) {
+  if (booting) {
     switcher.finish();
     return apply();
   }
-  // ?tr=<name> forces one animation and ?trSpeed= its speed (filming, the admin's "Probar")
-  checkGPU();
-  const plan = planSwitch(sw, { reduced: reducedMotion(), lowPower, gl: !!dissolve && !!engine, force: params.get('tr'), forceSpeed: params.get('trSpeed') });
-  switcher.switch(plan, apply);
+  const go = () => {
+    if (getActiveScreen() !== id) return; // another switch came meanwhile
+    // ?tr=<name> forces one animation and ?trSpeed= its speed (filming, the admin's "Probar")
+    checkGPU();
+    plan = planSwitch(sw, { reduced: reducedMotion(), lowPower, gl: !!dissolve && !!engine, force: params.get('tr'), forceSpeed: params.get('trSpeed') });
+    switcher.switch(plan, apply);
+  };
+  if (!start || !b.config) return go();
+  const ready = photos.prepare(start.list, start.idx, b.config.background);
+  void Promise.race([ready, new Promise((r) => setTimeout(r, PHOTO_WAIT_MS))]).then(go);
 }
 
 // ---------------------------------------------------------------------------------------------

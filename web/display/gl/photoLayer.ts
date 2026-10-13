@@ -54,6 +54,10 @@ export class PhotoLayer implements GLLayer {
   private cur: Slot | null = null;
   private nxt: Slot | null = null;
   private transStart = 0;
+  /** length of the running transition (s) */
+  private transDur = 2.6;
+  /** when a photo was put in with no transition: a few frames at full rate so it shows at once */
+  private cutAt = -1;
   private fadeStart = -1;
   private time = 0;
   brightness = 0.85;
@@ -94,7 +98,7 @@ export class PhotoLayer implements GLLayer {
   }
   /** transition or fade-in running → engine renders at full fps */
   get busy() {
-    return !!this.nxt || (this.fadeStart >= 0 && this.time - this.fadeStart < 1.7);
+    return !!this.nxt || (this.fadeStart >= 0 && this.time - this.fadeStart < 1.7) || (this.cutAt >= 0 && this.time - this.cutAt < 0.5);
   }
 
   private makeSlot(src: TexImageSource & { width: number; height: number }, focus?: Focus): Slot {
@@ -114,9 +118,21 @@ export class PhotoLayer implements GLLayer {
     };
   }
 
-  /** Show a decoded image (ImageBitmap / HTMLImageElement), cropped around its focal point when it has one. */
-  show(src: TexImageSource & { width: number; height: number }, focus?: Focus): void {
+  /**
+   * Show a decoded image (ImageBitmap / HTMLImageElement), cropped around its focal point when it has one. `sec`:
+   * the transition's length (default `duration`); 0 puts it in at once (a carousel switch animates the change).
+   */
+  show(src: TexImageSource & { width: number; height: number }, focus?: Focus, sec = this.duration): void {
     const slot = this.makeSlot(src, focus);
+    if (sec <= 0) {
+      this.cur?.tex.dispose();
+      this.nxt?.tex.dispose();
+      this.cur = slot;
+      this.nxt = null;
+      this.fadeStart = -1;
+      this.cutAt = this.time;
+      return;
+    }
     if (!this.cur) {
       this.cur = slot;
       this.fadeStart = this.time;
@@ -129,6 +145,7 @@ export class PhotoLayer implements GLLayer {
     }
     this.nxt = slot;
     this.transStart = this.time;
+    this.transDur = sec;
     this.mat.uniforms.uSeed.value = Math.random() * 50;
   }
 
@@ -172,7 +189,7 @@ export class PhotoLayer implements GLLayer {
     u.uTex0.value = this.cur.tex;
     this.place(this.cur, rect, u.uFit0.value, u.uAnc0.value, u.uKB0.value);
     if (this.nxt) {
-      const p = Math.min(1, (time - this.transStart) / this.duration);
+      const p = Math.min(1, (time - this.transStart) / this.transDur);
       u.uTex1.value = this.nxt.tex;
       this.place(this.nxt, rect, u.uFit1.value, u.uAnc1.value, u.uKB1.value);
       u.uProg.value = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;

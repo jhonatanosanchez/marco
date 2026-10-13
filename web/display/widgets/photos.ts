@@ -4,7 +4,7 @@
 // itself. Both layers then take the canvas like any other image, so Ken Burns and the tone measure stay the same.
 import { coverPosition, coverWindow, freeBand, type PhotoFrame } from '../../shared/focus';
 import type { PhotoStats } from '../../shared/glass';
-import type { Photo } from '../../shared/types';
+import type { BackgroundConfig, Photo } from '../../shared/types';
 import { immichCaption, wantsBlurFill } from '../photoFit';
 import { ctx } from '../ctx';
 import { el, esc, reducedMotion } from '../dom';
@@ -23,6 +23,23 @@ interface Loaded {
   tone: CanvasImageSource;
   /** composed frame: pixel size, and the URL the CSS layer uses (a blob: URL to revoke later) */
   composed?: { w: number; h: number; url: string };
+}
+
+/** A photo loaded ahead for the next carousel screen (Photos.prepare / takeover). */
+interface Ahead {
+  key: string;
+  /** photo panel size it was framed for (a blurred fill frame only fits that size) */
+  aw: number;
+  ah: number;
+  ready: Promise<Loaded | null>;
+  loaded: Loaded | null;
+}
+
+/** Free what a loaded photo holds that the browser does not free by itself. */
+function release(l: Loaded | null): void {
+  if (!l) return;
+  if (l.composed?.url) URL.revokeObjectURL(l.composed.url);
+  if (typeof ImageBitmap !== 'undefined' && l.src instanceof ImageBitmap) l.src.close();
 }
 
 /**
@@ -96,6 +113,9 @@ export class Photos {
   private shownFile = '';
   private lastShown = '';
   private fitSig = '';
+  /** bumped when a carousel switch puts a photo on screen: a photo still loading from before is dropped */
+  private gen = 0;
+  private ahead: Ahead | null = null;
   /** Called when the batch has been shown completely; may replace the list (awaited before wrapping around). */
   onExhausted: (() => Promise<void> | void) | null = null;
   /** Free band of the photo panel (not covered by clock / weather card / side widgets); reported in heartbeats. */
@@ -126,8 +146,11 @@ export class Photos {
   }
 
   get usingGL(): boolean {
-    const tr = ctx.cfg.background.transition;
-    return !!this.glLayer && tr === 'webgl';
+    return this.glFor(ctx.cfg.background);
+  }
+
+  private glFor(b: Pick<BackgroundConfig, 'transition'>): boolean {
+    return !!this.glLayer && b.transition === 'webgl';
   }
 
   applyConfig(): void {
@@ -241,7 +264,8 @@ export class Photos {
     let at = now + sec * 1000;
     const sw = this.switchAt?.() ?? null;
     if (sw !== null && sw > now) {
-      const margin = Math.min(5000, sec * 250);
+      // at least the length of a photo transition plus a short load, so the change is over before the switch
+      const margin = Math.max(3500, Math.min(5000, sec * 250));
       if (Math.abs(at - sw) < margin) at = sw + Math.max(margin, sec * 500);
     }
     if (this.timer) clearTimeout(this.timer);
@@ -250,7 +274,7 @@ export class Photos {
     this.dueSec = sec;
   }
 
-  private async load(p: Photo): Promise<Loaded> {
+  private async load(p: Photo, b: BackgroundConfig = ctx.cfg.background, gl = this.usingGL): Promise<Loaded> {
     const url = p.url;
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -271,18 +295,18 @@ export class Photos {
     let src: TexImageSource & { width: number; height: number } = img;
     const w = img.naturalWidth, h = img.naturalHeight;
     const aw = this.area.clientWidth || window.innerWidth, ah = this.area.clientHeight || window.innerHeight;
-    if (wantsBlurFill(ctx.cfg.background, p, w, h, aw, ah)) {
+    if (wantsBlurFill(b, p, w, h, aw, ah)) {
       try {
         const s = Math.min(1, MAX_COMPOSED / Math.max(aw * (window.devicePixelRatio || 1), ah * (window.devicePixelRatio || 1))) * (window.devicePixelRatio || 1);
         const fw = Math.max(2, Math.round(aw * s)), fh = Math.max(2, Math.round(ah * s));
         const canvas = composeBlurFill(img, fw, fh);
-        const composedUrl = this.usingGL ? '' : await canvasUrl(canvas);
+        const composedUrl = gl ? '' : await canvasUrl(canvas);
         return { img, src: canvas, tone: canvas, composed: { w: fw, h: fh, url: composedUrl } };
       } catch (e) {
         console.warn('[photos] blurred fill failed', e);
       }
     }
-    if (this.usingGL && (w > MAX_TEX || h > MAX_TEX) && 'createImageBitmap' in window) {
+    if (gl && (w > MAX_TEX || h > MAX_TEX) && 'createImageBitmap' in window) {
       const s = MAX_TEX / Math.max(w, h);
       // WebGL ignores UNPACK_FLIP_Y for ImageBitmaps (three uploads them unflipped): flip at decode time;
       // PhotoLayer sets texture.flipY = false for bitmaps so both paths end up upright.
@@ -306,12 +330,79 @@ export class Photos {
     void this.next();
   }
 
+  /** What a loaded photo depends on besides its URL: the renderer and the framing settings. */
+  private aheadKey(url: string, b: BackgroundConfig): string {
+    return `${url}|${this.glFor(b) ? 'gl' : 'dom'}|${b.cover}|${b.portraitFit ?? 'auto'}`;
+  }
+
+  /**
+   * Load and decode ahead the photo a carousel screen starts with (`list[idx]`, framed with that screen's photo
+   * settings `b`), so the switch can put it on screen at once (takeover). Resolves with false when it failed.
+   */
+  prepare(list: Photo[], idx: number, b: BackgroundConfig): Promise<boolean> {
+    const p = list[idx];
+    if (!p || !b.enabled) return Promise.resolve(false);
+    const key = this.aheadKey(p.url, b);
+    if (this.ahead?.key === key) return this.ahead.ready.then((l) => !!l);
+    this.dropAhead();
+    const a: Ahead = {
+      key, aw: this.area.clientWidth, ah: this.area.clientHeight, loaded: null,
+      ready: this.load(p, b, this.glFor(b)).then(
+        (l) => {
+          if (this.ahead !== a) {
+            release(l);
+            return null;
+          }
+          a.loaded = l;
+          return l;
+        },
+        () => {
+          // failed: the next prepare tries again
+          if (this.ahead === a) this.ahead = null;
+          return null;
+        },
+      ),
+    };
+    this.ahead = a;
+    return a.ready.then((l) => !!l);
+  }
+
+  private dropAhead(): void {
+    release(this.ahead?.loaded ?? null);
+    this.ahead = null;
+  }
+
+  /**
+   * A carousel switch: show `list[idx]` right now if prepare() has it ready, with no crossfade (the switch animation
+   * carries the change) and the tone set at once. `glSec` > 0 runs a short WebGL transition instead (the light
+   * switch, where the GL canvas does not fade with the page). False when it is not ready: go on as before.
+   */
+  takeover(list: Photo[], idx: number, glSec = 0): boolean {
+    const a = this.ahead;
+    const p = list[idx];
+    const l = a?.loaded;
+    const b = ctx.cfg.background;
+    if (!a || !l || !p || !b.enabled || a.key !== this.aheadKey(p.url, b)) return false;
+    // a blurred fill frame is composed for one panel size
+    if (l.composed && (Math.abs(a.aw - this.area.clientWidth) > 2 || Math.abs(a.ah - this.area.clientHeight) > 2)) return false;
+    this.ahead = null;
+    this.restart();
+    this.list = list.slice();
+    this.idx = idx;
+    this.display(p, l, glSec > 0 ? glSec : 0);
+    applyTone(l.tone, true);
+    this.failures = 0;
+    this.schedule(true);
+    return true;
+  }
+
   async next(): Promise<void> {
     if (this.loading || !this.list.length || !ctx.cfg.background.enabled) {
       this.schedule(true);
       return;
     }
     this.loading = true;
+    const gen = this.gen;
     try {
       let tries = 0;
       while (tries++ < Math.min(5, this.list.length)) {
@@ -322,7 +413,7 @@ export class Photos {
           } catch {
             /* keep the old list */
           }
-          if (!this.list.length) break;
+          if (!this.list.length || gen !== this.gen) break;
         }
         this.idx++;
         if (this.idx >= this.list.length) this.idx = 0;
@@ -332,6 +423,15 @@ export class Photos {
             await new Promise((r) => setTimeout(r, 1500)); // one retry for transient network/decoder hiccups
             return this.load(p);
           });
+          // a slow load that ends just before a carousel switch waits until the switch is over
+          const sw = this.switchAt?.() ?? null;
+          const wait = sw === null ? Infinity : sw - Date.now();
+          if (gen === this.gen && wait > -500 && wait < 3000) await new Promise((r) => setTimeout(r, Math.max(0, wait) + 2500));
+          // a carousel switch put another photo on screen meanwhile
+          if (gen !== this.gen) {
+            release(loaded);
+            break;
+          }
           this.display(p, loaded);
           applyTone(loaded.tone);
           this.failures = 0;
@@ -342,17 +442,28 @@ export class Photos {
         }
       }
     } finally {
-      this.loading = false;
-      this.schedule(true);
+      // after a newer start (see restart) that one owns the flag and the timer
+      if (gen === this.gen) {
+        this.loading = false;
+        this.schedule(true);
+      }
     }
+  }
+
+  /** Another slideshow starts (a carousel switch to other photo settings): a photo still loading is dropped. */
+  restart(): void {
+    this.gen++;
+    this.loading = false;
   }
 
   private showCurrentAgain(): void {
     const p = this.list[this.idx];
-    if (p) this.load(p).then((l) => this.display(p, l)).catch(() => {});
+    const gen = this.gen;
+    if (p) this.load(p).then((l) => (gen === this.gen ? this.display(p, l) : release(l))).catch(() => {});
   }
 
-  private display(p: Photo, l: Loaded): void {
+  /** `cut`: undefined = the usual transition; 0 = no transition; > 0 = a WebGL transition of that many seconds. */
+  private display(p: Photo, l: Loaded, cut?: number): void {
     const { img, src, composed } = l;
     const b = ctx.cfg.background;
     this.shownFile = p.file || '';
@@ -362,7 +473,7 @@ export class Photos {
     if (this.usingGL && this.glLayer) {
       // composed for the CSS path before WebGL came back: its blob URL is not used here
       if (composed?.url) URL.revokeObjectURL(composed.url);
-      this.glLayer.show(src, focus);
+      this.glLayer.show(src, focus, cut);
       if (this.domCur) {
         dropNode(this.domCur);
         this.domCur = null;
@@ -382,7 +493,7 @@ export class Photos {
       const old = this.domCur as PhNode | null;
       this.area.querySelector('.ph-stack')!.appendChild(node);
       this.domCur = node;
-      const fade = b.transition !== 'none' && !reducedMotion();
+      const fade = cut === undefined && b.transition !== 'none' && !reducedMotion();
       if (fade) {
         node.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 2200, easing: 'ease-in-out', fill: 'backwards' }).onfinish = () =>
           dropNode(old);
@@ -404,7 +515,7 @@ export class Photos {
 const toneCanvas = document.createElement('canvas');
 /** Latest measure of the photo (for the Modern glass tint / ink); null until a photo could be read. */
 export let photoStats: PhotoStats | null = null;
-function applyTone(img: CanvasImageSource): void {
+function applyTone(img: CanvasImageSource, instant = false): void {
   try {
     const W = 48, H = 32;
     toneCanvas.width = W; toneCanvas.height = H;
@@ -429,7 +540,7 @@ function applyTone(img: CanvasImageSource): void {
     const root = document.documentElement.style;
     // The first photo sets the tone at once: easing it in from the default made the glass cards and the chips
     // visibly change a second after the screen appeared. Later photos still ease (with the photo crossfade).
-    const first = !toneSeen;
+    const first = !toneSeen || instant;
     toneSeen = true;
     if (first) document.documentElement.classList.add('tone-instant');
     root.setProperty('--tone-top', region(0, 0.4).toFixed(3));
