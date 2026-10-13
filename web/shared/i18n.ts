@@ -502,7 +502,7 @@ const nl: Dict = {
 
 const da: Dict = {
   // layouts with their own view (web/display/widgets/views.ts)
-  upNext: 'Det næste',
+  upNext: 'Næste',
   nothingMoreToday: 'Ikke mere i dag',
   firstTomorrow: 'I morgen',
   everyone: 'Alle',
@@ -532,7 +532,7 @@ const da: Dict = {
   priceCheapestStretches: 'Billigste perioder på {n} t',
   priceNoneLeft: 'Ingen perioder tilbage',
   priceRange: '{a} til {b}',
-  priceMinMax: 'Min {a} · Maks {b}',
+  priceMinMax: 'Min. {a} · Maks. {b}',
   priceNowIs: 'Nu: {l}',
   priceLowest: 'Laveste',
   priceAverage: 'Gennemsnit',
@@ -613,8 +613,8 @@ const da: Dict = {
   kidsNoEventsLeft: 'Ikke mere i dag',
   kidsRoutinesDone: '{done} af {total} rutiner klaret',
   kidsRewards: 'Belønninger',
-  kidsStarsLeft: '{n} ⭐ tilbage',
-  kidsStarsLeft1: '1 ⭐ tilbage',
+  kidsStarsLeft: 'Mangler {n} ⭐',
+  kidsStarsLeft1: 'Mangler 1 ⭐',
   kidsLeft: '{n} tilbage',
   kidsRewardReady: 'Klar til at blive indløst!',
   kidsTasks: 'Opgaver',

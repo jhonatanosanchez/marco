@@ -82,7 +82,7 @@ function CsvDialog({ existing, onClose, onAdd }: { existing: Birthday[]; onClose
     >
       <div class="stack">
         <p class="muted small">
-          {t('Pega una línea por persona:')} <code>{t('nombre')};dd/mm</code> {t('o')} <code>{t('nombre')};dd/mm/aaaa</code>. {t('También vale coma o tabulador (copiar desde una hoja de cálculo).')}
+          {t('Pega una línea por persona:')} <code>{t('nombre')};dd/mm</code> {t('o')} <code>{t('nombre')};{t('dd/mm/aaaa')}</code>. {t('También vale coma o tabulador (copiar desde una hoja de cálculo).')}
         </p>
         <Textarea
           mono
