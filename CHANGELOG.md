@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.15.0] - 2026-10-13
 
 ### Added
 - The calendar can start on today (*Calendars → Calendar starts on → Today*): no past days, the first cell is today
