@@ -6,7 +6,7 @@ import type { MealDays, MealSlot, StoredConfig } from '../../shared/types';
 import { confirmDialog, toast } from '../components/feedback';
 import { Icon } from '../components/icons';
 import { Button, Callout, Card, PageHeader, ToggleRow } from '../components/ui';
-import { addDays, todayIn, weekdayNames } from '../dates';
+import { addDays, dropAbbrDots, todayIn, weekdayNames } from '../dates';
 import { locale, t } from '../i18n';
 import type { SectionProps } from './common';
 
@@ -231,7 +231,7 @@ function MealGrid({
           <div class={`meals-day ${isToday ? 'is-today' : ''}`} key={dow}>
             <div class="meals-day__head">
               <strong>{names[dow]}</strong>
-              {date && <span class="muted small">{fmt.format(new Date(`${date}T12:00:00Z`)).replace('.', '')}</span>}
+              {date && <span class="muted small">{dropAbbrDots(fmt.format(new Date(`${date}T12:00:00Z`)))}</span>}
               {isToday && <span class="meals-day__today">{t('Hoy')}</span>}
             </div>
             {slots.map((s) => (

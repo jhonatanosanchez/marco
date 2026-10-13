@@ -35,21 +35,26 @@ export function monthNames(style: 'short' | 'long' = 'long'): string[] {
   return Array.from({ length: 12 }, (_, i) => f.format(new Date(Date.UTC(2023, i, 1))).replace('.', ''));
 }
 
+/**
+ * Drops the dots of abbreviations ("okt." → "okt") but keeps the one after a day number, which Danish needs
+ * ("tirs. 13. okt." → "tirs 13. okt"), and the time separator ("12.05").
+ */
+export const dropAbbrDots = (s: string) => s.replace(/(?<=\p{L})\./gu, '');
+
 /** "vie, 9 oct" (adds the year when it differs from this year). */
 export function fmtDay(iso: string, opts: { weekday?: boolean; year?: boolean | 'auto' } = {}): string {
   if (!iso) return '';
   const d = new Date(toUTC(iso));
   const thisYear = new Date().getFullYear();
   const showYear = opts.year === true || ((opts.year ?? 'auto') === 'auto' && d.getUTCFullYear() !== thisYear);
-  return new Intl.DateTimeFormat(locale(), {
+  const s = new Intl.DateTimeFormat(locale(), {
     weekday: opts.weekday === false ? undefined : 'short',
     day: 'numeric',
     month: 'short',
     year: showYear ? 'numeric' : undefined,
     timeZone: 'UTC',
-  })
-    .format(d)
-    .replace(/\./g, '');
+  }).format(d);
+  return dropAbbrDots(s);
 }
 
 /** Localized date + time of an ISO timestamp ("9 oct, 14:05"). */
@@ -57,15 +62,15 @@ export function fmtDateTime(iso: string | null | undefined, withSeconds = false)
   if (!iso) return '–';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '–';
-  return new Intl.DateTimeFormat(locale(), {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: withSeconds ? '2-digit' : undefined,
-  })
-    .format(d)
-    .replace(/\./g, '');
+  return dropAbbrDots(
+    new Intl.DateTimeFormat(locale(), {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: withSeconds ? '2-digit' : undefined,
+    }).format(d),
+  );
 }
 
 export function fmtTime(iso: string): string {
