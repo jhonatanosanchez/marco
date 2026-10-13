@@ -46,7 +46,9 @@ export class EchoController {
     this.started = true;
     this.audio = new Audio('/echo/silencio.mp3');
     this.audio.loop = true;
-    document.addEventListener('pointerdown', this.onTap, { capture: true, passive: true });
+    // click, no pointerdown: en pantallas táctiles pointerdown no cuenta como gesto y Silk rechazaría la pantalla completa
+    // y el audio (echo-reloj, probado en estos Echo, también usa click: echo-reloj/html/js/pantalla.js)
+    document.addEventListener('click', this.onTap, { capture: true, passive: true });
     document.addEventListener('visibilitychange', () => { if (!document.hidden) this.guard.markVisible(); });
     onTick((t) => { if (this.s.enabled && t.minuteChanged) this.applySchedule(t, true); });
     setInterval(() => this.retry(), RETRY_MS);

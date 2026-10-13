@@ -89,3 +89,10 @@ test('liteUrl / cleanUrl', () => {
   assert.equal(E.cleanUrl(lite), base);
   assert.equal(E.cleanUrl('http://h/d/abc'), 'http://h/d/abc');
 });
+
+test('echo.ts escucha el toque con click (en táctil pointerdown NO es gesto: pantalla completa y audio fallarían)', async () => {
+  const fs = await import('node:fs');
+  const src = fs.readFileSync(new URL('../../web/display/echo.ts', import.meta.url), 'utf8');
+  assert.match(src, /addEventListener\('click', this\.onTap/);
+  assert.doesNotMatch(src, /addEventListener\('pointerdown'/);
+});
