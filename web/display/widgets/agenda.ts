@@ -122,7 +122,9 @@ export class Agenda {
       if (!rows.length) rows.push(`<div class="ag-empty">${esc(t('noEvents'))}</div>`);
       const d = keyToUTC(key);
       const rel = relativeDayLabel(lang, key, today, false);
-      const dateStr = `${weekdayName(lang, key, 'long')} ${d.getUTCDate()} ${monthName(lang, d.getUTCMonth() + 1, 'short')}`;
+      // Dutch writes the month in lower case ("Dinsdag 13 okt")
+      const mon = monthName(lang, d.getUTCMonth() + 1, 'short');
+      const dateStr = `${weekdayName(lang, key, 'long')} ${d.getUTCDate()} ${lang === 'nl' ? mon.toLowerCase() : mon}`;
       const label = i < 2 ? `<b>${esc(rel)}</b><span>${esc(dateStr)}</span>` : `<b>${esc(dateStr)}</b>`;
       specs.push({
         key: `d${key}`,

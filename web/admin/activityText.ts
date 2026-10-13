@@ -1,11 +1,12 @@
 // Localized one-line description of an activity log entry (the server stores only type + data).
 import type { ActivityEntry } from '../shared/types';
 import type { IconName } from './components/icons';
-import { nScreens, t } from './i18n';
+import { getLang, nScreens, t } from './i18n';
 import { fetchErrorText } from './apiErrors';
 
 const str = (v: unknown) => (v === undefined || v === null ? '' : String(v));
-const q = (v: unknown) => (str(v) ? `«${str(v)}»` : '');
+// quoted value: Dutch uses “ ”, the other languages « »
+const q = (v: unknown) => (str(v) ? (getLang() === 'nl' ? `“${str(v)}”` : `«${str(v)}»`) : '');
 
 export const ACTIVITY_GROUPS: { value: string; label: string; icon: IconName }[] = [
   { value: '', label: 'Todo', icon: 'list' },

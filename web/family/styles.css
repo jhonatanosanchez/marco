@@ -164,7 +164,7 @@ ul { list-style: none; margin: 0; padding: 0; }
 /* ---- today's meals ---- */
 .f-meals { padding: 16px 16px 8px; }
 .f-meals .f-h2 { margin: 0 0 6px; }
-.f-meals li { display: grid; grid-template-columns: 28px 92px 1fr; align-items: baseline; gap: 6px; padding: 10px 0; border-top: 1px solid var(--k-line); }
+.f-meals li { display: grid; grid-template-columns: 28px 108px 1fr; align-items: baseline; gap: 6px 10px; padding: 10px 0; border-top: 1px solid var(--k-line); }
 .f-meals li:first-child { border-top: 0; }
 .f-meal-emoji { font-size: 18px; }
 .f-meal-label { font-size: 14px; color: var(--k-ink-2); font-weight: 500; }
