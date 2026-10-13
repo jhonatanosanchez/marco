@@ -13,7 +13,7 @@
 // only while the display keeps polling (claims for a display that stopped waiting fail). Claims need an admin
 // session and are rate-limited per session + client address and globally (brute-force math in SECURITY.md).
 import crypto from 'node:crypto';
-import { ipBucket } from './lib/net.js';
+import { clientBucket } from './lib/net.js';
 import { createDevice } from './displayAccess.js';
 import { getConfig } from './store.js';
 import { logActivityThrottled } from './activity.js';
@@ -80,7 +80,7 @@ function makeRoom(bucket, now) {
 /** Start a pairing session for a waiting display. Returns PairStartResponse or { error, status }. */
 export function startPairing(req, now = Date.now()) {
   prune(now);
-  const bucket = ipBucket(req.ip);
+  const bucket = clientBucket(req);
   const hits = startHits.get(bucket) || [];
   if (hits.length >= START_LIMIT) return { error: 'too many pairing codes from this address, wait a few minutes', status: 429 };
   makeRoom(bucket, now);
@@ -116,7 +116,7 @@ export function pairingStatus(sessionId, now = Date.now()) {
 
 function rateKey(req) {
   const sid = req.session?.epoch ? shaHex(`${req.session.epoch}|${req.session.user?.email || ''}`).slice(0, 16) : 'nosession';
-  return `${sid}|${ipBucket(req.ip)}`;
+  return `${sid}|${clientBucket(req)}`;
 }
 
 /** The waiting display's address as the owner would recognise it ("192.168.1.50"; "" when unknown). */

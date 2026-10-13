@@ -66,16 +66,43 @@ export const inContainer = () => {
 
 const FORWARD_HEADERS = ['x-forwarded-for', 'forwarded', 'x-real-ip', 'x-forwarded-proto', 'x-forwarded-host'];
 const warnedProxies = new Set();
+const warnedNoXff = new Set();
 
-/** True when the request was relayed by a proxy that is not in TRUST_PROXY (forwarding headers present). */
-export function untrustedProxy(req) {
-  if (!FORWARD_HEADERS.some((h) => req.headers?.[h])) return false;
-  const peer = req.socket?.remoteAddress || '';
+/** The request carries a forwarding header (X-Forwarded-For/-Proto/-Host, Forwarded or X-Real-IP): a proxy relayed it. */
+export function relayed(req) {
+  return FORWARD_HEADERS.some((h) => req.headers?.[h]);
+}
+
+const peerOf = (req) => req.socket?.remoteAddress || '';
+const trustedPeer = (req) => {
   const trust = typeof req.app?.get === 'function' ? req.app.get('trust proxy fn') : null;
-  if (trust && trust(peer, 0)) return false;
+  return Boolean(trust && trust(peerOf(req), 0));
+};
+
+/**
+ * True when the request was relayed (forwarding headers present) and its client address is not known:
+ *   - the proxy is not in TRUST_PROXY (Express ignores its X-Forwarded-For), or
+ *   - the proxy is trusted but sent no X-Forwarded-For (only X-Real-IP, Forwarded, X-Forwarded-Proto or
+ *     X-Forwarded-Host, e.g. nginx with `proxy_set_header X-Real-IP` alone): Express reads the client address from
+ *     X-Forwarded-For only, so `req.ip` would be the proxy itself (127.0.0.1 for a proxy on this machine) and every
+ *     Internet client would look local.
+ * Such clients are treated as remote (fail closed).
+ */
+export function untrustedProxy(req) {
+  if (!relayed(req)) return false;
+  const peer = peerOf(req);
+  const ip = peer.replace(/^::ffff:/i, '');
+  if (trustedPeer(req)) {
+    if (req.headers?.['x-forwarded-for']) return false;
+    if (!warnedNoXff.has(peer) && warnedNoXff.size < 20) {
+      warnedNoXff.add(peer);
+      console.warn(`[net] requests from the proxy at ${ip} carry forwarding headers but no X-Forwarded-For: their clients are treated as `
+        + 'remote (setup token required, no LAN access). Make the proxy send X-Forwarded-For (nginx: proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for)');
+    }
+    return true;
+  }
   if (!warnedProxies.has(peer) && warnedProxies.size < 20) {
     warnedProxies.add(peer);
-    const ip = peer.replace(/^::ffff:/i, '');
     console.warn(`[net] requests from ${ip} carry X-Forwarded-* headers but ${ip} is not a trusted proxy: their clients are treated as `
       + `remote (setup token required, no Secure cookie detection). If this is your reverse proxy, set TRUST_PROXY=${ip}`);
   }
@@ -83,16 +110,32 @@ export function untrustedProxy(req) {
 }
 
 /**
+ * Rate-limit bucket for a request: ipBucket(req.ip), except behind a trusted proxy that sends X-Real-IP without
+ * X-Forwarded-For, where req.ip is the proxy for everybody (one shared bucket would let one client lock out all
+ * the others): there X-Real-IP picks the bucket. Only used to count attempts, never to trust a client.
+ */
+export function clientBucket(req) {
+  const real = String(req.headers?.['x-real-ip'] || '').trim();
+  if (real && !req.headers?.['x-forwarded-for'] && net.isIP(real.replace(/^::ffff:/i, '')) && trustedPeer(req)) return ipBucket(real);
+  return ipBucket(req.ip);
+}
+
+/**
  * Does this request really come from the local network? Private `req.ip` AND not relayed by an untrusted proxy
  * (a proxy on the Docker bridge or another host without TRUST_PROXY would otherwise make every Internet client
- * look local). `strict` (setup wizard without token, weak ADMIN_PASSWORD) also refuses the container's gateway
- * address, which in Docker Desktop / rootless setups is what every client looks like.
+ * look local; so would a trusted proxy that sends no X-Forwarded-For). `strict` (setup wizard without token, weak
+ * ADMIN_PASSWORD) also refuses any relayed request and the container's gateway address, which in Docker Desktop /
+ * rootless setups is what every client looks like.
  */
 export function isLanClient(req, { strict = false } = {}) {
   const ip = String(req.ip || '').replace(/^::ffff:/i, '');
   if (!isPrivateIp(ip)) return false;
   if (untrustedProxy(req)) return false;
   if (strict) {
+    // setup without token, weak ADMIN_PASSWORD: a direct connection only. A relayed request's client address is only
+    // as good as the proxy's X-Forwarded-For (a proxy that passes the client's own header on unchanged lets anyone
+    // claim a LAN address), so any forwarding header is enough to refuse.
+    if (relayed(req)) return false;
     const gw = containerGateway();
     if (gw && ip === gw) return false;
   }

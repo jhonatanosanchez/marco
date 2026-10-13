@@ -49,8 +49,10 @@ used on shared networks or behind an HTTPS reverse proxy on the Internet:
   bearer-token webhooks are exempt). This stops DNS-rebinding attacks, where a website a LAN user visits points its
   own name at your server to read the display API or run the setup wizard from the victim's browser.
 - **"From the LAN"** means: a loopback/private client address after `TRUST_PROXY` resolution, *not* relayed by a proxy
-  that is missing from `TRUST_PROXY` (forwarding headers from an untrusted hop make the client remote), and for the
-  setup wizard and weak passwords also not the container's default gateway (in Docker Desktop / rootless setups
+  that is missing from `TRUST_PROXY` (forwarding headers from an untrusted hop make the client remote) and not
+  relayed without `X-Forwarded-For` (a proxy that sends only `X-Real-IP`, `Forwarded` or `X-Forwarded-Proto` makes the
+  client remote too), and for the setup wizard and weak passwords also a direct connection (any forwarding header
+  means the token is required) that is not the container's default gateway (in Docker Desktop / rootless setups
   every client looks like that address). Set `TRUST_PROXY` whenever your reverse proxy does not connect from loopback
   (another host, or any proxy in front of the Docker container: `172.16.0.0/12`).
 - The admin panel (`/admin/`, `/api/admin/*`) requires a session (password and/or Google sign-in with an allow-list).

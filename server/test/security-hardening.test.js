@@ -213,8 +213,10 @@ test('login: many addresses share one budget of failures from outside the LAN; t
     // a new Internet address: refused before the password is checked, even the right one
     assert.equal((await call('POST', '/api/auth/login', { body: { password: PASSWORD }, headers: { 'x-forwarded-for': '198.51.100.7' } })).status, 429);
     assert.equal((await call('POST', '/api/auth/login', { body: { password: PASSWORD }, headers: { 'x-forwarded-for': '2001:db8:77::1' } })).status, 429);
-    // at home it still works
-    assert.equal((await call('POST', '/api/auth/login', { body: { password: PASSWORD }, headers: { 'x-forwarded-for': '192.168.1.20' } })).status, 200);
+    // a LAN address claimed through a proxy counts as outside (the proxy may pass a client's own X-Forwarded-For on)
+    assert.equal((await call('POST', '/api/auth/login', { body: { password: PASSWORD }, headers: { 'x-forwarded-for': '192.168.1.20' } })).status, 429);
+    // at home (a direct connection) it still works
+    assert.equal((await call('POST', '/api/auth/login', { body: { password: PASSWORD } })).status, 200);
   });
 });
 

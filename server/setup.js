@@ -15,7 +15,7 @@ import crypto from 'node:crypto';
 import { Router } from 'express';
 import os from 'node:os';
 import { getConfig, saveConfig, updateSecrets } from './store.js';
-import { isLanClient, ipBucket, inContainer } from './lib/net.js';
+import { isLanClient, clientBucket, inContainer } from './lib/net.js';
 import { hashPassword, needsSetup, startSession } from './auth.js';
 import { googleConfigured } from './google.js';
 import { logActivity, logActivityThrottled } from './activity.js';
@@ -83,7 +83,7 @@ function pruneFailures(now) {
  */
 function checkToken(req) {
   const now = Date.now();
-  const key = ipBucket(req.ip);
+  const key = clientBucket(req);
   const f = failures.get(key);
   if (f && now - f.first > FAIL_WINDOW) failures.delete(key);
   const cur = failures.get(key);
@@ -111,7 +111,7 @@ function tokenGate(req, res) {
     return false;
   }
   if (r === 'missing') {
-    logActivityThrottled('auth.setup_rejected', `setup|${ipBucket(req.ip)}`, { everyMs: 60_000, perMinute: 10 },
+    logActivityThrottled('auth.setup_rejected', `setup|${clientBucket(req)}`, { everyMs: 60_000, perMinute: 10 },
       { req, actor: 'anonymous', level: 'warn', data: { reason: 'token_required' } });
   }
   const given = r === 'invalid';

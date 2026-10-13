@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 import { getConfig, getSecrets, updateSecrets, paths, writeFileAtomic } from './store.js';
 import { publish } from './pollHub.js';
 import { logActivity, logActivityThrottled } from './activity.js';
-import { ipBucket, publicOrigin, hostnameOf, isLanClient } from './lib/net.js';
+import { clientBucket, publicOrigin, hostnameOf, isLanClient } from './lib/net.js';
 import { lanAddresses } from './setup.js';
 import { zonedParts, addDays, isDateStr } from './core/lib/tz.js';
 import { defaultScreen } from './core/screens.js';
@@ -210,7 +210,7 @@ function allow(map, key, ms, limit, now) {
   return true;
 }
 
-const rejected = (req, reason) => logActivityThrottled('family.key_rejected', `${ipBucket(req.ip)}|${reason}`,
+const rejected = (req, reason) => logActivityThrottled('family.key_rejected', `${clientBucket(req)}|${reason}`,
   { everyMs: BAD_KEY_WINDOW_MS, perMinute: 5 }, { req, level: 'warn', data: { reason } });
 
 /**
@@ -223,7 +223,7 @@ export function familyKeyAuth(req, res, next) {
   // a CORS preflight carries no key and gets no CORS headers: it fails without counting as a wrong try
   if (req.method === 'OPTIONS') return res.status(204).end();
   const now = Date.now();
-  const ip = ipBucket(req.ip);
+  const ip = clientBucket(req);
   const given = req.get(KEY_HEADER);
   if (given && checkFamilyKey(given)) {
     if (!allow(okByIp, ip, 60_000, REQUESTS_PER_MIN, now)) {

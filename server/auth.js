@@ -8,7 +8,7 @@ import * as google from './google.js';
 import * as microsoft from './microsoft.js';
 import { logActivity, logActivityThrottled } from './activity.js';
 import { passwordProblem, PASSWORD_MESSAGES } from './lib/password.js';
-import { isPrivateIp, isLanClient, ipBucket, hostAllowed, hostnameOf } from './lib/net.js';
+import { isPrivateIp, isLanClient, clientBucket, hostAllowed, hostnameOf } from './lib/net.js';
 import { LANGS } from './core/lib/i18n.js';
 
 export { isPrivateIp, isLanClient };
@@ -309,7 +309,7 @@ function countGlobalFailure(req, now) {
 function reservePasswordCheck(req, scope) {
   const now = Date.now();
   if (attempts.size > 1000) pruneAttempts(now);
-  const key = `${scope}|${ipBucket(req.ip)}`;
+  const key = `${scope}|${clientBucket(req)}`;
   let a = attempts.get(key);
   if (!a || (a.until <= now && now - a.first > WINDOW_MS)) {
     a = { n: 0, first: now, until: 0 };

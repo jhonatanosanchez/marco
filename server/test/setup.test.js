@@ -54,7 +54,8 @@ async function withApp(fn, { secrets = {}, env = {} } = {}) {
       headers: {
         ...(j.cookie ? { cookie: j.cookie } : {}),
         ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
-        'x-forwarded-for': o.ip ?? '192.168.1.20',
+        // no `ip`: a direct connection from this machine (a LAN client); `ip`: relayed by a proxy with that address
+        ...(o.ip ? { 'x-forwarded-for': o.ip } : {}),
         ...(o.headers || {}),
       },
       body: body !== undefined ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,

@@ -71,7 +71,7 @@ async function withApp(fn, { secrets = {}, env = {}, fetchJson = fakeFetch() } =
       headers: {
         ...(jar.cookie ? { cookie: jar.cookie } : {}),
         ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
-        'x-forwarded-for': o.ip ?? '192.168.1.20',
+        ...(o.ip ? { 'x-forwarded-for': o.ip } : {}), // no `ip`: a direct connection from this machine (LAN)
         ...(o.headers || {}),
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,

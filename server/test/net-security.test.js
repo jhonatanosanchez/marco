@@ -87,6 +87,8 @@ async function withApp(fn, { secrets = null, config = null, env = {}, trustProxy
 }
 
 const lan = { 'x-forwarded-for': '192.168.1.20' };
+/** A direct connection from this machine (loopback peer, no forwarding headers): the LAN for the strict checks. */
+const direct = {};
 
 test('host allowlist: LAN names, IP literals, PUBLIC_URL and ALLOWED_HOSTS only', () => {
   const restore = setEnv({ PUBLIC_URL: 'https://calendar.example.com', ALLOWED_HOSTS: 'other.example.net, *.home.example.org' });
@@ -103,16 +105,16 @@ test('host allowlist: LAN names, IP literals, PUBLIC_URL and ALLOWED_HOSTS only'
 
 test('DNS rebinding: foreign Host (with a matching Origin) is refused before setup; LAN host works', async () => {
   await withApp(async ({ call }) => {
-    const evil = { host: 'attacker.example:18471', origin: 'http://attacker.example:18471', ...lan };
+    const evil = { host: 'attacker.example:18471', origin: 'http://attacker.example:18471', ...direct };
     let r = await call({ method: 'POST', path: '/api/setup/complete', headers: evil, body: body() });
     assert.equal(r.status, 421);
     assert.equal(store.getSecrets().passwordHash, undefined);
-    r = await call({ path: '/api/setup/status', headers: { host: 'attacker.example', ...lan } });
+    r = await call({ path: '/api/setup/status', headers: { host: 'attacker.example', ...direct } });
     assert.equal(r.status, 421);
     // Origin from an unknown host is refused even when the Host header is fine
-    r = await call({ method: 'POST', path: '/api/setup/complete', headers: { host: '192.168.1.50:3000', origin: 'http://attacker.example', ...lan }, body: body() });
+    r = await call({ method: 'POST', path: '/api/setup/complete', headers: { host: '192.168.1.50:3000', origin: 'http://attacker.example', ...direct }, body: body() });
     assert.equal(r.status, 403);
-    r = await call({ method: 'POST', path: '/api/setup/complete', headers: { host: '192.168.1.50:3000', origin: 'http://192.168.1.50:3000', ...lan }, body: body() });
+    r = await call({ method: 'POST', path: '/api/setup/complete', headers: { host: '192.168.1.50:3000', origin: 'http://192.168.1.50:3000', ...direct }, body: body() });
     assert.equal(r.status, 200);
   });
 });
@@ -207,7 +209,7 @@ test('ADMIN_PASSWORD that breaks the password rules is LAN-only', async () => {
   await withApp(async ({ call }) => {
     assert.equal(store.getSecrets().passwordIsDefault, true);
     assert.equal((await call({ method: 'POST', path: '/api/auth/login', headers: { 'x-forwarded-for': '203.0.113.9' }, body: { password: 'password123' } })).status, 403);
-    assert.equal((await call({ method: 'POST', path: '/api/auth/login', headers: lan, body: { password: 'password123' } })).status, 200);
+    assert.equal((await call({ method: 'POST', path: '/api/auth/login', headers: direct, body: { password: 'password123' } })).status, 200);
   }, { env: { ADMIN_PASSWORD: 'password123' } });
   await withApp(async () => {
     assert.equal(store.getSecrets().passwordIsDefault, false);
@@ -244,10 +246,10 @@ test('SSRF guard: blocked destinations, also after a redirect; setup test-ics er
       assert.equal((await request(`http://${lanIp}:${target.address().port}/ok`, { guard: true })).status, 200);
     }
     await withApp(async ({ call }) => {
-      const r = await call({ method: 'POST', path: '/api/setup/test-ics', headers: lan, body: { url: `http://127.0.0.1:${target.address().port}/x.ics` } });
+      const r = await call({ method: 'POST', path: '/api/setup/test-ics', headers: direct, body: { url: `http://127.0.0.1:${target.address().port}/x.ics` } });
       assert.equal(r.json.ok, false);
       assert.equal(r.json.error, 'address not allowed');
-      const r2 = await call({ method: 'POST', path: '/api/setup/test-ics', headers: lan, body: { url: 'http://192.0.2.1.invalid/x.ics' } });
+      const r2 = await call({ method: 'POST', path: '/api/setup/test-ics', headers: direct, body: { url: 'http://192.0.2.1.invalid/x.ics' } });
       assert.equal(r2.json.ok, false);
       assert.equal(r2.json.error, 'could not load the calendar'); // no "Host not found (…)" details
     });

@@ -798,6 +798,7 @@ localhost).
 - **Cloudflare Tunnel** (sin abrir puertos): `cloudflared tunnel create calendar`, dirige `calendar.example.com` a
   `http://localhost:3000` en la configuración del túnel y, si quieres, protégelo con Cloudflare Access. Los
   Server-Sent Events funcionan a través del túnel.
+- El proxy tiene que enviar **`X-Forwarded-For`** (Caddy, cloudflared y el ejemplo de nginx lo hacen). Sin esa cabecera, todos los visitantes cuentan como remotos, también en la LAN.
 - Define **`TRUST_PROXY`** siempre que el proxy no se conecte desde `127.0.0.1`: un proxy en **otra máquina**
   (`TRUST_PROXY=<proxy-ip>`) o **cualquier proxy delante del contenedor Docker** (`TRUST_PROXY=172.16.0.0/12`, el
   bridge de Docker). Sin él, el servidor ve la dirección del proxy en lugar de la del visitante: todo el que pasa por
