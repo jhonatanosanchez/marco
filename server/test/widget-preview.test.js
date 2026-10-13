@@ -3,10 +3,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { registerHooks } from 'node:module';
+// a namespace import: Node 20 has no registerHooks, and a named import of it would fail before any test runs
+import * as nodeModule from 'node:module';
 
 // The admin's own imports have no extension (Vite resolves them): add ".ts" for those under web/.
-registerHooks?.({
+nodeModule.registerHooks?.({
   resolve(specifier, context, next) {
     if (/^\.\.?\/[^.]*$/.test(specifier) && context.parentURL?.includes('/web/')) {
       try { return next(`${specifier}.ts`, context); } catch { /* fall through */ }
