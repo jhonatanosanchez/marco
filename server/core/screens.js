@@ -141,6 +141,18 @@ export function displayWidgets(cfg, screen, { isPrivate = false, widgetSrc = nul
 }
 
 /**
+ * Tarjetas de esta pantalla para la pantalla (fork fsrhome): solo las encendidas, en el orden de la pantalla, sin URLs
+ * ni opciones; ninguna mientras está en modo privado.
+ */
+export function displayCards(cfg, screen, { isPrivate = false } = {}) {
+  const sc = screen.screen?.cards ?? { items: [], everyMin: 20, showSec: 30, corner: 'br' };
+  const defs = new Map((cfg.cards?.items ?? []).map((k) => [k.id, k]));
+  const items = isPrivate ? [] : (sc.items ?? []).map((id) => defs.get(id)).filter((k) => k && k.enabled)
+    .map((k) => ({ id: k.id, type: k.type, name: k.name, source: k.options.training.source }));
+  return { items, everyMin: sc.everyMin, showSec: sc.showSec, corner: sc.corner };
+}
+
+/**
  * GET /api/display/config payload for one screen (no secrets, no HA entity ids, no URLs except two: the family page's,
  * which the TV draws as a QR code, and the widgets' addresses on a server whose TVs load them directly).
  * `privacy` = { status, next } from core/privacy.js (privacyStatus, privacyNextChange); absent = not private.
@@ -175,6 +187,7 @@ export function displayConfig(cfg, screen, { privacy = null, carousel = null, fa
     privacy: priv,
     family: displayFamilyBlock(cfg, screen, priv.active, familyQr),
     widgets: displayWidgets(cfg, screen, { isPrivate: priv.active, widgetSrc }),
+    cards: displayCards(cfg, screen, { isPrivate: priv.active }),
     // what the display is bound to: this screen, or a carousel that shows it among others
     target: carousel
       ? { id: carousel.id, kind: 'carousel', slug: carousel.slug, name: carousel.name }

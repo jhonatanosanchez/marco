@@ -63,6 +63,9 @@ export function defaultScreenProfile({ id = 's_main', slug = 'living-room', name
       echo: { enabled: false, keepAlive: 'mp3', openFrom: '05:00', openTo: '16:00', fullscreenOnTap: true, fpsGuard: true },
       // Cámaras Frigate (fork fsrhome): esta pantalla abre la alerta de persona a pantalla completa
       cameras: { personAlerts: true },
+      // Tarjetas (fork fsrhome): cuáles salen en esta pantalla (ids de cfg.cards.items, en orden), cada cuánto, cuánto
+      // duran y en qué esquina
+      cards: { items: [], everyMin: 20, showSec: 30, corner: 'br' },
       // Modern style glass material (ignored by Classic). The defaults reproduce the original Modern look.
       glass: { appearance: 'auto', opacity: 0.5, blur: 18, tint: 'dark', edge: true },
     },
@@ -171,6 +174,9 @@ export function defaultConfig() {
       ],
       zones: ['pipol', 'pipol2', 'Entrada', 'mi-patio'],
     },
+    // Tarjetas (fork fsrhome, server/cards.js): información que aparece de vez en cuando (hoy solo 'training').
+    // { id: 'k_…', type: 'training', name, enabled, options: { training: { source: 'coach' | 'garmin', garminUrl, coachUrl } } }
+    cards: { items: [] },
     auth: { allowedGoogleEmails: [], passwordLoginEnabled: true },
     // 'private': every display needs its private link (/d/<key>) or a paired-device token (server/displayAccess.js).
     // 'open': legacy LAN mode (/ and /?screen= work without a key). Configs saved before 0.3 load as 'open'.

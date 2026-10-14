@@ -370,6 +370,7 @@
         "homeassistant",
         "immich",
         "frigate",
+        "cards",
         "auth",
         "security",
         "family"
@@ -406,6 +407,7 @@
         "homeassistant",
         "immich",
         "frigate",
+        "cards",
         "auth",
         "security",
         "family"

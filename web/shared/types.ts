@@ -58,6 +58,49 @@ export interface CamerasStatus { enabled: boolean; lastOkAt: string | null; last
 /** POST /api/admin/cameras/test-alert */
 export interface CameraTestAlertResponse { ok: boolean; delivered: number; screens: string[] }
 
+// ---- Tarjetas (fork fsrhome; server/cards.js) ----
+export type CardType = 'training';
+export type TrainingSource = 'coach' | 'garmin';
+export type CardCorner = 'tl' | 'tr' | 'bl' | 'br';
+export interface CardDef {
+  id: string; type: CardType; name: string; enabled: boolean;
+  options: { training: { source: TrainingSource; garminUrl: string; coachUrl: string } };
+}
+/** screen.cards: ids de cfg.cards.items en orden de rotación */
+export interface ScreenCards { items: string[]; everyMin: number; showSec: number; corner: CardCorner }
+export interface DisplayCardRef { id: string; type: CardType; name: string; source: TrainingSource }
+/** DisplayConfig.cards: las tarjetas encendidas de esta pantalla, sin URLs */
+export interface DisplayCards { items: DisplayCardRef[]; everyMin: number; showSec: number; corner: CardCorner }
+export interface TrainingSession { kind: 'session' | 'rest' | 'free' | 'none'; text: string }
+export interface TrainingRun {
+  name: string; date: string; when: 'today' | 'yesterday' | 'weekday'; weekday: number; km: number; min: number; pace: string;
+  avgHr: number | null; maxHr: number | null; elevGain: number | null; load: number | null; aerobicTE: number | null; zones: number[] | null;
+}
+export interface TrainingRecovery { sleep: number | null; hrv: number | null; restingHr: number | null; bodyBattery: number | null }
+export interface TrainingWeek { monday: string; todayIndex: number; kmByDay: number[]; km: number; runs: number; blockPct: number | null }
+/** minutos de antigüedad de la copia usada cuando la fuente no respondió */
+export interface TrainingStale { garmin?: number; coach?: number }
+/** GET /api/display/cards/<id> */
+export interface TrainingSummary {
+  source: TrainingSource; today: string; planOk: boolean | null; session: TrainingSession | null; garminOk: boolean;
+  done: { km: number; min: number } | null; last: TrainingRun | null; week: TrainingWeek | null; recovery: TrainingRecovery; stale: TrainingStale;
+}
+export interface TrainingDay {
+  date: string; weekday: number; planned: string | null; rest: boolean; km: number | null;
+  status: 'done' | 'missed' | 'pending' | 'rest' | 'future' | 'free';
+}
+export interface TrainingRecovery7 {
+  days: string[]; sleep: (number | null)[]; hrv: (number | null)[]; restingHr: (number | null)[]; bodyBattery: (number | null)[];
+}
+/** GET /api/display/cards/<id>/detail */
+export interface TrainingDetail {
+  source: TrainingSource; today: string; garminOk: boolean; planOk: boolean | null; days: TrainingDay[] | null;
+  last: TrainingRun | null; recovery7: TrainingRecovery7; race: { date: string; name: string; days: number } | null;
+  week: TrainingWeek | null; stale: TrainingStale;
+}
+/** POST /api/admin/cards/<id>/show */
+export interface CardShowResponse { ok: boolean; delivered: number; screens: string[] }
+
 export type DisplayStyle = 'classic' | 'modern';
 
 /** Glass material of the Modern style (like iOS Liquid Glass): ignored by Classic. */
@@ -91,6 +134,8 @@ export interface ScreenConfig {
   echo?: EchoSettings;
   /** cámaras Frigate (fork fsrhome): esta pantalla abre la alerta de persona */
   cameras?: { personAlerts: boolean };
+  /** tarjetas (fork fsrhome): cuáles salen aquí, cada cuánto, cuánto duran, en qué esquina */
+  cards?: ScreenCards;
 }
 
 export interface LayoutConfig {
@@ -792,6 +837,8 @@ export interface AppConfig {
   homeassistant: HomeAssistantConfig;
   immich: ImmichConfig;
   frigate: FrigateSettings;
+  /** tarjetas (fork fsrhome) */
+  cards: { items: CardDef[] };
   auth: AuthConfig;
   security: SecurityConfig;
   privacy: ScreenPrivacyConfig;
@@ -828,6 +875,8 @@ export interface DisplayConfig {
   target?: DisplayTarget;
   /** the carousel the display runs (null or absent: a plain screen) */
   carousel?: CarouselBlock | null;
+  /** tarjetas de esta pantalla (fork fsrhome; servidores sin tarjetas lo omiten) */
+  cards?: DisplayCards;
   /** Familia on this screen (older servers: absent) */
   family?: DisplayFamilyBlock;
   /** widgets on this screen, the full-screen one first (older servers: absent; none while private) */
@@ -1809,6 +1858,8 @@ export interface StoredConfig {
   homeassistant: HomeAssistantConfig;
   immich: ImmichConfig;
   frigate: FrigateSettings;
+  /** tarjetas (fork fsrhome) */
+  cards: { items: CardDef[] };
   auth: AuthConfig;
   security: SecurityConfig;
   family: FamilyConfig;

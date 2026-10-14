@@ -15,6 +15,7 @@ import {
 } from './carousels.js';
 import { IMMICH_ID_RE, MAX_IMMICH_ALBUMS, PORTRAIT_FITS, normalizeImmichUrl } from './immichCore.js';
 import { CAMERA_ID_RE, ZONE_RE, MAX_CAMERAS, MAX_ZONES } from './camerasCore.js';
+import { CARD_ID_RE, CARD_PREFIX, CARD_TYPES, MAX_CARDS, TRAINING_DEFAULTS, TRAINING_SOURCES } from './trainingCore.js';
 import {
   BAND_NAME_MAX, BAND_PRESET_IDS, GRID_IDS, gridCompany, HOLIDAY_SETS, MAX_BAND_PRICE, MAX_BANDS, MIN_BAND_PRICE, TARIFF_MODES,
 } from './tariffsCore.js';
@@ -227,7 +228,7 @@ function requiredStr(ctx, path, v, d, max) {
   return s;
 }
 
-function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs, familyMemberIds = [], widgetIds = new Set()) {
+function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs, familyMemberIds = [], widgetIds = new Set(), cardIds = new Set()) {
   const D = defaultScreenProfile();
   const x = obj(ctx, p, raw);
   const name = str(ctx, `${p}.name`, x.name, '', 60).trim() || 'Screen';
@@ -241,6 +242,8 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs, familyMemberIds 
   const nm = obj(ctx, `${p}.screen.nightMode`, sc.nightMode);
   const ec = obj(ctx, `${p}.screen.echo`, sc.echo);
   const cm = obj(ctx, `${p}.screen.cameras`, sc.cameras);
+  const kc = obj(ctx, `${p}.screen.cards`, sc.cards);
+  const KD = D.screen.cards;
   const ED = D.screen.echo;
   const gl = obj(ctx, `${p}.screen.glass`, sc.glass);
   const GD = D.screen.glass;
@@ -272,6 +275,13 @@ function sanitizeScreenProfile(ctx, p, raw, seenIds, seenSlugs, familyMemberIds 
     // Cámaras Frigate (fork fsrhome)
     cameras: {
       personAlerts: bool(ctx, `${p}.screen.cameras.personAlerts`, cm.personAlerts, D.screen.cameras.personAlerts),
+    },
+    // Tarjetas (fork fsrhome): ids que ya no existen se caen sin error (borrar una tarjeta es legítimo)
+    cards: {
+      items: [...new Set(arr(ctx, `${p}.screen.cards.items`, kc.items, KD.items, MAX_CARDS).filter((k) => typeof k === 'string' && cardIds.has(k)))],
+      everyMin: num(ctx, `${p}.screen.cards.everyMin`, kc.everyMin, KD.everyMin, 5, 120, true),
+      showSec: num(ctx, `${p}.screen.cards.showSec`, kc.showSec, KD.showSec, 10, 120, true),
+      corner: oneOf(ctx, `${p}.screen.cards.corner`, kc.corner, KD.corner, ['tl', 'tr', 'bl', 'br']),
     },
     // glass material of the Modern style: appearance, transparency (0 = see-through, 1 = solid), blur, tint, light edge
     glass: {
@@ -800,6 +810,29 @@ export function migrateConfig(raw) {
  * `opts.minWidgetRefreshSec` (default none) refuses shorter refreshes. Marco Cloud passes ['image'], ['https:'], 30.
  * `opts.immichAvailable` false (servers without Immich, such as Marco Cloud): a screen with the Immich source is refused.
  */
+/** Una tarjeta de cfg.cards.items (fork fsrhome). Las URLs son direcciones internas de solo lectura. */
+function sanitizeCard(ctx, p, x, seen) {
+  if (!isObj(x)) { ctx.err(p, 'expected object'); return null; }
+  if (!CARD_TYPES.includes(x.type)) { ctx.err(`${p}.type`, `must be one of ${CARD_TYPES.join(', ')}`); return null; }
+  const o = obj(ctx, `${p}.options`, x.options);
+  const tr = obj(ctx, `${p}.options.training`, o.training);
+  const url = (key) => {
+    const q = `${p}.options.training.${key}`;
+    const u = str(ctx, q, tr[key], TRAINING_DEFAULTS[key], 512).trim().replace(/\/+$/, '');
+    if (!u || !isHttpUrl(u)) { ctx.err(q, 'invalid URL'); return TRAINING_DEFAULTS[key]; }
+    return u;
+  };
+  const source = oneOf(ctx, `${p}.options.training.source`, tr.source, 'coach', TRAINING_SOURCES);
+  return {
+    id: id(ctx, `${p}.id`, typeof x.id === 'string' && CARD_ID_RE.test(x.id) ? x.id : undefined, CARD_PREFIX, seen),
+    type: x.type,
+    name: str(ctx, `${p}.name`, x.name, '', 60).trim() || 'Entreno',
+    enabled: bool(ctx, `${p}.enabled`, x.enabled, true),
+    // sin plan (solo Garmin) la dirección del coach no se usa: se guarda vacía
+    options: { training: { source, garminUrl: url('garminUrl'), coachUrl: source === 'coach' ? url('coachUrl') : '' } },
+  };
+}
+
 export function validateConfig(input, opts = {}) {
   const ctx = new Ctx();
   const D = defaultConfig();
@@ -986,12 +1019,18 @@ export function validateConfig(input, opts = {}) {
     .map((x, i) => sanitizeWidget(ctx, `widgets[${i}]`, x, widgetSeen, opts)).filter(Boolean);
   const widgetIds = new Set(widgets.map((w) => w.id));
 
+  // ---- Tarjetas (fork fsrhome): definiciones globales; cada pantalla elige cuáles muestra (screen.cards)
+  const kd = obj(ctx, 'cards', c.cards);
+  const cardSeen = new Set();
+  const cards = { items: arr(ctx, 'cards.items', kd.items, [], MAX_CARDS).map((x, i) => sanitizeCard(ctx, `cards.items[${i}]`, x, cardSeen)).filter(Boolean) };
+  const cardIds = new Set(cards.items.map((k) => k.id));
+
   // ---- F1 screens
   let rawScreens = arr(ctx, 'screens', c.screens, D.screens, MAX_SCREENS);
   if (!rawScreens.length) { ctx.err('screens', 'at least one screen'); rawScreens = D.screens; }
   const seenIds = new Set();
   const seenSlugs = new Set();
-  const screens = rawScreens.map((s, i) => sanitizeScreenProfile(ctx, `screens[${i}]`, s, seenIds, seenSlugs, familyMemberIds, widgetIds));
+  const screens = rawScreens.map((s, i) => sanitizeScreenProfile(ctx, `screens[${i}]`, s, seenIds, seenSlugs, familyMemberIds, widgetIds, cardIds));
   if (opts.immichAvailable === false) {
     screens.forEach((s, i) => { if (s.background.source === 'immich') ctx.err(`screens[${i}].background.source`, 'Immich is not available'); });
   }
@@ -1034,7 +1073,7 @@ export function validateConfig(input, opts = {}) {
   const revision = Number.isInteger(c.revision) && c.revision > 0 ? c.revision : 1;
   const value = {
     version: CONFIG_VERSION, revision, defaultScreen, screens,
-    calendar, datetime, weather, news, todo, localEvents, birthdays, eventRules, countdowns, schedules, carousels, widgets, homeassistant, immich, frigate, auth, security, family,
+    calendar, datetime, weather, news, todo, localEvents, birthdays, eventRules, countdowns, schedules, carousels, widgets, homeassistant, immich, frigate, cards, auth, security, family,
   };
   return { ok: ctx.errors.length === 0, errors: ctx.errors, value };
 }
