@@ -48,7 +48,7 @@ test('validate: solo Garmin no exige coach; nombre vacío = "Entreno"; id invál
 test('validate: tipo desconocido, fuente rara y URL que no es http se rechazan', () => {
   const c = base();
   c.cards = { items: [
-    card('k_a', { type: 'money' }),
+    card('k_a', { type: 'lottery' }),
     card('k_b', { options: { training: { source: 'x', garminUrl: 'http://g:4400', coachUrl: 'http://c:4300' } } }),
     card('k_c', { options: { training: { source: 'coach', garminUrl: 'file:///etc/passwd', coachUrl: 'http://c:4300' } } }),
   ] };

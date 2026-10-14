@@ -3,8 +3,19 @@
 
 export const CARD_PREFIX = 'k_';
 export const CARD_ID_RE = /^k_[a-z0-9]{1,40}$/;
-/** 'training': Entreno; 'ages': "A esta edad" a pantalla completa (server/ages.js) */
-export const CARD_TYPES = ['training', 'ages'];
+/** 'training': Entreno; 'ages': "A esta edad" a pantalla completa (server/ages.js); 'money': Dinero (server/money.js) */
+export const CARD_TYPES = ['training', 'ages', 'money'];
+/** tipos que un futuro modo visita esconde (spec 2026-10-14-marco-dinero §4.5) */
+export const SENSITIVE_CARD_TYPES = ['money'];
+
+/**
+ * ¿Puede esta tarjeta ir a una pantalla ahora? Única decisión para displayCards, la ruta de tarjetas y "Mostrar
+ * ahora". Hoy: modo privado → ninguna. El modo visita se agregará aquí ({ visitMode } → sensibles no).
+ */
+export function cardVisible(card, { privateMode = false } = {}) {
+  if (privateMode) return false;
+  return CARD_TYPES.includes(card?.type);
+}
 export const AGES_DEFAULTS = Object.freeze({ person: 'Arantza', birthDate: '2020-06-22', everyMin: 15 });
 /** segundos que "A esta edad" se queda en pantalla */
 export const AGES_SHOW_SEC = 45;

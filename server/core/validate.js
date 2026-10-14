@@ -817,6 +817,10 @@ function sanitizeCard(ctx, p, x, seen) {
   const o = obj(ctx, `${p}.options`, x.options);
   const cardId = id(ctx, `${p}.id`, typeof x.id === 'string' && CARD_ID_RE.test(x.id) ? x.id : undefined, CARD_PREFIX, seen);
   const enabled = bool(ctx, `${p}.enabled`, x.enabled, true);
+  if (x.type === 'money') {
+    // sin opciones propias todavía: la fuente (gastos-dashboard) y su token viven en el entorno del servidor
+    return { id: cardId, type: 'money', name: str(ctx, `${p}.name`, x.name, '', 60).trim() || 'Dinero', enabled, options: { money: {} } };
+  }
   if (x.type === 'ages') {
     const q = `${p}.options.ages`;
     const ag = obj(ctx, q, o.ages);
