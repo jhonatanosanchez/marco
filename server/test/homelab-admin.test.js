@@ -19,6 +19,8 @@ test('Cards.tsx: crea homelab con valores por defecto y la dibuja con sus campos
   assert.match(src, /k\.type === 'homelab'/);
   assert.match(src, /h\.everyMin = Number\(v\)/);
   assert.match(src, /h\.zones = v\.split/);
+  // sin filtrar al escribir: si no, la coma que se acaba de teclear desaparece en el siguiente render
+  assert.doesNotMatch(src, /h\.zones = v\.split\(','\)\.map\(\(z\) => z\.trim\(\)\)\.filter/);
   assert.match(src, /show\(k\.id\)/);
 });
 

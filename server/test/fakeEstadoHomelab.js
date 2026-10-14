@@ -1,5 +1,5 @@
 // estado-homelab falso (y Frigate falso) para las pruebas de la tarjeta Homelab (fork fsrhome): node:http en el puerto 0.
-//   GET /api/widget     → state.widget (500 con state.down)
+//   GET /api/widget     → state.widget (500 con state.down; tarda state.delayMs si se pone)
 //   POST /api/silencios → state.silenceStatus (200 por defecto); guarda el cuerpo y su content-type en `bodies`
 //   GET /api/events     → state.events (Frigate); guarda la consulta en `queries`
 import http from 'node:http';
@@ -17,11 +17,12 @@ export async function fakeEstadoHomelab(data = {}) {
     req.on('end', () => {
       if (state.down) { res.writeHead(500); return res.end(); }
       if (req.method === 'GET' && u.pathname === '/api/widget') {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        return res.end(JSON.stringify(state.widget));
+        const body = JSON.stringify(state.widget); // lo que había al llegar la petición
+        const send = () => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(body); };
+        return state.delayMs ? void setTimeout(send, state.delayMs) : send();
       }
       if (req.method === 'POST' && u.pathname === '/api/silencios') {
-        bodies.push({ type: req.headers['content-type'] ?? null, body: raw });
+        bodies.push({ type: req.headers['content-type'] ?? null, body: raw, perfil: req.headers['x-perfil'] ?? null });
         res.writeHead(state.silenceStatus, { 'content-type': 'application/json' });
         return res.end(JSON.stringify(state.silenceStatus < 300 ? { ok: true } : { error: 'no' }));
       }

@@ -88,7 +88,7 @@ export function CardsSection({ cfg, set, setFull, full, errors }: SectionProps) 
                 <Segmented value={String(hl.everyMin)} options={[5, 10, 15, 30, 60].map((n) => ({ value: String(n), label: String(n) }))} onChange={(v) => updHomelab(i, (h) => void (h.everyMin = Number(v)))} />
               </Field>
               <Field label={t('Zonas de cámaras para "Anoche"')} hint={t('Nombres de zonas de Frigate separados por comas.')} error={errors[`cards.items[${i}].options.homelab.zones`]}>
-                <TextInput value={hl.zones.join(', ')} maxLength={400} onValue={(v) => updHomelab(i, (h) => void (h.zones = v.split(',').map((z) => z.trim()).filter(Boolean)))} />
+                <TextInput value={hl.zones.join(', ')} maxLength={400} onValue={(v) => updHomelab(i, (h) => void (h.zones = v.split(',').map((z) => z.trim())))} />
               </Field>
               <div class="row-actions">
                 <Button onClick={() => show(k.id)} loading={busy === k.id} disabled={!k.enabled}>{t('Mostrar ahora')}</Button>

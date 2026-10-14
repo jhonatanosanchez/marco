@@ -91,6 +91,15 @@ test('hoja: secciones, alertas con data-clave, silenciadas, fichas, todo escapad
   assert.match(ht.homelabSheetHtml({ ok: false }, REF, UI(), t, 'es', NOW, TZ), /Sin datos del homelab/);
 });
 
+test('hoja: sin datos de Beszel los contenedores dicen "sin datos", nunca "todos sanos"', () => {
+  const w = { ...WID(), contenedores: { total: 0, caidos: 0 } };
+  const html = ht.homelabSheetHtml({ ok: true, at: NOW, data: w }, REF, UI(), t, 'es', NOW, TZ);
+  assert.doesNotMatch(html, /todos sanos/);
+  assert.match(html, /Contenedores<\/dt><dd>sin datos/);
+  const mudo = { ...WID(), sistema: { ...WID().sistema, estado: 'mudo' } };
+  assert.doesNotMatch(ht.homelabSheetHtml({ ok: true, at: NOW, data: mudo }, REF, UI(), t, 'es', NOW, TZ), /todos sanos/);
+});
+
 test('hoja: opciones de silencio en línea, guardando y error', () => {
   const open = ht.homelabSheetHtml({ ok: true, at: NOW, data: WID() }, REF, UI({ open: 'kuma:3' }), t, 'es', NOW, TZ);
   assert.deepEqual([...open.matchAll(/data-hasta="([^"]+)"/g)].map((m) => m[1]), ['arreglo', '1d', '7d']);

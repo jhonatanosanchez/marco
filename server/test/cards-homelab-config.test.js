@@ -33,6 +33,16 @@ test('validate: everyMin fuera de 5–120 y zonas inválidas dan error; un decim
   }
 });
 
+test('validate: zonas vacías (coma al final mientras se escribe en el admin) se descartan', () => {
+  const c = base();
+  c.cards = { items: [homelab({ options: { homelab: { everyMin: 10, zones: ['pipol', ' ', '', 'Entrada'] } } })] };
+  const r = validateConfig(c);
+  assert.equal(r.ok, true, JSON.stringify(r.errors));
+  assert.deepEqual(r.value.cards.items[0].options.homelab.zones, ['pipol', 'Entrada']);
+  c.cards = { items: [homelab({ options: { homelab: { everyMin: 10, zones: ['', ' '] } } })] };
+  assert.equal(validateConfig(c).ok, false); // nada que quede → error
+});
+
 test('tipos: homelab existe y NO es sensible', () => {
   assert.ok(CARD_TYPES.includes('homelab'));
   assert.equal(SENSITIVE_CARD_TYPES.includes('homelab'), false);

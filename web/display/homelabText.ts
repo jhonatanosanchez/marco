@@ -126,7 +126,11 @@ function serverHtml(w: HomelabWidget, t: T): string {
     return ficha(d.nombre, `${pct(d.usadoPct)} · ${Math.round(d.usadoGb ?? 0)} / ${Math.round(d.totalGb ?? 0)} GB${extra}`, fichaClass(d.estado));
   }).join('');
   const c = w.contenedores;
-  const conts = c ? ficha(t('hlContainers'), `${c.total} · ${c.caidos ? t('hlUnhealthy', { n: c.caidos }) : t('hlAllHealthy')}`, c.caidos ? 'is-warn' : '') : '';
+  // sin Beszel (servidor mudo o total 0) no se sabe: "sin datos", nunca "todos sanos"
+  const contsUnknown = !c || c.total === 0 || !s || s.estado === 'mudo';
+  const conts = contsUnknown
+    ? ficha(t('hlContainers'), t('hlNoDataShort'), 'is-dim')
+    : ficha(t('hlContainers'), `${c.total} · ${c.caidos ? t('hlUnhealthy', { n: c.caidos }) : t('hlAllHealthy')}`, c.caidos ? 'is-warn' : '');
   const r = w.respaldo;
   const backup = r ? ficha(t('hlBackup'), r.ok ? t('hlBackupOk', { h: Math.round(r.edadHoras ?? 0) }) : t('hlBackupBad'), r.ok ? '' : 'is-bad') : '';
   return `<section><h3>${escHtml(t('hlServer'))}</h3><dl class="hl-fichas">${server}</dl><h3>${escHtml(t('hlDisks'))}</h3><dl class="hl-fichas">${discos}${conts}${backup}</dl></section>`;

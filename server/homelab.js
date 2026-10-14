@@ -14,6 +14,8 @@ const UA = 'marco-cards';
 let copy = null;
 let inflight = null;
 let failing = false;
+/** sube al tirar la copia (silencio): una lectura que salió antes no la vuelve a escribir */
+let generation = 0;
 /** `${card.id}|${after}` → { at, personas } */
 const nights = new Map();
 
@@ -21,10 +23,12 @@ export function _resetHomelab() {
   copy = null;
   inflight = null;
   failing = false;
+  generation++;
   nights.clear();
 }
 
-export const invalidateHomelab = () => { copy = null; };
+/** tira la copia (tras un silencio); la lectura que esté en vuelo ya no cuenta: la siguiente pide de nuevo */
+export const invalidateHomelab = () => { copy = null; inflight = null; generation++; };
 
 export const homelabSource = (env = process.env) => ({
   url: String(env.HOMELAB_URL || 'http://estado-homelab:8000').replace(/\/+$/, ''),
@@ -45,20 +49,22 @@ export async function loadHomelab(now = Date.now(), env = process.env) {
   if (copy && now - copy.at < HOMELAB_CACHE_MS) return copy;
   if (!inflight) {
     const { url } = homelabSource(env);
-    inflight = (async () => {
+    const gen = generation;
+    const p = (async () => {
       try {
         const r = await fetch(`${url}/api/widget`, { signal: AbortSignal.timeout(TIMEOUT_MS), headers: { accept: 'application/json', 'user-agent': UA } });
         if (!r.ok) throw new Error(`http ${r.status}`);
         const data = pickWidget(await r.json());
         if (!data) throw new Error('forma inesperada');
-        copy = { at: now, data };
+        if (gen === generation) copy = { at: now, data };
         if (failing) { failing = false; console.info('[cards] Homelab: estado-homelab responde de nuevo'); }
       } catch (e) {
         if (!failing) { failing = true; console.warn(`[cards] Homelab: estado-homelab no respondió (${failReason(e)})`); }
       } finally {
-        inflight = null;
+        if (inflight === p) inflight = null;
       }
     })();
+    inflight = p;
   }
   await inflight;
   return copy && now - copy.at <= HOMELAB_STALE_MS ? copy : null;
@@ -84,13 +90,16 @@ export async function loadNight(card, frigate, now, tz) {
   }
 }
 
-/** Reenvía { clave, hasta } a silencios.py. La validación de forma y de clave la hace la ruta (cards.js). */
-export async function silenceHomelab({ clave, hasta }, env = process.env) {
+/**
+ * Reenvía { clave, hasta } a silencios.py. La validación de forma y de clave la hace la ruta (cards.js).
+ * `por` (X-Perfil) queda en el registro de estado-homelab: quién silenció (marco/<pantalla>).
+ */
+export async function silenceHomelab({ clave, hasta, por = 'marco' }, env = process.env) {
   try {
     const r = await fetch(homelabSource(env).silenceUrl, {
       method: 'POST',
       signal: AbortSignal.timeout(TIMEOUT_MS),
-      headers: { 'content-type': 'application/json', 'user-agent': UA },
+      headers: { 'content-type': 'application/json', 'user-agent': UA, 'x-perfil': String(por).slice(0, 60) },
       body: JSON.stringify({ clave, hasta }),
     });
     if (r.status >= 200 && r.status < 300) { invalidateHomelab(); return { ok: true }; }

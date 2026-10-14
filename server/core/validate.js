@@ -827,9 +827,11 @@ function sanitizeCard(ctx, p, x, seen) {
     const everyMin = num(ctx, `${q}.everyMin`, hl.everyMin, HOMELAB_DEFAULTS.everyMin, 5, 120, true);
     let zones = [...HOMELAB_DEFAULTS.zones];
     if (hl.zones !== undefined) {
-      const ok = Array.isArray(hl.zones) && hl.zones.length >= 1 && hl.zones.length <= 10
-        && hl.zones.every((z) => typeof z === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(z));
-      if (ok) zones = [...new Set(hl.zones)];
+      // el admin guarda el texto tal cual se escribe (una coma al final deja una zona vacía): las vacías se descartan
+      const list = Array.isArray(hl.zones) ? hl.zones.filter((z) => !(typeof z === 'string' && z.trim() === '')) : null;
+      const ok = list && list.length >= 1 && list.length <= 10
+        && list.every((z) => typeof z === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(z));
+      if (ok) zones = [...new Set(list)];
       else ctx.err(`${q}.zones`, '1–10 Frigate zone names ([A-Za-z0-9_-], up to 40 characters)');
     }
     return { id: cardId, type: 'homelab', name: str(ctx, `${p}.name`, x.name, '', 60).trim() || 'Homelab', enabled, options: { homelab: { everyMin, zones } } };

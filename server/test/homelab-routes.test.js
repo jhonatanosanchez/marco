@@ -120,6 +120,8 @@ test('POST silence: reenvía y responde ok; valida tipo, pantalla, hasta, clave 
     assert.equal(ok.status, 200, ok.raw);
     assert.deepEqual(ok.json, { ok: true });
     assert.deepEqual(JSON.parse(fake.bodies.at(-1).body), { clave: 'swap', hasta: '7d' });
+    // estado-homelab guarda quién silenció (X-Perfil): marco/<slug de la pantalla>
+    assert.match(fake.bodies.at(-1).perfil, /^marco\/[a-z0-9-]+$/);
     // una ya silenciada se puede reactivar (está en `silenciadas`, no en `alertas`)
     assert.equal((await call('POST', '/api/display/cards/k_homelab/silence', { key: k, body: { clave: 'kuma:58', hasta: null } })).status, 200);
     const sent = fake.bodies.length;

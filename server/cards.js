@@ -138,7 +138,8 @@ export function cardsDisplayRouter() {
       const h = await loadHomelab(Date.now());
       const known = h && [...h.data.alertas, ...h.data.silenciadas].some((a) => a.clave === clave);
       if (!known) return res.status(400).json({ error: 'unknown clave' });
-      const out = await silenceHomelab({ clave, hasta });
+      const { screen } = requestScreen(cfg, req);
+      const out = await silenceHomelab({ clave, hasta, por: `marco/${screen?.slug ?? screen?.id ?? '?'}` });
       if (!out.ok) return res.status(out.status).json({ error: out.error });
       res.json({ ok: true });
     } catch (e) {

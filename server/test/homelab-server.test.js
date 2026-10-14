@@ -101,14 +101,50 @@ test('silenceHomelab: reenvía JSON; 4xx → 400; caída → 502; invalida la co
   try {
     const t0 = Date.now();
     await loadHomelab(t0, env(f));
-    assert.deepEqual(await silenceHomelab({ clave: 'swap', hasta: '1d' }, env(f)), { ok: true });
-    assert.deepEqual(f.bodies.at(-1), { type: 'application/json', body: JSON.stringify({ clave: 'swap', hasta: '1d' }) });
+    assert.deepEqual(await silenceHomelab({ clave: 'swap', hasta: '1d', por: 'marco/echo-office' }, env(f)), { ok: true });
+    assert.deepEqual(f.bodies.at(-1), { type: 'application/json', body: JSON.stringify({ clave: 'swap', hasta: '1d' }), perfil: 'marco/echo-office' });
     await loadHomelab(t0 + 1000, env(f)); // la copia se tiró: vuelve a pedir
     assert.equal(f.hits.filter((h) => h === 'GET /api/widget').length, 2);
     f.state.silenceStatus = 400;
     assert.deepEqual(await silenceHomelab({ clave: 'swap', hasta: null }, env(f)), { ok: false, status: 400, error: 'rejected' });
     f.state.down = true;
     assert.deepEqual(await silenceHomelab({ clave: 'swap', hasta: null }, env(f)), { ok: false, status: 502, error: 'unavailable' });
+  } finally {
+    await f.stop();
+  }
+});
+
+test('loadHomelab: una lectura que salió antes de un silencio no pisa la copia tirada después', async () => {
+  const f = await fakeEstadoHomelab({ widget: W(), delayMs: 150 });
+  _resetHomelab();
+  try {
+    const t0 = Date.now();
+    const pending = loadHomelab(t0, env(f));      // sale con la alerta todavía activa
+    await new Promise((r) => setTimeout(r, 50));
+    invalidateHomelab();                          // el silencio se aplicó mientras tanto
+    await pending;
+    f.state.delayMs = 0;
+    await loadHomelab(t0 + 1000, env(f));         // la copia vieja no quedó: vuelve a pedir
+    assert.equal(f.hits.filter((h) => h === 'GET /api/widget').length, 2);
+  } finally {
+    await f.stop();
+  }
+});
+
+test('loadHomelab: pedir justo después de tirar la copia no espera la lectura vieja (la hoja no ve "Sin datos")', async () => {
+  const f = await fakeEstadoHomelab({ widget: W(), delayMs: 150 });
+  _resetHomelab();
+  try {
+    const t0 = Date.now();
+    const old = loadHomelab(t0, env(f));
+    await new Promise((r) => setTimeout(r, 50));
+    invalidateHomelab();
+    f.state.widget = { ...W(), alertas: [] };      // el silencio ya se aplicó
+    const fresh = await loadHomelab(t0 + 60, env(f));
+    assert.ok(fresh, 'no debe quedar sin datos');
+    assert.deepEqual(fresh.data.alertas, []);
+    await old;
+    assert.deepEqual((await loadHomelab(t0 + 100, env(f))).data.alertas, []); // la vieja no la pisó al terminar
   } finally {
     await f.stop();
   }
