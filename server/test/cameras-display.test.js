@@ -67,6 +67,16 @@ test('los recuadros reciben toques (Marco pone pointer-events: none en todos los
   assert.match(css, /\.camgrid \.cam \{[^}]*pointer-events: auto/);
 });
 
+test('imagen completa a 16:9 sin recorte: el DVR manda 960×1088 ("1080p lite", pensado para verse a 16:9)', () => {
+  const css = readFileSync(new URL('../../web/display/styles-cameras.css', import.meta.url), 'utf8');
+  // recuadros: la caja ya es 16:9 (gridBox); fill estira el cuadro completo en vez de recortar el centro (zoom)
+  assert.match(css, /\.camgrid \.cam img \{[^}]*object-fit: fill/);
+  assert.doesNotMatch(css, /object-fit: (cover|contain)/);
+  // vista: caja 16:9 que cabe en la pantalla, y la foto del evento también a 16:9
+  assert.match(css, /\.camview video, \.camview \.camview-fallback \{[^}]*width: min\(100vw, 177\.78vh\); height: min\(56\.25vw, 100vh\); object-fit: fill/);
+  assert.match(css, /\.camview-snap \{[^}]*width: 28vmin; height: 15\.75vmin; object-fit: fill/);
+});
+
 test('revisión 1: la frescura se mide con sentAt cuando viene (persona que entra tarde a la zona)', () => {
   assert.equal(txt.alertIsFresh({ startTime: at(120_000), sentAt: NOW - 2000 }, NOW), true);
   assert.equal(txt.alertIsFresh({ startTime: at(5000), sentAt: NOW - 61_000 }, NOW), false);
