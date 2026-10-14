@@ -1,11 +1,13 @@
 // Tarjetas (fork fsrhome): la tarjeta flotante de cada pantalla. Cuándo sale cada una lo decide CardRotation
 // (cardsRotation.ts); aquí se pide el resumen, se dibuja `showSec` y tocarla abre la hoja.
 import '../styles-cards.css';
-import type { DisplayCardRef, DisplayCards, TrainingSummary } from '../../shared/types';
+import '../styles-money.css';
+import type { DisplayCardRef, DisplayCards, MoneyResponse, TrainingSummary } from '../../shared/types';
 import { getJSON } from '../api';
 import { ctx } from '../ctx';
 import { isPreview, withScreen } from '../identity';
 import { cardsSig, trainingCardHtml } from '../cardsText';
+import { moneyCardHtml } from '../moneyText';
 import { CardRotation, CardStage } from '../cardsRotation';
 import type { AgesViewLike } from './agesView';
 
@@ -88,9 +90,9 @@ export class CardsController {
   private async show(ref: DisplayCardRef): Promise<void> {
     const tk = this.stage.begin();
     if (!tk) return;
-    let data: TrainingSummary;
+    let data: TrainingSummary | MoneyResponse;
     try {
-      data = await getJSON<TrainingSummary>(withScreen(`/api/display/cards/${encodeURIComponent(ref.id)}`), 10_000);
+      data = await getJSON<TrainingSummary | MoneyResponse>(withScreen(`/api/display/cards/${encodeURIComponent(ref.id)}`), 10_000);
     } catch {
       this.stage.end(tk);
       return; // esta vez no sale; la siguiente vuelta lo reintenta
@@ -101,7 +103,7 @@ export class CardsController {
     this.smallToken = tk;
     const el = document.createElement('div');
     el.className = `mcard mcard--${this.c.corner}`;
-    el.innerHTML = trainingCardHtml(data, ref, ctx.t, ctx.lang);
+    el.innerHTML = ref.type === 'money' ? moneyCardHtml(data as MoneyResponse, ref, ctx.t) : trainingCardHtml(data as TrainingSummary, ref, ctx.t, ctx.lang);
     el.addEventListener('click', () => {
       this.hide();
       this.o.sheet.open(ref);

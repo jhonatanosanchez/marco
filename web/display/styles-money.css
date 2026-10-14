@@ -1,0 +1,25 @@
+/* Tarjeta Dinero (fork fsrhome): colores de ritmo y la hoja. Solo transform/opacity animan (ninguna animación aquí). */
+:root { --money-ok: #5fd38a; --money-warn: #ffbf47; --money-bad: #ff6b5e; --money-dim: rgba(255, 255, 255, .45); }
+.mmoney-line { display: flex; align-items: center; gap: 1.2vmin; -webkit-line-clamp: unset; }
+.mmoney-dot { display: inline-block; flex: none; width: 1.8vmin; height: 1.8vmin; border-radius: 50%; margin-right: 1vmin; }
+.msheet.mmoney { grid-template-rows: auto 1fr; }
+.mmoney-cols { display: grid; grid-template-columns: 1.2fr 1fr; gap: 3vmin; min-height: 0; }
+.mmoney-scroll { overflow-y: auto; min-height: 0; padding-bottom: 6vmin; }
+.mmoney-ritmo { display: flex; align-items: center; font-size: 3.4vmin; font-weight: 600; line-height: 1.2; }
+.mmoney-ritmo .mmoney-dot { width: 3vmin; height: 3vmin; }
+.mmoney-figures { min-height: 3.2vmin; margin: .8vmin 0 1.6vmin; font-size: 2.4vmin; opacity: .8; }
+.mmoney-barrow { display: grid; grid-template-columns: 14em 1fr; align-items: center; gap: 1.6vmin; margin: .8vmin 0; font-size: 2vmin; }
+.mmoney-bar { height: 1.4vmin; border-radius: 1vmin; background: rgba(255, 255, 255, .12); overflow: hidden; }
+.mmoney-bar i { display: block; height: 100%; background: var(--money-ok); }
+.mmoney-bar.is-fast i { background: var(--money-warn); }
+.mmoney-bar.is-out i { background: var(--money-bad); }
+.mmoney h3 { margin: 2.2vmin 0 .6vmin; font-size: 2.2vmin; font-weight: 600; opacity: .8; }
+.mmoney-dim { opacity: .55; font-size: 1.8vmin; margin: 0 0 1vmin; }
+.mmoney-cats, .mmoney-list { list-style: none; margin: 0; padding: 0; }
+.mmoney-cats li { margin: 1.1vmin 0; }
+.mmoney-row { display: flex; justify-content: space-between; gap: 1.6vmin; font-size: 2.1vmin; margin-bottom: .5vmin; }
+.mmoney-list li { display: grid; grid-template-columns: 1fr auto auto; gap: 1.6vmin; padding: .9vmin 0; font-size: 2.1vmin; border-bottom: 1px solid rgba(255, 255, 255, .08); }
+.mmoney-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mmoney-when { opacity: .65; white-space: nowrap; }
+.mmoney-amt { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.mmoney-empty { display: flex; align-items: center; font-size: 3.2vmin; opacity: .8; }
