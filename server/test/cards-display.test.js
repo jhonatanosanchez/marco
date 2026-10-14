@@ -130,3 +130,10 @@ test('main.ts: la alerta de cámara y el cierre del modo Echo cierran tarjeta y 
   assert.match(main, /cards\.update\(cfg\.cards\);/);
   assert.match(main, /cardShow: \(d\) => \{ if \(!d\.sentAt \|\| serverNow\(\) - d\.sentAt < 60_000\) cards\.showNow\(d\.id\); \},/);
 });
+
+test('revisión 1: un anuncio o el timbre cierran tarjeta y hoja; con el timbre activo no sale ninguna', () => {
+  const main = readFileSync(new URL('../../web/display/main.ts', import.meta.url), 'utf8');
+  assert.match(main, /announce: \(a\) => \{ cards\.closeAll\(\); announcements\.show\(a\); \},/);
+  assert.match(main, /doorbell: \(d\) => \{\s*cards\.closeAll\(\);/);
+  assert.match(main, /const cardsPaused = \(\): boolean =>\s*doorbell\.active \|\| echo\.isClosed\(\)/);
+});

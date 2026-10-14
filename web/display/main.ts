@@ -80,7 +80,7 @@ const echo = new EchoController(isPreview);
 const cameraView = new CameraView(() => echo.isClosed());
 // Tarjetas (fork fsrhome): salen de vez en cuando; el horario, la cámara y los anuncios grandes mandan
 const cardsPaused = (): boolean =>
-  echo.isClosed() || cameraView.isOpen || announcements.expandedCount > 0 || document.hidden || !!state.config?.privacy?.active;
+  doorbell.active || echo.isClosed() || cameraView.isOpen || announcements.expandedCount > 0 || document.hidden || !!state.config?.privacy?.active;
 const cardSheet = new CardSheet(cardsPaused);
 const cards = new CardsController({ paused: cardsPaused, sheet: cardSheet });
 echo.onClose = () => { cameraView.close(); cards.closeAll(); };
@@ -1807,7 +1807,7 @@ const liveHandlers: StreamHandlers = {
   // a routine ticked (here, on a phone or in the admin), stars, a new family link
   family: () => void fetchFamily(),
   reload: () => location.reload(),
-  announce: (a) => announcements.show(a),
+  announce: (a) => { cards.closeAll(); announcements.show(a); },
   announceClear: (d) => announcements.clear(d.id),
   identify: (d) => {
     const car = carousel?.carousel;
@@ -1828,6 +1828,7 @@ const liveHandlers: StreamHandlers = {
   },
   // Doorbell: full screen above the night layer while it lasts (it wakes a dimmed screen, see widgets/doorbell.ts).
   doorbell: (d) => {
+    cards.closeAll();
     doorbellScreen = typeof d.screenId === 'string' ? d.screenId : '';
     doorbell.show(d);
   },

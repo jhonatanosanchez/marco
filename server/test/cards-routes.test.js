@@ -151,3 +151,10 @@ test('POST /api/admin/cards/<id>/show: evento cardShow solo a las pantallas que 
     assert.equal((await call('POST', '/api/admin/cards/k_apagada/show', { body: {}, cookie })).status, 404);
   });
 });
+
+test('revisión 2: pantalla en modo privado → 404 (la config tampoco le da tarjetas)', async () => {
+  await withApp(async ({ k, call }) => {
+    assert.equal((await call('GET', '/api/display/cards/k_mia', { key: k })).status, 404);
+    assert.equal((await call('GET', '/api/display/cards/k_mia/detail', { key: k })).status, 404);
+  }, { mutate: (c) => { c.screens[0].privacy = { hidePhotos: false, showLock: true, schedule: [{ days: [0, 1, 2, 3, 4, 5, 6], from: '00:00', to: '23:59' }] }; } });
+});
