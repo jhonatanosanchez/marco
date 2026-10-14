@@ -15,7 +15,7 @@ import {
 } from './carousels.js';
 import { IMMICH_ID_RE, MAX_IMMICH_ALBUMS, PORTRAIT_FITS, normalizeImmichUrl } from './immichCore.js';
 import { CAMERA_ID_RE, ZONE_RE, MAX_CAMERAS, MAX_ZONES } from './camerasCore.js';
-import { AGES_DEFAULTS, CARD_ID_RE, CARD_PREFIX, CARD_TYPES, MAX_CARDS, TRAINING_DEFAULTS, TRAINING_SOURCES } from './trainingCore.js';
+import { AGES_DEFAULTS, CARD_ID_RE, CARD_PREFIX, CARD_TYPES, HOMELAB_DEFAULTS, MAX_CARDS, TRAINING_DEFAULTS, TRAINING_SOURCES } from './trainingCore.js';
 import {
   BAND_NAME_MAX, BAND_PRESET_IDS, GRID_IDS, gridCompany, HOLIDAY_SETS, MAX_BAND_PRICE, MAX_BANDS, MIN_BAND_PRICE, TARIFF_MODES,
 } from './tariffsCore.js';
@@ -820,6 +820,19 @@ function sanitizeCard(ctx, p, x, seen) {
   if (x.type === 'money') {
     // sin opciones propias todavía: la fuente (gastos-dashboard) y su token viven en el entorno del servidor
     return { id: cardId, type: 'money', name: str(ctx, `${p}.name`, x.name, '', 60).trim() || 'Dinero', enabled, options: { money: {} } };
+  }
+  if (x.type === 'homelab') {
+    const q = `${p}.options.homelab`;
+    const hl = obj(ctx, q, o.homelab);
+    const everyMin = num(ctx, `${q}.everyMin`, hl.everyMin, HOMELAB_DEFAULTS.everyMin, 5, 120, true);
+    let zones = [...HOMELAB_DEFAULTS.zones];
+    if (hl.zones !== undefined) {
+      const ok = Array.isArray(hl.zones) && hl.zones.length >= 1 && hl.zones.length <= 10
+        && hl.zones.every((z) => typeof z === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(z));
+      if (ok) zones = [...new Set(hl.zones)];
+      else ctx.err(`${q}.zones`, '1–10 Frigate zone names ([A-Za-z0-9_-], up to 40 characters)');
+    }
+    return { id: cardId, type: 'homelab', name: str(ctx, `${p}.name`, x.name, '', 60).trim() || 'Homelab', enabled, options: { homelab: { everyMin, zones } } };
   }
   if (x.type === 'ages') {
     const q = `${p}.options.ages`;

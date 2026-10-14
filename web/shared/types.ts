@@ -59,7 +59,7 @@ export interface CamerasStatus { enabled: boolean; lastOkAt: string | null; last
 export interface CameraTestAlertResponse { ok: boolean; delivered: number; screens: string[] }
 
 // ---- Tarjetas (fork fsrhome; server/cards.js) ----
-export type CardType = 'training' | 'ages' | 'money';
+export type CardType = 'training' | 'ages' | 'money' | 'homelab';
 export type TrainingSource = 'coach' | 'garmin';
 export type CardCorner = 'tl' | 'tr' | 'bl' | 'br';
 export interface TrainingOptions { source: TrainingSource; garminUrl: string; coachUrl: string }
@@ -67,9 +67,11 @@ export interface TrainingOptions { source: TrainingSource; garminUrl: string; co
 export interface AgesOptions { person: string; birthDate: string; albumId: string; everyMin: number }
 /** Dinero (fork fsrhome): sin opciones propias; la fuente vive en el entorno del servidor */
 export type MoneyOptions = Record<string, never>;
+/** Homelab (fork fsrhome; server/homelab.js) */
+export interface HomelabOptions { everyMin: number; zones: string[] }
 export interface CardDef {
   id: string; type: CardType; name: string; enabled: boolean;
-  options: { training?: TrainingOptions; ages?: AgesOptions; money?: MoneyOptions };
+  options: { training?: TrainingOptions; ages?: AgesOptions; money?: MoneyOptions; homelab?: HomelabOptions };
 }
 /** una foto de la lista del día: `months` = edad en meses de ese tramo, `year` = año del tramo */
 export interface AgesPhoto { id: string; v: string; months: number; year: string }

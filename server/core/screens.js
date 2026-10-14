@@ -153,6 +153,8 @@ export function displayCards(cfg, screen, { isPrivate = false } = {}) {
     if (k.type === 'ages') return { id: k.id, type: k.type, name: k.name, everyMin: k.options.ages.everyMin, showSec: AGES_SHOW_SEC };
     // Dinero: nada del servicio (ni URL ni token) viaja a la pantalla
     if (k.type === 'money') return { id: k.id, type: k.type, name: k.name };
+    // Homelab: su propio ritmo de repetición; las zonas de Frigate no viajan a la pantalla
+    if (k.type === 'homelab') return { id: k.id, type: k.type, name: k.name, everyMin: k.options.homelab.everyMin };
     return { id: k.id, type: k.type, name: k.name, source: k.options.training.source };
   };
   const items = (sc.items ?? []).map((id) => defs.get(id))
