@@ -58,3 +58,36 @@ export class CardRotation<R extends { id: string }> {
     this.d.show(this.items[this.idx]);
   }
 }
+
+/**
+ * Una sola tarjeta en pantalla a la vez (fork fsrhome): la chica o "A esta edad", contando desde que se pide (antes de
+ * la red) hasta que se va. Así dos rotaciones que vencen en la misma vuelta no salen encimadas.
+ */
+export class CardStage {
+  private owner = 0;
+  private seq = 0;
+
+  get busy(): boolean {
+    return this.owner !== 0;
+  }
+
+  /** turno, o 0 si ya hay otra */
+  begin(): number {
+    if (this.owner) return 0;
+    this.owner = ++this.seq;
+    return this.owner;
+  }
+
+  /** ¿el turno sigue siendo de `token`? (closeAll o "Mostrar ahora" lo pueden haber quitado mientras cargaba) */
+  owns(token: number): boolean {
+    return token !== 0 && this.owner === token;
+  }
+
+  end(token: number): void {
+    if (token && this.owner === token) this.owner = 0;
+  }
+
+  reset(): void {
+    this.owner = 0;
+  }
+}

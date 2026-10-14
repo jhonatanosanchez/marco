@@ -824,7 +824,7 @@ function sanitizeCard(ctx, p, x, seen) {
     if (!person) ctx.err(`${q}.person`, 'required');
     let birthDate = str(ctx, `${q}.birthDate`, ag.birthDate, AGES_DEFAULTS.birthDate, 10).trim();
     const bd = new Date(`${birthDate}T00:00:00Z`);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(birthDate) || Number.isNaN(bd.getTime()) || bd.toISOString().slice(0, 10) !== birthDate || bd.getTime() > Date.now()) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(birthDate) || Number.isNaN(bd.getTime()) || bd.toISOString().slice(0, 10) !== birthDate || bd.getTime() > Date.now() || bd.getUTCFullYear() < new Date().getUTCFullYear() - 120) {
       ctx.err(`${q}.birthDate`, 'invalid date');
       birthDate = AGES_DEFAULTS.birthDate;
     }

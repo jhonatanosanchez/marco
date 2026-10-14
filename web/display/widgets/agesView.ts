@@ -9,7 +9,8 @@ import { ageLayout, agesHtml } from '../agesText';
 
 const LOAD_MS = 20_000;
 
-export interface AgesViewLike { open(ref: DisplayCardRef): void; close(): void; readonly isOpen: boolean }
+/** `onDone`: se llama una vez cuando se va (cerrada, a los 45 s o descartada sin mostrarse); suelta el turno */
+export interface AgesViewLike { open(ref: DisplayCardRef, onDone?: () => void): void; close(): void; readonly isOpen: boolean }
 
 const srcOf = (p: AgesPhoto): string => mediaUrl(`/media/immich/${encodeURIComponent(p.id)}?v=${encodeURIComponent(p.v)}`);
 
@@ -28,6 +29,9 @@ export class AgesView implements AgesViewLike {
   private root: HTMLElement | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private loading = false;
+  /** sube con cada close(): una carga que empezó antes se descarta */
+  private gen = 0;
+  private done: (() => void) | null = null;
 
   constructor(private paused: () => boolean) {}
 
@@ -35,30 +39,40 @@ export class AgesView implements AgesViewLike {
     return this.root !== null || this.loading;
   }
 
-  open(ref: DisplayCardRef): void {
-    if (this.loading) return;
+  open(ref: DisplayCardRef, onDone?: () => void): void {
+    if (this.loading || this.root) return void onDone?.();
+    this.done = onDone ?? null;
     void this.load(ref);
   }
 
+  private finish(): void {
+    const d = this.done;
+    this.done = null;
+    d?.();
+  }
+
   private async load(ref: DisplayCardRef): Promise<void> {
-    if (this.paused()) return;
+    const gen = this.gen;
+    let shown = false;
+    if (this.paused()) return this.finish();
     this.loading = true;
     try {
       const list = await getJSON<AgesList>(withScreen(`/api/display/cards/${encodeURIComponent(ref.id)}`), 30_000);
-      if (!list?.photos || list.photos.length < 2) return;
+      if (gen !== this.gen || !list?.photos || list.photos.length < 2) return;
       const ok = await Promise.all(list.photos.map((p) => preload(srcOf(p))));
       const photos = list.photos.filter((_, i) => ok[i]);
-      if (photos.length < 2 || this.paused()) return;
+      if (gen !== this.gen || photos.length < 2 || this.paused()) return;
       this.show({ ...list, photos }, (ref.showSec ?? 45) * 1000);
+      shown = true;
     } catch {
       /* esta vez no sale; la siguiente vuelta lo reintenta */
     } finally {
       this.loading = false;
+      if (!shown && gen === this.gen) this.finish();
     }
   }
 
   private show(list: AgesList, ms: number): void {
-    this.close();
     const root = document.createElement('div');
     root.className = 'edades';
     root.innerHTML = agesHtml(list, ageLayout(list.photos.length, innerWidth, innerHeight), ctx.t, srcOf);
@@ -70,10 +84,12 @@ export class AgesView implements AgesViewLike {
   }
 
   close(): void {
+    this.gen++;
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     const root = this.root;
     this.root = null;
+    this.finish();
     if (!root) return;
     root.classList.remove('visible');
     setTimeout(() => root.remove(), 1200);

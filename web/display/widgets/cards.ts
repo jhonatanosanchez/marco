@@ -6,7 +6,7 @@ import { getJSON } from '../api';
 import { ctx } from '../ctx';
 import { isPreview, withScreen } from '../identity';
 import { cardsSig, trainingCardHtml } from '../cardsText';
-import { CardRotation } from '../cardsRotation';
+import { CardRotation, CardStage } from '../cardsRotation';
 import type { AgesViewLike } from './agesView';
 
 const NONE: DisplayCards = { items: [], everyMin: 20, showSec: 30, corner: 'br' };
@@ -21,10 +21,12 @@ export class CardsController {
   private rot: CardRotation<DisplayCardRef>;
   /** "A esta edad" y futuras de pantalla completa: una rotación propia por tarjeta */
   private full = new Map<string, CardRotation<DisplayCardRef>>();
+  private stage = new CardStage();
+  private smallToken = 0;
 
   constructor(private o: { paused: () => boolean; sheet: SheetLike; ages: AgesViewLike }) {
-    // la vista previa del admin no rota (solo "Mostrar ahora"); con la hoja o "A esta edad" abiertas tampoco
-    this.rot = new CardRotation<DisplayCardRef>({ paused: o.paused, blocked: () => isPreview || o.sheet.isOpen || o.ages.isOpen, show: (ref) => void this.show(ref) });
+    // la vista previa del admin no rota (solo "Mostrar ahora"); con la hoja abierta u otra tarjeta en turno tampoco
+    this.rot = new CardRotation<DisplayCardRef>({ paused: o.paused, blocked: () => isPreview || o.sheet.isOpen || this.stage.busy, show: (ref) => void this.show(ref) });
   }
 
   /** config nueva de la pantalla; solo reinicia la rotación si cambió qué sale o cuándo */
@@ -42,9 +44,12 @@ export class CardsController {
     for (const ref of this.c.items.filter((i) => i.type === 'ages')) {
       const r = new CardRotation<DisplayCardRef>({
         paused: o.paused,
-        // nunca encima de una tarjeta chica, la hoja u otra "A esta edad": esa vuelta espera a la siguiente
-        blocked: () => isPreview || o.sheet.isOpen || this.el !== null || o.ages.isOpen,
-        show: (x) => o.ages.open(x),
+        // nunca encima de una tarjeta chica (aunque todavía esté cargando), la hoja u otra "A esta edad"
+        blocked: () => isPreview || o.sheet.isOpen || this.stage.busy,
+        show: (x) => {
+          const tk = this.stage.begin();
+          if (tk) o.ages.open(x, () => this.stage.end(tk));
+        },
       });
       r.reset([ref], ref.everyMin ?? 15);
       this.full.set(ref.id, r);
@@ -53,6 +58,8 @@ export class CardsController {
 
   /** "Mostrar ahora" del admin (evento cardShow) */
   showNow(id: string): void {
+    // "Mostrar ahora" gana sobre lo que esté en pantalla
+    this.closeAll();
     const r = this.full.get(id);
     if (r) r.showNow(id);
     else this.rot.showNow(id);
@@ -61,6 +68,8 @@ export class CardsController {
   hide(): void {
     if (this.hideTimer) clearTimeout(this.hideTimer);
     this.hideTimer = null;
+    this.stage.end(this.smallToken);
+    this.smallToken = 0;
     const el = this.el;
     this.el = null;
     if (!el) return;
@@ -73,17 +82,23 @@ export class CardsController {
     this.hide();
     this.o.sheet.close();
     this.o.ages.close();
+    this.stage.reset();
   }
 
   private async show(ref: DisplayCardRef): Promise<void> {
+    const tk = this.stage.begin();
+    if (!tk) return;
     let data: TrainingSummary;
     try {
       data = await getJSON<TrainingSummary>(withScreen(`/api/display/cards/${encodeURIComponent(ref.id)}`), 10_000);
     } catch {
+      this.stage.end(tk);
       return; // esta vez no sale; la siguiente vuelta lo reintenta
     }
-    if (this.o.paused()) return;
+    // pausa, o el turno se perdió mientras cargaba (closeAll, "Mostrar ahora")
+    if (this.o.paused() || !this.stage.owns(tk)) return void this.stage.end(tk);
     this.hide();
+    this.smallToken = tk;
     const el = document.createElement('div');
     el.className = `mcard mcard--${this.c.corner}`;
     el.innerHTML = trainingCardHtml(data, ref, ctx.t, ctx.lang);

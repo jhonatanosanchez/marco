@@ -55,12 +55,19 @@ test('cardsSig cambia si cambia el ritmo de una tarjeta a pantalla completa', ()
 
 test('CardsController: ages con rotación propia, bloqueada si hay otra tarjeta u hoja; closeAll la cierra', () => {
   const src = readFileSync(new URL('../../web/display/widgets/cards.ts', import.meta.url), 'utf8');
-  assert.match(src, /blocked: \(\) => isPreview \|\| o\.sheet\.isOpen \|\| this\.el !== null \|\| o\.ages\.isOpen/);
-  assert.match(src, /blocked: \(\) => isPreview \|\| o\.sheet\.isOpen \|\| o\.ages\.isOpen/);
+  // revisión 1: las dos rotaciones piden turno en el mismo escenario (prueba de abajo)
   assert.match(src, /closeAll\(\): void \{\s*this\.hide\(\);\s*this\.o\.sheet\.close\(\);\s*this\.o\.ages\.close\(\);/);
   const main = readFileSync(new URL('../../web/display/main.ts', import.meta.url), 'utf8');
   assert.match(main, /new CardsController\(\{ paused: cardsPaused, sheet: cardSheet, ages: agesView \}\)/);
   const css = readFileSync(new URL('../../web/display/styles-ages.css', import.meta.url), 'utf8');
   assert.match(css, /@font-face \{ font-family: "Patrick Hand";/);
   assert.match(css, /prefers-reduced-motion/);
+});
+
+test('revisión 1: todas las tarjetas piden turno en el mismo escenario; ages se descarta si la cierran mientras carga', () => {
+  const src = readFileSync(new URL('../../web/display/widgets/cards.ts', import.meta.url), 'utf8');
+  assert.equal((src.match(/blocked: \(\) => isPreview \|\| o\.sheet\.isOpen \|\| this\.stage\.busy/g) || []).length, 2);
+  assert.match(src, /const tk = this\.stage\.begin\(\);\s*if \(!tk\) return;/);
+  const view = readFileSync(new URL('../../web/display/widgets/agesView.ts', import.meta.url), 'utf8');
+  assert.match(view, /if \(gen !== this\.gen \|\| photos\.length < 2 \|\| this\.paused\(\)\) return;/);
 });
