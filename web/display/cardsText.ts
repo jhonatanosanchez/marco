@@ -12,8 +12,8 @@ const ZONE_COLORS = ['#6aa8ff', '#5fd38a', '#ffd166', '#ff9f43', '#ff5a4e'];
 
 export const nextIndex = (count: number, prev: number): number => (count > 0 ? (prev + 1) % count : -1);
 
-/** lo que, si cambia, reinicia la rotación (el nombre no) */
-export const cardsSig = (c: DisplayCards): string => JSON.stringify([c.items.map((i) => i.id), c.everyMin, c.showSec, c.corner]);
+/** lo que, si cambia, reinicia la rotación (el nombre no): ids, el ritmo propio de las de pantalla completa y el de la pantalla */
+export const cardsSig = (c: DisplayCards): string => JSON.stringify([c.items.map((i) => [i.id, i.everyMin ?? null]), c.everyMin, c.showSec, c.corner]);
 
 export function escHtml(s: unknown): string {
   return String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch] as string);

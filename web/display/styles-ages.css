@@ -1,0 +1,61 @@
+/* "A esta edad" (fork fsrhome): el marco de la puerta donde se marca con lápiz cuánto mide cada año, portado de
+   echo-reloj (html/css/pantallas.css #edades). Posiciones y tamaños: agesText.ts. */
+@font-face { font-family: "Patrick Hand"; font-weight: 400; font-display: block; src: url(./fonts/patrick-hand-latin-400-normal.woff2) format("woff2"); }
+.edades {
+  --pared: #CFE3EA; --madera: #E3BC82; --veta: #C99A5B; --lapiz: #37414F;
+  --crayon-rosa: #F08BA6; --crayon-sol: #F5C84A; --crayon-menta: #8FD3B6;
+  position: fixed; inset: 0; z-index: 8980; opacity: 0; transition: opacity 1.2s; pointer-events: auto;
+  overflow: hidden; color: var(--lapiz); font-family: "Patrick Hand", sans-serif; font-size: 16px;
+  background:
+    radial-gradient(120% 90% at 12% 0%, rgba(255, 255, 255, .55), transparent 60%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .26) 0 16px, transparent 16px 46px),
+    var(--pared);
+}
+.edades.visible { opacity: 1; }
+.edades-regla {
+  position: absolute; left: 30px; top: 0; bottom: 70px; width: 46px;
+  background:
+    repeating-linear-gradient(0deg, rgba(92, 60, 28, .7) 0 2px, transparent 2px 60px) right / 22px 100% no-repeat,
+    repeating-linear-gradient(0deg, rgba(92, 60, 28, .5) 0 1px, transparent 1px 12px) right / 11px 100% no-repeat,
+    linear-gradient(90deg, var(--veta), var(--madera) 30%, var(--madera) 75%, var(--veta));
+  box-shadow: 3px 0 8px rgba(40, 60, 70, .25);
+}
+.edades-zoclo {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 70px;
+  background: linear-gradient(#FBFBF8 0 38px, #E6E1D6 38px 42px, #B7875A 42px, #A57549);
+  box-shadow: 0 -3px 10px rgba(40, 60, 70, .18);
+}
+.edades-cabecera { position: absolute; left: 112px; top: 26px; }
+.edades-titulo { font-size: 3.4rem; line-height: 1; }
+.edades-sub { font-size: 1.7rem; margin-top: .3rem; opacity: .8; }
+.edades-estrellas { position: absolute; left: calc(100% + 14px); top: -6px; width: 74px; height: 50px; }
+.edades-fotos { position: absolute; inset: 0; }
+.marca-lapiz { position: absolute; left: 76px; height: 0; border-top: 2.5px solid var(--lapiz); opacity: .75; transform-origin: left center; }
+.marca-lapiz span {
+  position: absolute; left: -50px; top: -.8rem; padding: 0 .3rem; border-radius: 3px;
+  background: rgba(255, 252, 244, .92); font-size: 1.2rem; line-height: 1.4; transform: rotate(-4deg);
+  box-shadow: 0 1px 2px rgba(92, 60, 28, .3);
+}
+.instantanea {
+  position: absolute; background: #FFFEFB; box-sizing: border-box;
+  box-shadow: 0 10px 22px rgba(30, 50, 60, .28), 0 1px 2px rgba(0, 0, 0, .2);
+  transform: rotate(var(--giro));
+}
+.instantanea .foto { width: 100%; height: 80%; background-size: cover; background-position: center 30%; background-color: #D9D4C8; }
+.instantanea .pie { height: 20%; display: flex; align-items: center; justify-content: flex-end; padding-right: 4%; line-height: 1; white-space: nowrap; }
+.instantanea.primera .pie { justify-content: center; padding-right: 0; }
+.instantanea .cinta {
+  position: absolute; left: 50%; top: -14px; width: 42%; height: 28px; margin-left: -21%;
+  background: var(--color-cinta); opacity: .82; transform: rotate(var(--giro-cinta));
+  -webkit-mask: linear-gradient(90deg, transparent 0 3px, #000 3px calc(100% - 3px), transparent 0);
+}
+.edades.animar .instantanea { opacity: 0; animation: edad-cae .8s cubic-bezier(.2, .9, .3, 1.15) forwards; animation-delay: var(--retraso); }
+.edades.animar .instantanea .foto { animation: edad-revela 2.6s ease-out forwards; animation-delay: var(--retraso); filter: sepia(.9) brightness(1.55) contrast(.5) saturate(.3); }
+.edades.animar .marca-lapiz { transform: scaleX(0); animation: edad-traza .7s ease-out forwards; animation-delay: calc(var(--retraso) + .5s); }
+@keyframes edad-cae { from { opacity: 0; transform: translateY(-40px) rotate(calc(var(--giro) * 3)); } to { opacity: 1; transform: rotate(var(--giro)); } }
+@keyframes edad-revela { to { filter: none; } }
+@keyframes edad-traza { to { transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .edades.animar .instantanea, .edades.animar .instantanea .foto, .edades.animar .marca-lapiz { animation: none; opacity: 1; filter: none; transform: rotate(var(--giro)); }
+  .edades.animar .marca-lapiz { transform: none; }
+}

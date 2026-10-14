@@ -67,6 +67,7 @@ import { setCameraActivity, setCameraTapHandler } from './widgets/cameras';
 import { CameraView, TAP_MS, ALERT_MS, alertTitle } from './widgets/cameraView';
 import { CardsController } from './widgets/cards';
 import { CardSheet } from './widgets/cardSheet';
+import { AgesView } from './widgets/agesView';
 import { alertIsFresh } from './camerasText';
 
 const params = ctx.params;
@@ -82,7 +83,8 @@ const cameraView = new CameraView(() => echo.isClosed());
 const cardsPaused = (): boolean =>
   doorbell.active || echo.isClosed() || cameraView.isOpen || announcements.expandedCount > 0 || document.hidden || !!state.config?.privacy?.active;
 const cardSheet = new CardSheet(cardsPaused);
-const cards = new CardsController({ paused: cardsPaused, sheet: cardSheet });
+const agesView = new AgesView(cardsPaused);
+const cards = new CardsController({ paused: cardsPaused, sheet: cardSheet, ages: agesView });
 echo.onClose = () => { cameraView.close(); cards.closeAll(); };
 setCameraTapHandler((cam) => cameraView.open(cam, { title: ctx.t('camLive', { name: cam.name }), detail: ctx.t('camTapClose'), ms: TAP_MS }));
 function cameraAlertOpen(d: CameraAlert): void {
