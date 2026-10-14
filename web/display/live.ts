@@ -101,6 +101,8 @@ export interface StreamHandlers {
   /** cámaras (fork fsrhome): actividad por cámara y alerta de persona */
   cameras?: (d: CamerasActivityEvent) => void;
   cameraAlert?: (d: CameraAlert) => void;
+  /** tarjetas (fork fsrhome): "Mostrar ahora" del admin */
+  cardShow?: (d: { id: string; sentAt?: number }) => void;
   /** link regenerated / device revoked / display access switched to private */
   revoked?: (d: { code: string }) => void;
   open?: () => void;
@@ -138,6 +140,9 @@ export function dispatch(name: string, d: any, h: StreamHandlers): boolean {
           ...(typeof d.sentAt === 'number' ? { sentAt: d.sentAt } : {}),
         });
       }
+      return true;
+    case 'cardShow':
+      if (d && typeof d.id === 'string') h.cardShow?.({ id: d.id, ...(typeof d.sentAt === 'number' ? { sentAt: d.sentAt } : {}) });
       return true;
     default: return false;
   }
