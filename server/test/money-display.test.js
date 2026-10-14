@@ -112,9 +112,82 @@ test('fuentes: la tarjeta money se dibuja con moneyCardHtml; la hoja de dinero s
   const cards = readFileSync(new URL('../../web/display/widgets/cards.ts', import.meta.url), 'utf8');
   assert.match(cards, /ref\.type === 'money' \? moneyCardHtml\(/);
   const sheet = readFileSync(new URL('../../web/display/widgets/moneySheet.ts', import.meta.url), 'utf8');
-  assert.match(sheet, /close\(\): void \{[\s\S]*this\.data = null;[\s\S]*this\.until = 0;/);
+  assert.match(sheet, /close\(\): void \{[\s\S]*this\.clock\.stop\(\);[\s\S]*this\.data = null;/);
   assert.doesNotMatch(sheet, /localStorage|sessionStorage|indexedDB/);
   const main = readFileSync(new URL('../../web/display/main.ts', import.meta.url), 'utf8');
   assert.match(main, /const cardSheet = new SheetSwitch\(\{ money: new MoneySheet\(cardsPaused\) \}, new CardSheet\(cardsPaused\)\);/);
   assert.match(main, /new CardsController\(\{ paused: cardsPaused, sheet: cardSheet, ages: agesView \}\)/);
+});
+
+// Reloj de la hoja (spec §6, reloj falso): revelar 30 s y volver a ocultar; cerrar a los 90 s esperando el revelado;
+// stop() (closeAll) suelta todo.
+const [rv] = await loadWebModules('/web/display/moneyReveal.ts');
+const { mock } = await import('node:test');
+
+function clockHarness() {
+  mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: 0 });
+  const calls = { paint: [], close: 0 };
+  const clock = new rv.RevealClock({ paint: () => calls.paint.push(clock.revealed), close: () => { calls.close++; clock.stop(); } });
+  return { clock, calls };
+}
+
+test('RevealClock: revelar dura 30 s con repintado cada segundo y luego se oculta solo', () => {
+  const { clock, calls } = clockHarness();
+  try {
+    clock.start();
+    clock.reveal();
+    assert.equal(clock.revealed, true);
+    assert.equal(clock.secondsLeft, 30);
+    mock.timers.tick(10_000);
+    assert.equal(clock.secondsLeft, 20);
+    mock.timers.tick(20_000);
+    assert.equal(clock.revealed, false);
+    assert.equal(calls.paint.at(-1), false); // el último repintado ya es sin montos
+    const n = calls.paint.length;
+    mock.timers.tick(5_000);
+    assert.equal(calls.paint.length, n); // el tictac se detuvo
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+test('RevealClock: cierra a los 90 s; si se reveló a los 70 s, espera a los 100 s', () => {
+  let h = clockHarness();
+  try {
+    h.clock.start();
+    mock.timers.tick(89_999);
+    assert.equal(h.calls.close, 0);
+    mock.timers.tick(1);
+    assert.equal(h.calls.close, 1);
+  } finally {
+    mock.timers.reset();
+  }
+  h = clockHarness();
+  try {
+    h.clock.start();
+    mock.timers.tick(70_000);
+    h.clock.reveal();
+    mock.timers.tick(20_000); // 90 s: todavía revelado
+    assert.equal(h.calls.close, 0);
+    mock.timers.tick(10_000); // 100 s: se ocultó → cierra
+    assert.equal(h.calls.close, 1);
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+test('RevealClock: stop() (closeAll) oculta, detiene tictac y cierre agendado', () => {
+  const { clock, calls } = clockHarness();
+  try {
+    clock.start();
+    clock.reveal();
+    clock.stop();
+    assert.equal(clock.revealed, false);
+    const n = calls.paint.length;
+    mock.timers.tick(200_000);
+    assert.equal(calls.paint.length, n);
+    assert.equal(calls.close, 0);
+  } finally {
+    mock.timers.reset();
+  }
 });

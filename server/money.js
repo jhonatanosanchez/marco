@@ -14,11 +14,23 @@ let copy = null;
 /** petición en curso (dos pantallas a la vez no duplican) */
 let inflight = null;
 let warned = false;
+/** ¿la última lectura falló? (se registra solo el cambio, nunca el token ni la URL) */
+let failing = false;
 
 export function _resetMoney() {
   copy = null;
   inflight = null;
   warned = false;
+  failing = false;
+}
+
+/** motivo corto de una falla: 'http 401', 'timeout', 'forma inesperada' o 'error de red' (nunca la URL) */
+function failReason(e) {
+  const msg = String(e?.message ?? '');
+  if (/^http \d+$/.test(msg) || msg === 'forma inesperada') return msg;
+  if (e?.name === 'SyntaxError') return 'forma inesperada';
+  if (e?.name === 'TimeoutError' || e?.name === 'AbortError') return 'timeout';
+  return 'error de red';
 }
 
 export const gastosSource = (env = process.env) => ({
@@ -47,8 +59,10 @@ export async function loadMoney(now = Date.now(), env = process.env, today = new
         const data = sanitizeResumen(await r.json(), today);
         if (!data) throw new Error('forma inesperada');
         copy = { at: now, data };
-      } catch {
-        // se queda la copia anterior (si la hay)
+        if (failing) { failing = false; console.info('[cards] Dinero: gastos-dashboard responde de nuevo'); }
+      } catch (e) {
+        // se queda la copia anterior (si la hay); se registra solo el cambio de bien a mal, con el motivo
+        if (!failing) { failing = true; console.warn(`[cards] Dinero: gastos-dashboard no respondió (${failReason(e)})`); }
       } finally {
         inflight = null;
       }

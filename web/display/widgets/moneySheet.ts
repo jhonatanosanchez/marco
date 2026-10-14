@@ -6,18 +6,16 @@ import type { DisplayCardRef, MoneyResponse } from '../../shared/types';
 import { getJSON } from '../api';
 import { ctx } from '../ctx';
 import { withScreen } from '../identity';
-import { moneySheetHtml, REVEAL_MS, secondsLeft, sheetCloseAt } from '../moneyText';
+import { moneySheetHtml } from '../moneyText';
+import { RevealClock } from '../moneyReveal';
 import type { SheetLike } from './cards';
 
 export class MoneySheet implements SheetLike {
   private root: HTMLElement | null = null;
   private ref: DisplayCardRef | null = null;
   private data: MoneyResponse | null = null;
-  private until = 0;
-  private openedAt = 0;
-  private closeTimer: ReturnType<typeof setTimeout> | null = null;
-  private tick: ReturnType<typeof setInterval> | null = null;
   private gen = 0;
+  private clock = new RevealClock({ paint: () => this.paint(), close: () => this.close() });
 
   constructor(private paused: () => boolean) {}
 
@@ -44,40 +42,16 @@ export class MoneySheet implements SheetLike {
     this.gen = gen;
     this.ref = ref;
     this.data = r;
-    this.openedAt = Date.now();
     const root = document.createElement('div');
     root.className = 'msheet mmoney';
     root.addEventListener('click', (ev) => {
       if ((ev.target as HTMLElement).closest('.msheet-head')) return this.close();
-      this.reveal();
+      if (this.data?.ok) this.clock.reveal();
     });
     document.body.appendChild(root);
     this.root = root;
     this.paint();
-    this.scheduleClose();
-  }
-
-  private reveal(): void {
-    if (!this.data?.ok) return;
-    this.until = Date.now() + REVEAL_MS;
-    if (this.tick) clearInterval(this.tick);
-    this.tick = setInterval(() => {
-      if (Date.now() >= this.until) {
-        if (this.tick) clearInterval(this.tick);
-        this.tick = null;
-      }
-      this.paint();
-    }, 1000);
-    this.paint();
-  }
-
-  private scheduleClose(): void {
-    if (this.closeTimer) clearTimeout(this.closeTimer);
-    const wait = sheetCloseAt(this.openedAt, this.until) - Date.now();
-    this.closeTimer = setTimeout(() => {
-      if (Date.now() < this.until) return this.scheduleClose(); // revelado después de agendar: esperar a que se oculten
-      this.close();
-    }, Math.max(0, wait));
+    this.clock.start();
   }
 
   /** repinta conservando el scroll de las listas (el tictac de cada segundo no las regresa arriba) */
@@ -85,22 +59,16 @@ export class MoneySheet implements SheetLike {
     const root = this.root;
     if (!root || !this.data || !this.ref) return;
     const scrolls = [...root.querySelectorAll<HTMLElement>('.mmoney-scroll')].map((el) => el.scrollTop);
-    const now = Date.now();
-    const reveal = now < this.until;
-    root.innerHTML = moneySheetHtml(this.data, this.ref, { reveal, secondsLeft: secondsLeft(this.until, now) }, ctx.t, ctx.lang);
+    root.innerHTML = moneySheetHtml(this.data, this.ref, { reveal: this.clock.revealed, secondsLeft: this.clock.secondsLeft }, ctx.t, ctx.lang);
     root.querySelectorAll<HTMLElement>('.mmoney-scroll').forEach((el, i) => { el.scrollTop = scrolls[i] ?? 0; });
   }
 
   close(): void {
     this.gen++;
-    if (this.closeTimer) clearTimeout(this.closeTimer);
-    if (this.tick) clearInterval(this.tick);
-    this.closeTimer = null;
-    this.tick = null;
+    this.clock.stop();
     this.root?.remove();
     this.root = null;
     this.ref = null;
     this.data = null;
-    this.until = 0;
   }
 }

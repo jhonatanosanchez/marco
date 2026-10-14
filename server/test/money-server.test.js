@@ -182,3 +182,31 @@ test('GET /api/admin/cards/status: solo un booleano, nunca el token; requiere se
     assert.doesNotMatch(r.raw, new RegExp(TOKEN));
   });
 });
+
+test('loadMoney: registra una vez cuando gastos empieza a fallar (solo el motivo) y cuando vuelve', async () => {
+  const fake = await fakeGastos({ resumen: RESUMEN() });
+  _resetMoney();
+  const warns = [];
+  const infos = [];
+  const [w, i] = [console.warn, console.info];
+  console.warn = (...a) => warns.push(a.join(' '));
+  console.info = (...a) => infos.push(a.join(' '));
+  try {
+    const t0 = Date.now();
+    await loadMoney(t0, env(fake, { GASTOS_ECHO_TOKEN: 'rotado' }));
+    await loadMoney(t0 + 1000, env(fake, { GASTOS_ECHO_TOKEN: 'rotado' }));
+    assert.equal(warns.length, 1, warns.join('\n'));
+    assert.match(warns[0], /http 401/);
+    assert.doesNotMatch(warns[0], /rotado|127\.0\.0\.1/);
+    assert.ok(await loadMoney(t0 + 2000, env(fake)));
+    assert.equal(infos.length, 1);
+    fake.state.resumen = { ritmo: null };
+    _resetMoney();
+    await loadMoney(t0 + 3000, env(fake));
+    assert.match(warns.at(-1), /forma inesperada/);
+  } finally {
+    console.warn = w;
+    console.info = i;
+    await fake.stop();
+  }
+});
