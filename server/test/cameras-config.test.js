@@ -90,3 +90,10 @@ test('widget cameras con frigate apagado: la pantalla no lo recibe', () => {
   const r = validateConfig(c);
   assert.deepEqual(displayWidgets(r.value, r.value.screens[0]), []);
 });
+
+test('revisión 3: frigate sin zonas es error (Frigate no devolvería nada y las alertas callarían)', () => {
+  const c = base();
+  c.frigate = { ...defaultConfig().frigate, zones: [] };
+  const r = validateConfig(c);
+  assert.ok(r.errors.some((e) => e.path === 'frigate.zones'));
+});

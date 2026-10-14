@@ -88,7 +88,7 @@ test('una persona nueva publica actividad y alerta con el nombre de la cámara',
   assert.deepEqual(act.activity, { patio: { label: 'person', startTime: S - 5 } });
   const { type, ...al } = cmds.find((c) => c.type === 'cameraAlert');
   assert.equal(type, 'cameraAlert');
-  assert.deepEqual(al, { camera: 'patio', name: 'Patio', label: 'person', startTime: S - 5, eventId: `${S - 5}.0-ev1` });
+  assert.deepEqual(al, { camera: 'patio', name: 'Patio', label: 'person', startTime: S - 5, eventId: `${S - 5}.0-ev1`, sentAt: NOW });
   assert.ok(fake.hits.some((h) => h.includes('/api/events?') && h.includes('labels=person%2Ccar') && h.includes('zones=pipol%2Cpipol2%2CEntrada%2Cmi-patio')));
 }));
 
@@ -163,3 +163,43 @@ test('admin: estado y probar alerta', () => withApp(async ({ call, login, screen
   assert.equal(al.test, true);
   assert.equal((await call('GET', '/api/admin/cameras/status')).status, 401);
 }));
+
+test('revisión 1: la alerta lleva sentAt (hora del servidor al publicarla), aunque la persona entre a la zona tarde', () => withApp(async ({ fake, screenId }) => {
+  _resetPoll(); _resetCameras(NOW - 600_000);
+  const cur = currentCursor();
+  fake.state.events = [ev(1, 'patio', 'person', S - 120)]; // rastreada desde hace 2 min, recién entró a la zona
+  await tickCameras(NOW, { force: true });
+  const al = commandsFor(cur, screenId).find((c) => c.type === 'cameraAlert');
+  assert.ok(al, 'sí se publica');
+  assert.equal(al.sentAt, NOW);
+}));
+
+test('revisión 2: una pantalla en modo privado no recibe alertas de persona', () => withApp(async ({ fake, call, login, screenId }) => {
+  _resetPoll(); _resetCameras(NOW - 10_000);
+  const cookie = await login();
+  assert.equal((await call('POST', '/api/admin/privacy', { cookie, body: { mode: 'on', screens: [screenId] } })).status, 200);
+  const cur = currentCursor();
+  fake.state.events = [ev(1, 'patio', 'person', S - 5)];
+  await tickCameras(NOW, { force: true });
+  assert.ok(!commandsFor(cur, screenId).some((c) => c.type === 'cameraAlert'));
+  const t = await call('POST', '/api/admin/cameras/test-alert', { cookie, body: { camera: 'patio' } });
+  assert.deepEqual(t.json.screens, []);
+}));
+
+test('revisión 4: el estado del admin comprueba Frigate aunque no haya pantallas conectadas', async () => {
+  await withApp(async ({ call, login }) => {
+    _resetCameras(Date.now());
+    const cookie = await login();
+    const st = await call('GET', '/api/admin/cameras/status', { cookie });
+    assert.ok(st.json.lastOkAt, 'comprobado al pedir el estado');
+    assert.equal(st.json.lastError, null);
+  });
+  await withApp(async ({ call, login, fake }) => {
+    _resetCameras(Date.now());
+    fake.state.down = true;
+    const cookie = await login();
+    const st = await call('GET', '/api/admin/cameras/status', { cookie });
+    assert.equal(st.json.lastOkAt, null);
+    assert.equal(st.json.lastError, 'unreachable');
+  });
+});

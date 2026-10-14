@@ -18,7 +18,9 @@ export function cameraLabel(a: CameraActivity | undefined, nowMs: number, t: T):
   return `${what} · ${min < 1 ? t('camNow') : t('camAgo', { n: min })}`;
 }
 
-export const alertIsFresh = (a: Pick<CameraAlert, 'startTime'>, nowMs: number): boolean => nowMs - a.startTime * 1000 <= ALERT_FRESH_MS;
+/** Fresca = publicada por el servidor hace 60 s o menos (sentAt); sin sentAt (servidor viejo), desde start_time. */
+export const alertIsFresh = (a: Pick<CameraAlert, 'startTime' | 'sentAt'>, nowMs: number): boolean =>
+  nowMs - (typeof a.sentAt === 'number' ? a.sentAt : a.startTime * 1000) <= ALERT_FRESH_MS;
 
 /** Alto que la cuadrícula reserva en la columna lateral: el de todo su ancho (la agenda y lo demás ceden). */
 export const floorHeight = (width: number, count: number): number => (count > 0 ? gridBox(width, Infinity, count)[1] : 0);

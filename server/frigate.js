@@ -9,6 +9,7 @@ import { publish, listPollers } from './pollHub.js';
 import { listClients } from './sse.js';
 import { requireAuth } from './auth.js';
 import { logActivity } from './activity.js';
+import { screenPrivacy } from './privacy.js';
 import { CAMERA_ID_RE, EVENT_ID_RE, activityByCamera, alertScreenIds, emptyAlertState, newAlerts, screensWantingCameras, validEvents } from './core/camerasCore.js';
 
 /** User-Agent neutro: con uno tipo Safari (Silk), go2rtc redirige a HLS. */
@@ -60,13 +61,15 @@ export function camerasMediaRouter() {
 }
 
 export const POLL_MS = 5000;
+/** el estado del admin vuelve a preguntar a Frigate si la última comprobación es más vieja que esto */
+const STATUS_STALE_MS = 30_000;
 const FETCH_TIMEOUT_MS = 4000;
 
 let startedAtS = Date.now() / 1000;
 let alertState = emptyAlertState();
 let activity = {};
 let activitySig = '{}';
-let status = { lastOkAt: null, lastError: null, lastEventAt: null };
+let status = { lastOkAt: null, lastError: null, lastEventAt: null, checkedAt: 0 };
 let busy = false;
 let timer = null;
 
@@ -82,8 +85,16 @@ export function _resetCameras(startedAtMs = Date.now()) {
   alertState = emptyAlertState();
   activity = {};
   activitySig = '{}';
-  status = { lastOkAt: null, lastError: null, lastEventAt: null };
+  status = { lastOkAt: null, lastError: null, lastEventAt: null, checkedAt: 0 };
   busy = false;
+}
+
+/** Pantallas que reciben la alerta de persona ahora: con el interruptor encendido y sin modo privado activo. */
+function alertTargets(cfg, now) {
+  return alertScreenIds(cfg).filter((id) => {
+    const s = cfg.screens.find((x) => x.id === id);
+    return s && !screenPrivacy(cfg, s, new Date(now)).active;
+  });
 }
 
 /** ¿Hay una pantalla conectada (SSE o sondeo) que muestre cámaras o tenga alertas? */
@@ -105,7 +116,7 @@ export async function tickCameras(now = Date.now(), { force = false } = {}) {
     if (!r.ok) throw new Error(`http ${r.status}`);
     const events = validEvents(await r.json(), new Set(f.cameras.map((c) => c.id)));
     const newest = events.reduce((m, e) => Math.max(m, e.start_time * 1000), 0);
-    status = { lastOkAt: now, lastError: null, lastEventAt: Math.max(newest, status.lastEventAt || 0) || null };
+    status = { lastOkAt: now, lastError: null, lastEventAt: Math.max(newest, status.lastEventAt || 0) || null, checkedAt: now };
     const act = activityByCamera(events, now / 1000);
     const sig = JSON.stringify(act);
     if (sig !== activitySig) {
@@ -115,15 +126,16 @@ export async function tickCameras(now = Date.now(), { force = false } = {}) {
     }
     const out = newAlerts(alertState, events, startedAtS);
     alertState = out.state;
-    const screenIds = alertScreenIds(cfg);
+    const screenIds = alertTargets(cfg, now);
     if (screenIds.length) {
       for (const a of out.alerts) {
         const name = f.cameras.find((c) => c.id === a.camera)?.name || a.camera;
-        publish('cameraAlert', { ...a, name }, { screenIds });
+        // sentAt: la pantalla mide la frescura desde que el servidor la publica, no desde que Frigate empezó a seguirla
+        publish('cameraAlert', { ...a, name, sentAt: now }, { screenIds });
       }
     }
   } catch (e) {
-    status = { ...status, lastError: e?.name === 'TimeoutError' ? 'timeout' : 'unreachable' };
+    status = { ...status, lastError: e?.name === 'TimeoutError' ? 'timeout' : 'unreachable', checkedAt: now };
   } finally {
     busy = false;
   }
@@ -153,15 +165,25 @@ export function camerasDisplayRouter() {
 
 export function camerasAdminRouter() {
   const r = Router();
-  r.get('/cameras/status', requireAuth, (req, res) => res.set('cache-control', 'no-store').json(camerasStatus()));
+  r.get('/cameras/status', requireAuth, async (req, res, next) => {
+    try {
+      // sin pantallas conectadas el ciclo no corre: el admin pregunta ahora para no mostrar un verde sin comprobar
+      const now = Date.now();
+      if (getConfig().frigate?.enabled && now - status.checkedAt > STATUS_STALE_MS) await tickCameras(now, { force: true });
+      res.set('cache-control', 'no-store').json(camerasStatus());
+    } catch (e) {
+      next(e);
+    }
+  });
   r.post('/cameras/test-alert', requireAuth, (req, res) => {
     const cfg = getConfig();
     const f = cfg.frigate;
     const cam = f?.enabled ? f.cameras.find((c) => c.id === req.body?.camera) : null;
     if (!cam) return res.status(400).json({ error: 'unknown camera' });
-    const screenIds = alertScreenIds(cfg);
+    const now = Date.now();
+    const screenIds = alertTargets(cfg, now);
     const delivered = screenIds.length
-      ? publish('cameraAlert', { camera: cam.id, name: cam.name, label: 'person', startTime: Date.now() / 1000, eventId: null, test: true }, { screenIds })
+      ? publish('cameraAlert', { camera: cam.id, name: cam.name, label: 'person', startTime: now / 1000, eventId: null, test: true, sentAt: now }, { screenIds })
       : 0;
     const screens = screenIds.map((id) => cfg.screens.find((s) => s.id === id)?.slug || id);
     logActivity('display.cameraTest', { req, data: { camera: cam.id, screens, delivered } });

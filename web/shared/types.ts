@@ -52,7 +52,7 @@ export interface CameraActivity { label: string; startTime: number }
 /** evento en vivo `cameras` y GET /api/display/cameras */
 export interface CamerasActivityEvent { activity: Record<string, CameraActivity> }
 /** evento en vivo `cameraAlert` (solo a pantallas con screen.cameras.personAlerts) */
-export interface CameraAlert { camera: string; name: string; label: string; startTime: number; eventId: string | null; test?: boolean }
+export interface CameraAlert { camera: string; name: string; label: string; startTime: number; eventId: string | null; test?: boolean; /** ms del servidor al publicarla */ sentAt?: number }
 /** GET /api/admin/cameras/status */
 export interface CamerasStatus { enabled: boolean; lastOkAt: string | null; lastError: string | null; lastEventAt: string | null }
 /** POST /api/admin/cameras/test-alert */

@@ -66,3 +66,20 @@ test('los recuadros reciben toques (Marco pone pointer-events: none en todos los
   const css = readFileSync(new URL('../../web/display/styles-cameras.css', import.meta.url), 'utf8');
   assert.match(css, /\.camgrid \.cam \{[^}]*pointer-events: auto/);
 });
+
+test('revisión 1: la frescura se mide con sentAt cuando viene (persona que entra tarde a la zona)', () => {
+  assert.equal(txt.alertIsFresh({ startTime: at(120_000), sentAt: NOW - 2000 }, NOW), true);
+  assert.equal(txt.alertIsFresh({ startTime: at(5000), sentAt: NOW - 61_000 }, NOW), false);
+  const got = [];
+  live.dispatch('cameraAlert', { camera: 'patio', name: 'Patio', label: 'person', startTime: 1, eventId: null, sentAt: 5 }, { cameraAlert: (d) => got.push(d) });
+  assert.equal(got[0].sentAt, 5);
+});
+
+test('revisión 3: zonas como texto libre; se separan al salir del campo, no en cada tecla', async () => {
+  const [z] = await loadWebModules('/web/admin/camerasZones.ts');
+  assert.deepEqual(z.parseZones('pipol, , Entrada,'), ['pipol', 'Entrada']);
+  assert.deepEqual(z.parseZones('  '), []);
+  const sec = readFileSync(new URL('../../web/admin/sections/Cameras.tsx', import.meta.url), 'utf8');
+  assert.match(sec, /onBlur=/);
+  assert.doesNotMatch(sec, /onValue=\{\(v\) => set\(\(d\) => void \(d\.frigate\.zones/);
+});

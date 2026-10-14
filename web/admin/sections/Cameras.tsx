@@ -5,6 +5,7 @@ import { api, ApiError } from '../api';
 import { toast } from '../components/feedback';
 import { Button, Callout, Card, Field, PageHeader, Segmented, TextInput, ToggleRow } from '../components/ui';
 import { t } from '../i18n';
+import { parseZones } from '../camerasZones';
 import type { SectionProps } from './common';
 
 const ago = (iso: string | null): string => {
@@ -18,6 +19,9 @@ export function CamerasSection({ cfg, set, errors }: SectionProps) {
   const [st, setSt] = useState<CamerasStatus | null>(null);
   const [cam, setCam] = useState(f.cameras[0]?.id ?? '');
   const [busy, setBusy] = useState(false);
+  // texto libre mientras se escribe (si no, la coma se borra en cada tecla); se separa al salir del campo
+  const [zonesText, setZonesText] = useState(f.zones.join(', '));
+  useEffect(() => setZonesText(f.zones.join(', ')), [f.zones.join(',')]);
   useEffect(() => {
     let alive = true;
     const load = () => api.camerasStatus().then((s) => alive && setSt(s)).catch(() => {});
@@ -57,7 +61,7 @@ export function CamerasSection({ cfg, set, errors }: SectionProps) {
           ))}
         </div>
         <Field label={t('Zonas (separadas por comas)')} hint={t('Solo se avisa de lo que entra a estas zonas.')} error={errors['frigate.zones']}>
-          <TextInput value={f.zones.join(', ')} onValue={(v) => set((d) => void (d.frigate.zones = v.split(',').map((z) => z.trim()).filter(Boolean)))} />
+          <TextInput value={zonesText} onValue={setZonesText} onBlur={() => set((d) => void (d.frigate.zones = parseZones(zonesText)))} />
         </Field>
         {f.enabled && st && (
           <Callout kind={st.lastError ? 'error' : 'ok'}>

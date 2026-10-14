@@ -135,6 +135,7 @@ export function dispatch(name: string, d: any, h: StreamHandlers): boolean {
         h.cameraAlert?.({
           camera: d.camera, name: typeof d.name === 'string' ? d.name : d.camera, label: typeof d.label === 'string' ? d.label : 'person',
           startTime: d.startTime, eventId: typeof d.eventId === 'string' ? d.eventId : null, ...(d.test === true ? { test: true } : {}),
+          ...(typeof d.sentAt === 'number' ? { sentAt: d.sentAt } : {}),
         });
       }
       return true;

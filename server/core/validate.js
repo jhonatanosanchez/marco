@@ -959,6 +959,8 @@ export function validateConfig(input, opts = {}) {
       return ok;
     }),
   };
+  // sin zonas Frigate no devuelve eventos: actividad y alertas callarían sin aviso
+  if (!frigate.zones.length) ctx.err('frigate.zones', 'at least one zone');
 
   const au = obj(ctx, 'auth', c.auth);
   const emails = arr(ctx, 'auth.allowedGoogleEmails', au.allowedGoogleEmails, [], 50)
