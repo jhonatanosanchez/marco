@@ -1,7 +1,7 @@
 // Tarjetas (fork fsrhome): crear, nombrar, encender o apagar, fuente y direcciones, borrar y "Mostrar ahora".
 // Cada pantalla elige cuáles muestra en Diseño (ScreenCardsCard en Layout.tsx).
 import { useEffect, useState } from 'preact/hooks';
-import type { AgesOptions, CardDef, CardsStatus, ImmichAlbum, StoredConfig, TrainingOptions, TrainingSource } from '../../shared/types';
+import type { AgesOptions, CardDef, CardsStatus, HomelabOptions, ImmichAlbum, StoredConfig, TrainingOptions, TrainingSource } from '../../shared/types';
 import { api, ApiError } from '../api';
 import { toast } from '../components/feedback';
 import { Button, Card, Field, PageHeader, Segmented, Select, TextInput, ToggleRow } from '../components/ui';
@@ -23,6 +23,10 @@ const newAges = (albumId: string): CardDef => ({
 });
 
 const newMoney = (): CardDef => ({ id: uid('k'), type: 'money', name: 'Dinero', enabled: true, options: { money: {} } });
+const newHomelab = (): CardDef => ({
+  id: uid('k'), type: 'homelab', name: 'Homelab', enabled: true,
+  options: { homelab: { everyMin: 10, zones: ['pipol', 'pipol2', 'Entrada', 'mi-patio'] } },
+});
 
 /** Borra la tarjeta y la quita de todas las pantallas. */
 export function pruneCard(d: StoredConfig, id: string) {
@@ -46,6 +50,7 @@ export function CardsSection({ cfg, set, setFull, full, errors }: SectionProps) 
   // el álbum por defecto: el primero que ya usa el fondo de alguna pantalla
   const firstAlbum = full.screens.flatMap((s) => s.background?.immich?.albumIds ?? [])[0] ?? '';
   const updAges = (i: number, fn: (a: AgesOptions) => void) => upd(i, (k) => { if (k.options.ages) fn(k.options.ages); });
+  const updHomelab = (i: number, fn: (h: HomelabOptions) => void) => upd(i, (k) => { if (k.options.homelab) fn(k.options.homelab); });
   const add = (source: TrainingSource) => set((d) => void (d.cards = { items: [...(d.cards?.items ?? []), newCard(source)] }));
   const show = async (id: string) => {
     setBusy(id);
@@ -67,9 +72,31 @@ export function CardsSection({ cfg, set, setFull, full, errors }: SectionProps) 
           <Button onClick={() => add('garmin')}>{t('Entreno solo con Garmin')}</Button>
           <Button onClick={() => set((d) => void (d.cards = { items: [...(d.cards?.items ?? []), newAges(firstAlbum)] }))}>{t('A esta edad')}</Button>
           <Button onClick={() => set((d) => void (d.cards = { items: [...(d.cards?.items ?? []), newMoney()] }))}>{t('Dinero')}</Button>
+          <Button onClick={() => set((d) => void (d.cards = { items: [...(d.cards?.items ?? []), newHomelab()] }))}>{t('Homelab')}</Button>
         </div>
       </Card>
       {items.map((k, i) => {
+        if (k.type === 'homelab') {
+          const hl = k.options.homelab!;
+          return (
+            <Card key={k.id} id={`card-${k.id}`} title={k.name || t('Homelab')} icon="tag" desc={t('El estado del servidor. Sale solo cuando hay algo: aviso, alerta o sin datos. De 5 a 8 a.m. resume la noche.')}>
+              <ToggleRow label={t('Tarjeta activa')} checked={k.enabled} onChange={(v) => upd(i, (x) => void (x.enabled = v))} />
+              <Field label={t('Nombre de la tarjeta')} error={errors[`cards.items[${i}].name`]}>
+                <TextInput value={k.name} maxLength={60} onValue={(v) => upd(i, (x) => void (x.name = v))} />
+              </Field>
+              <Field label={t('Repetir cada (min)')} error={errors[`cards.items[${i}].options.homelab.everyMin`]}>
+                <Segmented value={String(hl.everyMin)} options={[5, 10, 15, 30, 60].map((n) => ({ value: String(n), label: String(n) }))} onChange={(v) => updHomelab(i, (h) => void (h.everyMin = Number(v)))} />
+              </Field>
+              <Field label={t('Zonas de cámaras para "Anoche"')} hint={t('Nombres de zonas de Frigate separados por comas.')} error={errors[`cards.items[${i}].options.homelab.zones`]}>
+                <TextInput value={hl.zones.join(', ')} maxLength={400} onValue={(v) => updHomelab(i, (h) => void (h.zones = v.split(',').map((z) => z.trim()).filter(Boolean)))} />
+              </Field>
+              <div class="row-actions">
+                <Button onClick={() => show(k.id)} loading={busy === k.id} disabled={!k.enabled}>{t('Mostrar ahora')}</Button>
+                <Button variant="danger" onClick={() => setFull((d) => pruneCard(d, k.id))}>{t('Borrar tarjeta')}</Button>
+              </div>
+            </Card>
+          );
+        }
         if (k.type === 'money') {
           return (
             <Card key={k.id} id={`card-${k.id}`} title={k.name || t('Dinero')} icon="tag" desc={t('El ritmo de la quincena, sin montos. Tocar la hoja muestra las cifras 30 s.')}>

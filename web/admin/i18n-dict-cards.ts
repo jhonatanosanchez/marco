@@ -33,6 +33,11 @@ export const ROWS_CARDS: [string, string, string][] = [
   ['El ritmo de la quincena, sin montos. Tocar la hoja muestra las cifras 30 s.', 'How the fortnight is going, without amounts. Tapping the sheet shows the figures for 30 s.', 'O ritmo da quinzena, sem valores. Tocar na folha mostra os valores 30 s.'],
   ['Los montos solo se ven 30 s al tocar la hoja. No sale en modo privado.', 'Amounts only show for 30 s after tapping the sheet. Hidden in privacy mode.', 'Os valores só se veem 30 s ao tocar na folha. Não aparece no modo privado.'],
   ['Falta el token de gastos en el servidor (GASTOS_ECHO_TOKEN).', 'The server is missing the spending token (GASTOS_ECHO_TOKEN).', 'Falta o token de gastos no servidor (GASTOS_ECHO_TOKEN).'],
+  ['Homelab', 'Homelab', 'Homelab'],
+  ['El estado del servidor. Sale solo cuando hay algo: aviso, alerta o sin datos. De 5 a 8 a.m. resume la noche.', 'The server’s status. Only shows up when there is something: a warning, an alert or no data. From 5 to 8 a.m. it sums up the night.', 'O estado do servidor. Só aparece quando há algo: aviso, alerta ou sem dados. Das 5 às 8 h resume a noite.'],
+  ['Repetir cada (min)', 'Repeat every (min)', 'Repetir a cada (min)'],
+  ['Zonas de cámaras para "Anoche"', 'Camera zones for "Last night"', 'Zonas das câmaras para "Esta noite"'],
+  ['Nombres de zonas de Frigate separados por comas.', 'Frigate zone names, separated by commas.', 'Nomes das zonas do Frigate separados por vírgulas.'],
 ];
 
 export const NL_CARDS: Record<string, string> = {
@@ -69,6 +74,11 @@ export const NL_CARDS: Record<string, string> = {
   'El ritmo de la quincena, sin montos. Tocar la hoja muestra las cifras 30 s.': 'Hoe de periode loopt, zonder bedragen. Tik op het blad om de bedragen 30 s te zien.',
   'Los montos solo se ven 30 s al tocar la hoja. No sale en modo privado.': 'Bedragen zijn alleen 30 s zichtbaar na een tik op het blad. Verborgen in privémodus.',
   'Falta el token de gastos en el servidor (GASTOS_ECHO_TOKEN).': 'De server mist het uitgaventoken (GASTOS_ECHO_TOKEN).',
+  'Homelab': 'Homelab',
+  'El estado del servidor. Sale solo cuando hay algo: aviso, alerta o sin datos. De 5 a 8 a.m. resume la noche.': 'De status van de server. Verschijnt alleen als er iets is: een waarschuwing, een melding of geen gegevens. Van 5 tot 8 uur vat het de nacht samen.',
+  'Repetir cada (min)': 'Herhalen elke (min)',
+  'Zonas de cámaras para "Anoche"': 'Camerazones voor "Vannacht"',
+  'Nombres de zonas de Frigate separados por comas.': 'Namen van Frigate-zones, gescheiden door komma’s.',
 };
 
 export const DA_CARDS: Record<string, string> = {
@@ -105,4 +115,9 @@ export const DA_CARDS: Record<string, string> = {
   'El ritmo de la quincena, sin montos. Tocar la hoja muestra las cifras 30 s.': 'Hvordan perioden går, uden beløb. Tryk på arket for at se beløbene i 30 s.',
   'Los montos solo se ven 30 s al tocar la hoja. No sale en modo privado.': 'Beløb vises kun i 30 s efter et tryk på arket. Skjult i privat tilstand.',
   'Falta el token de gastos en el servidor (GASTOS_ECHO_TOKEN).': 'Serveren mangler udgiftstokenet (GASTOS_ECHO_TOKEN).',
+  'Homelab': 'Homelab',
+  'El estado del servidor. Sale solo cuando hay algo: aviso, alerta o sin datos. De 5 a 8 a.m. resume la noche.': 'Serverens status. Vises kun når der er noget: en advarsel, en alarm eller ingen data. Fra kl. 5 til 8 opsummerer den natten.',
+  'Repetir cada (min)': 'Gentag hver (min)',
+  'Zonas de cámaras para "Anoche"': 'Kamerazoner til "I nat"',
+  'Nombres de zonas de Frigate separados por comas.': 'Navne på Frigate-zoner, adskilt af kommaer.',
 };
