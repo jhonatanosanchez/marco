@@ -6,6 +6,7 @@ import type { EchoSettings, EchoStatus } from '../shared/types';
 import { ctx } from './ctx';
 import { current, onTick, type Tick } from './time';
 import { FpsGuard, cleanUrl, isOpenAt, liteUrl, normalizeEcho } from './echoCore';
+import { pauseCameras } from './widgets/cameras';
 
 const RETRY_MS = 60_000;
 
@@ -19,6 +20,8 @@ export class EchoController {
   private fsRefused = false;
   private frames = 0;
   private guard = new FpsGuard(() => Date.now(), ctx.lite);
+  /** se llama al pasar a cerrado (main.ts cierra la vista de cámara) */
+  onClose: (() => void) | null = null;
 
   /** `disabled`: la vista previa del admin nunca activa el modo (ni audio, ni pausa, ni recargas). */
   constructor(private disabled = false) {}
@@ -29,6 +32,11 @@ export class EchoController {
     if (!this.started) this.start();
     if (this.s.keepAlive === 'off') this.audio?.pause();
     this.applySchedule(current(), false);
+  }
+
+  /** modo Echo activo y fuera de horario: nada de cámaras a pantalla completa */
+  isClosed(): boolean {
+    return !this.disabled && this.s.enabled && !this.open;
   }
 
   status(): EchoStatus | null {
@@ -63,6 +71,7 @@ export class EchoController {
     this.tapEl?.remove(); this.tapEl = null;
     this.pauseEl?.remove(); this.pauseEl = null;
     this.open = true;
+    pauseCameras('echo-closed', false);
   }
 
   private onTap = (): void => {
@@ -97,7 +106,11 @@ export class EchoController {
       return;
     }
     this.open = nowOpen;
-    if (!nowOpen) this.audio?.pause();
+    pauseCameras('echo-closed', !nowOpen);
+    if (!nowOpen) {
+      this.audio?.pause();
+      this.onClose?.();
+    }
     this.renderPause();
     this.renderTap();
   }

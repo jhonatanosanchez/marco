@@ -6,7 +6,7 @@
 import type { CameraActivity, DisplayWidget, FrigateCamera } from '../../shared/types';
 import { ctx } from '../ctx';
 import { authHeaders, mediaUrl, withScreen } from '../identity';
-import { cameraLabel, gridBox } from '../camerasText';
+import { cameraLabel, floorHeight, gridBox } from '../camerasText';
 import '../styles-cameras.css';
 
 export const RECONNECT_MS = 10 * 60_000;
@@ -65,6 +65,11 @@ export class CameraCard {
     this.w = w;
     this.el = div('uw-media camgrid');
     this.build();
+  }
+
+  /** alto mínimo que pide en la columna lateral de ancho `width` */
+  floorHeight(width: number): number {
+    return floorHeight(width, this.tiles.length);
   }
 
   get hasData(): boolean {

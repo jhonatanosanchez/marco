@@ -20,6 +20,9 @@ export function cameraLabel(a: CameraActivity | undefined, nowMs: number, t: T):
 
 export const alertIsFresh = (a: Pick<CameraAlert, 'startTime'>, nowMs: number): boolean => nowMs - a.startTime * 1000 <= ALERT_FRESH_MS;
 
+/** Alto que la cuadrícula reserva en la columna lateral: el de todo su ancho (la agenda y lo demás ceden). */
+export const floorHeight = (width: number, count: number): number => (count > 0 ? gridBox(width, Infinity, count)[1] : 0);
+
 /** Tamaño de la cuadrícula: 2 columnas de recuadros 16:9 dentro de maxW × maxH. */
 export function gridBox(maxW: number, maxH: number, count: number): [number, number] {
   const cols = count > 1 ? 2 : 1;

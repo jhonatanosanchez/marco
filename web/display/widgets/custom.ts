@@ -213,10 +213,13 @@ export class CustomWidgets {
   private fitSideBox(): void {
     const items = [...this.entries.values()].filter((e) => e.el.parentElement === this.side && e.media && !e.el.classList.contains('uw-wait'));
     // price cards keep the room for their smallest readable size: the column drops its secondary content first
-    // (main.ts fitSideContent), as it does for its own cards
+    // (main.ts fitSideContent), as it does for its own cards. Camera grids (fork fsrhome) keep their full-width height.
     const cards = items.filter((e) => e.card);
     const gap = parseFloat(getComputedStyle(this.side).rowGap) || 0;
-    const floor = cards.length ? cards.length * priceFloorHeight() + gap * (cards.length - 1) : 0;
+    const width = this.side.clientWidth;
+    const floor = cards.length
+      ? cards.reduce((n, e) => n + (e.card instanceof CameraCard ? e.card.floorHeight(width) : priceFloorHeight()), 0) + gap * (cards.length - 1)
+      : 0;
     this.side.style.minHeight = floor ? `${Math.ceil(floor)}px` : '';
     if (!items.length) return;
     const avail = this.side.clientHeight;

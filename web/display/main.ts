@@ -9,9 +9,9 @@ import './styles-modern.css';
 import './styles-planner.css';
 import './styles-kids.css';
 import type {
-  Announcement, CountdownsResponse, DisplayConfig, EventsResponse, FamilyDisplayState, Lang, NewsResponse, NightCommand, Photo, PhotosResponse, PlannerBar, StreamHello, WeatherResponse,
+  Announcement, CameraAlert, CountdownsResponse, DisplayConfig, EventsResponse, FamilyDisplayState, Lang, NewsResponse, NightCommand, Photo, PhotosResponse, PlannerBar, StreamHello, WeatherResponse,
 } from '../shared/types';
-import { addDays, LANGS, startOfWeek } from '../shared/i18n';
+import { addDays, formatHM, LANGS, startOfWeek, zonedParts } from '../shared/i18n';
 import { api, ApiError } from './api';
 import { parseColor, toHex } from './color';
 import { ctx, setCtxConfig } from './ctx';
@@ -63,7 +63,9 @@ import { isKidsPreset, Kids, withToggle } from './widgets/kids';
 import { refreshMarquee } from './marquee';
 import { CustomWidgets } from './widgets/custom';
 import { EchoController } from './echo';
-import { setCameraActivity } from './widgets/cameras';
+import { setCameraActivity, setCameraTapHandler } from './widgets/cameras';
+import { CameraView, TAP_MS, ALERT_MS, alertTitle } from './widgets/cameraView';
+import { alertIsFresh } from './camerasText';
 
 const params = ctx.params;
 if (isWidgetOnly) document.documentElement.classList.add('widget-only');
@@ -72,6 +74,21 @@ const lite = ctx.lite;
 if (lite) document.documentElement.classList.add('lite');
 // modo Echo Show (fork fsrhome); nunca en la vista previa del admin
 const echo = new EchoController(isPreview);
+// Cámaras (fork fsrhome): vista a pantalla completa al tocar un recuadro o por una alerta de persona
+const cameraView = new CameraView(() => echo.isClosed());
+echo.onClose = () => cameraView.close();
+setCameraTapHandler((cam) => cameraView.open(cam, { title: ctx.t('camLive', { name: cam.name }), detail: ctx.t('camTapClose'), ms: TAP_MS }));
+function cameraAlertOpen(d: CameraAlert): void {
+  const dt = ctx.cfg.datetime;
+  const p = zonedParts(new Date(d.startTime * 1000), dt.timezone);
+  cameraView.open({ id: d.camera, name: d.name }, {
+    title: alertTitle(d.label, d.name),
+    detail: ctx.t('camDetected', { time: formatHM(p.hour, p.minute, dt?.format24 !== false, !!dt?.showAmPm) }),
+    snapshot: d.eventId ? `/media/cameras/events/${encodeURIComponent(d.eventId)}/snapshot.jpg` : null,
+    ms: ALERT_MS,
+    alert: true,
+  });
+}
 
 // ?now=2026-10-09T10:43 → fixed clock offset (for screenshots / testing)
 const nowParam = params.get('now');
@@ -1808,6 +1825,7 @@ const liveHandlers: StreamHandlers = {
   doorbellEnd: (d) => doorbell.end(d.id),
   // Cámaras (fork fsrhome): etiquetas de actividad sobre cada recuadro
   cameras: (d) => setCameraActivity(d.activity),
+  cameraAlert: (d) => { if (alertIsFresh(d, serverNow())) cameraAlertOpen(d); },
   // Link regenerated / device revoked → "no longer valid"; switched to private without a key → pairing.
   revoked: (d) => denyAccess(d.code === 'key_required' ? 401 : 403),
   open: () => setOnline(true),

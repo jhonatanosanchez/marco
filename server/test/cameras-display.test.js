@@ -44,3 +44,25 @@ test('el stream escucha los eventos de cámaras', () => {
   const src = readFileSync(new URL('../../web/display/stream.ts', import.meta.url), 'utf8');
   assert.match(src, /STREAM_EVENTS = \[[^\]]*'cameras'[^\]]*'cameraAlert'/);
 });
+
+test('la vista nunca abre en la vista previa del admin ni con el Echo cerrado; la alerta exige frescura', () => {
+  const view = readFileSync(new URL('../../web/display/widgets/cameraView.ts', import.meta.url), 'utf8');
+  assert.match(view, /if \(isPreview \|\| this\.isClosed\(\)\) return/);
+  const main = readFileSync(new URL('../../web/display/main.ts', import.meta.url), 'utf8');
+  assert.match(main, /cameraAlert: \(d\) =>[^\n]*alertIsFresh\(d, serverNow\(\)\)/);
+  const echo = readFileSync(new URL('../../web/display/echo.ts', import.meta.url), 'utf8');
+  assert.match(echo, /pauseCameras\('echo-closed', !nowOpen\)/);
+});
+
+test('floorHeight: la cuadrícula reserva su alto a todo el ancho de la columna (la agenda cede)', () => {
+  assert.equal(txt.floorHeight(340, 4), 191);
+  assert.equal(txt.floorHeight(340, 2), 95);
+  assert.equal(txt.floorHeight(340, 0), 0);
+  const custom = readFileSync(new URL('../../web/display/widgets/custom.ts', import.meta.url), 'utf8');
+  assert.match(custom, /e\.card instanceof CameraCard \? e\.card\.floorHeight\(/);
+});
+
+test('los recuadros reciben toques (Marco pone pointer-events: none en todos los widgets)', () => {
+  const css = readFileSync(new URL('../../web/display/styles-cameras.css', import.meta.url), 'utf8');
+  assert.match(css, /\.camgrid \.cam \{[^}]*pointer-events: auto/);
+});
