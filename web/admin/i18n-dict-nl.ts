@@ -5,12 +5,14 @@
 import { NL_TWOFA } from './i18n-dict-2fa';
 import { NL_ECHO } from './i18n-dict-echo';
 import { NL_CAMERAS } from './i18n-dict-cameras';
+import { NL_CARDS } from './i18n-dict-cards';
 
 /** Every admin row but the Familia ones. */
 export const NL: Record<string, string> = {
   ...NL_TWOFA,
   ...NL_ECHO,
   ...NL_CAMERAS,
+  ...NL_CARDS,
   '(ninguno)': '(geen)',
   'Estás usando la contraseña inicial. Cámbiala: hasta entonces solo se acepta desde tu red local.': 'Je gebruikt het startwachtwoord. Wijzig het: tot dan wordt het alleen vanuit je lokale netwerk geaccepteerd.',
   'Sesiones': 'Sessies',

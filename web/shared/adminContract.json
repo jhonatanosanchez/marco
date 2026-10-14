@@ -340,6 +340,23 @@
       ]
     },
     {
+      "method": "POST",
+      "path": "/api/admin/cards/:id/show",
+      "query": [],
+      "feature": null,
+      "callers": [
+        "cardShow"
+      ],
+      "request": null,
+      "response": "CardShowResponse",
+      "responseArray": false,
+      "responseKeys": [
+        "ok",
+        "delivered",
+        "screens"
+      ]
+    },
+    {
       "method": "GET",
       "path": "/api/admin/config",
       "query": [],

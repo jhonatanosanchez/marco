@@ -1,6 +1,6 @@
 import { useRef } from 'preact/hooks';
 import { CALENDAR_BLUR_DEFAULT, CALENDAR_OPACITY_DEFAULT, GLASS_DEFAULTS, glassVars, normalizeGlass, SCREEN_PHOTO_PRESETS, type PhotoStats } from '../../shared/glass';
-import type { BackgroundScope, DisplayStyle, FrameCorner, GlassConfig, LayoutPreset, PlannerBar, WidgetPlacement } from '../../shared/types';
+import type { BackgroundScope, CardCorner, DisplayStyle, FrameCorner, GlassConfig, LayoutPreset, PlannerBar, ScreenCards, WidgetPlacement } from '../../shared/types';
 import { Icon } from '../components/icons';
 import { EventStyleField, PLANNER_CALENDAR, undoPlannerPick, weeksCap, WeeksField } from '../components/PlannerFields';
 import { Button, Callout, Card, ColorPicker, Field, PageHeader, ReorderButtons, Segmented, Select, Slider, ToggleRow } from '../components/ui';
@@ -747,6 +747,63 @@ export function ScreenWidgetsCard({ cfg, set, full, go }: Pick<SectionProps, 'cf
   );
 }
 
+const CARDS_NONE: ScreenCards = { items: [], everyMin: 20, showSec: 30, corner: 'br' };
+
+/** Tarjetas en esta pantalla (fork fsrhome): cuáles salen y en qué orden, cada cuánto, cuánto duran y en qué esquina. */
+export function ScreenCardsCard({ cfg, set, full, go }: Pick<SectionProps, 'cfg' | 'set' | 'full' | 'go'>) {
+  const defs = full.cards?.items ?? [];
+  const sc = cfg.screen.cards ?? CARDS_NONE;
+  const setSc = (fn: (c: ScreenCards) => void) =>
+    set((d) => {
+      const c = d.screen.cards ?? { ...CARDS_NONE, items: [] };
+      fn(c);
+      d.screen.cards = c;
+    });
+  // primero las activas en su orden, luego el resto
+  const ordered = [...sc.items.map((id) => defs.find((k) => k.id === id)).filter((k): k is NonNullable<typeof k> => !!k), ...defs.filter((k) => !sc.items.includes(k.id))];
+  return (
+    <Card id="layout-cards" scope="screen" title={t('Tarjetas en esta pantalla')} icon="activity" desc={t('Aparecen de vez en cuando en una esquina; tocarlas abre el detalle.')}>
+      {defs.length === 0 ? (
+        <p class="muted small">
+          {t('Aún no hay tarjetas.')}{' '}
+          <button type="button" class="link-btn" onClick={() => go('cards')}>
+            {t('Crear una tarjeta')}
+          </button>
+        </p>
+      ) : (
+        <>
+          <div class="widget-rows">
+            {ordered.map((k) => {
+              const i = sc.items.indexOf(k.id);
+              return (
+                <div class="widget-row" key={k.id}>
+                  <ToggleRow
+                    label={k.name || t('Entreno')}
+                    checked={i >= 0}
+                    onChange={(v) => setSc((c) => void (c.items = v ? [...c.items, k.id] : c.items.filter((x) => x !== k.id)))}
+                  />
+                  {i >= 0 && <ReorderButtons index={i} count={sc.items.length} onMove={(a, b) => setSc((c) => void (c.items = moveItem(c.items, a, b)))} />}
+                </div>
+              );
+            })}
+          </div>
+          <div class="grid grid--2">
+            <Field label={t('Cada cuánto (minutos)')}>
+              <Segmented value={String(sc.everyMin)} options={[10, 20, 30, 60].map((n) => ({ value: String(n), label: String(n) }))} onChange={(v) => setSc((c) => void (c.everyMin = Number(v)))} />
+            </Field>
+            <Field label={t('Cuánto dura (segundos)')}>
+              <Segmented value={String(sc.showSec)} options={[15, 30, 60].map((n) => ({ value: String(n), label: String(n) }))} onChange={(v) => setSc((c) => void (c.showSec = Number(v)))} />
+            </Field>
+          </div>
+          <Field label={t('Esquina')}>
+            <CornerPick value={sc.corner} onChange={(v) => setSc((c) => void (c.corner = v as CardCorner))} />
+          </Field>
+        </>
+      )}
+    </Card>
+  );
+}
+
 /** Settings of the layouts that have any: the people columns (Por persona) and the corner (Marco de fotos). */
 function PresetOptions({ cfg, set, full, go }: SectionProps) {
   const l = cfg.layout;
@@ -1040,6 +1097,7 @@ export function LayoutSection(props: SectionProps) {
       </div>
       <PresetOptions {...props} />
       {has('widgets') && <ScreenWidgetsCard cfg={cfg} set={set} full={props.full} go={props.go} />}
+      <ScreenCardsCard cfg={cfg} set={set} full={props.full} go={props.go} />
       <Card
         id="layout-side"
         scope="screen"

@@ -20,6 +20,7 @@ import { ROWS_PRIVACY } from './i18n-dict-privacy';
 import { ROWS_DOORBELL } from './i18n-dict-doorbell';
 import { ROWS_ECHO } from './i18n-dict-echo';
 import { ROWS_CAMERAS } from './i18n-dict-cameras';
+import { ROWS_CARDS } from './i18n-dict-cards';
 import { ROWS_CAROUSELS } from './i18n-dict-carousels';
 import { ROWS_IMMICH } from './i18n-dict-immich';
 import { ROWS_PLANNER } from './i18n-dict-planner';
@@ -430,7 +431,7 @@ for (const [es, en, pt] of ROWS) {
   PT[es] = pt;
 }
 // v2 pages; existing rows win on duplicates.
-for (const [es, en, pt] of [...ROWS2, ...ROWS3, ...ROWS4, ...ROWS5, ...ROWS6, ...ROWS7, ...ROWS8, ...ROWS9, ...ROWS10, ...ROWS11, ...ROWS12, ...ROWS13, ...ROWS14, ...ROWS15, ...ROWS_ICLOUD, ...ROWS_MOTION, ...ROWS_COMPACT, ...ROWS_FEEDBACK, ...ROWS_PRIVACY, ...ROWS_DOORBELL, ...ROWS_CAROUSELS, ...ROWS_IMMICH, ...ROWS_PLANNER, ...ROWS_FAMILY, ...ROWS_WIDGETS, ...ROWS_PRICES, ...ROWS_BACKGROUND, ...ROWS_TWOFA, ...ROWS_ECHO, ...ROWS_CAMERAS]) {
+for (const [es, en, pt] of [...ROWS2, ...ROWS3, ...ROWS4, ...ROWS5, ...ROWS6, ...ROWS7, ...ROWS8, ...ROWS9, ...ROWS10, ...ROWS11, ...ROWS12, ...ROWS13, ...ROWS14, ...ROWS15, ...ROWS_ICLOUD, ...ROWS_MOTION, ...ROWS_COMPACT, ...ROWS_FEEDBACK, ...ROWS_PRIVACY, ...ROWS_DOORBELL, ...ROWS_CAROUSELS, ...ROWS_IMMICH, ...ROWS_PLANNER, ...ROWS_FAMILY, ...ROWS_WIDGETS, ...ROWS_PRICES, ...ROWS_BACKGROUND, ...ROWS_TWOFA, ...ROWS_ECHO, ...ROWS_CAMERAS, ...ROWS_CARDS]) {
   if (!(es in EN)) EN[es] = en;
   if (!(es in PT)) PT[es] = pt;
 }
