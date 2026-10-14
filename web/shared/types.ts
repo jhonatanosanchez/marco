@@ -69,6 +69,41 @@ export interface AgesOptions { person: string; birthDate: string; albumId: strin
 export type MoneyOptions = Record<string, never>;
 /** Homelab (fork fsrhome; server/homelab.js) */
 export interface HomelabOptions { everyMin: number; zones: string[] }
+/** Homelab (fork fsrhome; server/core/homelabCore.js) */
+export type HomelabEstado = 'calma' | 'aviso' | 'alerta' | 'mudo';
+export type HomelabModo = 'ahora' | 'anoche';
+export interface HomelabAlerta { severidad: string; titulo: string; dominio: string | null; abiertaEn: number | null; clave: string }
+export interface HomelabSilenciada { clave: string; titulo: string; hasta: 'arreglo' | number | null }
+export interface HomelabNocheAlerta { titulo: string; abiertaEn: number | null; resuelta: boolean }
+export interface HomelabPersonas { camara: string; nombre: string; n: number }
+export interface HomelabDisco { nombre: string; usadoPct: number | null; usadoGb: number | null; totalGb: number | null; saludSmartOk: boolean | null; tempC: number | null; estado: string }
+export interface HomelabWidget {
+  veredicto: { texto: string; estado: string };
+  alertas: HomelabAlerta[];
+  silenciadas: HomelabSilenciada[];
+  sistema: { cpu: number | null; ramPct: number | null; ramUsadaGb: number | null; ramTotalGb: number | null; swapPct: number | null; discoPct: number | null; load: number | null; tempC: number | null; uptimeS: number | null; estado: string } | null;
+  discos: HomelabDisco[];
+  contenedores: { total: number; caidos: number } | null;
+  respaldo: { ok: boolean | null; edadHoras: number | null; estado: string } | null;
+  isp: { estado: string; pingMs: number | null; perdidaPct: number | null } | null;
+  speedtest: { bajadaMbps: number | null; subidaMbps: number | null } | null;
+  red: Record<string, string>;
+  noche: HomelabNocheAlerta[];
+}
+export interface HomelabSummary {
+  estado: HomelabEstado;
+  firma: string;
+  modo: HomelabModo;
+  veredicto: { texto: string; estado: string } | null;
+  metricas: { ramPct: number | null; swapPct: number | null; discoPct: number | null; pingMs: number | null } | null;
+  /** hasta 2, la más grave primero */
+  alertas: HomelabAlerta[];
+  /** solo en modo 'anoche' */
+  anoche: { respaldo: { ok: boolean | null; edadHoras: number | null } | null; personas: HomelabPersonas[] | null; alertas: HomelabNocheAlerta[] } | null;
+}
+/** GET /api/display/cards/<id>/detail de una tarjeta homelab */
+export type HomelabDetailResponse = { ok: true; at: number; data: HomelabWidget } | { ok: false };
+export type HomelabSilenceHasta = 'arreglo' | '1d' | '7d' | null;
 export interface CardDef {
   id: string; type: CardType; name: string; enabled: boolean;
   options: { training?: TrainingOptions; ages?: AgesOptions; money?: MoneyOptions; homelab?: HomelabOptions };
