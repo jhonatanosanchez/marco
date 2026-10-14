@@ -58,7 +58,7 @@ test('tarjeta coach: pendiente + última carrera; hecho cuando ya corrió', () =
 
 test('tarjeta solo Garmin: sin plan, última carrera primero; Garmin caído lo dice', () => {
   const g = txt.trainingCardHtml(sum({ source: 'garmin', planOk: null, session: null }), { ...REF, source: 'garmin' }, t, 'es');
-  assert.match(g, /class="mcard-title">🏃 Entreno</);
+  assert.match(g, /class="mcard-title"><span class="mcard-ico">🏃<\/span>Entreno</);
   assert.doesNotMatch(g, /pendiente|Sin plan/);
   assert.match(g, /mcard-main">Última carrera, hoy/);
   const down = txt.trainingCardHtml(sum({ garminOk: false, last: null, week: null, done: null, planOk: false, session: null, recovery: { sleep: null, hrv: null, restingHr: null, bodyBattery: null } }), REF, t, 'es');
@@ -96,4 +96,37 @@ test('la tarjeta recibe toques y se anima solo con transform/opacity', () => {
   assert.match(css, /html\.lite \.mcard, html\.lite \.msheet \{[^}]*backdrop-filter: none/);
   const stream = readFileSync(new URL('../../web/display/stream.ts', import.meta.url), 'utf8');
   assert.match(stream, /'cardShow'/);
+});
+
+test('hoja: semana con pendiente y No se hizo, carrera, y sin fila de plan para solo Garmin', () => {
+  const days = [
+    { date: '2026-10-12', weekday: 0, planned: '2 SETS', rest: false, km: 7.9, status: 'done' },
+    { date: '2026-10-13', weekday: 1, planned: '60min', rest: false, km: null, status: 'missed' },
+    { date: '2026-10-14', weekday: 2, planned: '60min progresivos', rest: false, km: null, status: 'pending' },
+    { date: '2026-10-15', weekday: 3, planned: null, rest: false, km: null, status: 'free' },
+    { date: '2026-10-16', weekday: 4, planned: null, rest: true, km: null, status: 'rest' },
+    { date: '2026-10-17', weekday: 5, planned: 'Especial HM', rest: false, km: null, status: 'future' },
+    { date: '2026-10-18', weekday: 6, planned: null, rest: false, km: null, status: 'free' },
+  ];
+  const rec7 = { days: [], sleep: [70, 72, null, 80, 81, 82, 83], hrv: [null, null, null, null, null, null, null], restingHr: [50, 49, 49, 48, 48, 48, 48], bodyBattery: [80, 85, 90, 70, 75, 80, 90] };
+  const det = { source: 'coach', today: '2026-10-14', garminOk: true, planOk: true, days, last: RUN, recovery7: rec7, race: { date: '2026-11-08', name: 'Carrera Medio Maratón', days: 25 }, week: WEEK, stale: { garmin: 40 } };
+  const h = txt.trainingSheetHtml(det, REF, t, 'es');
+  assert.match(h, /is-done">7\.9 km/);
+  assert.match(h, /is-missed">No se hizo/);
+  assert.match(h, /is-pending">pendiente/);
+  assert.match(h, /Faltan 25 días · Carrera Medio Maratón/);
+  assert.match(h, /FC 150\/170/);
+  assert.match(h, /Datos de hace 40 min · Toca para volver/);
+  assert.doesNotMatch(h, /<span>HRV<\/span>/); // sin datos de HRV no se dibuja su fila
+  const g = txt.trainingSheetHtml({ ...det, source: 'garmin', planOk: null, race: null, days: days.map((x) => ({ ...x, planned: null })) }, { ...REF, source: 'garmin' }, t, 'es');
+  assert.doesNotMatch(g, /Faltan/);
+  assert.doesNotMatch(g, /msheet-plan">2 SETS/);
+});
+
+test('main.ts: la alerta de cámara y el cierre del modo Echo cierran tarjeta y hoja; config y cardShow conectados', () => {
+  const main = readFileSync(new URL('../../web/display/main.ts', import.meta.url), 'utf8');
+  assert.match(main, /function cameraAlertOpen\(d: CameraAlert\): void \{\s*cards\.closeAll\(\);/);
+  assert.match(main, /echo\.onClose = \(\) => \{ cameraView\.close\(\); cards\.closeAll\(\); \};/);
+  assert.match(main, /cards\.update\(cfg\.cards\);/);
+  assert.match(main, /cardShow: \(d\) => \{ if \(!d\.sentAt \|\| serverNow\(\) - d\.sentAt < 60_000\) cards\.showNow\(d\.id\); \},/);
 });

@@ -65,6 +65,8 @@ import { CustomWidgets } from './widgets/custom';
 import { EchoController } from './echo';
 import { setCameraActivity, setCameraTapHandler } from './widgets/cameras';
 import { CameraView, TAP_MS, ALERT_MS, alertTitle } from './widgets/cameraView';
+import { CardsController } from './widgets/cards';
+import { CardSheet } from './widgets/cardSheet';
 import { alertIsFresh } from './camerasText';
 
 const params = ctx.params;
@@ -76,9 +78,15 @@ if (lite) document.documentElement.classList.add('lite');
 const echo = new EchoController(isPreview);
 // Cámaras (fork fsrhome): vista a pantalla completa al tocar un recuadro o por una alerta de persona
 const cameraView = new CameraView(() => echo.isClosed());
-echo.onClose = () => cameraView.close();
+// Tarjetas (fork fsrhome): salen de vez en cuando; el horario, la cámara y los anuncios grandes mandan
+const cardsPaused = (): boolean =>
+  echo.isClosed() || cameraView.isOpen || announcements.expandedCount > 0 || document.hidden || !!state.config?.privacy?.active;
+const cardSheet = new CardSheet(cardsPaused);
+const cards = new CardsController({ paused: cardsPaused, sheet: cardSheet });
+echo.onClose = () => { cameraView.close(); cards.closeAll(); };
 setCameraTapHandler((cam) => cameraView.open(cam, { title: ctx.t('camLive', { name: cam.name }), detail: ctx.t('camTapClose'), ms: TAP_MS }));
 function cameraAlertOpen(d: CameraAlert): void {
+  cards.closeAll();
   const dt = ctx.cfg.datetime;
   const p = zonedParts(new Date(d.startTime * 1000), dt.timezone);
   cameraView.open({ id: d.camera, name: d.name }, {
@@ -488,6 +496,7 @@ function applyConfig(raw: DisplayConfig): void {
   custom.render(cfg, preset);
   revealApp(cfg);
   echo.update(cfg.screen.echo);
+  cards.update(cfg.cards);
 }
 
 /**
@@ -1826,6 +1835,8 @@ const liveHandlers: StreamHandlers = {
   // Cámaras (fork fsrhome): etiquetas de actividad sobre cada recuadro
   cameras: (d) => setCameraActivity(d.activity),
   cameraAlert: (d) => { if (alertIsFresh(d, serverNow())) cameraAlertOpen(d); },
+  // Tarjetas (fork fsrhome): "Mostrar ahora" del admin; uno viejo (reconexión) se ignora
+  cardShow: (d) => { if (!d.sentAt || serverNow() - d.sentAt < 60_000) cards.showNow(d.id); },
   // Link regenerated / device revoked → "no longer valid"; switched to private without a key → pairing.
   revoked: (d) => denyAccess(d.code === 'key_required' ? 401 : 403),
   open: () => setOnline(true),

@@ -101,7 +101,7 @@ export function trainingCardHtml(d: TrainingSummary, ref: DisplayCardRef, t: T, 
   if (d.done) mark = `<span class="mcard-mark is-done">✓ ${escHtml(t('cardDone'))}</span>`;
   else if (coach && d.session?.kind === 'session') mark = `<span class="mcard-mark is-pending">${escHtml(t('cardPending'))}</span>`;
   const lines: string[] = [
-    `<div class="mcard-head"><span class="mcard-title">🏃 ${escHtml(coach ? t('cardTraining') : t('cardTrainingShort'))}</span>${mark}</div>`,
+    `<div class="mcard-head"><span class="mcard-title"><span class="mcard-ico">🏃</span>${escHtml(coach ? t('cardTraining') : t('cardTrainingShort'))}</span>${mark}</div>`,
   ];
   if (coach) {
     lines.push(`<div class="mcard-main">${escHtml(d.session ? sessionText(d.session, t) : t('cardPlanDown'))}</div>`);
