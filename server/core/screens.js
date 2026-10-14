@@ -1,6 +1,7 @@
 // Screen profiles (F1): resolve ?screen=, project the v2 config into the flat per-screen view that the display
 // (and the legacy single-screen code paths) understand. Pure functions. See docs/API.md and docs/ARCHITECTURE.md.
 // Mirror for the admin panel: web/shared/screens.ts (keep both in sync).
+import { AGES_SHOW_SEC } from './trainingCore.js';
 import { SCREEN_SPLIT_KEYS, SCREEN_ONLY_KEYS, LOCAL_SOURCE_ID, BIRTHDAYS_SOURCE_ID } from './defaults.js';
 import { displayPrivacy } from './privacy.js';
 import { showsFamilyQr } from './familyCore.js';
@@ -148,7 +149,10 @@ export function displayCards(cfg, screen, { isPrivate = false } = {}) {
   const sc = screen.screen?.cards ?? { items: [], everyMin: 20, showSec: 30, corner: 'br' };
   const defs = new Map((cfg.cards?.items ?? []).map((k) => [k.id, k]));
   const items = isPrivate ? [] : (sc.items ?? []).map((id) => defs.get(id)).filter((k) => k && k.enabled)
-    .map((k) => ({ id: k.id, type: k.type, name: k.name, source: k.options.training.source }));
+    .map((k) => (k.type === 'ages'
+      // "A esta edad": su propio ritmo y 45 s; ni álbum ni fecha de nacimiento viajan a la pantalla
+      ? { id: k.id, type: k.type, name: k.name, everyMin: k.options.ages.everyMin, showSec: AGES_SHOW_SEC }
+      : { id: k.id, type: k.type, name: k.name, source: k.options.training.source }));
   return { items, everyMin: sc.everyMin, showSec: sc.showSec, corner: sc.corner };
 }
 

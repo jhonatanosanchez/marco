@@ -59,16 +59,23 @@ export interface CamerasStatus { enabled: boolean; lastOkAt: string | null; last
 export interface CameraTestAlertResponse { ok: boolean; delivered: number; screens: string[] }
 
 // ---- Tarjetas (fork fsrhome; server/cards.js) ----
-export type CardType = 'training';
+export type CardType = 'training' | 'ages';
 export type TrainingSource = 'coach' | 'garmin';
 export type CardCorner = 'tl' | 'tr' | 'bl' | 'br';
+export interface TrainingOptions { source: TrainingSource; garminUrl: string; coachUrl: string }
+/** "A esta edad" (fork fsrhome) */
+export interface AgesOptions { person: string; birthDate: string; albumId: string; everyMin: number }
 export interface CardDef {
   id: string; type: CardType; name: string; enabled: boolean;
-  options: { training: { source: TrainingSource; garminUrl: string; coachUrl: string } };
+  options: { training?: TrainingOptions; ages?: AgesOptions };
 }
+/** una foto de la lista del día: `months` = edad en meses de ese tramo, `year` = año del tramo */
+export interface AgesPhoto { id: string; v: string; months: number; year: string }
+/** GET /api/display/cards/<id> de una tarjeta ages */
+export interface AgesList { person: string; today: string; months: number; photos: AgesPhoto[] }
 /** screen.cards: ids de cfg.cards.items en orden de rotación */
 export interface ScreenCards { items: string[]; everyMin: number; showSec: number; corner: CardCorner }
-export interface DisplayCardRef { id: string; type: CardType; name: string; source: TrainingSource }
+export interface DisplayCardRef { id: string; type: CardType; name: string; source?: TrainingSource; everyMin?: number; showSec?: number }
 /** DisplayConfig.cards: las tarjetas encendidas de esta pantalla, sin URLs */
 export interface DisplayCards { items: DisplayCardRef[]; everyMin: number; showSec: number; corner: CardCorner }
 export interface TrainingSession { kind: 'session' | 'rest' | 'free' | 'none'; text: string }

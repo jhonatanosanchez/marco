@@ -15,7 +15,7 @@ import {
 } from './carousels.js';
 import { IMMICH_ID_RE, MAX_IMMICH_ALBUMS, PORTRAIT_FITS, normalizeImmichUrl } from './immichCore.js';
 import { CAMERA_ID_RE, ZONE_RE, MAX_CAMERAS, MAX_ZONES } from './camerasCore.js';
-import { CARD_ID_RE, CARD_PREFIX, CARD_TYPES, MAX_CARDS, TRAINING_DEFAULTS, TRAINING_SOURCES } from './trainingCore.js';
+import { AGES_DEFAULTS, CARD_ID_RE, CARD_PREFIX, CARD_TYPES, MAX_CARDS, TRAINING_DEFAULTS, TRAINING_SOURCES } from './trainingCore.js';
 import {
   BAND_NAME_MAX, BAND_PRESET_IDS, GRID_IDS, gridCompany, HOLIDAY_SETS, MAX_BAND_PRICE, MAX_BANDS, MIN_BAND_PRICE, TARIFF_MODES,
 } from './tariffsCore.js';
@@ -815,6 +815,26 @@ function sanitizeCard(ctx, p, x, seen) {
   if (!isObj(x)) { ctx.err(p, 'expected object'); return null; }
   if (!CARD_TYPES.includes(x.type)) { ctx.err(`${p}.type`, `must be one of ${CARD_TYPES.join(', ')}`); return null; }
   const o = obj(ctx, `${p}.options`, x.options);
+  const cardId = id(ctx, `${p}.id`, typeof x.id === 'string' && CARD_ID_RE.test(x.id) ? x.id : undefined, CARD_PREFIX, seen);
+  const enabled = bool(ctx, `${p}.enabled`, x.enabled, true);
+  if (x.type === 'ages') {
+    const q = `${p}.options.ages`;
+    const ag = obj(ctx, q, o.ages);
+    const person = str(ctx, `${q}.person`, ag.person, AGES_DEFAULTS.person, 40).trim();
+    if (!person) ctx.err(`${q}.person`, 'required');
+    let birthDate = str(ctx, `${q}.birthDate`, ag.birthDate, AGES_DEFAULTS.birthDate, 10).trim();
+    const bd = new Date(`${birthDate}T00:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(birthDate) || Number.isNaN(bd.getTime()) || bd.toISOString().slice(0, 10) !== birthDate || bd.getTime() > Date.now()) {
+      ctx.err(`${q}.birthDate`, 'invalid date');
+      birthDate = AGES_DEFAULTS.birthDate;
+    }
+    const albumId = str(ctx, `${q}.albumId`, ag.albumId, '', 64).trim().toLowerCase();
+    if (!IMMICH_ID_RE.test(albumId)) ctx.err(`${q}.albumId`, 'invalid album id');
+    return {
+      id: cardId, type: 'ages', name: str(ctx, `${p}.name`, x.name, '', 60).trim() || 'A esta edad', enabled,
+      options: { ages: { person: person || AGES_DEFAULTS.person, birthDate, albumId, everyMin: num(ctx, `${q}.everyMin`, ag.everyMin, AGES_DEFAULTS.everyMin, 5, 120, true) } },
+    };
+  }
   const tr = obj(ctx, `${p}.options.training`, o.training);
   const url = (key) => {
     const q = `${p}.options.training.${key}`;
@@ -824,10 +844,10 @@ function sanitizeCard(ctx, p, x, seen) {
   };
   const source = oneOf(ctx, `${p}.options.training.source`, tr.source, 'coach', TRAINING_SOURCES);
   return {
-    id: id(ctx, `${p}.id`, typeof x.id === 'string' && CARD_ID_RE.test(x.id) ? x.id : undefined, CARD_PREFIX, seen),
+    id: cardId,
     type: x.type,
     name: str(ctx, `${p}.name`, x.name, '', 60).trim() || 'Entreno',
-    enabled: bool(ctx, `${p}.enabled`, x.enabled, true),
+    enabled,
     // sin plan (solo Garmin) la dirección del coach no se usa: se guarda vacía
     options: { training: { source, garminUrl: url('garminUrl'), coachUrl: source === 'coach' ? url('coachUrl') : '' } },
   };

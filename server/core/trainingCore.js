@@ -3,7 +3,11 @@
 
 export const CARD_PREFIX = 'k_';
 export const CARD_ID_RE = /^k_[a-z0-9]{1,40}$/;
-export const CARD_TYPES = ['training'];
+/** 'training': Entreno; 'ages': "A esta edad" a pantalla completa (server/ages.js) */
+export const CARD_TYPES = ['training', 'ages'];
+export const AGES_DEFAULTS = Object.freeze({ person: 'Arantza', birthDate: '2020-06-22', everyMin: 15 });
+/** segundos que "A esta edad" se queda en pantalla */
+export const AGES_SHOW_SEC = 45;
 /** 'coach': plan del coach + Garmin; 'garmin': solo Garmin (sin plan) */
 export const TRAINING_SOURCES = ['coach', 'garmin'];
 export const MAX_CARDS = 12;

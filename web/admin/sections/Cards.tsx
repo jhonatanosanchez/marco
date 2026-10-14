@@ -1,7 +1,7 @@
 // Tarjetas (fork fsrhome): crear, nombrar, encender o apagar, fuente y direcciones, borrar y "Mostrar ahora".
 // Cada pantalla elige cuáles muestra en Diseño (ScreenCardsCard en Layout.tsx).
 import { useState } from 'preact/hooks';
-import type { CardDef, StoredConfig, TrainingSource } from '../../shared/types';
+import type { CardDef, StoredConfig, TrainingOptions, TrainingSource } from '../../shared/types';
 import { api, ApiError } from '../api';
 import { toast } from '../components/feedback';
 import { Button, Card, Field, PageHeader, Segmented, TextInput, ToggleRow } from '../components/ui';
@@ -10,7 +10,7 @@ import { uid } from '../util';
 import type { SectionProps } from './common';
 
 /** fuentes por defecto: plan del coach + el Garmin de la casa, o solo Garmin (el de Andrea) */
-const PRESETS: Record<TrainingSource, CardDef['options']['training']> = {
+const PRESETS: Record<TrainingSource, TrainingOptions> = {
   coach: { source: 'coach', garminUrl: 'http://garmin-stats:4400', coachUrl: 'http://running-coach:4300' },
   garmin: { source: 'garmin', garminUrl: 'http://garmin-andrea:4400', coachUrl: '' },
 };
@@ -53,7 +53,7 @@ export function CardsSection({ cfg, set, setFull, errors }: SectionProps) {
         </div>
       </Card>
       {items.map((k, i) => {
-        const tr = k.options.training;
+        const tr = k.options.training!;
         return (
           <Card key={k.id} id={`card-${k.id}`} title={k.name || t('Entreno')} icon="activity">
             <ToggleRow label={t('Tarjeta activa')} checked={k.enabled} onChange={(v) => upd(i, (x) => void (x.enabled = v))} />
@@ -65,17 +65,17 @@ export function CardsSection({ cfg, set, setFull, errors }: SectionProps) {
                 <Segmented
                   value={tr.source}
                   options={[{ value: 'coach', label: t('Coach + Garmin') }, { value: 'garmin', label: t('Solo Garmin') }]}
-                  onChange={(v) => upd(i, (x) => void (x.options.training = { ...PRESETS[v as TrainingSource], garminUrl: x.options.training.garminUrl }))}
+                  onChange={(v) => upd(i, (x) => void (x.options.training = { ...PRESETS[v as TrainingSource], garminUrl: x.options.training!.garminUrl }))}
                 />
               </Field>
             </div>
             <div class="grid grid--2">
               <Field label={t('Dirección de Garmin Stats')} error={errors[`cards.items[${i}].options.training.garminUrl`]}>
-                <TextInput value={tr.garminUrl} onValue={(v) => upd(i, (x) => void (x.options.training.garminUrl = v))} />
+                <TextInput value={tr.garminUrl} onValue={(v) => upd(i, (x) => void (x.options.training!.garminUrl = v))} />
               </Field>
               {tr.source === 'coach' && (
                 <Field label={t('Dirección del coach')} error={errors[`cards.items[${i}].options.training.coachUrl`]}>
-                  <TextInput value={tr.coachUrl} onValue={(v) => upd(i, (x) => void (x.options.training.coachUrl = v))} />
+                  <TextInput value={tr.coachUrl} onValue={(v) => upd(i, (x) => void (x.options.training!.coachUrl = v))} />
                 </Field>
               )}
             </div>
