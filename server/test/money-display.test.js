@@ -115,7 +115,7 @@ test('fuentes: la tarjeta money se dibuja con moneyCardHtml; la hoja de dinero s
   assert.match(sheet, /close\(\): void \{[\s\S]*this\.clock\.stop\(\);[\s\S]*this\.data = null;/);
   assert.doesNotMatch(sheet, /localStorage|sessionStorage|indexedDB/);
   const main = readFileSync(new URL('../../web/display/main.ts', import.meta.url), 'utf8');
-  assert.match(main, /const cardSheet = new SheetSwitch\(\{ money: new MoneySheet\(cardsPaused\) \}, new CardSheet\(cardsPaused\)\);/);
+  assert.match(main, /const cardSheet = new SheetSwitch\(\{ money: new MoneySheet\(cardsPaused\)[^}]*\}, new CardSheet\(cardsPaused\)\);/);
   assert.match(main, /new CardsController\(\{ paused: cardsPaused, sheet: cardSheet, ages: agesView \}\)/);
 });
 
