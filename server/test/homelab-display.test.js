@@ -45,6 +45,14 @@ test('tarjeta: veredicto, métricas redondeadas, alerta escapada; gris sin datos
   assert.match(ht.homelabCardHtml(SUM({ estado: 'calma', veredicto: { texto: 'Todo bien', estado: 'ok' }, alertas: [] }), REF, t, NOW, TZ), /var\(--hl-ok\)/);
 });
 
+test('tarjeta: el punto pinta el veredicto de ahora, no lo que subió la noche (Anoche + "Todo bien" = verde)', () => {
+  const card = ht.homelabCardHtml(SUM({ modo: 'anoche', estado: 'aviso', veredicto: { texto: 'Todo bien', estado: 'ok' }, alertas: [], anoche: { respaldo: { ok: true, edadHoras: 3 }, personas: [{ camara: 'patio', nombre: 'Patio', n: 1 }], alertas: [] } }), REF, t, NOW, TZ);
+  assert.match(card, /var\(--hl-ok\)/);
+  assert.doesNotMatch(card, /var\(--hl-warn\)/);
+  // un veredicto que Marco no conoce sigue siendo ámbar
+  assert.match(ht.homelabCardHtml(SUM({ veredicto: { texto: 'x', estado: 'raro' } }), REF, t, NOW, TZ), /var\(--hl-warn\)/);
+});
+
 test('Anoche: respaldo con hora local, personas por cámara, alertas de la noche; Frigate caído', () => {
   const lines = ht.nightLines({ respaldo: { ok: true, edadHoras: 3.5 }, personas: [{ camara: 'cochera', nombre: 'Cochera', n: 2 }, { camara: 'patio', nombre: 'Patio', n: 1 }], alertas: [{ titulo: 'Kuma', abiertaEn: Date.parse('2026-10-14T02:10:00-06:00'), resuelta: true }] }, NOW, t, TZ);
   assert.deepEqual(lines.map((l) => l.texto), ['Respaldo a las 03:00 ✓', '3 personas en zona: Cochera 2, Patio 1', 'Kuma, 02:10 (ya pasó)']);

@@ -61,6 +61,10 @@ export function nightLines(a: Anoche, now: number, t: T, tz: string): { texto: s
   return out;
 }
 
+/** veredicto de estado-homelab → estado del punto; lo desconocido es ámbar (nunca verde por no entenderlo) */
+const VEREDICTO: Record<string, string> = { ok: 'calma', aviso: 'aviso', critico: 'alerta' };
+const verdictEstado = (v: { estado: string }): string => VEREDICTO[v.estado] ?? 'aviso';
+
 const dot = (estado: string): string => `<span class="hl-dot" style="background:${estadoColor(estado)}"></span>`;
 
 export function homelabCardHtml(s: HomelabSummary, ref: DisplayCardRef, t: T, now: number, tz: string): string {
@@ -68,7 +72,8 @@ export function homelabCardHtml(s: HomelabSummary, ref: DisplayCardRef, t: T, no
   const head = `<div class="mcard-head"><span class="mcard-title"><span class="mcard-ico">🖥️</span>${title}</span></div>`;
   if (s.estado === 'mudo') return `${head}<div class="mcard-main hl-line">${dot('mudo')}${escHtml(t('hlNoData'))}</div>`;
   const verdict = s.estado === 'calma' && !s.veredicto?.texto ? t('hlAllGood') : s.veredicto?.texto ?? '';
-  const main = `<div class="mcard-main hl-line">${dot(s.estado)}${escHtml(verdict)}</div>`;
+  // el punto dice cómo está el servidor ahora; lo que pasó en la noche lo dicen las líneas de "Anoche"
+  const main = `<div class="mcard-main hl-line">${dot(s.veredicto ? verdictEstado(s.veredicto) : s.estado)}${escHtml(verdict)}</div>`;
   if (s.modo === 'anoche' && s.anoche) {
     const li = nightLines(s.anoche, now, t, tz).map((l) => `<li${l.alto ? ' class="is-high"' : ''}>${escHtml(l.texto)}</li>`).join('');
     return `${head}${main}<ul class="hl-list">${li}</ul>`;
@@ -140,7 +145,6 @@ export function homelabSheetHtml(r: HomelabDetailResponse, ref: DisplayCardRef, 
   const name = escHtml(ref.name || t('hlTitle'));
   if (!r.ok) return `<div class="msheet-head"><div class="msheet-title">🖥️ ${name}</div></div><div class="hl-empty">${dot('mudo')}${escHtml(t('hlNoData'))}</div>`;
   const w = r.data;
-  const estado = ({ ok: 'calma', aviso: 'aviso', critico: 'alerta' } as Record<string, string>)[w.veredicto.estado] ?? 'aviso';
-  const head = `<div class="msheet-head"><div class="msheet-title">🖥️ ${name}</div><div class="hl-verdict">${dot(estado)}${escHtml(w.veredicto.texto)}</div></div>`;
+  const head = `<div class="msheet-head"><div class="msheet-title">🖥️ ${name}</div><div class="hl-verdict">${dot(verdictEstado(w.veredicto))}${escHtml(w.veredicto.texto)}</div></div>`;
   return `${head}<div class="hl-cols"><div class="hl-scroll">${alertsHtml(w, ui, t, lang, now, tz)}</div><div class="hl-scroll">${serverHtml(w, t)}${networkHtml(w, t)}</div></div>`;
 }
