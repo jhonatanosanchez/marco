@@ -29,6 +29,10 @@ export const ROWS_CARDS: [string, string, string][] = [
   ['Álbum de Immich', 'Immich album', 'Álbum do Immich'],
   ['Elige un álbum', 'Pick an album', 'Escolhe um álbum'],
   ['“A esta edad” sale a pantalla completa con su propio “cada cuánto” (en Tarjetas).', '“At this age” shows full screen on its own schedule (set in Cards).', '“Nesta idade” aparece em ecrã inteiro com a sua própria frequência (em Cartões).'],
+  ['Dinero', 'Money', 'Dinheiro'],
+  ['El ritmo de la quincena, sin montos. Tocar la hoja muestra las cifras 30 s.', 'How the fortnight is going, without amounts. Tapping the sheet shows the figures for 30 s.', 'O ritmo da quinzena, sem valores. Tocar na folha mostra os valores 30 s.'],
+  ['Los montos solo se ven 30 s al tocar la hoja. No sale en modo privado.', 'Amounts only show for 30 s after tapping the sheet. Hidden in privacy mode.', 'Os valores só se veem 30 s ao tocar na folha. Não aparece no modo privado.'],
+  ['Falta el token de gastos en el servidor (GASTOS_ECHO_TOKEN).', 'The server is missing the spending token (GASTOS_ECHO_TOKEN).', 'Falta o token de gastos no servidor (GASTOS_ECHO_TOKEN).'],
 ];
 
 export const NL_CARDS: Record<string, string> = {
@@ -61,6 +65,10 @@ export const NL_CARDS: Record<string, string> = {
   'Álbum de Immich': 'Immich-album',
   'Elige un álbum': 'Kies een album',
   '“A esta edad” sale a pantalla completa con su propio “cada cuánto” (en Tarjetas).': '“Op deze leeftijd” verschijnt schermvullend met een eigen ritme (in Kaarten).',
+  'Dinero': 'Geld',
+  'El ritmo de la quincena, sin montos. Tocar la hoja muestra las cifras 30 s.': 'Hoe de periode loopt, zonder bedragen. Tik op het blad om de bedragen 30 s te zien.',
+  'Los montos solo se ven 30 s al tocar la hoja. No sale en modo privado.': 'Bedragen zijn alleen 30 s zichtbaar na een tik op het blad. Verborgen in privémodus.',
+  'Falta el token de gastos en el servidor (GASTOS_ECHO_TOKEN).': 'De server mist het uitgaventoken (GASTOS_ECHO_TOKEN).',
 };
 
 export const DA_CARDS: Record<string, string> = {
@@ -93,4 +101,8 @@ export const DA_CARDS: Record<string, string> = {
   'Álbum de Immich': 'Immich-album',
   'Elige un álbum': 'Vælg et album',
   '“A esta edad” sale a pantalla completa con su propio “cada cuánto” (en Tarjetas).': '“I denne alder” vises i fuld skærm med sin egen rytme (under Kort).',
+  'Dinero': 'Penge',
+  'El ritmo de la quincena, sin montos. Tocar la hoja muestra las cifras 30 s.': 'Hvordan perioden går, uden beløb. Tryk på arket for at se beløbene i 30 s.',
+  'Los montos solo se ven 30 s al tocar la hoja. No sale en modo privado.': 'Beløb vises kun i 30 s efter et tryk på arket. Skjult i privat tilstand.',
+  'Falta el token de gastos en el servidor (GASTOS_ECHO_TOKEN).': 'Serveren mangler udgiftstokenet (GASTOS_ECHO_TOKEN).',
 };

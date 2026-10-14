@@ -1,4 +1,4 @@
-import type {
+import type { CardsStatus,
   CamerasStatus,
   CardShowResponse,
   CameraTestAlertResponse,
@@ -211,6 +211,7 @@ export const api = {
   camerasStatus: () => request<CamerasStatus>('GET', '/api/admin/cameras/status'),
   cameraTestAlert: (camera: string) => request<CameraTestAlertResponse>('POST', '/api/admin/cameras/test-alert', { camera }),
   cardShow: (id: string) => request<CardShowResponse>('POST', `/api/admin/cards/${encodeURIComponent(id)}/show`),
+  cardsStatus: () => request<CardsStatus>('GET', '/api/admin/cards/status'),
   refreshImmich: () => request<ImmichStatus>('POST', '/api/admin/immich/refresh'),
   clearImmichCache: () => request<{ ok: boolean; freed: number }>('DELETE', '/api/admin/immich/cache'),
   weatherKey: () => request<WeatherKeyStatus>('GET', '/api/admin/weather/key'),

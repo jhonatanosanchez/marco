@@ -358,6 +358,21 @@
     },
     {
       "method": "GET",
+      "path": "/api/admin/cards/status",
+      "query": [],
+      "feature": null,
+      "callers": [
+        "cardsStatus"
+      ],
+      "request": null,
+      "response": "CardsStatus",
+      "responseArray": false,
+      "responseKeys": [
+        "moneyToken"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/api/admin/config",
       "query": [],
       "feature": null,

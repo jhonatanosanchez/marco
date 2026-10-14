@@ -1,7 +1,7 @@
 // Tarjetas (fork fsrhome): crear, nombrar, encender o apagar, fuente y direcciones, borrar y "Mostrar ahora".
 // Cada pantalla elige cuáles muestra en Diseño (ScreenCardsCard en Layout.tsx).
 import { useEffect, useState } from 'preact/hooks';
-import type { AgesOptions, CardDef, ImmichAlbum, StoredConfig, TrainingOptions, TrainingSource } from '../../shared/types';
+import type { AgesOptions, CardDef, CardsStatus, ImmichAlbum, StoredConfig, TrainingOptions, TrainingSource } from '../../shared/types';
 import { api, ApiError } from '../api';
 import { toast } from '../components/feedback';
 import { Button, Card, Field, PageHeader, Segmented, Select, TextInput, ToggleRow } from '../components/ui';
@@ -22,6 +22,8 @@ const newAges = (albumId: string): CardDef => ({
   options: { ages: { person: 'Arantza', birthDate: '2020-06-22', albumId, everyMin: 15 } },
 });
 
+const newMoney = (): CardDef => ({ id: uid('k'), type: 'money', name: 'Dinero', enabled: true, options: { money: {} } });
+
 /** Borra la tarjeta y la quita de todas las pantallas. */
 export function pruneCard(d: StoredConfig, id: string) {
   d.cards = { items: (d.cards?.items ?? []).filter((k) => k.id !== id) };
@@ -38,6 +40,9 @@ export function CardsSection({ cfg, set, setFull, full, errors }: SectionProps) 
     });
   const [albums, setAlbums] = useState<ImmichAlbum[]>([]);
   useEffect(() => { api.immichAlbums().then(setAlbums, () => setAlbums([])); }, []);
+  // ¿tiene el servidor el token de gastos? (solo un booleano; null mientras carga o si falla)
+  const [status, setStatus] = useState<CardsStatus | null>(null);
+  useEffect(() => { api.cardsStatus().then(setStatus, () => setStatus(null)); }, []);
   // el álbum por defecto: el primero que ya usa el fondo de alguna pantalla
   const firstAlbum = full.screens.flatMap((s) => s.background?.immich?.albumIds ?? [])[0] ?? '';
   const updAges = (i: number, fn: (a: AgesOptions) => void) => upd(i, (k) => { if (k.options.ages) fn(k.options.ages); });
@@ -61,9 +66,26 @@ export function CardsSection({ cfg, set, setFull, full, errors }: SectionProps) 
           <Button onClick={() => add('coach')}>{t('Entreno con plan del coach')}</Button>
           <Button onClick={() => add('garmin')}>{t('Entreno solo con Garmin')}</Button>
           <Button onClick={() => set((d) => void (d.cards = { items: [...(d.cards?.items ?? []), newAges(firstAlbum)] }))}>{t('A esta edad')}</Button>
+          <Button onClick={() => set((d) => void (d.cards = { items: [...(d.cards?.items ?? []), newMoney()] }))}>{t('Dinero')}</Button>
         </div>
       </Card>
       {items.map((k, i) => {
+        if (k.type === 'money') {
+          return (
+            <Card key={k.id} id={`card-${k.id}`} title={k.name || t('Dinero')} icon="tag" desc={t('El ritmo de la quincena, sin montos. Tocar la hoja muestra las cifras 30 s.')}>
+              <ToggleRow label={t('Tarjeta activa')} checked={k.enabled} onChange={(v) => upd(i, (x) => void (x.enabled = v))} />
+              <Field label={t('Nombre de la tarjeta')} error={errors[`cards.items[${i}].name`]}>
+                <TextInput value={k.name} maxLength={60} onValue={(v) => upd(i, (x) => void (x.name = v))} />
+              </Field>
+              <p class="muted small">{t('Los montos solo se ven 30 s al tocar la hoja. No sale en modo privado.')}</p>
+              {status && !status.moneyToken && <p class="field__error">{t('Falta el token de gastos en el servidor (GASTOS_ECHO_TOKEN).')}</p>}
+              <div class="row-actions">
+                <Button onClick={() => show(k.id)} loading={busy === k.id} disabled={!k.enabled}>{t('Mostrar ahora')}</Button>
+                <Button variant="danger" onClick={() => setFull((d) => pruneCard(d, k.id))}>{t('Borrar tarjeta')}</Button>
+              </div>
+            </Card>
+          );
+        }
         if (k.type === 'ages') {
           const ag = k.options.ages!;
           return (
