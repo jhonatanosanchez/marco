@@ -96,6 +96,10 @@ export async function fakeImmich(opts = {}) {
       let items = albums.flatMap((a) => a.assets);
       if (q.type) items = items.filter((a) => a.type === q.type);
       if (q.isFavorite !== undefined) items = items.filter((a) => a.isFavorite === q.isFavorite);
+      // "A esta edad" (fork fsrhome): rango de fechas por localDateTime y personas solo si se piden
+      if (q.takenAfter) items = items.filter((a) => (a.localDateTime || '') >= q.takenAfter);
+      if (q.takenBefore) items = items.filter((a) => (a.localDateTime || '') < q.takenBefore);
+      if (!q.withPeople) items = items.map(({ people, ...rest }) => rest);
       const size = q.size || 250, page = q.page || 1;
       const slice = items.slice((page - 1) * size, page * size);
       const more = page * size < items.length;

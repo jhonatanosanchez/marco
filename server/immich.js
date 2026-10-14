@@ -49,6 +49,22 @@ export function immichSettings(override = {}) {
 /** Enabled, with a URL and a key. */
 export const immichUsable = (s = immichSettings()) => Boolean(s.enabled && s.url && s.key);
 
+/** JSON de Immich con la URL y la llave guardadas (fork fsrhome: tarjeta "A esta edad", server/ages.js). */
+export async function immichJson(p, opts = {}) {
+  const s = immichSettings();
+  if (!immichUsable(s)) throw new ImmichError('not_configured');
+  return callJson(s, p, opts);
+}
+
+/**
+ * Fotos que también se sirven por /media/immich aunque no sean de un álbum de fondo (fork fsrhome: la lista del día de
+ * "A esta edad"). `fn(id, screens)` → versión o null; `screens` como en immichMedia (null = sesión del admin).
+ */
+let extraVersions = null;
+export function setExtraAssetVersions(fn) {
+  extraVersions = fn;
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // HTTP
 
@@ -503,7 +519,7 @@ export async function immichMedia(req, res) {
     // that is private with "hide photos" serves none of its photos (displayAccess.js mediaScreens)
     const screens = mediaScreens(getConfig(), access);
     if (screens && !screens.length) return fail(404, 'not found');
-    v = assetVersion(id, screens);
+    v = assetVersion(id, screens) ?? extraVersions?.(id, screens) ?? null;
   }
   if (v === null || v === undefined) return fail(404, 'not found');
   if (!immichUsable()) return fail(503, 'immich not configured');

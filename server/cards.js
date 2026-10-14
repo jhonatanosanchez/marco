@@ -9,6 +9,7 @@ import { logActivity } from './activity.js';
 import { screenPrivacy } from './privacy.js';
 import { requestScreen } from './displayAccess.js';
 import { trainingDetail, trainingSummary } from './core/trainingCore.js';
+import { agesList } from './ages.js';
 
 export const CACHE_MS = 30 * 60_000;
 const TIMEOUT_MS = 8000;
@@ -89,20 +90,22 @@ function cardFor(cfg, req, id) {
 /** Montado bajo /api después de displayAuth (DISPLAY_API_PATHS cubre /api/display). */
 export function cardsDisplayRouter() {
   const r = Router();
-  const handler = (build) => async (req, res, next) => {
+  const handler = (kind) => async (req, res, next) => {
     try {
       const cfg = getConfig();
       const card = cardFor(cfg, req, req.params.id);
       res.set('cache-control', 'private, no-store');
-      if (!card) return res.status(404).json({ error: 'not found' });
+      if (!card || (kind === 'detail' && card.type !== 'training')) return res.status(404).json({ error: 'not found' });
+      if (card.type === 'ages') return res.json(await agesList(card));
       const now = Date.now();
+      const build = kind === 'detail' ? trainingDetail : trainingSummary;
       res.json(build(await loadTraining(card, now), { source: card.options.training.source, now, tz: timezone(cfg) }));
     } catch (e) {
       next(e);
     }
   };
-  r.get('/display/cards/:id', handler(trainingSummary));
-  r.get('/display/cards/:id/detail', handler(trainingDetail));
+  r.get('/display/cards/:id', handler('summary'));
+  r.get('/display/cards/:id/detail', handler('detail'));
   return r;
 }
 
