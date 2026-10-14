@@ -24,6 +24,7 @@ import { hostGuard } from './lib/net.js';
 import { redactSecrets } from './core/activityCore.js';
 import { displayAuth, mediaAuth } from './displayAccess.js';
 import { camerasMediaRouter, camerasDisplayRouter, camerasAdminRouter } from './frigate.js';
+import { cardsDisplayRouter, cardsAdminRouter } from './cards.js';
 import { immichMedia } from './immich.js';
 import { galleryMedia, thumbMedia } from './photos.js';
 
@@ -114,14 +115,14 @@ export function createApp({ version, dist = path.join(ROOT, 'dist'), updater = n
   // Two-step sign-in settings (routes/twofactor.js).
   app.use('/api/admin', twoFactorRouter());
   app.use('/api/admin', updatesRouter({ version, updater }));
-  app.use('/api/admin', screensAdminRouter(), announceRouter(), systemRouter({ version }), eventsAdminRouter(), accessAdminRouter(), doorbellAdminRouter(), familyAdminRouter(), camerasAdminRouter());
+  app.use('/api/admin', screensAdminRouter(), announceRouter(), systemRouter({ version }), eventsAdminRouter(), accessAdminRouter(), doorbellAdminRouter(), familyAdminRouter(), camerasAdminRouter(), cardsAdminRouter());
   // Display access (private links / paired devices / admin session; open mode = legacy LAN). displayAccess.js
   app.use(DISPLAY_API_PATHS, displayAuth());
   app.use('/api/stream', displayAuth({ allowQuery: true }));
   // Pairing (unauthenticated, rate-limited), the family page (its own key, rate-limited) and the public (display)
   // routers.
   app.use('/api', pairPublicRouter(), familyPublicRouter());
-  app.use('/api', displayPublicRouter(), eventsPublicRouter(), doorbellPublicRouter(), familyDisplayRouter(), camerasDisplayRouter());
+  app.use('/api', displayPublicRouter(), eventsPublicRouter(), doorbellPublicRouter(), familyDisplayRouter(), camerasDisplayRouter(), cardsDisplayRouter());
   app.use('/api', publicRouter({ version }));
   app.use('/api', (req, res) => res.status(404).json({ error: 'not found' }));
 
