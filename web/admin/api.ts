@@ -1,4 +1,6 @@
 import type {
+  CamerasStatus,
+  CameraTestAlertResponse,
   TestWidgetResponse,
   WidgetType,
   TestPricesResponse,
@@ -204,6 +206,9 @@ export const api = {
   setImmichKey: (key: string) => request<ImmichKeyStatus>('PUT', '/api/admin/immich/key', { key }),
   immichAlbums: () => request<ImmichAlbum[]>('GET', '/api/admin/immich/albums'),
   immichStatus: () => request<ImmichStatus>('GET', '/api/admin/immich/status'),
+  // Cámaras Frigate (fork fsrhome)
+  camerasStatus: () => request<CamerasStatus>('GET', '/api/admin/cameras/status'),
+  cameraTestAlert: (camera: string) => request<CameraTestAlertResponse>('POST', '/api/admin/cameras/test-alert', { camera }),
   refreshImmich: () => request<ImmichStatus>('POST', '/api/admin/immich/refresh'),
   clearImmichCache: () => request<{ ok: boolean; freed: number }>('DELETE', '/api/admin/immich/cache'),
   weatherKey: () => request<WeatherKeyStatus>('GET', '/api/admin/weather/key'),

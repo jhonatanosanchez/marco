@@ -306,6 +306,41 @@
     },
     {
       "method": "GET",
+      "path": "/api/admin/cameras/status",
+      "query": [],
+      "feature": null,
+      "callers": [
+        "camerasStatus"
+      ],
+      "request": null,
+      "response": "CamerasStatus",
+      "responseArray": false,
+      "responseKeys": [
+        "enabled",
+        "lastOkAt",
+        "lastError",
+        "lastEventAt"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/cameras/test-alert",
+      "query": [],
+      "feature": null,
+      "callers": [
+        "cameraTestAlert"
+      ],
+      "request": "{camera}",
+      "response": "CameraTestAlertResponse",
+      "responseArray": false,
+      "responseKeys": [
+        "ok",
+        "delivered",
+        "screens"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/api/admin/config",
       "query": [],
       "feature": null,

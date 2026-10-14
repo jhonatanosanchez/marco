@@ -43,6 +43,7 @@ import { FiltersSection } from './sections/Filters';
 import { HomeSection } from './sections/Home';
 import { HomeAssistantSection } from './sections/HomeAssistant';
 import { ImmichSection } from './sections/Immich';
+import { CamerasSection } from './sections/Cameras';
 import { IconRulesSection } from './sections/IconRules';
 import { LayoutSection } from './sections/Layout';
 import { LocalEventsSection } from './sections/LocalEvents';
@@ -86,6 +87,7 @@ const SECTIONS: Record<string, (p: SectionProps) => any> = {
   widgets: WidgetsSection,
   homeassistant: HomeAssistantSection,
   immich: ImmichSection,
+  cameras: CamerasSection,
   api: ApiSection,
   screens: ScreensSection,
   carousels: CarouselsSection,

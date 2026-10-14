@@ -335,6 +335,8 @@ export function validateGlobal(c: StoredConfig): Errors {
   const minRefresh = limitOf(wcaps, 'widgetMinRefreshSec') ?? 0;
   for (const w of c.widgets ?? []) {
     const p = `wdg.${w.id}`;
+    // cámaras Frigate (fork fsrhome): sin dirección que revisar
+    if (w.type === 'cameras') continue;
     if (w.type === 'prices') {
       const o = w.options.prices;
       if (!hasFeature(wcaps, 'priceWidgets')) e[`${p}.type`] = 'No disponible aquí';

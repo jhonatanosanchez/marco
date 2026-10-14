@@ -95,6 +95,12 @@ export function ScreenSection({ cfg, set, errors, screenId, saved, go }: Section
           <ToggleRow label={t('Pantalla completa al tocar')} checked={ec.fullscreenOnTap} onChange={(v) => setEcho({ fullscreenOnTap: v })} />
           <ToggleRow label={t('Pasar a modo ligero si va lenta')} checked={ec.fpsGuard} onChange={(v) => setEcho({ fpsGuard: v })} />
         </div>
+        <ToggleRow
+          label={t('Alertas de persona')}
+          hint={t('Abre la cámara a pantalla completa cuando Frigate ve a una persona en una zona.')}
+          checked={s.cameras?.personAlerts ?? true}
+          onChange={(v) => set((d) => void (d.screen.cameras = { personAlerts: v }))}
+        />
       </Card>
       {has('privacy') && <PrivacyCard cfg={cfg} set={set} errors={errors} go={go} />}
       {has('customCss') && (

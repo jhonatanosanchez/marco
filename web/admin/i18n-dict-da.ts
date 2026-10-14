@@ -4,11 +4,13 @@
 
 import { DA_TWOFA } from './i18n-dict-2fa';
 import { DA_ECHO } from './i18n-dict-echo';
+import { DA_CAMERAS } from './i18n-dict-cameras';
 
 /** Every admin row but the Familia ones. */
 export const DA: Record<string, string> = {
   ...DA_TWOFA,
   ...DA_ECHO,
+  ...DA_CAMERAS,
   '(ninguno)': '(ingen)',
   'Estás usando la contraseña inicial. Cámbiala: hasta entonces solo se acepta desde tu red local.': 'Du bruger den første adgangskode. Skift den: indtil da godtages den kun fra dit lokale netværk.',
   'Sesiones': 'Sessioner',

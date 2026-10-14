@@ -57,6 +57,8 @@ export function widgetPreviewSpot(cfg: StoredConfig, screenId: string, w: Widget
   if (p) return { place: p.place, size: p.size, corner: p.corner };
   // the Vertical shape is a tall card: the large size, where it has the height
   if (w.type === 'prices') return { place: 'side', size: w.options.prices?.view === 'next' || w.options.prices?.chartShape === 'rows' ? 'l' : 'm', corner: 'br' };
+  // cámaras Frigate (fork fsrhome): la cuadrícula va en la columna lateral, grande
+  if (w.type === 'cameras') return { place: 'side', size: 'l', corner: 'br' };
   return { place: 'corner', size: 'm', corner: 'br' };
 }
 

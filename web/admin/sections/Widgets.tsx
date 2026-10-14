@@ -147,6 +147,9 @@ function WidgetCard({ w, i, n, full, errors, upd, remove, move, go, setScreenId,
   const [more, setMore] = useState(false);
   const image = w.type === 'image';
   const prices = w.type === 'prices';
+  // cámaras Frigate (fork fsrhome): como los precios, sin dirección ni prueba
+  const cameras = w.type === 'cameras';
+  const own = prices || cameras;
   // Marco Cloud fetches the image itself (https only) and serves it to the screens; self-hosted TVs load the address
   const cloud = edition() === 'cloud';
   const webOk = has('webWidgets');
@@ -181,7 +184,7 @@ function WidgetCard({ w, i, n, full, errors, upd, remove, move, go, setScreenId,
     <Card
       id={`widget-${w.id}`}
       class={previewed ? 'is-previewed' : ''}
-      icon={image ? 'image' : prices ? 'zap' : 'globe'}
+      icon={image ? 'image' : prices ? 'zap' : cameras ? 'eye' : 'globe'}
       title={w.name.trim() || t('Widget sin nombre')}
       actions={
         <div class="row-actions">
@@ -204,7 +207,9 @@ function WidgetCard({ w, i, n, full, errors, upd, remove, move, go, setScreenId,
               ? t('Solo para servidores propios. La página se carga en la pantalla dentro de un marco aislado.')
               : prices
                 ? t('Precio de la electricidad de tu zona, hoy y mañana. Lo consulta este servidor; las pantallas no llaman a ninguna web.')
-                : undefined
+                : cameras
+                  ? t('Cuadrícula de las cámaras de Frigate. Lo sirve este servidor; las pantallas no llaman a Frigate.')
+                  : undefined
           }
         >
           {((w.type === 'web' && !webOk) || (prices && !pricesOk)) && <span class="chip chip--static chip--bad">{t('No disponible aquí')}</span>}
@@ -215,11 +220,18 @@ function WidgetCard({ w, i, n, full, errors, upd, remove, move, go, setScreenId,
               { value: 'image', label: t('Imagen') },
               ...(webOk || w.type === 'web' ? [{ value: 'web' as const, label: t('Web (iframe)') }] : []),
               ...(pricesOk || prices ? [{ value: 'prices' as const, label: t('Precio de la luz') }] : []),
+              { value: 'cameras' as const, label: t('Cámaras') },
             ]}
             onChange={(v) =>
               upd((x) => {
                 if (x.type === v) return;
                 x.type = v;
+                if (v === 'cameras') {
+                  delete x.options.prices;
+                  x.options.url = '';
+                  x.options.refreshSec = 0;
+                  return;
+                }
                 if (v === 'prices') {
                   x.options.prices ??= newPriceOptions(full.datetime.timezone);
                   return;
@@ -233,7 +245,7 @@ function WidgetCard({ w, i, n, full, errors, upd, remove, move, go, setScreenId,
         </Field>
       </div>
       {prices && w.options.prices && <PriceWidgetFields w={w} errors={errors} upd={upd} part="main" tz={full.datetime.timezone} />}
-      {!prices && (
+      {!own && (
         <>
           <Field
             label={t('Dirección')}
@@ -270,7 +282,7 @@ function WidgetCard({ w, i, n, full, errors, upd, remove, move, go, setScreenId,
         </>
       )}
       <div class="grid grid--2">
-        {!prices && (
+        {!own && (
           <Field label={t('Recargar cada')} error={errors[`wdg.${w.id}.refreshSec`] ? t(errors[`wdg.${w.id}.refreshSec`]) : undefined}>
             <Select
               value={w.options.refreshSec}
@@ -306,7 +318,7 @@ function WidgetCard({ w, i, n, full, errors, upd, remove, move, go, setScreenId,
         <Icon name={more ? 'up' : 'chevron'} size={14} /> {t('Más opciones')}
       </button>
       {more && prices && w.options.prices && <PriceWidgetFields w={w} errors={errors} upd={upd} part="more" tz={full.datetime.timezone} />}
-      {more && !prices && (
+      {more && !own && (
         <div class="stack">
           <Field label={t('Ajuste')} hint={t('Solo cuenta cuando el widget ocupa toda la pantalla.')}>
             <Segmented
