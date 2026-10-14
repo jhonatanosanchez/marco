@@ -2,7 +2,7 @@
 // Every per-screen endpoint gets `?screen=<key>` when the display was opened with one; every request carries the
 // display credential (private-link key or paired-device token) in X-Marco-Key.
 import type {
-  CountdownsResponse, DisplayConfig, DisplayHeartbeat, EventsResponse, FamilyDisplayState, HealthResponse, HeartbeatResponse, NewsResponse,
+  CountdownsResponse, DisplayConfig, DisplayHeartbeat, EventsResponse, FamilyDisplayState, HealthResponse, HeartbeatResponse, HomelabSilenceHasta, NewsResponse,
   PhotosResponse, PollResponse, WeatherResponse,
 } from '../shared/types';
 import { authHeaders, withScreen, withTarget } from './identity';
@@ -66,6 +66,11 @@ export const api = {
   familyToggle: (choreId: string, done: boolean, screen?: string) =>
     request<{ ok: boolean; state: FamilyDisplayState }>(withScreen('/api/display/family/toggle', screen), {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ choreId, done }),
+    }, 8000),
+  /** Silenciar o reactivar una alerta del homelab desde la hoja (tarjeta homelab de esta pantalla). */
+  homelabSilence: (id: string, clave: string, hasta: HomelabSilenceHasta) =>
+    request<{ ok: boolean }>(withScreen(`/api/display/cards/${encodeURIComponent(id)}/silence`), {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ clave, hasta }),
     }, 8000),
   health: () => getJSON<HealthResponse>('/api/health', 5000),
   /** `q` from stream.ts pollUrl (client, cursor, rev, hidden, preview). Asks for what the display is bound to. */

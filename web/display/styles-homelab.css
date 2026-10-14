@@ -1,0 +1,34 @@
+/* Tarjeta Homelab (fork fsrhome): colores de estado, la tarjeta y la hoja. Sin animaciones propias. */
+:root { --hl-ok: #5fd38a; --hl-warn: #ffbf47; --hl-bad: #ff6b5e; --hl-dim: rgba(255, 255, 255, .45); }
+.hl-line { display: flex; align-items: center; -webkit-line-clamp: unset; }
+.hl-dot { display: inline-block; flex: none; width: 1.8vmin; height: 1.8vmin; border-radius: 50%; margin-right: 1.2vmin; }
+.hl-metrics { display: flex; flex-wrap: wrap; gap: .4vmin 1.6vmin; }
+.hl-list { list-style: none; margin: .8vmin 0 0; padding: 0; font-size: 2vmin; }
+.hl-list li { margin: .4vmin 0; opacity: .85; }
+.is-high { color: #ffcf7a; opacity: 1; }
+.msheet.mhomelab { grid-template-rows: auto 1fr; }
+.hl-verdict { display: flex; align-items: center; font-size: 2.6vmin; font-weight: 600; }
+.hl-verdict .hl-dot { width: 2.4vmin; height: 2.4vmin; }
+.hl-cols { display: grid; grid-template-columns: 1fr 1.2fr; gap: 3vmin; min-height: 0; }
+.hl-scroll { overflow-y: auto; min-height: 0; padding-bottom: 6vmin; }
+.mhomelab h3 { margin: 2.2vmin 0 .8vmin; font-size: 2.2vmin; font-weight: 600; opacity: .8; }
+.hl-alerts { list-style: none; margin: 0; padding: 0; }
+.hl-alert { padding: 1.2vmin 1.4vmin; margin: .8vmin 0; border-radius: 1.4vmin; background: rgba(255, 255, 255, .06); border-left: .6vmin solid var(--hl-dim); }
+.hl-alert b { display: block; font-size: 2.2vmin; }
+.hl-alert span { display: block; font-size: 1.8vmin; opacity: .7; margin-top: .3vmin; }
+.hl-alert.is-bad { border-left-color: var(--hl-bad); }
+.hl-alert.is-warn { border-left-color: var(--hl-warn); }
+.hl-alert.is-ok { border-left-color: var(--hl-ok); }
+.hl-alert.is-dim { opacity: .75; }
+.hl-opts { display: flex; flex-wrap: wrap; gap: 1vmin; margin-top: 1.2vmin; }
+.hl-opts button { font: inherit; font-size: 2vmin; padding: 1vmin 1.8vmin; border-radius: 999px; border: 0; color: #fff; background: rgba(255, 255, 255, .16); }
+.hl-opts .hl-cancel { background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .3); }
+.hl-note { font-size: 2vmin; align-self: center; }
+.hl-fichas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1vmin; margin: 0; }
+.hl-ficha { padding: 1vmin 1.4vmin; border-radius: 1.2vmin; background: rgba(255, 255, 255, .06); min-width: 0; }
+.hl-ficha dt { font-size: 1.6vmin; opacity: .65; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hl-ficha dd { margin: .2vmin 0 0; font-size: 2vmin; font-variant-numeric: tabular-nums; }
+.hl-ficha.is-warn dd { color: var(--hl-warn); }
+.hl-ficha.is-bad dd { color: var(--hl-bad); }
+.hl-ficha.is-dim dd { opacity: .55; }
+.hl-empty { display: flex; align-items: center; font-size: 3.2vmin; opacity: .8; }

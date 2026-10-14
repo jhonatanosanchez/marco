@@ -1,6 +1,7 @@
 // Tarjeta Homelab en la pantalla (fork fsrhome): textos, colores, HTML escapado, Anoche y opciones de silencio.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { loadWebModules } from './webModules.js';
 
 const [ht, i18n] = await loadWebModules('/web/display/homelabText.ts', '/web/shared/i18n.ts');
@@ -93,4 +94,23 @@ test('hoja: opciones de silencio en línea, guardando y error', () => {
   assert.match(react, /Reactivar/);
   assert.match(ht.homelabSheetHtml({ ok: true, at: NOW, data: WID() }, REF, UI({ open: 'kuma:3', saving: true }), t, 'es', NOW, TZ), /Guardando…/);
   assert.match(ht.homelabSheetHtml({ ok: true, at: NOW, data: WID() }, REF, UI({ open: 'kuma:3', error: true }), t, 'es', NOW, TZ), /No se pudo guardar/);
+});
+
+const src = (p) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
+
+test('cards.ts: homelab fuera de la rotación chica, un vigilante por tarjeta, mismo CardStage', () => {
+  const s = src('web/display/widgets/cards.ts');
+  assert.match(s, /i\.type !== 'ages' && i\.type !== 'homelab'/);
+  assert.match(s, /new HomelabWatcher\(/);
+  assert.match(s, /canPoll: \(\) => !isPreview && !o\.paused\(\) && !document\.hidden/);
+  assert.match(s, /this\.stage\.begin\(\)/);
+  assert.match(s, /for \(const w of this\.watchers\.values\(\)\) w\.stop\(\)/);
+});
+
+test('main.ts: la hoja de homelab está en el SheetSwitch; api.ts manda JSON por POST', () => {
+  assert.match(src('web/display/main.ts'), /homelab: new HomelabSheet\(cardsPaused\)/);
+  const api = src('web/display/api.ts');
+  assert.match(api, /homelabSilence: \(id: string, clave: string, hasta: HomelabSilenceHasta\)/);
+  assert.match(api, /\/silence`\)/);
+  assert.match(api, /'content-type': 'application\/json'/);
 });

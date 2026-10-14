@@ -68,6 +68,7 @@ import { CameraView, TAP_MS, ALERT_MS, alertTitle } from './widgets/cameraView';
 import { CardsController } from './widgets/cards';
 import { CardSheet } from './widgets/cardSheet';
 import { MoneySheet } from './widgets/moneySheet';
+import { HomelabSheet } from './widgets/homelabSheet';
 import { SheetSwitch } from './sheetSwitch';
 import { AgesView } from './widgets/agesView';
 import { alertIsFresh } from './camerasText';
@@ -84,7 +85,7 @@ const cameraView = new CameraView(() => echo.isClosed());
 // Tarjetas (fork fsrhome): salen de vez en cuando; el horario, la cámara y los anuncios grandes mandan
 const cardsPaused = (): boolean =>
   doorbell.active || echo.isClosed() || cameraView.isOpen || announcements.expandedCount > 0 || document.hidden || !!state.config?.privacy?.active;
-const cardSheet = new SheetSwitch({ money: new MoneySheet(cardsPaused) }, new CardSheet(cardsPaused));
+const cardSheet = new SheetSwitch({ money: new MoneySheet(cardsPaused), homelab: new HomelabSheet(cardsPaused) }, new CardSheet(cardsPaused));
 const agesView = new AgesView(cardsPaused);
 const cards = new CardsController({ paused: cardsPaused, sheet: cardSheet, ages: agesView });
 echo.onClose = () => { cameraView.close(); cards.closeAll(); };
