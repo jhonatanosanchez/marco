@@ -22,6 +22,13 @@ export const ROWS_CARDS: [string, string, string][] = [
   ['Crear una tarjeta', 'Create a card', 'Criar um cartão'],
   ['Cada cuánto (minutos)', 'How often (minutes)', 'Com que frequência (minutos)'],
   ['Cuánto dura (segundos)', 'How long (seconds)', 'Quanto dura (segundos)'],
+  ['A esta edad', 'At this age', 'Nesta idade'],
+  ['Fotos de cada año a la misma edad que hoy, a pantalla completa.', 'A photo from each year at the same age as today, full screen.', 'Fotos de cada ano com a mesma idade de hoje, em ecrã inteiro.'],
+  ['Persona en Immich', 'Person in Immich', 'Pessoa no Immich'],
+  ['Fecha de nacimiento', 'Date of birth', 'Data de nascimento'],
+  ['Álbum de Immich', 'Immich album', 'Álbum do Immich'],
+  ['Elige un álbum', 'Pick an album', 'Escolhe um álbum'],
+  ['“A esta edad” sale a pantalla completa con su propio “cada cuánto” (en Tarjetas).', '“At this age” shows full screen on its own schedule (set in Cards).', '“Nesta idade” aparece em ecrã inteiro com a sua própria frequência (em Cartões).'],
 ];
 
 export const NL_CARDS: Record<string, string> = {
@@ -47,6 +54,13 @@ export const NL_CARDS: Record<string, string> = {
   'Crear una tarjeta': 'Een kaart maken',
   'Cada cuánto (minutos)': 'Hoe vaak (minuten)',
   'Cuánto dura (segundos)': 'Hoe lang (seconden)',
+  'A esta edad': 'Op deze leeftijd',
+  'Fotos de cada año a la misma edad que hoy, a pantalla completa.': 'Een foto uit elk jaar op dezelfde leeftijd als vandaag, schermvullend.',
+  'Persona en Immich': 'Persoon in Immich',
+  'Fecha de nacimiento': 'Geboortedatum',
+  'Álbum de Immich': 'Immich-album',
+  'Elige un álbum': 'Kies een album',
+  '“A esta edad” sale a pantalla completa con su propio “cada cuánto” (en Tarjetas).': '“Op deze leeftijd” verschijnt schermvullend met een eigen ritme (in Kaarten).',
 };
 
 export const DA_CARDS: Record<string, string> = {
@@ -72,4 +86,11 @@ export const DA_CARDS: Record<string, string> = {
   'Crear una tarjeta': 'Opret et kort',
   'Cada cuánto (minutos)': 'Hvor ofte (minutter)',
   'Cuánto dura (segundos)': 'Hvor længe (sekunder)',
+  'A esta edad': 'I denne alder',
+  'Fotos de cada año a la misma edad que hoy, a pantalla completa.': 'Et foto fra hvert år i samme alder som i dag, i fuld skærm.',
+  'Persona en Immich': 'Person i Immich',
+  'Fecha de nacimiento': 'Fødselsdato',
+  'Álbum de Immich': 'Immich-album',
+  'Elige un álbum': 'Vælg et album',
+  '“A esta edad” sale a pantalla completa con su propio “cada cuánto” (en Tarjetas).': '“I denne alder” vises i fuld skærm med sin egen rytme (under Kort).',
 };

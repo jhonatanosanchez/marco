@@ -1,10 +1,10 @@
 // Tarjetas (fork fsrhome): crear, nombrar, encender o apagar, fuente y direcciones, borrar y "Mostrar ahora".
 // Cada pantalla elige cuáles muestra en Diseño (ScreenCardsCard en Layout.tsx).
-import { useState } from 'preact/hooks';
-import type { CardDef, StoredConfig, TrainingOptions, TrainingSource } from '../../shared/types';
+import { useEffect, useState } from 'preact/hooks';
+import type { AgesOptions, CardDef, ImmichAlbum, StoredConfig, TrainingOptions, TrainingSource } from '../../shared/types';
 import { api, ApiError } from '../api';
 import { toast } from '../components/feedback';
-import { Button, Card, Field, PageHeader, Segmented, TextInput, ToggleRow } from '../components/ui';
+import { Button, Card, Field, PageHeader, Segmented, Select, TextInput, ToggleRow } from '../components/ui';
 import { t } from '../i18n';
 import { uid } from '../util';
 import type { SectionProps } from './common';
@@ -17,13 +17,18 @@ const PRESETS: Record<TrainingSource, TrainingOptions> = {
 
 const newCard = (source: TrainingSource): CardDef => ({ id: uid('k'), type: 'training', name: 'Entreno', enabled: true, options: { training: { ...PRESETS[source] } } });
 
+const newAges = (albumId: string): CardDef => ({
+  id: uid('k'), type: 'ages', name: 'A esta edad', enabled: true,
+  options: { ages: { person: 'Arantza', birthDate: '2020-06-22', albumId, everyMin: 15 } },
+});
+
 /** Borra la tarjeta y la quita de todas las pantallas. */
 export function pruneCard(d: StoredConfig, id: string) {
   d.cards = { items: (d.cards?.items ?? []).filter((k) => k.id !== id) };
   for (const s of d.screens) if (s.screen.cards) s.screen.cards.items = s.screen.cards.items.filter((x) => x !== id);
 }
 
-export function CardsSection({ cfg, set, setFull, errors }: SectionProps) {
+export function CardsSection({ cfg, set, setFull, full, errors }: SectionProps) {
   const items = cfg.cards?.items ?? [];
   const [busy, setBusy] = useState('');
   const upd = (i: number, fn: (k: CardDef) => void) =>
@@ -31,6 +36,11 @@ export function CardsSection({ cfg, set, setFull, errors }: SectionProps) {
       const k = d.cards?.items[i];
       if (k) fn(k);
     });
+  const [albums, setAlbums] = useState<ImmichAlbum[]>([]);
+  useEffect(() => { api.immichAlbums().then(setAlbums, () => setAlbums([])); }, []);
+  // el álbum por defecto: el primero que ya usa el fondo de alguna pantalla
+  const firstAlbum = full.screens.flatMap((s) => s.background?.immich?.albumIds ?? [])[0] ?? '';
+  const updAges = (i: number, fn: (a: AgesOptions) => void) => upd(i, (k) => { if (k.options.ages) fn(k.options.ages); });
   const add = (source: TrainingSource) => set((d) => void (d.cards = { items: [...(d.cards?.items ?? []), newCard(source)] }));
   const show = async (id: string) => {
     setBusy(id);
@@ -50,9 +60,43 @@ export function CardsSection({ cfg, set, setFull, errors }: SectionProps) {
         <div class="row-actions">
           <Button onClick={() => add('coach')}>{t('Entreno con plan del coach')}</Button>
           <Button onClick={() => add('garmin')}>{t('Entreno solo con Garmin')}</Button>
+          <Button onClick={() => set((d) => void (d.cards = { items: [...(d.cards?.items ?? []), newAges(firstAlbum)] }))}>{t('A esta edad')}</Button>
         </div>
       </Card>
       {items.map((k, i) => {
+        if (k.type === 'ages') {
+          const ag = k.options.ages!;
+          return (
+          <Card key={k.id} id={`card-${k.id}`} title={k.name || t('A esta edad')} icon="image" desc={t('Fotos de cada año a la misma edad que hoy, a pantalla completa.')}>
+            <ToggleRow label={t('Tarjeta activa')} checked={k.enabled} onChange={(v) => upd(i, (x) => void (x.enabled = v))} />
+            <div class="grid grid--2">
+              <Field label={t('Nombre de la tarjeta')} error={errors[`cards.items[${i}].name`]}>
+                <TextInput value={k.name} maxLength={60} onValue={(v) => upd(i, (x) => void (x.name = v))} />
+              </Field>
+              <Field label={t('Persona en Immich')} error={errors[`cards.items[${i}].options.ages.person`]}>
+                <TextInput value={ag.person} maxLength={40} onValue={(v) => updAges(i, (a) => void (a.person = v))} />
+              </Field>
+              <Field label={t('Fecha de nacimiento')} error={errors[`cards.items[${i}].options.ages.birthDate`]}>
+                <TextInput type="date" value={ag.birthDate} onValue={(v) => updAges(i, (a) => void (a.birthDate = v))} />
+              </Field>
+              <Field label={t('Álbum de Immich')} error={errors[`cards.items[${i}].options.ages.albumId`]}>
+                <Select
+                  value={ag.albumId}
+                  options={[{ value: '', label: t('Elige un álbum') }, ...albums.map((al) => ({ value: al.id, label: `${al.name} (${al.count})` }))]}
+                  onChange={(v) => updAges(i, (a) => void (a.albumId = String(v)))}
+                />
+              </Field>
+            </div>
+            <Field label={t('Cada cuánto (minutos)')}>
+              <Segmented value={String(ag.everyMin)} options={[10, 15, 30, 60].map((n) => ({ value: String(n), label: String(n) }))} onChange={(v) => updAges(i, (a) => void (a.everyMin = Number(v)))} />
+            </Field>
+            <div class="row-actions">
+              <Button onClick={() => show(k.id)} loading={busy === k.id} disabled={!k.enabled}>{t('Mostrar ahora')}</Button>
+              <Button variant="danger" onClick={() => setFull((d) => pruneCard(d, k.id))}>{t('Borrar tarjeta')}</Button>
+            </div>
+          </Card>
+          );
+        }
         const tr = k.options.training!;
         return (
           <Card key={k.id} id={`card-${k.id}`} title={k.name || t('Entreno')} icon="activity">

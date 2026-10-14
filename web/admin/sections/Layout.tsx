@@ -787,6 +787,7 @@ export function ScreenCardsCard({ cfg, set, full, go }: Pick<SectionProps, 'cfg'
               );
             })}
           </div>
+          {defs.some((k) => k.type === 'ages') && <p class="muted small">{t('“A esta edad” sale a pantalla completa con su propio “cada cuánto” (en Tarjetas).')}</p>}
           <div class="grid grid--2">
             <Field label={t('Cada cuánto (minutos)')}>
               <Segmented value={String(sc.everyMin)} options={[10, 20, 30, 60].map((n) => ({ value: String(n), label: String(n) }))} onChange={(v) => setSc((c) => void (c.everyMin = Number(v)))} />
