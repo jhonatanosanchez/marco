@@ -8,8 +8,9 @@ import { requireAuth } from './auth.js';
 import { logActivity } from './activity.js';
 import { screenPrivacy } from './privacy.js';
 import { requestScreen } from './displayAccess.js';
-import { trainingDetail, trainingSummary } from './core/trainingCore.js';
+import { trainingDetail, trainingSummary, cardVisible, localDay } from './core/trainingCore.js';
 import { agesList } from './ages.js';
+import { loadMoney, moneyConfigured } from './money.js';
 
 export const CACHE_MS = 30 * 60_000;
 const TIMEOUT_MS = 8000;
@@ -83,7 +84,7 @@ function cardFor(cfg, req, id) {
   if (!card) return null;
   const { screen } = requestScreen(cfg, req);
   if (!screen?.screen?.cards?.items?.includes(id)) return null;
-  if (screenPrivacy(cfg, screen, new Date()).active) return null;
+  if (!cardVisible(card, { privateMode: screenPrivacy(cfg, screen, new Date()).active })) return null;
   return card;
 }
 
@@ -97,6 +98,11 @@ export function cardsDisplayRouter() {
       res.set('cache-control', 'private, no-store');
       if (!card || (kind === 'detail' && card.type !== 'training')) return res.status(404).json({ error: 'not found' });
       if (card.type === 'ages') return res.json(await agesList(card));
+      if (card.type === 'money') {
+        const now = Date.now();
+        const m = await loadMoney(now, process.env, localDay(now, timezone(cfg)));
+        return res.json(m ? { ok: true, at: m.at, data: m.data } : { ok: false });
+      }
       const now = Date.now();
       const build = kind === 'detail' ? trainingDetail : trainingSummary;
       res.json(build(await loadTraining(card, now), { source: card.options.training.source, now, tz: timezone(cfg) }));
@@ -111,7 +117,10 @@ export function cardsDisplayRouter() {
 
 /** Pantallas que tienen la tarjeta `id` y no están en modo privado. */
 function showTargets(cfg, id, now) {
-  return cfg.screens.filter((s) => s.screen?.cards?.items?.includes(id) && !screenPrivacy(cfg, s, new Date(now)).active).map((s) => s.id);
+  const card = (cfg.cards?.items ?? []).find((k) => k.id === id);
+  return cfg.screens
+    .filter((s) => s.screen?.cards?.items?.includes(id) && cardVisible(card, { privateMode: screenPrivacy(cfg, s, new Date(now)).active }))
+    .map((s) => s.id);
 }
 
 export function cardsAdminRouter() {
@@ -126,6 +135,11 @@ export function cardsAdminRouter() {
     const screens = screenIds.map((id) => cfg.screens.find((s) => s.id === id)?.slug || id);
     logActivity('display.cardShow', { req, data: { card: card.id, screens, delivered } });
     res.json({ ok: true, delivered, screens });
+  });
+  // ¿tiene el servidor el token de gastos? Solo un booleano: el token nunca sale del servidor
+  r.get('/cards/status', requireAuth, (req, res) => {
+    res.set('cache-control', 'no-store');
+    res.json({ moneyToken: moneyConfigured() });
   });
   return r;
 }

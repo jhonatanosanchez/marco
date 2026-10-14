@@ -75,6 +75,18 @@ export interface CardDef {
 export interface AgesPhoto { id: string; v: string; months: number; year: string }
 /** GET /api/display/cards/<id> de una tarjeta ages */
 export interface AgesList { person: string; today: string; months: number; photos: AgesPhoto[] }
+/** Dinero (fork fsrhome; server/core/moneyCore.js): montos en centavos; nunca se pintan sin revelar */
+export type MoneyRitmoEstado = 'bien' | 'rapido' | 'pasado' | 'sin-plan';
+export interface MoneyRitmo { estado: MoneyRitmoEstado; pctQueda: number | null; pctTiempo: number | null }
+export interface MoneyQuincena { rango: string; diasRestantes: number; diasTotales: number; presupuesto: number; gastado: number; queda: number; porDia: number }
+export interface MoneyCategoria { nombre: string; presupuesto: number; gastado: number; queda: number; pctUsado: number | null; estado: 'bien' | 'rapido' | 'agotada' }
+export interface MoneyPago { nombre: string; vencimiento: string; centavos: number }
+export interface MoneyGasto { fecha: string; descripcion: string; persona: 'andrea' | 'jhonatan' | null; centavos: number }
+export interface MoneyResumen { generadoEn: string | null; today: string; quincena: MoneyQuincena | null; ritmo: MoneyRitmo; categorias: MoneyCategoria[]; proximos: MoneyPago[]; ultimos: MoneyGasto[] }
+/** GET /api/display/cards/<id> de una tarjeta money */
+export type MoneyResponse = { ok: true; at: number; data: MoneyResumen } | { ok: false };
+/** GET /api/admin/cards/status */
+export interface CardsStatus { moneyToken: boolean }
 /** screen.cards: ids de cfg.cards.items en orden de rotación */
 export interface ScreenCards { items: string[]; everyMin: number; showSec: number; corner: CardCorner }
 export interface DisplayCardRef { id: string; type: CardType; name: string; source?: TrainingSource; everyMin?: number; showSec?: number }
