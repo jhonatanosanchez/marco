@@ -155,6 +155,8 @@ export function displayCards(cfg, screen, { isPrivate = false } = {}) {
     if (k.type === 'money') return { id: k.id, type: k.type, name: k.name };
     // Homelab: su propio ritmo de repetición; las zonas de Frigate no viajan a la pantalla
     if (k.type === 'homelab') return { id: k.id, type: k.type, name: k.name, everyMin: k.options.homelab.everyMin };
+    // Organización: su ritmo; la URL y el token de organizacion viven en el entorno del servidor
+    if (k.type === 'org') return { id: k.id, type: k.type, name: k.name, everyMin: k.options.org.everyMin };
     return { id: k.id, type: k.type, name: k.name, source: k.options.training.source };
   };
   const items = (sc.items ?? []).map((id) => defs.get(id))

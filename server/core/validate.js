@@ -15,7 +15,7 @@ import {
 } from './carousels.js';
 import { IMMICH_ID_RE, MAX_IMMICH_ALBUMS, PORTRAIT_FITS, normalizeImmichUrl } from './immichCore.js';
 import { CAMERA_ID_RE, ZONE_RE, MAX_CAMERAS, MAX_ZONES } from './camerasCore.js';
-import { AGES_DEFAULTS, CARD_ID_RE, CARD_PREFIX, CARD_TYPES, HOMELAB_DEFAULTS, MAX_CARDS, TRAINING_DEFAULTS, TRAINING_SOURCES } from './trainingCore.js';
+import { AGES_DEFAULTS, CARD_ID_RE, CARD_PREFIX, CARD_TYPES, HOMELAB_DEFAULTS, MAX_CARDS, ORG_DEFAULTS, TRAINING_DEFAULTS, TRAINING_SOURCES } from './trainingCore.js';
 import {
   BAND_NAME_MAX, BAND_PRESET_IDS, GRID_IDS, gridCompany, HOLIDAY_SETS, MAX_BAND_PRICE, MAX_BANDS, MIN_BAND_PRICE, TARIFF_MODES,
 } from './tariffsCore.js';
@@ -835,6 +835,12 @@ function sanitizeCard(ctx, p, x, seen) {
       else ctx.err(`${q}.zones`, '1–10 Frigate zone names ([A-Za-z0-9_-], up to 40 characters)');
     }
     return { id: cardId, type: 'homelab', name: str(ctx, `${p}.name`, x.name, '', 60).trim() || 'Homelab', enabled, options: { homelab: { everyMin, zones } } };
+  }
+  if (x.type === 'org') {
+    const q = `${p}.options.org`;
+    const og = obj(ctx, q, o.org);
+    const everyMin = num(ctx, `${q}.everyMin`, og.everyMin, ORG_DEFAULTS.everyMin, 5, 120, true);
+    return { id: cardId, type: 'org', name: str(ctx, `${p}.name`, x.name, '', 60).trim() || 'Organización', enabled, options: { org: { everyMin } } };
   }
   if (x.type === 'ages') {
     const q = `${p}.options.ages`;

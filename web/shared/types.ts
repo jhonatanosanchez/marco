@@ -59,7 +59,7 @@ export interface CamerasStatus { enabled: boolean; lastOkAt: string | null; last
 export interface CameraTestAlertResponse { ok: boolean; delivered: number; screens: string[] }
 
 // ---- Tarjetas (fork fsrhome; server/cards.js) ----
-export type CardType = 'training' | 'ages' | 'money' | 'homelab';
+export type CardType = 'training' | 'ages' | 'money' | 'homelab' | 'org';
 export type TrainingSource = 'coach' | 'garmin';
 export type CardCorner = 'tl' | 'tr' | 'bl' | 'br';
 export interface TrainingOptions { source: TrainingSource; garminUrl: string; coachUrl: string }
@@ -104,9 +104,17 @@ export interface HomelabSummary {
 /** GET /api/display/cards/<id>/detail de una tarjeta homelab */
 export type HomelabDetailResponse = { ok: true; at: number; data: HomelabWidget } | { ok: false };
 export type HomelabSilenceHasta = 'arreglo' | '1d' | '7d' | null;
+/** Organización (fork fsrhome; server/org.js) */
+export interface OrgOptions { everyMin: number }
+export type OrgEstado = 'calma' | 'aviso' | 'alerta' | 'mudo';
+export interface OrgPendiente { id: string; lider: string; emoji: string; severidad: 'info' | 'atencion' | 'alta'; en: string;
+  resumen: string | null; accion: string | null; estado: string }
+export interface OrgData { pendientes: OrgPendiente[]; altas24h: string[] }
+export interface OrgSummary { estado: OrgEstado; firma: string; accionables: number; pendientes: OrgPendiente[]; altas: number }
+export type OrgDetailResponse = { ok: true; at: number; data: OrgData } | { ok: false };
 export interface CardDef {
   id: string; type: CardType; name: string; enabled: boolean;
-  options: { training?: TrainingOptions; ages?: AgesOptions; money?: MoneyOptions; homelab?: HomelabOptions };
+  options: { training?: TrainingOptions; ages?: AgesOptions; money?: MoneyOptions; homelab?: HomelabOptions; org?: OrgOptions };
 }
 /** una foto de la lista del día: `months` = edad en meses de ese tramo, `year` = año del tramo */
 export interface AgesPhoto { id: string; v: string; months: number; year: string }

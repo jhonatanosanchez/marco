@@ -4,10 +4,10 @@
 export const CARD_PREFIX = 'k_';
 export const CARD_ID_RE = /^k_[a-z0-9]{1,40}$/;
 /** 'training': Entreno; 'ages': "A esta edad" a pantalla completa (server/ages.js); 'money': Dinero (server/money.js);
- *  'homelab': estado del homelab, sale solo si hay algo (server/homelab.js) */
-export const CARD_TYPES = ['training', 'ages', 'money', 'homelab'];
-/** tipos que un futuro modo visita esconde (spec 2026-10-14-marco-dinero §4.5) */
-export const SENSITIVE_CARD_TYPES = ['money'];
+ *  'homelab': estado del homelab, sale solo si hay algo (server/homelab.js); 'org': propuestas de la organización (server/org.js) */
+export const CARD_TYPES = ['training', 'ages', 'money', 'homelab', 'org'];
+/** tipos que un futuro modo visita esconde (spec 2026-10-14-marco-dinero §4.5; org: spec 2026-10-19-panel-organizacion §6) */
+export const SENSITIVE_CARD_TYPES = ['money', 'org'];
 
 /**
  * ¿Puede esta tarjeta ir a una pantalla ahora? Única decisión para displayCards, la ruta de tarjetas y "Mostrar
@@ -19,6 +19,8 @@ export function cardVisible(card, { privateMode = false } = {}) {
 }
 export const AGES_DEFAULTS = Object.freeze({ person: 'Arantza', birthDate: '2020-06-22', everyMin: 15 });
 /** Homelab: repetición mientras haya aviso y zonas de Frigate que cuentan para "Anoche" (spec 2026-10-14-marco-homelab) */
+/** Organización: repetición mientras haya propuestas pendientes (spec 2026-10-19-panel-organizacion §6) */
+export const ORG_DEFAULTS = Object.freeze({ everyMin: 30 });
 export const HOMELAB_DEFAULTS = Object.freeze({ everyMin: 10, zones: Object.freeze(['pipol', 'pipol2', 'Entrada', 'mi-patio']) });
 /** segundos que "A esta edad" se queda en pantalla */
 export const AGES_SHOW_SEC = 45;

@@ -17,9 +17,9 @@ test('validate: tarjeta money válida; nombre vacío → "Dinero"; opciones de m
   assert.deepEqual(r.value.cards.items[0], { id: 'k_dinero', type: 'money', name: 'Dinero', enabled: true, options: { money: {} } });
 });
 
-test('tipos: money es sensible; training y ages no', () => {
+test('tipos: money y org son sensibles; training y ages no', () => {
   assert.ok(CARD_TYPES.includes('money'));
-  assert.deepEqual(SENSITIVE_CARD_TYPES, ['money']);
+  assert.deepEqual(SENSITIVE_CARD_TYPES, ['money', 'org']);
 });
 
 test('cardVisible: en modo privado ninguna; fuera de él todas', () => {
