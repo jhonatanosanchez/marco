@@ -89,6 +89,8 @@ export function createApp({ version, dist = path.join(ROOT, 'dist'), updater = n
   app.use(['/api/family', '/api/display/family'], express.json({ limit: '4kb' }));
   // silencio de una alerta desde la hoja de Homelab (fork fsrhome): { clave, hasta }
   app.use('/api/display/cards/:id/silence', express.json({ limit: '2kb' }));
+  // aprobar una propuesta de la organización desde la hoja (fork fsrhome): { id }
+  app.use('/api/display/cards/:id/approve', express.json({ limit: '2kb' }));
   app.use(express.json({ limit: '1mb' }));
   app.use(['/api/admin', '/api/auth', '/api/setup'], csrfGuard({ multipartPaths: ['/photos', /^\/photos\/[^/]+\/thumb$/] }));
 

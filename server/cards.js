@@ -13,6 +13,8 @@ import { agesList } from './ages.js';
 import { loadMoney, moneyConfigured } from './money.js';
 import { homelabSummary, homelabMode } from './core/homelabCore.js';
 import { loadHomelab, loadNight, silenceHomelab } from './homelab.js';
+import { orgSummary } from './core/orgCore.js';
+import { loadOrg, approveOrg } from './org.js';
 
 export const CACHE_MS = 30 * 60_000;
 const TIMEOUT_MS = 8000;
@@ -98,7 +100,7 @@ export function cardsDisplayRouter() {
       const cfg = getConfig();
       const card = cardFor(cfg, req, req.params.id);
       res.set('cache-control', 'private, no-store');
-      if (!card || (kind === 'detail' && card.type !== 'training' && card.type !== 'homelab')) return res.status(404).json({ error: 'not found' });
+      if (!card || (kind === 'detail' && card.type !== 'training' && card.type !== 'homelab' && card.type !== 'org')) return res.status(404).json({ error: 'not found' });
       if (card.type === 'ages') return res.json(await agesList(card));
       if (card.type === 'homelab') {
         const now = Date.now();
@@ -108,6 +110,11 @@ export function cardsDisplayRouter() {
         // Frigate solo se consulta en la ventana de "Anoche"
         const night = homelabMode(now, tz) === 'anoche' ? await loadNight(card, cfg.frigate, now, tz) : null;
         return res.json(homelabSummary(h?.data ?? null, night, { now, tz }));
+      }
+      if (card.type === 'org') {
+        const o = await loadOrg(Date.now());
+        if (kind === 'detail') return res.json(o ? { ok: true, at: o.at, data: o.data } : { ok: false });
+        return res.json(orgSummary(o?.data ?? null));
       }
       if (card.type === 'money') {
         const now = Date.now();
@@ -140,6 +147,26 @@ export function cardsDisplayRouter() {
       if (!known) return res.status(400).json({ error: 'unknown clave' });
       const { screen } = requestScreen(cfg, req);
       const out = await silenceHomelab({ clave, hasta, por: `marco/${screen?.slug ?? screen?.id ?? '?'}` });
+      if (!out.ok) return res.status(out.status).json({ error: out.error });
+      res.json({ ok: true });
+    } catch (e) {
+      next(e);
+    }
+  });
+  // Aprobar desde el Echo (solo tarjetas org de esta pantalla). El id debe estar accionable en la última lectura;
+  // organizacion → asistente-wa pide el «sí» por WhatsApp antes de aplicar nada.
+  const ORG_ID = /^#[A-Z]\d{1,5}$/;
+  r.post('/display/cards/:id/approve', async (req, res, next) => {
+    try {
+      const cfg = getConfig();
+      const card = cardFor(cfg, req, req.params.id);
+      res.set('cache-control', 'private, no-store');
+      if (!card || card.type !== 'org') return res.status(404).json({ error: 'not found' });
+      const id = req.body?.id;
+      if (typeof id !== 'string' || !ORG_ID.test(id)) return res.status(400).json({ error: 'invalid id' });
+      const o = await loadOrg(Date.now());
+      if (!o?.data.pendientes.some((p) => p.id === id && p.estado === 'pendiente')) return res.status(400).json({ error: 'unknown id' });
+      const out = await approveOrg(id);
       if (!out.ok) return res.status(out.status).json({ error: out.error });
       res.json({ ok: true });
     } catch (e) {
