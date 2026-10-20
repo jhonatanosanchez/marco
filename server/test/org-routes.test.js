@@ -119,7 +119,7 @@ test('approve: reenvía el id; id no accionable 400; 4xx de arriba → 400 con t
     assert.equal((await call('POST', '/api/display/cards/k_org/approve', { key: k, body: { id: 'x' } })).status, 400);
     fake.state.approveStatus = 409;
     const r409 = await call('POST', '/api/display/cards/k_org/approve', { key: k, body: { id: '#C1' } });
-    assert.equal(r409.status, 400);
+    assert.equal(r409.status, 409);
     assert.equal(r409.json.error, 'ya está aplicando');
     fake.state.approveStatus = 500;
     assert.equal((await call('POST', '/api/display/cards/k_org/approve', { key: k, body: { id: '#C1' } })).status, 502);

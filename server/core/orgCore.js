@@ -13,7 +13,9 @@ export function pickOrg(raw) {
     .filter((p) => p && typeof p.id === 'string' && ID.test(p.id) && SEV.has(p.severidad))
     .slice(0, MAX)
     .map((p) => ({ id: p.id, lider: corto(p.lider, 20) ?? '', emoji: corto(p.emoji, 8) ?? '', severidad: p.severidad,
-      en: corto(p.en, 30) ?? '', resumen: corto(p.resumen, 140), accion: corto(p.accion, 140), estado: corto(p.estado, 20) ?? '' }));
+      // Arce habla de dinero: sus textos nunca llegan a la pantalla (organizacion ya los quita; esta es la segunda barrera)
+      en: corto(p.en, 30) ?? '', resumen: p.lider === 'arce' ? null : corto(p.resumen, 140), accion: p.lider === 'arce' ? null : corto(p.accion, 140),
+      estado: corto(p.estado, 20) ?? '' }));
   const altas24h = raw.altas24h.filter((x) => typeof x === 'string' && ID.test(x)).slice(0, MAX);
   return { pendientes, altas24h };
 }

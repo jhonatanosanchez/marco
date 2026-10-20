@@ -33,3 +33,9 @@ test('orgSummary: hasta 5 pendientes, accionables primero y alta antes', () => {
   assert.equal(s.pendientes.length, 5);
   assert.equal(s.pendientes[0].id, '#A4');
 });
+
+test('revisión final C: pickOrg nunca deja pasar textos de Arce (segunda barrera)', () => {
+  const d = pickOrg({ pendientes: [P({ lider: 'arce', resumen: 'Pagar $2,191', accion: 'Pagar CFE $2,191' })], altas24h: [] });
+  assert.equal(d.pendientes[0].resumen, null);
+  assert.equal(d.pendientes[0].accion, null);
+});

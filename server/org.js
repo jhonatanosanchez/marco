@@ -73,7 +73,8 @@ export async function approveOrg(id, env = process.env) {
     if (r.status >= 400 && r.status < 500) {
       const j = await r.json().catch(() => ({}));
       invalidateOrg();
-      return { ok: false, status: 400, error: typeof j.error === 'string' ? j.error.slice(0, 120) : 'rejected' };
+      // 409 (ya cambió u otra pregunta abierta en WhatsApp) se distingue en la hoja; lo demás, 400
+      return { ok: false, status: r.status === 409 ? 409 : 400, error: typeof j.error === 'string' ? j.error.slice(0, 120) : 'rejected' };
     }
     return { ok: false, status: 502, error: 'unavailable' };
   } catch {

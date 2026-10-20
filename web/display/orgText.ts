@@ -9,7 +9,7 @@ export interface OrgSheetUi { confirm: string | null; saving: boolean; sent: str
 const COLOR: Record<string, string> = { calma: 'var(--hl-ok)', aviso: 'var(--hl-warn)', alerta: 'var(--hl-bad)', alta: 'var(--hl-bad)', atencion: 'var(--hl-warn)', info: 'var(--hl-dim)' };
 const dot = (k: string): string => `<span class="hl-dot" style="background:${COLOR[k] ?? 'var(--hl-dim)'}"></span>`;
 const ESTADO_TXT: Record<string, string> = { aplicando: 'orgStateAplicando', fallo: 'orgStateFallo', por_confirmar: 'orgStatePorConfirmar', sin_cierre: 'orgStateSinCierre' };
-const texto = (p: OrgPendiente, t: T): string => (p.resumen === null ? t('orgArce') : p.resumen);
+const texto = (p: OrgPendiente, t: T): string => (p.lider === 'arce' ? t('orgArce') : p.resumen ?? p.accion ?? p.id);
 const head = (ref: DisplayCardRef, t: T): string =>
   `<div class="mcard-head"><span class="mcard-title"><span class="mcard-ico">🧭</span>${escHtml(ref.name || t('orgTitle'))}</span></div>`;
 
@@ -39,7 +39,11 @@ export function orgSheetHtml(r: OrgDetailResponse, ref: DisplayCardRef, ui: OrgS
   const top = `<div class="msheet-head"><div class="msheet-title">🧭 ${name}</div></div>`;
   if (!r.ok) return `${top}<div class="hl-empty">${dot('mudo')}${escHtml(t('orgNoData'))}</div>`;
   const filas = r.data.pendientes;
-  if (!filas.length) return `${top}<div class="hl-empty">${dot('calma')}${escHtml(t('orgNone'))}</div>`;
+  if (!filas.length) {
+    // sin propuestas pero con un informe de severidad alta reciente: la hoja dice lo mismo que la tarjeta
+    if (r.data.altas24h.length) return `${top}<div class="hl-empty">${dot('alerta')}${escHtml(t('orgHighOnly'))}</div>`;
+    return `${top}<div class="hl-empty">${dot('calma')}${escHtml(t('orgNone'))}</div>`;
+  }
   const error = ui.error ? `<div class="org-note is-bad">${escHtml(t('orgFailed', { msg: ui.error }))}</div>` : '';
   return `${top}<div class="hl-scroll">${error}<ul class="hl-alerts">${filas.map((p) => filaHtml(p, ui, t)).join('')}</ul></div>`;
 }

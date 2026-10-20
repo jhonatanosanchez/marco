@@ -78,7 +78,8 @@ export class OrgSheet implements SheetLike {
       if (!r.ok) error = r.error ?? 'rechazada';
     } catch (e) {
       // ApiError no trae el cuerpo: 400 = ya no estaba pendiente o la rechazaron arriba (409); lo demás, sin conexión
-      error = (e as { status?: number }).status === 400 ? 'ya no está pendiente' : 'sin conexión';
+      const st = (e as { status?: number }).status;
+      error = st === 409 ? 'ya cambió o hay otra pregunta abierta en WhatsApp' : st === 400 ? 'ya no está pendiente' : 'sin conexión';
     }
     if (gen !== this.gen) return; // se cerró mientras guardaba
     const data = await this.fetchDetail(ref);

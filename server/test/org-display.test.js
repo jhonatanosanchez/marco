@@ -38,3 +38,16 @@ test('hoja: Aprobar solo en pendientes; confirmación en línea; enviada; guarda
   assert.doesNotMatch(ot.orgSheetHtml(r, REF, UI({ error: EVIL }), t, 0), /<img/);
   assert.match(ot.orgSheetHtml({ ok: false }, REF, UI(), t, 0), /Sin datos de la organización/);
 });
+
+test('revisión final C: «Propuesta de Arce» solo para Arce; otro líder sin resumen muestra su acción', () => {
+  const s = SUM({ pendientes: [P({ lider: 'atalaya', emoji: '🛰️', resumen: null, accion: 'Crear monitor' })] });
+  const h = ot.orgCardHtml(s, REF, t);
+  assert.doesNotMatch(h, /Propuesta de Arce/);
+  assert.match(h, /Crear monitor/);
+});
+
+test('revisión final C: hoja solo con altas de 24 h no dice "Sin pendientes"', () => {
+  const h = ot.orgSheetHtml({ ok: true, at: 0, data: { pendientes: [], altas24h: ['#A9'] } }, REF, UI(), t, 0);
+  assert.doesNotMatch(h, /Sin pendientes/);
+  assert.match(h, /severidad alta/);
+});

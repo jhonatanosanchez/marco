@@ -76,7 +76,7 @@ export const api = {
   orgApprove: (cardId: string, id: string) =>
     request<{ ok: boolean; error?: string }>(withScreen(`/api/display/cards/${encodeURIComponent(cardId)}/approve`), {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }),
-    }, 8000),
+    }, 12_000), // el servidor puede tardar hasta 10 s (relectura + reenvío): no rendirse antes
   health: () => getJSON<HealthResponse>('/api/health', 5000),
   /** `q` from stream.ts pollUrl (client, cursor, rev, hidden, preview). Asks for what the display is bound to. */
   poll: (q: string) => getJSON<PollResponse>(withTarget(`/api/display/poll?${q}`), 10000),
