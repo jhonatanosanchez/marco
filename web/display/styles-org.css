@@ -1,0 +1,5 @@
+/* Tarjeta Organización (fork fsrhome): reutiliza las clases de Homelab (hl-*) y agrega lo propio. */
+.msheet.morg { grid-template-rows: auto 1fr; }
+.org-note { margin-top: 1vmin; font-size: 2vmin; color: var(--hl-warn); }
+.org-note.is-bad { color: var(--hl-bad); }
+.hl-opts .org-aprobar, .hl-opts .org-si { background: #2ec4b6; color: #06201d; font-weight: 600; }

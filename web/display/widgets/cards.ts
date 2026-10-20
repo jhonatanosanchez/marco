@@ -3,7 +3,7 @@
 import '../styles-cards.css';
 import '../styles-money.css';
 import '../styles-homelab.css';
-import type { DisplayCardRef, DisplayCards, HomelabSummary, MoneyResponse, TrainingSummary } from '../../shared/types';
+import type { DisplayCardRef, DisplayCards, HomelabSummary, MoneyResponse, OrgSummary, TrainingSummary } from '../../shared/types';
 import { getJSON } from '../api';
 import { ctx } from '../ctx';
 import { isPreview, withScreen } from '../identity';
@@ -11,7 +11,8 @@ import { cardsSig, trainingCardHtml } from '../cardsText';
 import { moneyCardHtml } from '../moneyText';
 import { CardRotation, CardStage } from '../cardsRotation';
 import { homelabCardHtml } from '../homelabText';
-import { HomelabWatcher } from '../homelabWatch';
+import { CardWatcher, HomelabWatcher, orgDecide } from '../homelabWatch';
+import { orgCardHtml } from '../orgText';
 import type { AgesViewLike } from './agesView';
 
 const NONE: DisplayCards = { items: [], everyMin: 20, showSec: 30, corner: 'br' };
@@ -27,7 +28,7 @@ export class CardsController {
   /** "A esta edad" y futuras de pantalla completa: una rotación propia por tarjeta */
   private full = new Map<string, CardRotation<DisplayCardRef>>();
   /** Homelab: un vigilante por tarjeta (sale solo si hay algo; homelabWatch.ts) */
-  private watchers = new Map<string, HomelabWatcher>();
+  private watchers = new Map<string, { stop(): void; start(): void; showNow(): Promise<void> }>();
   private stage = new CardStage();
   private smallToken = 0;
 
@@ -40,7 +41,7 @@ export class CardsController {
   update(c: DisplayCards | undefined): void {
     const o = this.o;
     this.c = c && Array.isArray(c.items) ? c : NONE;
-    const small = this.c.items.filter((i) => i.type !== 'ages' && i.type !== 'homelab');
+    const small = this.c.items.filter((i) => i.type !== 'ages' && i.type !== 'homelab' && i.type !== 'org');
     const sig = cardsSig(this.c);
     if (sig === this.sig) return this.rot.refresh(small);
     this.sig = sig;
@@ -70,6 +71,17 @@ export class CardsController {
         // nada de red en pausa (horario, modo Echo cerrado), en la vista previa del admin ni con la pestaña oculta
         canPoll: () => !isPreview && !o.paused() && !document.hidden,
         show: (s) => this.showHomelab(ref, s),
+      });
+      w.start();
+      this.watchers.set(ref.id, w);
+    }
+    // Organización: igual que Homelab, con su decisor (sale si hay propuestas pendientes)
+    for (const ref of this.c.items.filter((i) => i.type === 'org')) {
+      const w = new CardWatcher<OrgSummary>({
+        everyMin: ref.everyMin ?? 30, decide: orgDecide,
+        fetch: () => getJSON<OrgSummary>(withScreen(`/api/display/cards/${encodeURIComponent(ref.id)}`), 10_000),
+        canPoll: () => !isPreview && !o.paused() && !document.hidden,
+        show: (s) => this.showOrg(ref, s),
       });
       w.start();
       this.watchers.set(ref.id, w);
@@ -113,6 +125,14 @@ export class CardsController {
     const tk = this.stage.begin();
     if (!tk) return false;
     this.drawSmall(ref, homelabCardHtml(s, ref, ctx.t, Date.now(), ctx.tz), tk);
+    return true;
+  }
+
+  private showOrg(ref: DisplayCardRef, s: OrgSummary): boolean {
+    if (this.o.paused() || this.o.sheet.isOpen) return false;
+    const tk = this.stage.begin();
+    if (!tk) return false;
+    this.drawSmall(ref, orgCardHtml(s, ref, ctx.t), tk);
     return true;
   }
 
