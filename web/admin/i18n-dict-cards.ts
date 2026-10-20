@@ -37,6 +37,8 @@ export const ROWS_CARDS: [string, string, string][] = [
   ['El estado del servidor. Sale solo cuando hay algo: aviso, alerta o sin datos. De 5 a 8 a.m. resume la noche.', 'The server’s status. Only shows up when there is something: a warning, an alert or no data. From 5 to 8 a.m. it sums up the night.', 'O estado do servidor. Só aparece quando há algo: aviso, alerta ou sem dados. Das 5 às 8 h resume a noite.'],
   ['Repetir cada (min)', 'Repeat every (min)', 'Repetir a cada (min)'],
   ['Zonas de cámaras para "Anoche"', 'Camera zones for "Last night"', 'Zonas das câmaras para "Esta noite"'],
+  ['Organización', 'Organization', 'Organização'],
+  ['Propuestas de Rocky y sus líderes. Sale solo si hay pendientes; aprobar pide un «sí» por WhatsApp. No sale en modo privado.', 'Proposals from Rocky and his leads. Only shows up when something is pending; approving asks for a “yes” on WhatsApp. Hidden in privacy mode.', 'Propostas do Rocky e seus líderes. Só aparece quando há pendentes; aprovar pede um «sim» no WhatsApp. Não aparece no modo privado.'],
   ['Nombres de zonas de Frigate separados por comas.', 'Frigate zone names, separated by commas.', 'Nomes das zonas do Frigate separados por vírgulas.'],
 ];
 
@@ -79,6 +81,8 @@ export const NL_CARDS: Record<string, string> = {
   'Repetir cada (min)': 'Herhalen elke (min)',
   'Zonas de cámaras para "Anoche"': 'Camerazones voor "Vannacht"',
   'Nombres de zonas de Frigate separados por comas.': 'Namen van Frigate-zones, gescheiden door komma’s.',
+  'Organización': 'Organisatie',
+  'Propuestas de Rocky y sus líderes. Sale solo si hay pendientes; aprobar pide un «sí» por WhatsApp. No sale en modo privado.': 'Voorstellen van Rocky en zijn leiders. Verschijnt alleen als er iets openstaat; goedkeuren vraagt om een „ja” in WhatsApp. Verborgen in privémodus.',
 };
 
 export const DA_CARDS: Record<string, string> = {
@@ -120,4 +124,6 @@ export const DA_CARDS: Record<string, string> = {
   'Repetir cada (min)': 'Gentag hver (min)',
   'Zonas de cámaras para "Anoche"': 'Kamerazoner til "I nat"',
   'Nombres de zonas de Frigate separados por comas.': 'Navne på Frigate-zoner, adskilt af kommaer.',
+  'Organización': 'Organisation',
+  'Propuestas de Rocky y sus líderes. Sale solo si hay pendientes; aprobar pide un «sí» por WhatsApp. No sale en modo privado.': 'Forslag fra Rocky og hans ledere. Vises kun når noget afventer; godkendelse beder om et „ja” i WhatsApp. Skjult i privat tilstand.',
 };

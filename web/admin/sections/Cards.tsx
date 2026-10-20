@@ -23,6 +23,7 @@ const newAges = (albumId: string): CardDef => ({
 });
 
 const newMoney = (): CardDef => ({ id: uid('k'), type: 'money', name: 'Dinero', enabled: true, options: { money: {} } });
+const newOrg = (): CardDef => ({ id: uid('k'), type: 'org', name: 'Organización', enabled: true, options: { org: { everyMin: 30 } } });
 const newHomelab = (): CardDef => ({
   id: uid('k'), type: 'homelab', name: 'Homelab', enabled: true,
   options: { homelab: { everyMin: 10, zones: ['pipol', 'pipol2', 'Entrada', 'mi-patio'] } },
@@ -73,9 +74,28 @@ export function CardsSection({ cfg, set, setFull, full, errors }: SectionProps) 
           <Button onClick={() => set((d) => void (d.cards = { items: [...(d.cards?.items ?? []), newAges(firstAlbum)] }))}>{t('A esta edad')}</Button>
           <Button onClick={() => set((d) => void (d.cards = { items: [...(d.cards?.items ?? []), newMoney()] }))}>{t('Dinero')}</Button>
           <Button onClick={() => set((d) => void (d.cards = { items: [...(d.cards?.items ?? []), newHomelab()] }))}>{t('Homelab')}</Button>
+          <Button onClick={() => set((d) => void (d.cards = { items: [...(d.cards?.items ?? []), newOrg()] }))}>{t('Organización')}</Button>
         </div>
       </Card>
       {items.map((k, i) => {
+        if (k.type === 'org') {
+          const og = k.options.org!;
+          return (
+            <Card key={k.id} id={`card-${k.id}`} title={k.name || t('Organización')} icon="tag" desc={t('Propuestas de Rocky y sus líderes. Sale solo si hay pendientes; aprobar pide un «sí» por WhatsApp. No sale en modo privado.')}>
+              <ToggleRow label={t('Tarjeta activa')} checked={k.enabled} onChange={(v) => upd(i, (x) => void (x.enabled = v))} />
+              <Field label={t('Nombre de la tarjeta')} error={errors[`cards.items[${i}].name`]}>
+                <TextInput value={k.name} maxLength={60} onValue={(v) => upd(i, (x) => void (x.name = v))} />
+              </Field>
+              <Field label={t('Repetir cada (min)')} error={errors[`cards.items[${i}].options.org.everyMin`]}>
+                <Segmented value={String(og.everyMin)} options={[15, 30, 60, 120].map((n) => ({ value: String(n), label: String(n) }))} onChange={(v) => upd(i, (x) => { if (x.options.org) x.options.org.everyMin = Number(v); })} />
+              </Field>
+              <div class="row-actions">
+                <Button onClick={() => show(k.id)} loading={busy === k.id} disabled={!k.enabled}>{t('Mostrar ahora')}</Button>
+                <Button variant="danger" onClick={() => setFull((d) => pruneCard(d, k.id))}>{t('Borrar tarjeta')}</Button>
+              </div>
+            </Card>
+          );
+        }
         if (k.type === 'homelab') {
           const hl = k.options.homelab!;
           return (

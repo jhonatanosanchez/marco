@@ -23,3 +23,9 @@ test('org: a la pantalla solo id, tipo, nombre y everyMin; es sensible', () => {
   assert.ok(SENSITIVE_CARD_TYPES.includes('org'));
   assert.equal(cardVisible({ type: 'org' }, { privateMode: true }), false);
 });
+
+test('admin: el botón Organización crea una tarjeta org válida con los valores por defecto', async () => {
+  const src = (await import('node:fs')).readFileSync(new URL('../../web/admin/sections/Cards.tsx', import.meta.url), 'utf8');
+  assert.match(src, /type: 'org', name: 'Organización', enabled: true, options: \{ org: \{ everyMin: 30 \} \}/);
+  assert.match(src, /newOrg\(\)/);
+});
