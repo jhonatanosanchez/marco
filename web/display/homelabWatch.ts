@@ -2,7 +2,7 @@
 // Sale solo si hay algo (aviso, alerta o gris): de inmediato cuando la firma es nueva y luego cada `everyMin`; "Anoche"
 // sin alertas activas cada 3 × everyMin. En calma no sale y olvida, así el siguiente aviso sale ya.
 // Spec: homelab-docs/specs/2026-10-14-marco-homelab-design.md §4.3
-import type { HomelabSummary } from '../shared/types';
+import type { HomelabSummary, OrgSummary } from '../shared/types';
 
 export const WATCH_MS = 60_000;
 export const WATCH_FIRST_MS = 20_000;
@@ -17,25 +17,37 @@ export function homelabDecide(m: WatchMemo, s: HomelabSummary, now: number, ever
   return { show: now - m.shownAt >= factor * everyMin * 60_000, memo: m };
 }
 
-export const markShown = (s: HomelabSummary, now: number): WatchMemo => ({ firma: s.firma, shownAt: now });
+export const markShown = (s: WatchSummary, now: number): WatchMemo => ({ firma: s.firma, shownAt: now });
 
-export interface WatchDeps {
+/** Organización: como Homelab, pero "solo altas sin propuestas accionables" se repite cada 3 × everyMin. */
+export function orgDecide(m: WatchMemo, s: OrgSummary, now: number, everyMin: number): { show: boolean; memo: WatchMemo } {
+  if (s.estado === 'calma') return { show: false, memo: EMPTY_MEMO };
+  if (s.firma !== m.firma) return { show: true, memo: m };
+  const factor = s.accionables === 0 ? 3 : 1;
+  return { show: now - m.shownAt >= factor * everyMin * 60_000, memo: m };
+}
+
+export interface WatchSummary { estado: string; firma: string }
+type Decide<S> = (m: WatchMemo, s: S, now: number, everyMin: number) => { show: boolean; memo: WatchMemo };
+
+export interface WatchDeps<S extends WatchSummary = HomelabSummary> {
   everyMin: number;
-  fetch: () => Promise<HomelabSummary>;
+  fetch: () => Promise<S>;
   /** false en pausa (horario, modo Echo cerrado), vista previa del admin o pestaña oculta */
   canPoll: () => boolean;
   /** dibuja la tarjeta; false si no pudo (otra tarjeta, la hoja, pausa) */
-  show: (s: HomelabSummary) => boolean;
+  show: (s: S) => boolean;
   now?: () => number;
 }
 
-export class HomelabWatcher {
+/** Vigilante de una tarjeta que sale sola (Homelab, Organización): `decide` dice cuándo. */
+export class CardWatcher<S extends WatchSummary> {
   private memo: WatchMemo = EMPTY_MEMO;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private alive = false;
   private busy = false;
 
-  constructor(private d: WatchDeps) {}
+  constructor(private d: WatchDeps<S> & { decide: Decide<S> }) {}
 
   private now(): number {
     return this.d.now ? this.d.now() : Date.now();
@@ -65,7 +77,7 @@ export class HomelabWatcher {
     try {
       const s = await this.d.fetch();
       const now = this.now();
-      const r = homelabDecide(this.memo, s, now, this.d.everyMin);
+      const r = this.d.decide(this.memo, s, now, this.d.everyMin);
       this.memo = r.memo;
       // si no pudo salir (otra tarjeta en turno), no se marca: la siguiente consulta lo reintenta
       if (r.show && this.d.show(s)) this.memo = markShown(s, now);
@@ -85,4 +97,9 @@ export class HomelabWatcher {
       // sin datos no hay qué mostrar
     }
   }
+}
+
+/** Homelab: el vigilante de siempre (cards.ts lo crea sin `decide`). */
+export class HomelabWatcher extends CardWatcher<HomelabSummary> {
+  constructor(d: WatchDeps<HomelabSummary>) { super({ ...d, decide: homelabDecide }); }
 }
